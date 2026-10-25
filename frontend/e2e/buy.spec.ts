@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { connect, goTo, openApp, openBuyDialogForSeed } from './helpers.ts'
+import { connect, expectOpenOffers, goTo, openApp, openBuyDialogForSeed, toast } from './helpers.ts'
 
 test('buy, then exercise', async ({ page }) => {
   await openApp(page)
@@ -15,17 +15,20 @@ test('buy, then exercise', async ({ page }) => {
   // Escape cancels without buying.
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
-  await expect(page.getByRole('button', { name: /^Market \(4\)/ })).toBeVisible()
+  await expectOpenOffers(page, 4)
 
   await openBuyDialogForSeed(page)
   await page.getByRole('button', { name: 'Confirm purchase and sign transaction' }).click()
-  await expect(page.locator('.banner.ok')).toContainText('Purchase confirmed')
-  await expect(page.getByRole('button', { name: /^Market \(3\)/ })).toBeVisible()
+  await expect(toast(page)).toContainText('Purchase confirmed')
+  await expect(toast(page)).toContainText('(mock)')
+  await expectOpenOffers(page, 3)
 
-  await goTo(page, 'My positions')
+  // The new position shows as a waiting action on the Portfolio link.
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Portfolio 1' })).toBeVisible()
+  await goTo(page, 'Portfolio')
   const row = page.getByRole('row').filter({ hasText: 'GMAK…BBBB' })
   await expect(row.locator('.state')).toHaveText('active')
   await row.getByRole('button', { name: 'Exercise' }).click()
-  await expect(page.locator('.banner.ok')).toContainText('Exercise confirmed')
+  await expect(toast(page)).toContainText('Exercise confirmed')
   await expect(row.locator('.state')).toHaveText('exercised')
 })
