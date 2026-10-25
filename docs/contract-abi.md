@@ -80,8 +80,9 @@ pub enum Error {
 
 Codes start at 101 so they can never be confused with Stellar Asset Contract errors (SAC #1–#13, e.g. #10 insufficient
 balance, #11 balance deauthorized, #13 trustline missing), which surface to clients through this contract unchanged.
-**v1 (deployed 2026-10-25 19:0x, `CDRS3BBF…L673`) used codes 1–13 with the same names and order; v1.1 renumbers once,
-before any production use, and adds 114/115.** Error codes are public ABI: never renumber. New codes append at the end.
+**v1 (deployed 2026-10-25 19:06 UTC, `CDRS3BBF…L673`) used codes 1–13 with the same names and order; v1.1
+(deployed 2026-10-25 19:38 UTC, `CBRTUM4NF5P5ENYSPPOTT3NMRCPT65QSKMD2BB3AJPLU2C4YCFOCMSQC`) renumbered once,
+before any production use, and added 114/115.** Error codes are public ABI: never renumber. New codes append at the end.
 
 Derived values (clients compute, contract does not store):
 
@@ -311,7 +312,7 @@ stellar contract bindings typescript --network testnet --id options --output-dir
 ```
 
 Generated TypeScript types: `i128`/`u64` → `bigint`, `u32` → `number`, `Address` → `string`,
-`Option<Address>` → `Option<string>` (`string | undefined`), unit enums → `{ tag: "Put" | "Call", values: void }`
+`Option<Address>` → `Option<string>` in the bindings' types, but the SDK's spec decoder returns **`null`** for `None` at runtime (verified with stellar-sdk 17.3), so treat it as `string | null | undefined`; unit enums → `{ tag: "Put" | "Call", values: void }`
 and `{ tag: State-name, values: void }`, `Result` → `Ok | Err` wrappers with the `Error` codes above.
 Auth: every mutating call is signed by its first `Address` argument; SAC sub-invocations are added to the auth
 tree by simulation (Freighter signs them with the transaction).
@@ -320,7 +321,7 @@ Demo asset plan (fictional, Testnet only): `USDx` (quote, unflagged issuer), `RW
 one regulated issuer with `AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED`). The deployed IDs live only
 in the **Deployed contracts** table of `AGENTS.md`.
 
-## 10. v1 → v1.1 hardening (decided 2026-10-25 19:40 by Dev 2 after the P0 audit; one redeploy)
+## 10. v1 → v1.1 hardening (decided 2026-10-25 19:40 by Dev 2 after the P0 audit; deployed 19:38 UTC as `CBRTUM4NF5P5ENYSPPOTT3NMRCPT65QSKMD2BB3AJPLU2C4YCFOCMSQC`)
 
 The deployed v1 (`CDRS3BBFHUTB66OBP6Z3744QM7C7XDXLV5ZJ5URSFTAQMBJQCMZTL673`, codes 1–13) passed the P0/P0+ testnet
 smoke run and the 53-test suite. v1.1 changes, all reflected in §2, §3, §6 and §8 above:
@@ -338,5 +339,6 @@ smoke run and the 53-test suite. v1.1 changes, all reflected in §2, §3, §6 an
    open_collateral(token)` for the option's quote or underlying token. Existing positions are unaffected (a full
    fail-closed guard on every payout remains a product decision for Dev 1, §6).
 
-Not changed: function names, argument order, types, events, lifecycle. Frontend action: update the error-code map and
-the contract id after the v1.1 deploy; everything else is unchanged.
+Not changed: function names, argument order, types, events, lifecycle (verified by diffing `stellar contract info
+interface` of both wasms: only the Error enum differs). Frontend action: switch the contract id to the v1.1 id above and
+key the error map by name (codes 101–115); everything else is unchanged. The v1 contract remains on testnet.
