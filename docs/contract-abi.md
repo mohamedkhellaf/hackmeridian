@@ -311,7 +311,7 @@ stellar contract bindings typescript --network testnet --id options --output-dir
 ```
 
 Generated TypeScript types: `i128`/`u64` → `bigint`, `u32` → `number`, `Address` → `string`,
-`Option<Address>` → `Option<string>` (`string | undefined`), unit enums → `{ tag: "Put" | "Call", values: void }`
+`Option<Address>` → `Option<string>` in the bindings' types, but the SDK's spec decoder returns **`null`** for `None` at runtime (verified with stellar-sdk 17.3), so treat it as `string | null | undefined`; unit enums → `{ tag: "Put" | "Call", values: void }`
 and `{ tag: State-name, values: void }`, `Result` → `Ok | Err` wrappers with the `Error` codes above.
 Auth: every mutating call is signed by its first `Address` argument; SAC sub-invocations are added to the auth
 tree by simulation (Freighter signs them with the transaction).
