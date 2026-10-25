@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11.** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11; v1.3 (permissionless listing, per-writer cap, prune_expired, tenor cap, backstop) decided 22:10, see §12.** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -75,6 +75,10 @@ pub enum Error {
     InvalidConfig = 113,          // constructor: empty/duplicate/too many underlyings, or quote in underlyings
     OpenListFull = 114,           // create_offer: MAX_OPEN (1000) offers are already in state Offered
     CollateralShortfall = 115,    // create_offer/buy: SAC balance(contract) < open_collateral(token) for a token of this option
+    WriterOpenLimit = 116,        // v1.3 create_offer: this writer already has MAX_OPEN_PER_WRITER (50) offers in state Offered
+    AlreadyListed = 117,          // v1.3 list_asset: the derived SAC is already listed (or is the quote token)
+    AssetNotDeployed = 118,       // v1.3 list_asset: the canonical SAC for (code, issuer) is not deployed on this network
+    TenorOutOfRange = 119,        // v1.3 create_offer: expiry > now + MAX_TENOR (2 years)
 }
 ```
 
@@ -117,6 +121,13 @@ pub fn extend_ttl(env: Env, ids: Vec<u32>) -> Result<(), Error>;
 // v1.2 additions (see §11)
 pub fn transfer(env: Env, holder: Address, to: Address, id: u32) -> Result<(), Error>;
 pub fn get_options(env: Env, from: u32, limit: u32) -> Vec<OptionData>;
+// v1.3 additions (see §12)
+pub fn list_asset(env: Env, lister: Address, code: String, issuer: Address) -> Result<Address, Error>;
+pub fn is_listed(env: Env, token: Address) -> bool;
+pub fn list_assets(env: Env, from: u32, limit: u32) -> Vec<Address>;
+pub fn asset_count(env: Env) -> u32;
+pub fn prune_expired(env: Env, ids: Vec<u32>) -> Result<u32, Error>;
+pub fn writer_open_count(env: Env, writer: Address) -> u32;
 ```
 
 Check order inside every state-changing function is fixed: **auth → NotFound → ownership (NotWriter/NotHolder)
@@ -130,12 +141,18 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
 
 ### `create_offer(writer, underlying, option_type, qty, strike_total, premium_total, expiry) -> id`
 - `writer.require_auth()`.
-- `AssetNotAllowed` unless `underlying` is in the allowlist.
+- `InvalidArgs` if `writer == current_contract_address()` (v1.3 backstop; the same check applies to `buyer` in `buy`,
+  `holder` in `exercise`/`transfer` and `to` in `transfer`).
+- `AssetNotAllowed` unless `is_listed(underlying)` (v1.3: the registry seeded by the constructor and extended by `list_asset`;
+  before v1.3 this was the constructor vector).
 - `InvalidArgs` unless `qty > 0 && strike_total > 0 && premium_total > 0 && expiry > now`.
 - `NotEligible` unless `is_eligible(underlying, writer)` **and** `is_eligible(quote, writer)` (a writer with no quote
   trustline could neither receive the premium nor claim CALL proceeds); `ContractNotAuthorized` unless
   `is_eligible(underlying, contract)` (an unauthorized contract could not receive the PUT delivery later).
+- `TenorOutOfRange` if `expiry > now + MAX_TENOR` (v1.3; `MAX_TENOR = 63_072_000` seconds, 2 years). Checked right after
+  `InvalidArgs`.
 - `OpenListFull` if `list_open()` already holds `MAX_OPEN = 1000` ids.
+- `WriterOpenLimit` if `writer_open_count(writer) >= MAX_OPEN_PER_WRITER = 50` (v1.3; checked right after `OpenListFull`).
 - `CollateralShortfall` if, for the option's quote or underlying token, `balance(contract) < open_collateral(token)`
   (an earlier issuer clawback left a pooled deficit; no new exposure is accepted on that token, see §6).
 - Pulls collateral from the writer: PUT `quote.transfer(writer, contract, strike_total)`;
@@ -196,7 +213,35 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
   **No tokens move**: any payment for the position is settled outside this call (a separate quote-token payment, or a
   future on-chain position market). Emits `OptionTransferred`. The previous holder can no longer exercise.
 
+### `list_asset(lister, code, issuer)` (v1.3)
+Permissionless listing of a classic Stellar asset as an underlying. No admin anywhere.
+- `lister.require_auth()` (accountability only; anyone may list).
+- `InvalidArgs` unless `code` is 1–12 characters of `[A-Za-z0-9]` and `issuer` is an account (`G…`) address.
+- Derives the **canonical SAC address** of the classic asset `(code, issuer)` with the SDK deployer
+  (`env.deployer().with_stellar_asset(asset_xdr).deployed_address()`), so only a genuine Stellar asset can ever be listed;
+  a custom or malicious token contract cannot be, because the address is computed, not supplied.
+- `AssetNotDeployed` unless that SAC is deployed (probe with `token::Client::try_decimals`); anyone can deploy a SAC with
+  `stellar contract asset deploy`, so this is a one-time prerequisite, not a permission.
+- `AlreadyListed` if the SAC is already in the registry, or if it is the quote token.
+- Stores `Key::Listed(sac) = true`, appends `Key::AssetAt(asset_count) = sac`, increments `asset_count`. Emits `AssetListed`.
+  Returns the SAC address. Listing does **not** authorize anything: a regulated asset's issuer must still authorize the
+  escrow contract (`ContractNotAuthorized` otherwise) and each counterparty (`NotEligible`).
+- The quote token stays the constructor's `USDx`; per-offer quote tokens are not in v1.3.
+
+### `prune_expired(ids)` (v1.3)
+Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from it.
+- No auth. For each id in order: `NotFound` if unknown; otherwise skipped (not an error) unless state is `Offered` and
+  `now >= expiry`. For each eligible id: returns the collateral to the **writer** with `try_transfer`; if that transfer
+  fails (writer frozen on a CALL's underlying) the id is skipped and nothing about it changes; otherwise reserved total −=
+  collateral, `list_open` −= id, `writer_open_count(writer) −= 1`, `state = Expired`, event `OfferPruned { id, pruner }`.
+- Returns the number of options pruned. Live offers (`now < expiry`) are never touched; only the writer can `cancel_offer`.
+
 ### Views
+- `is_listed(token)` (v1.3): `true` iff `token` is in the registry (constructor underlyings plus `list_asset`).
+- `list_assets(from, limit)` (v1.3): registry addresses in listing order, same paging rule as `get_options`
+  (`MAX_PAGE = 50`). `asset_count()`: number of listed assets. Clients should build their asset list from this, not
+  from `config().underlyings`, which stays the constructor-time list for compatibility.
+- `writer_open_count(writer)` (v1.3): number of this writer's options currently in state `Offered`.
 - `get_options(from, limit)` (v1.2): the stored `OptionData` for ids `from, from+1, …` in id order, stopping at
   `option_count()` and after at most `min(limit, MAX_PAGE = 50)` entries. Returns an empty `Vec` when
   `from >= option_count()` or `limit == 0`. Never fails. Clients page with `from += returned.len()`.
@@ -225,7 +270,7 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
                      create_offer (writer locks collateral)
                                   │
                                   ▼
-            cancel_offer ◄──── Offered ────► reclaim (now >= expiry)
+            cancel_offer ◄──── Offered ────► reclaim (now >= expiry) / prune_expired by anyone (v1.3)
              (Cancelled)          │                (Expired)
                                   │ buy (premium buyer → writer, PROVISIONAL)
                                   ▼
@@ -255,6 +300,8 @@ pub struct OfferCancelled { #[topic] pub id: u32 }
 pub struct OptionReclaimed{ #[topic] pub id: u32 }
 pub struct DeliveryClaimed{ #[topic] pub id: u32 }
 pub struct OptionTransferred { #[topic] pub id: u32, pub from: Address, pub to: Address }   // v1.2
+pub struct AssetListed      { #[topic] pub sac: Address, pub code: String, pub issuer: Address, pub lister: Address }  // v1.3
+pub struct OfferPruned      { #[topic] pub id: u32, pub pruner: Address }   // v1.3
 ```
 
 ## 6. Eligibility and issuer actions (what the contract does and does not promise)
@@ -282,12 +329,10 @@ pub struct OptionTransferred { #[topic] pub id: u32, pub from: Address, pub to: 
   for that asset: PUT `exercise` and PUT `claim_delivery`, CALL `exercise` and CALL `reclaim` all fail until the
   issuer re-authorizes the contract. Writers can still `reclaim` PUT collateral (quote token) after expiry.
 - The contract never claims to override issuer control. README and UI disclose this.
-- **Open-list capacity is global.** `MAX_OPEN = 1000` bounds the instance entry but not any one writer: an
-  issuer-authorized writer can list 1000 dust offers (1 unit each, far expiry) and every other maker then gets
-  `OpenListFull` until that writer cancels, or until other accounts buy the dust offers (1 unit of premium each)
-  after the issuer de-authorizes the writer, which blocks re-listing (de-authorization alone frees no slot). Only
-  issuer-authorized accounts can write, so this is an availability limitation of the demo deployment, not a
-  fund-safety issue. Planned v1.3: per-writer cap, anyone-may-prune expired `Offered` ids, tenor bounds.
+- **Open-list capacity.** `MAX_OPEN = 1000` bounds the instance entry; since v1.3 each writer is also capped at
+  `MAX_OPEN_PER_WRITER = 50` open offers, offers cannot expire more than `MAX_TENOR` (2 years) out, and anyone can
+  `prune_expired` unsold expired offers (collateral always returns to the writer). Before v1.3 one issuer-authorized
+  writer could fill the book with dust offers (finding F-1); this is the fix.
 
 ## 7. PROVISIONAL decisions and blocker questions for Dev 1 (`PRODUCT_SPEC.md` absent at lock time)
 
@@ -312,14 +357,21 @@ enum Key {
     Open,               // instance: Vec<u32> (ids in state Offered)
     Reserved(Address),  // instance: i128 per token (see open_collateral)
     Opt(u32),           // persistent: OptionData
+    Listed(Address),    // persistent: bool, v1.3 asset registry membership (seeded by the constructor)
+    AssetAt(u32),       // persistent: Address, v1.3 registry index for paging
+    AssetCount,         // instance: u32, v1.3
+    WriterOpen(Address),// persistent: u32, v1.3 count of this writer's Offered options
 }
 const MAX_OPEN: u32 = 1000;        // cap on ids in Key::Open (instance storage is one 64 KB entry)
 const MAX_PAGE: u32 = 50;          // get_options page cap (v1.2)
+const MAX_OPEN_PER_WRITER: u32 = 50;   // v1.3
+const MAX_TENOR: u64 = 63_072_000;     // v1.3, 2 years in seconds
 const DAY_LEDGERS: u32 = 17_280;
 const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
 ```
 
+Registry and per-writer entries are persistent and get their TTL extended whenever they are read on a state-changing path (v1.3).
 Every state-changing function extends the contract instance **and code** TTL (`instance().extend_ttl` does both
 in soroban-sdk 28) and the touched option's persistent TTL with `(TTL_THRESHOLD, TTL_EXTEND_TO)`. `extend_ttl(ids)`
 does the same for the instance/code and for every listed option, so a keeper can keep idle options alive.
@@ -392,3 +444,22 @@ Additive only: two functions, one event, one constant. No error code, type or ex
 
 Not in v1.2, deliberately: position token (second token system, untestable before freeze), impairment/refund logic
 (economics unspecified, AGENTS.md precondition), partial exercise, multi-leg.
+
+## 12. v1.3: open-book hardening and permissionless asset listing (decided 2026-10-25 22:10 by Dev 2; one redeploy)
+
+Additive: six functions, two events, four error codes (116–119), one lifecycle edge, four storage keys. No existing
+signature, type or event changes; `Config` keeps its constructor-time meaning.
+
+1. **Permissionless listing** (`list_asset`, `is_listed`, `list_assets`, `asset_count`, event `AssetListed`): any classic
+   Stellar asset becomes an eligible underlying by deriving its canonical SAC address on chain. The only permission that
+   matters stays the issuer's: it must authorize the escrow and the counterparties on its asset. Custom token contracts
+   can never be listed. The frontend reads the asset list from `list_assets`.
+2. **Per-writer open cap** (`WriterOpenLimit`, `writer_open_count`), **tenor cap** (`TenorOutOfRange`) and
+   **`prune_expired`** (event `OfferPruned`): closes finding F-1 (§6).
+3. **Backstop**: the contract's own address is rejected as any party (`InvalidArgs`); the host already rejects it, the
+   contract now says so itself.
+4. **Testnet demo**: a third fictional asset `EQTY` (tokenized equity label, same regulated issuer) is NOT in the
+   constructor; the smoke run lists it with `list_asset`, the issuer authorizes the escrow, and a PUT on `EQTY` settles.
+
+Deliberately not in v1.3: per-offer quote tokens (needs a `create_offer` signature change), delisting (no admin),
+position token, impairment/refund, margin.
