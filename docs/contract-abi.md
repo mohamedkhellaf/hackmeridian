@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon.** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis (no signature changes).** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -173,7 +173,7 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
 ### Views
 - `get_option(id)`: the stored `OptionData` or `NotFound`. Pure read.
 - `list_open()`: ids whose state is `Offered`, oldest first. May include offers past `expiry`; clients filter by
-  `expiry` before showing them as purchasable.
+  `expiry` before showing them as purchasable. The list lives in instance storage, so it is bounded (see §10).
 - `option_count()`: number of options ever created (next id).
 - `open_collateral(token)`: total units of `token` the contract must currently hold for non-terminal options:
   locked collateral of `Offered`/`Active` options plus unclaimed proceeds of `Exercised` options. Clients compare
@@ -181,7 +181,8 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
   Returns 0 for unknown tokens.
 - `is_eligible(token, who)`: `true` iff the SAC reports `authorized(who) == true`. Implemented with
   `StellarAssetClient::try_authorized`; a SAC error (for example a `G` account with no trustline, SAC error #13)
-  returns `false`. For a non-AUTH_REQUIRED asset this is `true` for everyone.
+  returns `false`. For a non-AUTH_REQUIRED asset this is `true` for every account that holds a trustline and for
+  every contract address; a `G` account with no trustline is still `false`.
 - `extend_ttl(ids)`: anyone may call. Extends the contract instance and code TTL and the persistent entry of every
   id in `ids` (`NotFound` for an unknown id). See §8.
 
@@ -232,9 +233,17 @@ pub struct DeliveryClaimed{ #[topic] pub id: u32 }
 - Issuer freeze of the **holder** blocks that holder's `exercise` (SAC #11); after expiry the writer reclaims.
   Issuer freeze of the **writer** does not block `exercise` (payment lands in the contract); it blocks
   `claim_delivery`/`reclaim` of the underlying until re-authorized.
-- Issuer clawback from the **contract** (CALL collateral, or an unclaimed PUT delivery) makes the corresponding
-  transfer fail (SAC #10). The option stays in its state, nothing partial happens, and `open_collateral` exceeds
-  the SAC balance, which the UI must display. There is **no** `Impaired` state or refund (AGENTS.md).
+- Issuer clawback from the **contract** hits a **pooled** balance: the contract holds one SAC balance per token for
+  every option on that token, and payouts (`exercise`, `reclaim`, `claim_delivery`) are not checked against a
+  per-option backing. After a clawback, payouts keep succeeding first-come-first-served until the pooled balance
+  runs out; the shortfall lands on whoever claims last, not on the option whose collateral was clawed. Nothing
+  partial happens inside one call (a failing SAC transfer, #10, reverts the whole call). The deficit is visible as
+  `open_collateral(token) > balance(contract)` and the UI must show it as a warning for **every** option on that
+  token. There is **no** `Impaired` state, refund or pro-rata logic (AGENTS.md). `USDx` is unflagged, so PUT strike
+  collateral is not exposed to clawback.
+- Issuer de-authorization of the **contract address** itself blocks every SAC transfer into or out of the contract
+  for that asset: PUT `exercise` and PUT `claim_delivery`, CALL `exercise` and CALL `reclaim` all fail until the
+  issuer re-authorizes the contract. Writers can still `reclaim` PUT collateral (quote token) after expiry.
 - The contract never claims to override issuer control. README and UI disclose this.
 
 ## 7. PROVISIONAL decisions and blocker questions for Dev 1 (`PRODUCT_SPEC.md` absent at lock time)
@@ -266,9 +275,10 @@ const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
 ```
 
-Every state-changing function extends the instance TTL and the touched option's persistent TTL with
-`(TTL_THRESHOLD, TTL_EXTEND_TO)`. `extend_ttl(ids)` additionally extends the contract code via
-`env.deployer().extend_ttl(contract, TTL_THRESHOLD, TTL_EXTEND_TO)`. Judging ends 2026-10-28; 30 days covers it.
+Every state-changing function extends the contract instance **and code** TTL (`instance().extend_ttl` does both
+in soroban-sdk 28) and the touched option's persistent TTL with `(TTL_THRESHOLD, TTL_EXTEND_TO)`. `extend_ttl(ids)`
+does the same for the instance/code and for every listed option, so a keeper can keep idle options alive.
+Judging ends 2026-10-28; 30 days covers it. Testnet `max_entry_ttl` is 3,110,400 ledgers, so the values are legal.
 TTL is never used as a security mechanism; `expiry` lives in the value.
 
 ## 9. Deployment and client notes
@@ -293,3 +303,21 @@ tree by simulation (Freighter signs them with the transaction).
 Demo asset plan (fictional, Testnet only): `USDx` (quote, unflagged issuer), `RWA` and `BOND` (underlyings,
 one regulated issuer with `AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED`). The deployed IDs live only
 in the **Deployed contracts** table of `AGENTS.md`.
+
+## 10. Known limitations of the deployed v1 and planned additive changes (not yet deployed)
+
+Found by the P0 static analysis and audit on 2026-10-25. Each change below is additive (new error codes are appended,
+no signature changes) and will ship together in one hardening redeploy; until then the deployed contract behaves as
+described in §3.
+
+1. **Unbounded open-offer list.** `Key::Open` grows with every `Offered` option and is rewritten on every
+   state-changing call. An eligible account could create thousands of 1-unit offers to bloat the instance entry
+   (hard limit 64 KB, roughly 8,000 ids) and raise everyone's fees. Planned: `MAX_OPEN = 1000` enforced in
+   `create_offer` with `Error::OpenListFull = 14`. Mitigation today: only issuer-authorized accounts can create offers.
+2. **Writer eligibility on the quote token.** A writer with no `USDx` trustline can create an offer that nobody can
+   buy (every `buy` fails at the premium transfer), and could not `claim_delivery` on a CALL. Planned: `create_offer`
+   also requires `is_eligible(quote, writer)`, reusing `Error::NotEligible`. Clients should simulate `buy` before
+   presenting an offer as executable (RFQ truth rule).
+3. **Pooled clawback exposure** (§6): documented, no code change planned for the MVP. A fail-closed guard
+   (`balance(contract) >= open_collateral(token)` before any payout) is possible but freezes every option on the
+   token after any clawback, which is a product decision for Dev 1.
