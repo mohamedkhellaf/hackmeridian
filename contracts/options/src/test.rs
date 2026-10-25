@@ -23,9 +23,11 @@ use soroban_sdk::{
         IssuerFlags, Ledger as _, MockAuth, MockAuthInvoke, StellarAssetIssuer,
     },
     token::{StellarAssetClient, TokenClient},
-    vec, Address, Env, Event as _, IntoVal, InvokeError, Symbol, Val, Vec,
+    vec, Address, Bytes, Env, Event as _, IntoVal, InvokeError, String, Symbol, TryFromVal, Val,
+    Vec,
 };
 use std::fmt::Debug;
+use std::string::ToString;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -43,6 +45,10 @@ const START: u64 = 1_793_000_000; // ledger time at setup
 const EXPIRY: u64 = START + 7 * 86_400;
 
 const DAY: u32 = 17_280; // ledgers per day (ABI §8 DAY_LEDGERS)
+
+// v1.3 limits (ABI §8), restated so the tests pin the values, not the names.
+const WRITER_CAP: u32 = 50; // MAX_OPEN_PER_WRITER
+const TENOR_CAP: u64 = 63_072_000; // MAX_TENOR, 2 years in seconds
 
 // SAC (soroban-env-host ContractError) codes observed in the spike.
 const SAC_BALANCE: u32 = 10; // insufficient / zero balance
@@ -2281,18 +2287,28 @@ fn error_codes_are_101_plus() {
 fn open_list_cap_returns_open_list_full() {
     let t = setup();
     assert_eq!(MAX_OPEN, 1000);
-    // 1-unit PUTs: 1000 offers lock 1000 USDx units of the writer's USDX_START.
+    // v1.3: one writer holds at most WRITER_CAP (50) open offers, so 20 writers
+    // fill the global cap; ids 0..50 belong to `t.writer`.
+    let mut writers = std::vec![t.writer.clone()];
+    while writers.len() < (MAX_OPEN / WRITER_CAP) as usize {
+        let w = Address::generate(&t.env);
+        t.sac(&t.rwa).set_authorized(&w, &true);
+        t.sac(&t.usdx).mint(&w, &USDX_START);
+        writers.push(w);
+    }
+    // 1-unit PUTs: each offer locks 1 USDx unit.
     let tiny_put = |writer: &Address| {
         t.c.try_create_offer(writer, &t.rwa, &OptionType::Put, &1, &1, &1, &EXPIRY)
     };
     for i in 0..MAX_OPEN {
-        assert_eq!(tiny_put(&t.writer), Ok(Ok(i)));
+        assert_eq!(tiny_put(&writers[(i / WRITER_CAP) as usize]), Ok(Ok(i)));
     }
     assert_eq!(t.c.list_open().len(), MAX_OPEN);
     assert_eq!(t.c.open_collateral(&t.usdx), MAX_OPEN as i128);
     let before = t.snap();
 
-    // the cap is global: any writer, any underlying, PUT or CALL
+    // the cap is global: any writer, any underlying, PUT or CALL. `t.writer` is
+    // at both caps: OpenListFull is checked before WriterOpenLimit (ABI §3).
     assert_err(tiny_put(&t.writer), Error::OpenListFull);
     assert_err(tiny_put(&t.maker2), Error::OpenListFull);
     assert_err(
@@ -2965,9 +2981,11 @@ fn get_options_pages_in_order() {
         assert_eq!(o, t.c.get_option(&(i as u32)));
     }
 
-    // 60 options: one call returns at most MAX_PAGE = 50
-    for _ in 7..60 {
-        t.c.create_offer(&t.writer, &t.rwa, &OptionType::Put, &1, &1, &1, &EXPIRY);
+    // 60 options: one call returns at most MAX_PAGE = 50 (spread over two
+    // writers, each below the v1.3 per-writer cap of 50 open offers)
+    for i in 7..60 {
+        let w = if i % 2 == 0 { &t.writer } else { &t.maker2 };
+        t.c.create_offer(w, &t.rwa, &OptionType::Put, &1, &1, &1, &EXPIRY);
     }
     assert_eq!(t.c.option_count(), 60);
     assert_eq!(MAX_PAGE, 50);
@@ -3210,4 +3228,1115 @@ fn sub_reserved_rejects_negative_result_on_corrupted_reserve() {
     let before = t.snap();
     assert_err(t.c.try_cancel_offer(&t.writer, &id), Error::Overflow);
     assert_eq!(t.snap(), before);
+}
+
+// ---------------------------------------------------------------------------
+// v1.3: permissionless listing, per-writer cap, tenor cap, prune_expired and
+// the contract-address backstop (ABI §2, §3, §5, §8, §12)
+// ---------------------------------------------------------------------------
+
+fn s(t: &T, v: &str) -> String {
+    String::from_str(&t.env, v)
+}
+
+/// `(code, issuer)` of a classic-asset SAC, parsed from its SEP-41 `name()`,
+/// which the SAC reports as `CODE:ISSUER`.
+fn code_and_issuer(t: &T, sac: &Address) -> (String, Address) {
+    let name = TokenClient::new(&t.env, sac).name().to_string();
+    let (code, issuer) = name.split_once(':').expect("SAC name is CODE:ISSUER");
+    (s(t, code), Address::from_str(&t.env, issuer))
+}
+
+/// A classic asset whose SAC is deployed but NOT listed: code "aaa" from a
+/// fresh `G…` issuer account (what `register_stellar_asset_contract_v2` issues),
+/// SAC admin = the regulated issuer. `regulated` sets AUTH_REQUIRED |
+/// AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED before any balance exists, like RWA/BOND.
+fn new_asset(t: &T, regulated: bool) -> (Address, String, Address) {
+    let sac = t
+        .env
+        .register_stellar_asset_contract_v2(t.rwa_issuer.clone());
+    if regulated {
+        let issuer = sac.issuer();
+        issuer.set_flag(IssuerFlags::RequiredFlag);
+        issuer.set_flag(IssuerFlags::RevocableFlag);
+        issuer.set_flag(IssuerFlags::ClawbackEnabledFlag);
+    }
+    let (code, issuer) = code_and_issuer(t, &sac.address());
+    assert_eq!(issuer, sac.issuer().address());
+    (sac.address(), code, issuer)
+}
+
+/// A classic `G…` account address with the given ed25519 key (no ledger entry).
+fn g_account(env: &Env, key: [u8; 32]) -> Address {
+    use soroban_sdk::xdr::{AccountId, PublicKey, ScAddress, Uint256};
+    Address::try_from_val(
+        env,
+        &ScAddress::Account(AccountId(PublicKey::PublicKeyTypeEd25519(Uint256(key)))),
+    )
+    .unwrap()
+}
+
+/// Deploys the SAC of the classic asset `(code, G(issuer_key))`, as
+/// `stellar contract asset deploy` does, and returns its address. Codes of 1–4
+/// characters are CreditAlphanum4, 5–12 CreditAlphanum12 (zero padded).
+fn deploy_classic_sac(env: &Env, code: &str, issuer_key: [u8; 32]) -> Address {
+    use soroban_sdk::xdr::{
+        AccountId, AlphaNum12, AlphaNum4, Asset, AssetCode12, AssetCode4, Limits, PublicKey,
+        Uint256, WriteXdr,
+    };
+    let issuer = AccountId(PublicKey::PublicKeyTypeEd25519(Uint256(issuer_key)));
+    let b = code.as_bytes();
+    let asset = if b.len() <= 4 {
+        let mut c = [0u8; 4];
+        c[..b.len()].copy_from_slice(b);
+        Asset::CreditAlphanum4(AlphaNum4 {
+            asset_code: AssetCode4(c),
+            issuer,
+        })
+    } else {
+        let mut c = [0u8; 12];
+        c[..b.len()].copy_from_slice(b);
+        Asset::CreditAlphanum12(AlphaNum12 {
+            asset_code: AssetCode12(c),
+            issuer,
+        })
+    };
+    let xdr = Bytes::from_slice(env, &asset.to_xdr(Limits::none()).unwrap());
+    env.deployer().with_stellar_asset(xdr).deploy()
+}
+
+fn sym(name: &str) -> soroban_sdk::xdr::ScVal {
+    soroban_sdk::xdr::ScVal::Symbol(soroban_sdk::xdr::ScSymbol(name.try_into().unwrap()))
+}
+
+/// The `OfferPruned` events of the most recent invocation as `(id, pruner)`,
+/// in emission order. Each event must be exactly
+/// `OfferPruned { id, pruner }.to_xdr(..)` (topics `["offer_pruned", id]`,
+/// data `{pruner}`). The ABI does not say which address `pruner` is
+/// (`prune_expired` takes no address and needs no auth), so it is read from
+/// the event rather than asserted.
+fn pruned_events(t: &T) -> std::vec::Vec<(u32, Address)> {
+    use soroban_sdk::xdr::{ContractEventBody, ScVal};
+    let all = t.env.events().all().filter_by_contract(&t.contract);
+    all.events()
+        .iter()
+        .map(|ev| {
+            let ContractEventBody::V0(body) = &ev.body;
+            assert_eq!(body.topics.len(), 2, "OfferPruned topics: {ev:?}");
+            assert_eq!(body.topics[0], sym("offer_pruned"), "{ev:?}");
+            let id = match &body.topics[1] {
+                ScVal::U32(id) => *id,
+                other => panic!("OfferPruned id topic: {other:?}"),
+            };
+            let pruner = match &body.data {
+                ScVal::Map(Some(map)) => map
+                    .iter()
+                    .find(|e| e.key == sym("pruner"))
+                    .map(|e| Address::try_from_val(&t.env, &e.val).unwrap())
+                    .expect("OfferPruned has a pruner field"),
+                other => panic!("OfferPruned data: {other:?}"),
+            };
+            assert_eq!(
+                *ev,
+                OfferPruned {
+                    id,
+                    pruner: pruner.clone()
+                }
+                .to_xdr(&t.env, &t.contract)
+            );
+            (id, pruner)
+        })
+        .collect()
+}
+
+fn pruned_ids(t: &T) -> std::vec::Vec<u32> {
+    pruned_events(t).into_iter().map(|(id, _)| id).collect()
+}
+
+fn listed_assets(t: &T) -> std::vec::Vec<Address> {
+    t.c.list_assets(&0, &MAX_PAGE).iter().collect()
+}
+
+/// Raw persistent TTL of a v1.3 storage entry through its ABI §8 key shape
+/// `Key::<variant>(arg)` = ScVal vec [Symbol(variant), arg].
+fn key_ttl(t: &T, variant: &str, arg: Val) -> u32 {
+    let key: Vec<Val> = vec![&t.env, Symbol::new(&t.env, variant).into_val(&t.env), arg];
+    t.env
+        .as_contract(&t.contract, || t.env.storage().persistent().get_ttl(&key))
+}
+
+#[test]
+fn error_codes_v13_append_116_to_119() {
+    for (e, code) in [
+        (Error::WriterOpenLimit, 116),
+        (Error::AlreadyListed, 117),
+        (Error::AssetNotDeployed, 118),
+        (Error::TenorOutOfRange, 119),
+    ] {
+        assert_eq!(e as u32, code, "{e:?}");
+    }
+    // the v1.1 codes did not move
+    assert_eq!(Error::NotFound as u32, 101);
+    assert_eq!(Error::CollateralShortfall as u32, 115);
+}
+
+#[test]
+fn constructor_seeds_registry() {
+    let t = setup();
+    assert!(t.c.is_listed(&t.rwa));
+    assert!(t.c.is_listed(&t.bond));
+    // the quote token, a deployed but unlisted SAC and a random address are not listed
+    assert!(!t.c.is_listed(&t.usdx));
+    let (unlisted, _, _) = new_asset(&t, true);
+    assert!(!t.c.is_listed(&unlisted));
+    assert!(!t.c.is_listed(&Address::generate(&t.env)));
+    assert_eq!(t.c.asset_count(), 2);
+    assert_eq!(listed_assets(&t), [t.rwa.clone(), t.bond.clone()]);
+    // config() keeps its constructor-time meaning and matches the seeded registry
+    assert_eq!(t.c.config().underlyings, t.c.list_assets(&0, &MAX_PAGE));
+
+    // a maximal allowlist (8) is seeded in constructor order
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let quote = env
+        .register_stellar_asset_contract_v2(admin.clone())
+        .address();
+    let mut many: Vec<Address> = Vec::new(&env);
+    for _ in 0..8 {
+        many.push_back(
+            env.register_stellar_asset_contract_v2(admin.clone())
+                .address(),
+        );
+    }
+    let id = env.register(OptionsContract, (quote.clone(), many.clone()));
+    let c = OptionsContractClient::new(&env, &id);
+    assert_eq!(c.asset_count(), 8);
+    assert_eq!(c.list_assets(&0, &MAX_PAGE), many);
+    for a in many.iter() {
+        assert!(c.is_listed(&a));
+    }
+    assert!(!c.is_listed(&quote));
+}
+
+#[test]
+fn list_asset_registers_canonical_sac() {
+    let t = setup();
+    // a 4th SAC in the test env
+    let sac = t
+        .env
+        .register_stellar_asset_contract_v2(t.rwa_issuer.clone());
+    let (code, issuer) = code_and_issuer(&t, &sac.address());
+    assert_eq!(code, s(&t, "aaa"));
+    assert_eq!(issuer, sac.issuer().address());
+    assert!(!t.c.is_listed(&sac.address()));
+    assert_eq!(t.c.asset_count(), 2);
+    let before = t.snap();
+
+    // anyone may list: here a party with no role on the asset
+    let listed = t.c.list_asset(&t.outsider, &code, &issuer);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [AssetListed {
+            sac: sac.address(),
+            code: code.clone(),
+            issuer: issuer.clone(),
+            lister: t.outsider.clone(),
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    // the address is derived on chain from (code, issuer), not supplied, and
+    // is the deployed SAC
+    assert_eq!(listed, sac.address());
+    assert!(t.c.is_listed(&sac.address()));
+    assert_eq!(t.c.asset_count(), 3);
+    assert_eq!(
+        listed_assets(&t),
+        [t.rwa.clone(), t.bond.clone(), sac.address()]
+    );
+    // config() stays the constructor-time list
+    assert_eq!(
+        t.c.config().underlyings,
+        vec![&t.env, t.rwa.clone(), t.bond.clone()]
+    );
+    // listing moves no tokens and touches no option, reserve or open list
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.bal(&sac.address(), &t.contract), 0);
+    assert_eq!(t.c.open_collateral(&sac.address()), 0);
+
+    // the next listing is appended last
+    let (other, code2, issuer2) = new_asset(&t, false);
+    assert_eq!(t.c.list_asset(&t.writer, &code2, &issuer2), other);
+    assert_eq!(t.c.asset_count(), 4);
+    assert_eq!(listed_assets(&t).last(), Some(&other));
+    assert_eq!(
+        t.c.list_assets(&2, &MAX_PAGE),
+        vec![&t.env, sac.address(), other]
+    );
+}
+
+#[test]
+fn list_asset_derives_alphanum4_and_alphanum12_sacs() {
+    let t = setup();
+    let key = [7u8; 32];
+    let issuer = g_account(&t.env, key);
+    // 1–4 characters are CreditAlphanum4, 5–12 CreditAlphanum12; codes are
+    // case-sensitive and a shorter code is a different asset
+    let codes = [
+        "A",
+        "Ab9",
+        "ABC",
+        "ABCD",
+        "ABCDE",
+        "EQTY2026",
+        "abcdefghijk",
+        "ABCDEFGHIJKL",
+    ];
+    let mut expected = listed_assets(&t);
+    for code in codes {
+        let sac = deploy_classic_sac(&t.env, code, key);
+        // the deployed SAC reports exactly this asset
+        assert_eq!(
+            code_and_issuer(&t, &sac),
+            (s(&t, code), issuer.clone()),
+            "{code}"
+        );
+        assert!(!t.c.is_listed(&sac), "{code}");
+        assert_eq!(
+            t.c.list_asset(&t.maker2, &s(&t, code), &issuer),
+            sac,
+            "{code}"
+        );
+        assert!(t.c.is_listed(&sac), "{code}");
+        expected.push(sac);
+    }
+    // the same code from another issuer is another asset
+    let other = deploy_classic_sac(&t.env, "ABCD", [8u8; 32]);
+    assert_eq!(
+        t.c.list_asset(&t.maker2, &s(&t, "ABCD"), &g_account(&t.env, [8u8; 32])),
+        other
+    );
+    expected.push(other);
+    assert_eq!(t.c.asset_count(), expected.len() as u32);
+    assert_eq!(listed_assets(&t), expected);
+}
+
+#[test]
+fn list_asset_then_put_on_new_asset_settles() {
+    let t = setup();
+    let (eqty, code, issuer) = new_asset(&t, true);
+    assert_eq!(t.c.list_asset(&t.maker2, &code, &issuer), eqty);
+
+    // the issuer authorizes the escrow and both counterparties on its asset
+    let admin = t.sac(&eqty);
+    admin.set_authorized(&t.contract, &true);
+    admin.set_authorized(&t.writer, &true);
+    admin.set_authorized(&t.holder, &true);
+    admin.mint(&t.holder, &UNDERLYING_START);
+    let rwa_bond_before = (t.bals(&t.writer), t.bals(&t.holder), t.bals(&t.contract));
+
+    // create: the writer locks the total strike in USDx
+    let id = t.offer(&t.writer, &eqty, OptionType::Put);
+    assert_eq!(
+        t.c.get_option(&id),
+        expected_option(&t, id, &eqty, OptionType::Put, &t.writer)
+    );
+    assert_eq!(t.bal(&t.usdx, &t.writer), USDX_START - STRIKE);
+    assert_eq!(t.bal(&t.usdx, &t.contract), STRIKE);
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE);
+    assert_eq!(t.c.open_collateral(&eqty), 0);
+    assert_eq!(t.open(), [id]);
+    assert_eq!(t.c.writer_open_count(&t.writer), 1);
+
+    // buy: premium buyer -> writer
+    t.c.buy(&t.holder, &id);
+    assert_eq!(t.state(id), State::Active);
+    assert_eq!(t.bal(&t.usdx, &t.holder), USDX_START - PREMIUM);
+    assert_eq!(t.bal(&t.usdx, &t.writer), USDX_START - STRIKE + PREMIUM);
+    assert!(t.open().is_empty());
+    assert_eq!(t.c.writer_open_count(&t.writer), 0);
+
+    // exercise: the holder delivers the new asset to the contract and is paid
+    t.c.exercise(&t.holder, &id);
+    assert_eq!(t.state(id), State::Exercised);
+    assert_eq!(t.bal(&eqty, &t.holder), UNDERLYING_START - QTY);
+    assert_eq!(t.bal(&t.usdx, &t.holder), USDX_START - PREMIUM + STRIKE);
+    assert_eq!(t.bal(&eqty, &t.contract), QTY);
+    assert_eq!(t.bal(&t.usdx, &t.contract), 0);
+    assert_eq!(t.c.open_collateral(&eqty), QTY);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+
+    // claim: the writer pulls the delivered asset
+    t.c.claim_delivery(&t.writer, &id);
+    assert_eq!(t.state(id), State::Settled);
+    assert_eq!(t.bal(&eqty, &t.writer), QTY);
+    assert_eq!(t.bal(&eqty, &t.contract), 0);
+    assert_eq!(t.c.open_collateral(&eqty), 0);
+    assert_eq!(t.bal(&t.usdx, &t.writer), USDX_START - STRIKE + PREMIUM);
+    // RWA and BOND were never touched
+    let (w, h, c) = rwa_bond_before;
+    assert_eq!(
+        (t.bal(&t.rwa, &t.writer), t.bal(&t.bond, &t.writer)),
+        (w.rwa, w.bond)
+    );
+    assert_eq!(
+        (t.bal(&t.rwa, &t.holder), t.bal(&t.bond, &t.holder)),
+        (h.rwa, h.bond)
+    );
+    assert_eq!(
+        (t.bal(&t.rwa, &t.contract), t.bal(&t.bond, &t.contract)),
+        (c.rwa, c.bond)
+    );
+}
+
+#[test]
+fn list_asset_rejects_bad_code() {
+    let t = setup();
+    let (sac, code, issuer) = new_asset(&t, true);
+    let before = t.snap();
+
+    for bad in [
+        "",
+        "ABCDEFGHIJKLM", // 13 characters
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "AB-C",
+        "A B",
+        " aaa",
+        "AB_C",
+        "aaa:",
+        "a.b",
+        "aaa\0",    // must not be read as the zero-padded "aaa"
+        "\u{c4}BC", // non-ASCII letter
+        "\u{20ac}",
+    ] {
+        assert_err(
+            t.c.try_list_asset(&t.writer, &s(&t, bad), &issuer),
+            Error::InvalidArgs,
+        );
+    }
+    // the 1- and 12-character boundaries pass validation and reach the
+    // deployment probe (no SAC exists for these codes)
+    for edge in ["Z", "ABCDEFGHIJKL"] {
+        assert_err(
+            t.c.try_list_asset(&t.writer, &s(&t, edge), &issuer),
+            Error::AssetNotDeployed,
+        );
+    }
+    assert!(!t.c.is_listed(&sac));
+    assert_eq!(t.c.asset_count(), 2);
+    assert_eq!(t.snap(), before);
+
+    // control: the genuine code lists
+    assert_eq!(t.c.list_asset(&t.writer, &code, &issuer), sac);
+}
+
+#[test]
+fn list_asset_rejects_contract_issuer() {
+    let t = setup();
+    let (sac, code, _issuer) = new_asset(&t, true);
+    let before = t.snap();
+
+    // `C…` addresses (this contract, SACs, an arbitrary contract) are never issuers
+    for issuer in [
+        t.contract.clone(),
+        t.usdx.clone(),
+        t.rwa.clone(),
+        sac.clone(),
+        Address::generate(&t.env),
+    ] {
+        assert_err(
+            t.c.try_list_asset(&t.writer, &code, &issuer),
+            Error::InvalidArgs,
+        );
+    }
+    assert!(!t.c.is_listed(&sac));
+    assert_eq!(t.c.asset_count(), 2);
+    assert_eq!(t.snap(), before);
+}
+
+#[test]
+fn list_asset_rejects_undeployed() {
+    let t = setup();
+    let key = [9u8; 32];
+    let stranger = g_account(&t.env, key);
+    let (_, _, issuer) = new_asset(&t, true);
+    let before = t.snap();
+
+    // a random code and issuer
+    for code in ["ZZZ", "EQTY", "LONGERCODE12"] {
+        assert_err(
+            t.c.try_list_asset(&t.writer, &s(&t, code), &stranger),
+            Error::AssetNotDeployed,
+        );
+    }
+    // an issuer with a deployed SAC, but not for this code (codes are case-sensitive)
+    for code in ["bbb", "AAA", "aaaa"] {
+        assert_err(
+            t.c.try_list_asset(&t.writer, &s(&t, code), &issuer),
+            Error::AssetNotDeployed,
+        );
+    }
+    assert_eq!(t.c.asset_count(), 2);
+    assert_eq!(t.snap(), before);
+
+    // deploying the SAC (anyone can) is the only prerequisite
+    let zzz = deploy_classic_sac(&t.env, "ZZZ", key);
+    assert!(!t.c.is_listed(&zzz));
+    assert_eq!(t.c.list_asset(&t.writer, &s(&t, "ZZZ"), &stranger), zzz);
+    assert!(t.c.is_listed(&zzz));
+    assert_eq!(t.c.asset_count(), 3);
+}
+
+#[test]
+fn list_asset_rejects_duplicate_and_quote() {
+    let t = setup();
+    let before = t.snap();
+
+    // the constructor underlyings are already listed
+    for token in [&t.rwa, &t.bond] {
+        let (code, issuer) = code_and_issuer(&t, token);
+        assert_err(
+            t.c.try_list_asset(&t.maker2, &code, &issuer),
+            Error::AlreadyListed,
+        );
+    }
+    // the quote token can never become an underlying
+    let (code, issuer) = code_and_issuer(&t, &t.usdx);
+    assert_err(
+        t.c.try_list_asset(&t.maker2, &code, &issuer),
+        Error::AlreadyListed,
+    );
+    assert!(!t.c.is_listed(&t.usdx));
+    assert_eq!(t.c.asset_count(), 2);
+    assert_eq!(listed_assets(&t), [t.rwa.clone(), t.bond.clone()]);
+    assert_eq!(t.snap(), before);
+
+    // a listed asset cannot be listed again, by anyone
+    let (sac, code, issuer) = new_asset(&t, false);
+    assert_eq!(t.c.list_asset(&t.writer, &code, &issuer), sac);
+    for lister in [&t.writer, &t.maker2] {
+        assert_err(
+            t.c.try_list_asset(lister, &code, &issuer),
+            Error::AlreadyListed,
+        );
+    }
+    assert_eq!(t.c.asset_count(), 3);
+    assert_eq!(
+        listed_assets(&t),
+        [t.rwa.clone(), t.bond.clone(), sac.clone()]
+    );
+}
+
+#[test]
+fn list_asset_requires_lister_auth() {
+    let t = setup();
+    let (sac, code, issuer) = new_asset(&t, true);
+    let invoke = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "list_asset",
+        args: (&t.writer, code.clone(), &issuer).into_val(&t.env),
+        sub_invokes: &[],
+    };
+    let before = t.snap();
+
+    // maker2 cannot list in the writer's name
+    t.env.mock_auths(&[MockAuth {
+        address: &t.maker2,
+        invoke: &invoke,
+    }]);
+    assert_host_abort(t.c.try_list_asset(&t.writer, &code, &issuer));
+    // nor can anyone with no signature at all
+    t.env.set_auths(&[]);
+    assert_host_abort(t.c.try_list_asset(&t.writer, &code, &issuer));
+    assert!(!t.c.is_listed(&sac));
+    assert_eq!(t.c.asset_count(), 2);
+    assert_eq!(t.snap(), before);
+
+    // the lister's own signature over list_asset, and nothing else, is enough
+    t.env.mock_auths(&[MockAuth {
+        address: &t.writer,
+        invoke: &invoke,
+    }]);
+    assert_eq!(t.c.list_asset(&t.writer, &code, &issuer), sac);
+    assert!(t.c.is_listed(&sac));
+
+    // the recorded auth tree is exactly the lister over list_asset
+    t.env.mock_all_auths();
+    let (sac2, code2, issuer2) = new_asset(&t, true);
+    assert_eq!(t.c.list_asset(&t.maker2, &code2, &issuer2), sac2);
+    assert_eq!(
+        t.env.auths(),
+        std::vec![(
+            t.maker2.clone(),
+            leaf(contract_fn(
+                &t,
+                &t.contract,
+                "list_asset",
+                (t.maker2.clone(), code2.clone(), issuer2.clone()).into_val(&t.env),
+            ))
+        )]
+    );
+}
+
+#[test]
+fn list_asset_does_not_authorize() {
+    let t = setup();
+    let (eqty, code, issuer) = new_asset(&t, true);
+    t.c.list_asset(&t.writer, &code, &issuer);
+    let admin = t.sac(&eqty);
+    for who in [&t.writer, &t.holder] {
+        admin.set_authorized(who, &true);
+        admin.mint(who, &UNDERLYING_START);
+    }
+    assert!(t.c.is_listed(&eqty));
+    assert!(!t.c.is_eligible(&eqty, &t.contract));
+    let before = t.snap();
+
+    // listed, but the issuer has not authorized the escrow
+    for ty in [OptionType::Put, OptionType::Call] {
+        assert_err(
+            t.c.try_create_offer(&t.writer, &eqty, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+            Error::ContractNotAuthorized,
+        );
+    }
+    // nor a counterparty: maker2 holds no authorization on the new asset
+    assert_err(
+        t.c.try_create_offer(
+            &t.maker2,
+            &eqty,
+            &OptionType::Put,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::NotEligible,
+    );
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.bal(&eqty, &t.contract), 0);
+    assert_eq!(t.c.option_count(), 0);
+
+    // only the issuer's authorization of the escrow unlocks the asset
+    admin.set_authorized(&t.contract, &true);
+    let id = t.offer(&t.writer, &eqty, OptionType::Call);
+    assert_eq!(t.bal(&eqty, &t.contract), QTY);
+    assert_eq!(t.bal(&eqty, &t.writer), UNDERLYING_START - QTY);
+    assert_eq!(t.c.open_collateral(&eqty), QTY);
+    assert_eq!(t.open(), [id]);
+}
+
+#[test]
+fn create_offer_rejects_unlisted_random_sac() {
+    let t = setup();
+    // a real SAC, fully authorized by its issuer, but never listed
+    let (eqty, code, issuer) = new_asset(&t, true);
+    let admin = t.sac(&eqty);
+    admin.set_authorized(&t.contract, &true);
+    admin.set_authorized(&t.writer, &true);
+    admin.mint(&t.writer, &UNDERLYING_START);
+    // and a deployed SAC of an unrelated classic asset
+    let random = deploy_classic_sac(&t.env, "RANDOM12CODE", [3u8; 32]);
+    let before = t.snap();
+
+    for token in [&eqty, &random] {
+        for ty in [OptionType::Put, OptionType::Call] {
+            assert_err(
+                t.c.try_create_offer(&t.writer, token, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+                Error::AssetNotAllowed,
+            );
+        }
+        assert!(!t.c.is_listed(token));
+    }
+    // check order: AssetNotAllowed before InvalidArgs and TenorOutOfRange
+    assert_err(
+        t.c.try_create_offer(&t.writer, &eqty, &OptionType::Put, &0, &0, &0, &u64::MAX),
+        Error::AssetNotAllowed,
+    );
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.bal(&eqty, &t.contract), 0);
+
+    // once listed, the same offer is accepted
+    t.c.list_asset(&t.maker2, &code, &issuer);
+    assert_eq!(t.offer(&t.writer, &eqty, OptionType::Call), 0);
+    assert_eq!(t.bal(&eqty, &t.contract), QTY);
+}
+
+#[test]
+fn writer_open_cap_blocks_51st_offer() {
+    let t = setup();
+    let tiny = |w: &Address, expiry: u64| {
+        t.c.try_create_offer(w, &t.rwa, &OptionType::Put, &1, &1, &1, &expiry)
+    };
+    let count = |w: &Address| t.c.writer_open_count(w);
+    assert_eq!(count(&t.writer), 0);
+    for i in 0..WRITER_CAP {
+        assert_eq!(tiny(&t.writer, EXPIRY), Ok(Ok(i)));
+        assert_eq!(count(&t.writer), i + 1);
+    }
+    let before = t.snap();
+
+    // the 51st open offer of the same writer fails, on any underlying, either type
+    assert_err(tiny(&t.writer, EXPIRY), Error::WriterOpenLimit);
+    assert_err(
+        t.c.try_create_offer(&t.writer, &t.bond, &OptionType::Call, &1, &1, &1, &EXPIRY),
+        Error::WriterOpenLimit,
+    );
+    // check order: InvalidArgs, TenorOutOfRange and NotEligible come first
+    assert_err(
+        t.c.try_create_offer(&t.writer, &t.rwa, &OptionType::Put, &0, &1, &1, &EXPIRY),
+        Error::InvalidArgs,
+    );
+    assert_err(
+        tiny(&t.writer, START + TENOR_CAP + 1),
+        Error::TenorOutOfRange,
+    );
+    t.sac(&t.rwa).set_authorized(&t.writer, &false);
+    assert_err(tiny(&t.writer, EXPIRY), Error::NotEligible);
+    t.sac(&t.rwa).set_authorized(&t.writer, &true);
+    assert_eq!(t.snap(), before);
+    assert_eq!(count(&t.writer), WRITER_CAP);
+
+    // the cap is per writer
+    assert_eq!(tiny(&t.maker2, EXPIRY), Ok(Ok(50)));
+    assert_eq!(count(&t.maker2), 1);
+
+    // cancel_offer: -1, frees exactly one slot
+    t.c.cancel_offer(&t.writer, &0);
+    assert_eq!(count(&t.writer), WRITER_CAP - 1);
+    assert_eq!(tiny(&t.writer, EXPIRY), Ok(Ok(51)));
+    assert_eq!(count(&t.writer), WRITER_CAP);
+    assert_err(tiny(&t.writer, EXPIRY), Error::WriterOpenLimit);
+
+    // buy: -1 (Active is no longer Offered); exercise of that option: unchanged
+    t.c.buy(&t.holder, &1);
+    assert_eq!(count(&t.writer), WRITER_CAP - 1);
+    t.c.exercise(&t.holder, &1);
+    assert_eq!(count(&t.writer), WRITER_CAP - 1);
+    assert_eq!(tiny(&t.writer, EXPIRY), Ok(Ok(52)));
+    t.c.buy(&t.holder, &2); // stays Active until expiry
+    assert_eq!(count(&t.writer), WRITER_CAP - 1);
+    assert_eq!(tiny(&t.writer, EXPIRY), Ok(Ok(53)));
+    assert_eq!(count(&t.writer), WRITER_CAP);
+
+    // expired but unpruned offers are still Offered and still count
+    t.at(EXPIRY);
+    let later = EXPIRY + 7 * 86_400;
+    assert_eq!(count(&t.writer), WRITER_CAP);
+    assert_err(tiny(&t.writer, later), Error::WriterOpenLimit);
+
+    // reclaim of an Offered option: -1; reclaim of an Active option: unchanged
+    t.c.reclaim(&t.writer, &3);
+    assert_eq!(count(&t.writer), WRITER_CAP - 1);
+    t.c.reclaim(&t.writer, &2);
+    assert_eq!(count(&t.writer), WRITER_CAP - 1);
+    assert_eq!(tiny(&t.writer, later), Ok(Ok(54)));
+    assert_eq!(count(&t.writer), WRITER_CAP);
+
+    // prune_expired by anyone: -1
+    assert_eq!(t.c.prune_expired(&vec![&t.env, 4u32]), 1);
+    assert_eq!(count(&t.writer), WRITER_CAP - 1);
+    assert_eq!(tiny(&t.writer, later), Ok(Ok(55)));
+    assert_eq!(count(&t.writer), WRITER_CAP);
+    assert_err(tiny(&t.writer, later), Error::WriterOpenLimit);
+
+    // maker2 was never affected; an address with no offers reads 0
+    assert_eq!(count(&t.maker2), 1);
+    assert_eq!(count(&t.outsider), 0);
+    // the counter equals the writer's options in state Offered
+    let offered = |w: &Address| {
+        (0..t.c.option_count())
+            .map(|id| t.c.get_option(&id))
+            .filter(|o| o.writer == *w && o.state == State::Offered)
+            .count() as u32
+    };
+    assert_eq!(offered(&t.writer), count(&t.writer));
+    assert_eq!(offered(&t.maker2), count(&t.maker2));
+}
+
+#[test]
+fn tenor_cap() {
+    let t = setup();
+    let max = START + TENOR_CAP;
+    let create = |w: &Address, ty: OptionType, expiry: u64| {
+        t.c.try_create_offer(w, &t.rwa, &ty, &QTY, &STRIKE, &PREMIUM, &expiry)
+    };
+    let before = t.snap();
+
+    for ty in [OptionType::Put, OptionType::Call] {
+        assert_err(create(&t.writer, ty, max + 1), Error::TenorOutOfRange);
+        assert_err(create(&t.writer, ty, u64::MAX), Error::TenorOutOfRange);
+    }
+    // check order: InvalidArgs first, TenorOutOfRange right after it (before NotEligible)
+    assert_err(
+        t.c.try_create_offer(
+            &t.writer,
+            &t.rwa,
+            &OptionType::Put,
+            &0,
+            &STRIKE,
+            &PREMIUM,
+            &(max + 1),
+        ),
+        Error::InvalidArgs,
+    );
+    assert_err(
+        create(&t.outsider, OptionType::Put, max + 1),
+        Error::TenorOutOfRange,
+    );
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.c.option_count(), 0);
+
+    // expiry == now + MAX_TENOR is accepted
+    let id = create(&t.writer, OptionType::Put, max).unwrap().unwrap();
+    assert_eq!(t.c.get_option(&id).expiry, max);
+    // the window moves with the ledger clock
+    t.at(START + 1_000);
+    assert_err(
+        create(&t.maker2, OptionType::Call, max + 1_001),
+        Error::TenorOutOfRange,
+    );
+    let id2 = create(&t.maker2, OptionType::Call, max + 1_000)
+        .unwrap()
+        .unwrap();
+    assert_eq!(t.c.get_option(&id2).expiry, max + 1_000);
+
+    // a maximum-tenor option settles like any other
+    t.c.buy(&t.holder, &id);
+    t.at(max - 1);
+    t.c.exercise(&t.holder, &id);
+    assert_eq!(t.state(id), State::Exercised);
+}
+
+#[test]
+fn prune_expired_returns_collateral_and_skips_live_and_bought() {
+    let t = setup();
+    let later = EXPIRY + 7 * 86_400;
+    let a = t.put(&t.writer); // expired Offered PUT -> pruned
+    let b = t.call(&t.writer); // expired Offered CALL -> pruned
+    let live = t.c.create_offer(
+        &t.writer,
+        &t.bond,
+        &OptionType::Put,
+        &QTY,
+        &STRIKE,
+        &PREMIUM,
+        &later,
+    ); // live Offered -> untouched
+    let m = t.offer(&t.maker2, &t.bond, OptionType::Call); // other writer -> pruned
+    let act = t.put(&t.maker2); // Active -> untouched
+    t.c.buy(&t.holder, &act);
+    let settled = t.call(&t.maker2); // Settled -> untouched
+    t.c.buy(&t.holder, &settled);
+    t.c.exercise(&t.holder, &settled);
+    t.c.claim_delivery(&t.maker2, &settled);
+    let cancelled = t.put(&t.maker2); // Cancelled -> untouched
+    t.c.cancel_offer(&t.maker2, &cancelled);
+    let all = vec![&t.env, a, b, live, m, act, settled, cancelled];
+
+    // before expiry nothing is prunable
+    let before = t.snap();
+    assert_eq!(t.c.prune_expired(&all), 0);
+    assert!(pruned_events(&t).is_empty());
+    assert_eq!(t.snap(), before);
+
+    t.at(EXPIRY);
+    let before = t.snap();
+    assert_eq!(before.open, [a, b, live, m]);
+    assert_eq!(t.c.writer_open_count(&t.writer), 3);
+    assert_eq!(t.c.writer_open_count(&t.maker2), 1);
+
+    // an unknown id fails the whole call, even after prunable ids
+    assert_err(
+        t.c.try_prune_expired(&vec![&t.env, a, b, 999]),
+        Error::NotFound,
+    );
+    assert_err(
+        t.c.try_prune_expired(&vec![&t.env, t.c.option_count()]),
+        Error::NotFound,
+    );
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.c.writer_open_count(&t.writer), 3);
+
+    // a mixed batch (with a repeated id) prunes only the expired Offered ids, in order
+    let n =
+        t.c.prune_expired(&vec![&t.env, live, act, a, settled, cancelled, b, m, a]);
+    assert_eq!(pruned_ids(&t), [a, b, m]);
+    assert_eq!(n, 3);
+
+    // collateral went back to each writer; reserves and list_open follow
+    let mut expected = before.clone();
+    expected.writer.usdx += STRIKE; // a: PUT, USDx
+    expected.writer.rwa += QTY; // b: CALL on RWA
+    expected.maker2.bond += QTY; // m: CALL on BOND
+    expected.contract.usdx -= STRIKE;
+    expected.contract.rwa -= QTY;
+    expected.contract.bond -= QTY;
+    expected.open_usdx -= STRIKE;
+    expected.open_rwa -= QTY;
+    expected.open_bond -= QTY;
+    expected.open = std::vec![live];
+    for id in [a, b, m] {
+        expected.options[id as usize].state = State::Expired;
+    }
+    assert_eq!(t.snap(), expected);
+    assert_eq!(t.state(live), State::Offered);
+    assert_eq!(t.state(act), State::Active);
+    assert_eq!(t.state(settled), State::Settled);
+    assert_eq!(t.state(cancelled), State::Cancelled);
+    assert_eq!(t.c.writer_open_count(&t.writer), 1);
+    assert_eq!(t.c.writer_open_count(&t.maker2), 0);
+
+    // nothing left to prune: no-op, no events
+    assert_eq!(t.c.prune_expired(&all), 0);
+    assert!(pruned_events(&t).is_empty());
+    assert_eq!(t.c.prune_expired(&Vec::new(&t.env)), 0);
+    assert_eq!(t.snap(), expected);
+
+    // Expired is terminal; the Active option is still the writer's to reclaim
+    assert_err(t.c.try_cancel_offer(&t.writer, &a), Error::WrongState);
+    assert_err(t.c.try_reclaim(&t.writer, &a), Error::WrongState);
+    assert_err(t.c.try_buy(&t.holder, &b), Error::WrongState);
+    t.c.reclaim(&t.maker2, &act);
+    assert_eq!(t.state(act), State::Expired);
+}
+
+#[test]
+fn prune_expired_skips_frozen_call_writer() {
+    let t = setup();
+    let c = t.call(&t.writer);
+    let p = t.put(&t.writer);
+    t.at(EXPIRY);
+    // the issuer freezes the writer on RWA: the CALL collateral cannot go back
+    t.sac(&t.rwa).set_authorized(&t.writer, &false);
+    let before = t.snap();
+
+    assert_eq!(t.c.prune_expired(&vec![&t.env, c]), 0);
+    assert!(pruned_events(&t).is_empty());
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.state(c), State::Offered);
+    assert_eq!(t.c.writer_open_count(&t.writer), 2);
+
+    // in a batch only the CALL is skipped; the PUT (USDx collateral) is pruned
+    assert_eq!(t.c.prune_expired(&vec![&t.env, c, p]), 1);
+    assert_eq!(pruned_ids(&t), [p]);
+    assert_eq!(t.state(c), State::Offered);
+    assert_eq!(t.state(p), State::Expired);
+    assert_eq!(t.open(), [c]);
+    assert_eq!(t.bal(&t.usdx, &t.writer), USDX_START);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    assert_eq!(t.bal(&t.rwa, &t.contract), QTY);
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY);
+    assert_eq!(t.c.writer_open_count(&t.writer), 1);
+
+    // after the issuer unfreezes the writer, the CALL is pruned
+    t.sac(&t.rwa).set_authorized(&t.writer, &true);
+    assert_eq!(t.c.prune_expired(&vec![&t.env, c]), 1);
+    assert_eq!(pruned_ids(&t), [c]);
+    assert_eq!(t.state(c), State::Expired);
+    assert_eq!(t.bal(&t.rwa, &t.writer), UNDERLYING_START);
+    assert_eq!(t.bal(&t.rwa, &t.contract), 0);
+    assert_eq!(t.c.open_collateral(&t.rwa), 0);
+    assert!(t.open().is_empty());
+    assert_eq!(t.c.writer_open_count(&t.writer), 0);
+}
+
+#[test]
+fn prune_expired_needs_no_auth() {
+    let t = setup();
+    let p = t.put(&t.writer);
+    let c = t.call(&t.writer);
+    t.at(EXPIRY);
+
+    // no mocked authorization of any kind from here on
+    t.env.set_auths(&[]);
+    // control: an auth-gated call now fails
+    assert_host_abort(t.c.try_cancel_offer(&t.writer, &p));
+
+    assert_eq!(t.c.prune_expired(&vec![&t.env, p, c]), 2);
+    assert!(t.env.auths().is_empty());
+    assert_eq!(pruned_ids(&t), [p, c]);
+    assert_eq!(t.state(p), State::Expired);
+    assert_eq!(t.state(c), State::Expired);
+    assert_eq!(t.bal(&t.usdx, &t.writer), USDX_START);
+    assert_eq!(t.bal(&t.rwa, &t.writer), UNDERLYING_START);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    assert_eq!(t.c.open_collateral(&t.rwa), 0);
+    assert!(t.open().is_empty());
+    assert_eq!(t.c.writer_open_count(&t.writer), 0);
+}
+
+#[test]
+fn backstop_rejects_contract_address_as_party() {
+    // Under mock_all_auths the contract's own address passes require_auth (the
+    // v1.2 build let it buy its own offer with pooled collateral), so the
+    // explicit v1.3 check is the only thing that can fail these calls.
+    let t = setup();
+    let offered = t.put(&t.writer);
+    let active = t.call(&t.writer);
+    t.c.buy(&t.holder, &active);
+    let (sac, code, issuer) = new_asset(&t, true);
+    let me = &t.contract;
+    let before = t.snap();
+
+    for token in [&t.rwa, &t.bond] {
+        for ty in [OptionType::Put, OptionType::Call] {
+            assert_err(
+                t.c.try_create_offer(me, token, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+                Error::InvalidArgs,
+            );
+        }
+    }
+    // checked right after auth, before AssetNotAllowed
+    assert_err(
+        t.c.try_create_offer(me, &sac, &OptionType::Put, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+        Error::InvalidArgs,
+    );
+    assert_err(t.c.try_buy(me, &offered), Error::InvalidArgs);
+    assert_err(t.c.try_exercise(me, &active), Error::InvalidArgs);
+    assert_err(t.c.try_transfer(&t.holder, me, &active), Error::InvalidArgs);
+    assert_err(t.c.try_transfer(me, &t.maker2, &active), Error::InvalidArgs);
+    assert_err(t.c.try_list_asset(me, &code, &issuer), Error::InvalidArgs);
+
+    assert_eq!(t.snap(), before);
+    assert!(!t.c.is_listed(&sac));
+    assert_eq!(t.c.asset_count(), 2);
+    assert_eq!(t.c.writer_open_count(me), 0);
+
+    // control: the same calls by real parties succeed
+    t.c.buy(&t.maker2, &offered);
+    t.c.transfer(&t.holder, &t.maker2, &active);
+    assert_eq!(t.c.list_asset(&t.holder, &code, &issuer), sac);
+}
+
+#[test]
+fn get_assets_paging() {
+    let t = setup();
+    let page = |from: u32, limit: u32| -> std::vec::Vec<Address> {
+        t.c.list_assets(&from, &limit).iter().collect()
+    };
+    assert_eq!(page(0, 1), std::slice::from_ref(&t.rwa));
+    assert_eq!(page(1, 50), std::slice::from_ref(&t.bond));
+    assert!(page(2, 5).is_empty());
+    assert!(page(0, 0).is_empty());
+    assert!(page(u32::MAX, 50).is_empty());
+    assert_eq!(page(0, u32::MAX), [t.rwa.clone(), t.bond.clone()]);
+
+    // 60 listed assets: one call returns at most MAX_PAGE = 50, in listing order
+    let mut expected = std::vec![t.rwa.clone(), t.bond.clone()];
+    for _ in 2..60 {
+        let (sac, code, issuer) = new_asset(&t, false);
+        assert_eq!(t.c.list_asset(&t.writer, &code, &issuer), sac);
+        expected.push(sac);
+    }
+    assert_eq!(t.c.asset_count(), 60);
+    assert_eq!(MAX_PAGE, 50);
+    assert_eq!(page(0, 1000), expected[..50].to_vec());
+    assert_eq!(page(50, 1000), expected[50..].to_vec());
+    assert_eq!(page(55, 50), expected[55..].to_vec());
+    assert!(page(60, 1).is_empty());
+
+    // paging with from += len visits every asset exactly once
+    let mut seen = std::vec::Vec::new();
+    let mut from = 0u32;
+    loop {
+        let p = page(from, 7);
+        if p.is_empty() {
+            break;
+        }
+        from += p.len() as u32;
+        seen.extend(p);
+    }
+    assert_eq!(seen, expected);
+}
+
+#[test]
+fn events_for_v13() {
+    use soroban_sdk::xdr::ContractEventBody;
+    let t = setup();
+
+    // AssetListed: topics ["asset_listed", sac], data {code, issuer, lister}
+    let (sac, code, issuer) = new_asset(&t, true);
+    t.c.list_asset(&t.maker2, &code, &issuer);
+    let evs = t.env.events().all().filter_by_contract(&t.contract);
+    assert_eq!(
+        evs,
+        [AssetListed {
+            sac: sac.clone(),
+            code: code.clone(),
+            issuer: issuer.clone(),
+            lister: t.maker2.clone(),
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    let ContractEventBody::V0(body) = &evs.events()[0].body;
+    assert_eq!(body.topics.len(), 2);
+    assert_eq!(body.topics[0], sym("asset_listed"));
+    assert_eq!(Address::try_from_val(&t.env, &body.topics[1]).unwrap(), sac);
+
+    // OfferPruned: topics ["offer_pruned", id], data {pruner}, one per pruned id
+    let id = t.put(&t.writer);
+    t.at(EXPIRY);
+    assert_eq!(t.c.prune_expired(&vec![&t.env, id]), 1);
+    assert_eq!(
+        t.env
+            .events()
+            .all()
+            .filter_by_contract(&t.contract)
+            .events()
+            .len(),
+        1
+    );
+    let pruned = pruned_events(&t);
+    assert_eq!(pruned.len(), 1);
+    assert_eq!(pruned[0].0, id);
+
+    // failed v1.3 calls publish nothing
+    assert_err(
+        t.c.try_list_asset(&t.maker2, &code, &issuer),
+        Error::AlreadyListed,
+    );
+    assert!(t.env.events().all().events().is_empty());
+    assert_err(t.c.try_prune_expired(&vec![&t.env, 99]), Error::NotFound);
+    assert!(t.env.events().all().events().is_empty());
+}
+
+#[test]
+fn prune_expired_extends_ttls() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.at(EXPIRY);
+    age_below_ttl_threshold(&t);
+    assert_eq!(t.c.prune_expired(&vec![&t.env, id]), 1);
+    assert_ttls_extended(&t, id);
+}
+
+#[test]
+fn list_asset_and_create_offer_extend_registry_ttls() {
+    let t = setup();
+    let (sac, code, issuer) = new_asset(&t, true);
+    t.put(&t.writer);
+    age_below_ttl_threshold(&t);
+
+    // list_asset: instance, code and the new registry entry (ABI §8)
+    t.c.list_asset(&t.maker2, &code, &issuer);
+    assert!(
+        t.instance_ttl() >= 29 * DAY,
+        "instance TTL {}",
+        t.instance_ttl()
+    );
+    assert!(
+        t.env.deployer().get_contract_code_ttl(&t.contract) >= 29 * DAY,
+        "code TTL"
+    );
+    let listed = key_ttl(&t, "Listed", sac.into_val(&t.env));
+    assert!(listed >= 29 * DAY, "Listed(sac) TTL {listed}");
+
+    // create_offer reads Listed(underlying) and WriterOpen(writer) on a
+    // state-changing path, so both are extended
+    let id = t.put(&t.writer);
+    assert_ttls_extended(&t, id);
+    let rwa = key_ttl(&t, "Listed", t.rwa.clone().into_val(&t.env));
+    assert!(rwa >= 29 * DAY, "Listed(rwa) TTL {rwa}");
+    let wo = key_ttl(&t, "WriterOpen", t.writer.clone().into_val(&t.env));
+    assert!(wo >= 29 * DAY, "WriterOpen(writer) TTL {wo}");
 }
