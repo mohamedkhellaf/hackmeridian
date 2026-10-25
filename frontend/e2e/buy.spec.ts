@@ -8,8 +8,8 @@ test('buy review gates on the checkbox, then confirmed step, then exercise', asy
   await openBuyDialogForSeed(page)
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('You pay now')
-  await expect(dialog).toContainText('1.8 USDx')
-  await expect(dialog).toContainText('50 USDx locked')
+  await expect(dialog).toContainText('1.80 USDx')
+  await expect(dialog).toContainText('50.00 USDx locked')
   await expect(dialog).toContainText(/Issuer controls on regulated assets \(freeze, clawback\) can block settlement/)
   await expect(dialog).toContainText(/not refunded/)
   // Pre-trade checks resolve against the client.

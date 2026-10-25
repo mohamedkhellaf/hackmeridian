@@ -9,7 +9,7 @@ export async function openApp(page: Page) {
 }
 
 export async function connect(page: Page) {
-  await page.getByRole('button', { name: 'Connect Freighter' }).click()
+  await page.getByRole('button', { name: 'Connect wallet' }).click()
   await expect(page.getByRole('button', { name: 'Disconnect' })).toBeVisible()
 }
 
@@ -42,7 +42,7 @@ export async function totalHeld(page: Page, code: string): Promise<number> {
 }
 
 export async function openBuyDialogForSeed(page: Page) {
-  // Seeded best-priced FUND put (maker B, 1.8 USDx for 5 FUND).
-  await page.getByRole('button', { name: /^Buy put on 5 FUND from GMAK…BBBB/ }).click()
+  // Seeded best-priced FUND put (maker B, 1.80 USDx for 5.00 FUND).
+  await page.getByRole('button', { name: /^Buy put on 5.00 FUND from GMAK…BBBB/ }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
 }

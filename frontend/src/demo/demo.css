@@ -2,10 +2,10 @@
 body.present {
   font-size: 18px;
 }
-body.present .app {
+body.present .content {
   padding-bottom: 72px;
 }
-body.present footer {
+body.present .shell-footer {
   font-size: 0.8em;
 }
 

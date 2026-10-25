@@ -33,12 +33,22 @@ function NavLink({ item, current, badge }: { item: NavItem; current: Route; badg
   )
 }
 
-/** Wallet chip: green dot + short address + Disconnect, or a primary Connect button. */
-export function WalletChip({ address, onConnect, onDisconnect }: { address: string | null; onConnect: () => void; onDisconnect: () => void }) {
+/** Wallet chip: green dot + wallet name and short address + Disconnect, or a primary Connect button. */
+export function WalletChip({
+  address,
+  walletName,
+  onConnect,
+  onDisconnect,
+}: {
+  address: string | null
+  walletName?: string | null
+  onConnect: () => void
+  onDisconnect: () => void
+}) {
   if (!address) {
     return (
       <Button variant="primary" onClick={onConnect}>
-        Connect Freighter
+        Connect wallet
       </Button>
     )
   }
@@ -46,7 +56,7 @@ export function WalletChip({ address, onConnect, onDisconnect }: { address: stri
     <div className="wallet-chip">
       <span className="wallet-pill" title={address}>
         <StatusDot tone="ok" />
-        <Mono>{shortAddress(address)}</Mono>
+        <Mono>{walletName ? `${walletName} · ${shortAddress(address)}` : shortAddress(address)}</Mono>
       </span>
       <Button variant="ghost" size="sm" onClick={onDisconnect}>
         Disconnect

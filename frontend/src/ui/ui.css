@@ -159,6 +159,9 @@
 .ui-dot--neutral {
   background: var(--muted);
 }
+.ui-dot--info {
+  background: var(--link);
+}
 
 /* Chip */
 .ui-chip {

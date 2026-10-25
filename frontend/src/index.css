@@ -106,6 +106,9 @@ textarea,
 button {
   font: inherit;
 }
+button {
+  color: inherit;
+}
 
 /* Keyboard focus: one ring everywhere. */
 :focus-visible {

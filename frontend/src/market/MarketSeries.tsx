@@ -1,6 +1,6 @@
 import type { OptionOffer } from '../options/types'
 import { requiredCollateral } from '../options/types'
-import { formatAmount, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
+import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
 import { AssetBadge, Button, Mono, Tag } from '../ui'
 import { formatCountdown, groupSeries } from './series'
 import './market.css'
@@ -8,12 +8,12 @@ import './market.css'
 // Display only: premium per one unit of underlying.
 function premiumPerUnit(o: OptionOffer): string {
   if (o.underlyingQty === 0n) return '–'
-  return formatAmount((o.totalPremium * 10n ** BigInt(o.underlying.decimals)) / o.underlyingQty, o.quote.decimals)
+  return formatDisplay((o.totalPremium * 10n ** BigInt(o.underlying.decimals)) / o.underlyingQty, o.quote.decimals)
 }
 
 function locked(o: OptionOffer): string {
   const c = requiredCollateral(o)
-  return `${formatAmount(c.amount, c.token.decimals)} ${c.token.code} locked`
+  return `${formatDisplay(c.amount, c.token.decimals)} ${c.token.code} locked`
 }
 
 export function MarketSeries({
@@ -34,8 +34,8 @@ export function MarketSeries({
 
   const buyProps = (o: OptionOffer) => ({
     disabled: !me || busy || o.writer === me,
-    title: !me ? 'Connect Freighter to buy' : o.writer === me ? 'This is your own offer' : busy ? 'Another transaction is in progress' : undefined,
-    'aria-label': `Buy ${o.kind} on ${formatAmount(o.underlyingQty, o.underlying.decimals)} ${o.underlying.code} from ${shortAddress(o.writer)}`,
+    title: !me ? 'Connect a wallet to buy' : o.writer === me ? 'This is your own offer' : busy ? 'Another transaction is in progress' : undefined,
+    'aria-label': `Buy ${o.kind} on ${formatDisplay(o.underlyingQty, o.underlying.decimals)} ${o.underlying.code} from ${shortAddress(o.writer)}`,
   })
 
   return (
@@ -93,13 +93,13 @@ export function MarketSeries({
                           )}
                         </td>
                         <td>
-                          {formatAmount(o.underlyingQty, o.underlying.decimals)} {o.underlying.code}
+                          {formatDisplay(o.underlyingQty, o.underlying.decimals)} {o.underlying.code}
                         </td>
                         <td>
-                          {formatAmount(o.totalStrike, o.quote.decimals)} {o.quote.code}
+                          {formatDisplay(o.totalStrike, o.quote.decimals)} {o.quote.code}
                         </td>
                         <td className="ui-strong">
-                          {formatAmount(o.totalPremium, o.quote.decimals)} {o.quote.code}
+                          {formatDisplay(o.totalPremium, o.quote.decimals)} {o.quote.code}
                         </td>
                         <td>{premiumPerUnit(o)}</td>
                         <td className="mk-backing">{locked(o)}</td>
@@ -122,10 +122,10 @@ export function MarketSeries({
                   <li key={o.id.toString()} className="mk-offer">
                     <div className="mk-offer-main">
                       <span className="mk-offer-price">
-                        {formatAmount(o.totalPremium, o.quote.decimals)} {o.quote.code} {best && <Tag tone="ok">Best</Tag>}
+                        {formatDisplay(o.totalPremium, o.quote.decimals)} {o.quote.code} {best && <Tag tone="ok">Best</Tag>}
                       </span>
                       <span className="mk-offer-sub">
-                        {formatAmount(o.underlyingQty, o.underlying.decimals)} {o.underlying.code} · {premiumPerUnit(o)} / unit · {locked(o)}
+                        {formatDisplay(o.underlyingQty, o.underlying.decimals)} {o.underlying.code} · {premiumPerUnit(o)} / unit · {locked(o)}
                       </span>
                       <span className="mk-offer-sub">
                         Maker <Mono>{shortAddress(o.writer)}</Mono>

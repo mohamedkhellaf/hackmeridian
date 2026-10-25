@@ -13,7 +13,7 @@ test('writer claims delivery after a second account buys and exercises', async (
   // B buys it and exercises (same page session: mock state is in memory).
   await switchTo(page, ADDR_B)
   await goTo(page, 'Markets')
-  await page.getByRole('button', { name: /^Buy put on 5 FUND from GBE6…3ZEG/ }).click()
+  await page.getByRole('button', { name: /^Buy put on 5.00 FUND from GBE6…3ZEG/ }).click()
   await page.getByRole('dialog').getByRole('checkbox', { name: /I understand/ }).check()
   await page.getByRole('dialog').getByRole('button', { name: /Confirm in wallet/ }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Back to markets' }).click()

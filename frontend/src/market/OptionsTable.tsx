@@ -12,7 +12,7 @@ import {
   statusOf,
 } from '../portfolio/positions'
 import type { Role } from '../portfolio/positions'
-import { Button, Tag } from '../ui'
+import { Button, StatusDot, Tag } from '../ui'
 import '../portfolio/portfolio.css'
 
 export interface RowAction {
@@ -25,7 +25,7 @@ function StatusText({ o, role }: { o: OptionOffer; role: Role }) {
   const s = statusOf(o, role)
   return (
     <span className={`pf-status pf-status--${s.tone}`}>
-      <i aria-hidden="true" />
+      <StatusDot tone={s.tone} />
       {s.label}
     </span>
   )
@@ -87,10 +87,6 @@ export function OptionRow({ o, me, action }: { o: OptionOffer; me: string | null
       </td>
       <td>
         <StatusText o={o} role={role} />
-        {/* Raw contract state, visually hidden: the buy e2e spec reads `.state`. The visible label is above. */}
-        <span className="state pf-sr" aria-hidden="true">
-          {o.state}
-        </span>
       </td>
       <td>
         <ActionButton o={o} role={role} action={action} />

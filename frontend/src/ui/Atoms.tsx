@@ -7,7 +7,7 @@ export function Tag({ tone = 'neutral', className, ...rest }: HTMLAttributes<HTM
   return <span className={['ui-tag', `ui-tag--${tone}`, className].filter(Boolean).join(' ')} {...rest} />
 }
 
-export type DotTone = 'ok' | 'warn' | 'danger' | 'neutral'
+export type DotTone = 'ok' | 'warn' | 'danger' | 'neutral' | 'info'
 
 /** 7px status dot. Decorative: always pair with text. */
 export function StatusDot({ tone = 'ok', className }: { tone?: DotTone; className?: string }) {

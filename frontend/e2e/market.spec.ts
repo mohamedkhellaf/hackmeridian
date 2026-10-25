@@ -4,16 +4,16 @@ import { expectOpenOffers, goTo, openApp } from './helpers.ts'
 test('market lists the seeded series', async ({ page }) => {
   await openApp(page)
   await expectOpenOffers(page, 4)
-  await expect(page.getByRole('heading', { name: /FUND PUT Strike 10 USDx/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /FUND CALL Strike 12 USDx/ })).toBeVisible()
-  await expect(page.getByRole('heading', { name: /BOND PUT Strike 98 USDx/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /FUND PUT Strike 10.00 USDx/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /FUND CALL Strike 12.00 USDx/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /BOND PUT Strike 98.00 USDx/ })).toBeVisible()
 })
 
 test('best-price badge only on the series with several offers', async ({ page }) => {
   await openApp(page)
   await expect(page.getByText('Best price')).toHaveCount(1)
   // The cheaper 5 FUND put (maker B, 0.36/unit) carries it.
-  await expect(page.getByRole('row').filter({ hasText: 'GMAK…BBBB' }).filter({ hasText: '5 FUND' })).toContainText('Best price')
+  await expect(page.getByRole('row').filter({ hasText: 'GMAK…BBBB' }).filter({ hasText: '5.00 FUND' })).toContainText('Best price')
 })
 
 test('series cards show makers competing and the countdown', async ({ page }) => {
