@@ -308,15 +308,15 @@ lifecycle() {
   else
     check_deltas "${tag}_CREATE_BAL" "m1U=-$q ctrU=$q ocU=$q" || return 1
   fi
-  [[ -z $checks ]] || expect_fail "${tag}_FAIL_SELF_TRADE" 11 SelfTrade "$ID_MAKER1" buy --buyer "$MAKER1" --id "$id"
+  [[ -z $checks ]] || expect_fail "${tag}_FAIL_SELF_TRADE" 111 SelfTrade "$ID_MAKER1" buy --buyer "$MAKER1" --id "$id"
 
   send "${tag}_BUY" "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$id" || return 1
   expect_option "${tag}_BUY_STATE" "$id" Active "$INVESTOR" || return 1
   snapshot "$tag after buy #$id" "$u" "$sym"
   check_deltas "${tag}_BUY_BAL" "invQ=-$p m1Q=$p" || return 1
   if [[ -n $checks ]]; then
-    expect_fail FAIL_NOT_HOLDER 8 NotHolder "$ID_MAKER2" exercise --holder "$MAKER2" --id "$id"
-    expect_fail FAIL_NOT_EXPIRED 10 NotExpired "$ID_MAKER1" reclaim --writer "$MAKER1" --id "$id"
+    expect_fail FAIL_NOT_HOLDER 108 NotHolder "$ID_MAKER2" exercise --holder "$MAKER2" --id "$id"
+    expect_fail FAIL_NOT_EXPIRED 110 NotExpired "$ID_MAKER1" reclaim --writer "$MAKER1" --id "$id"
   fi
 
   send "${tag}_EXERCISE" "$ID_INVESTOR" exercise --holder "$INVESTOR" --id "$id" || return 1
@@ -327,7 +327,7 @@ lifecycle() {
   else
     check_deltas "${tag}_EXERCISE_BAL" "invQ=-$k invU=$q ctrQ=$k ctrU=-$q ocU=-$q ocQ=$k" || return 1
   fi
-  [[ -z $checks ]] || expect_fail FAIL_DOUBLE_EXERCISE 6 WrongState "$ID_INVESTOR" exercise --holder "$INVESTOR" --id "$id"
+  [[ -z $checks ]] || expect_fail FAIL_DOUBLE_EXERCISE 106 WrongState "$ID_INVESTOR" exercise --holder "$INVESTOR" --id "$id"
 
   send "${tag}_CLAIM" "$ID_MAKER1" claim_delivery --writer "$MAKER1" --id "$id" || return 1
   expect_option "${tag}_CLAIM_STATE" "$id" Settled "$INVESTOR" || return 1
@@ -366,7 +366,7 @@ expiry_finish() {
     fail EXP_WAIT "ledger did not pass expiry $E_EXP"
     return 1
   }
-  expect_fail FAIL_BUY_EXPIRED 9 Expired "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$E_ID"
+  expect_fail FAIL_BUY_EXPIRED 109 Expired "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$E_ID"
   snapshot "EXP before reclaim #$E_ID" "$RWA_SAC" RWA
   send EXP_RECLAIM "$ID_MAKER1" reclaim --writer "$MAKER1" --id "$E_ID" || return 1
   expect_option EXP_RECLAIM_STATE "$E_ID" Expired || return 1
@@ -399,8 +399,8 @@ competition() {
   echo "   same terms (5 RWA put, strike_total $PUT_STRIKE); cheaper premium for the buyer: #$b (maker2)"
   n1="$(jq length <<<"$open")"
 
-  expect_fail FAIL_NOT_WRITER 7 NotWriter "$ID_MAKER2" cancel_offer --writer "$MAKER2" --id "$a"
-  expect_fail FAIL_NOT_ELIGIBLE 4 NotEligible "$ID_OUTSIDER" buy --buyer "$OUTSIDER" --id "$a"
+  expect_fail FAIL_NOT_WRITER 107 NotWriter "$ID_MAKER2" cancel_offer --writer "$MAKER2" --id "$a"
+  expect_fail FAIL_NOT_ELIGIBLE 104 NotEligible "$ID_OUTSIDER" buy --buyer "$OUTSIDER" --id "$a"
 
   send COMP_MAKER1_CANCEL "$ID_MAKER1" cancel_offer --writer "$MAKER1" --id "$a" || return 1
   expect_option COMP_CANCEL_STATE "$a" Cancelled || return 1
@@ -460,10 +460,10 @@ lifecycle P0_PUT Put "$RWA_SAC" RWA "$PUT_QTY" "$PUT_STRIKE" "$PUT_PREM" checks 
 
 section "P0-2 argument and allowlist checks (simulated)"
 NOW="$(date +%s)"
-expect_fail FAIL_ASSET_NOT_ALLOWED 3 AssetNotAllowed "$ID_MAKER1" create_offer --writer "$MAKER1" \
+expect_fail FAIL_ASSET_NOT_ALLOWED 103 AssetNotAllowed "$ID_MAKER1" create_offer --writer "$MAKER1" \
   --underlying "$USDX_SAC" --option_type Put --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" \
   --premium_total "$PUT_PREM" --expiry "$((NOW + 3600))"
-expect_fail FAIL_INVALID_ARGS 2 InvalidArgs "$ID_MAKER1" create_offer --writer "$MAKER1" \
+expect_fail FAIL_INVALID_ARGS 102 InvalidArgs "$ID_MAKER1" create_offer --writer "$MAKER1" \
   --underlying "$RWA_SAC" --option_type Put --qty 0 --strike_total "$PUT_STRIKE" \
   --premium_total "$PUT_PREM" --expiry "$((NOW + 3600))"
 
