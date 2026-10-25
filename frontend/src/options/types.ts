@@ -4,8 +4,14 @@
 
 export type OptionKind = 'put' | 'call'
 
-// 'expired' = past expiry, collateral still in the contract; 'reclaimed' = writer took it back.
-export type OptionState = 'offered' | 'active' | 'exercised' | 'expired' | 'reclaimed' | 'cancelled'
+// Mapping from the on-chain State (docs/contract-abi.md, see abi.ts `stateFromAbi`):
+//   Offered / Active, now < expiry  -> 'offered' / 'active'
+//   Offered / Active, now >= expiry -> 'expired'   (derived: collateral still locked, writer can reclaim)
+//   Expired (writer reclaimed)      -> 'reclaimed' (terminal)
+//   Exercised                       -> 'exercised' (writer's proceeds wait in the contract: claim_delivery)
+//   Settled                         -> 'settled'   (terminal)
+//   Cancelled                       -> 'cancelled' (terminal)
+export type OptionState = 'offered' | 'active' | 'exercised' | 'settled' | 'expired' | 'reclaimed' | 'cancelled'
 
 export interface TokenInfo {
   contractId: string // SAC contract ID
@@ -52,6 +58,15 @@ export interface CollateralLine {
   offered: bigint // backing open offers
   active: bigint // backing sold options
   pendingReclaim: bigint // backing expired options the writer hasn't reclaimed
+  unclaimed: bigint // exercised options' proceeds the writer hasn't claimed yet (claim_delivery)
+}
+
+// Reserved (open_collateral) vs actually held (SAC balance of the contract) for one token.
+// held < reserved means the issuer clawed back from the contract.
+export interface CollateralHealth {
+  token: TokenInfo
+  reserved: bigint
+  held: bigint
 }
 
 // Puts lock the total strike in the quote token; covered calls lock the underlying.

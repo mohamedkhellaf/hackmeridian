@@ -1,5 +1,6 @@
-// Decode Stellar/Soroban failures into human messages. Update the tables below when the
-// final options contract error codes are published.
+import { config } from '../config'
+
+// Decode Stellar/Soroban failures into human messages.
 
 // SAC (Stellar Asset Contract) errors.
 export const SAC_ERRORS: Record<number, string> = {
@@ -8,14 +9,36 @@ export const SAC_ERRORS: Record<number, string> = {
   11: 'Token balance is deauthorized: the issuer has frozen it or has not authorized your account.',
 }
 
-// Options contract errors (spike codes; final contract may differ).
+// Options contract errors: docs/contract-abi.md section 2 (public ABI, codes never renumbered).
 export const OPTIONS_ERRORS: Record<number, string> = {
   1: 'Option not found.',
-  2: 'This option has expired.',
-  3: 'This option has not expired yet.',
-  4: 'This option is already settled.',
-  5: 'Only the option writer can do this.',
-  6: 'Invalid arguments for this option.',
+  2: 'Invalid offer: amounts must be positive and the expiry must be in the future.',
+  3: 'This asset is not supported by the contract.',
+  4: 'Your account is not authorized to hold this asset (the issuer has not approved it).',
+  5: 'The issuer has not authorized the options contract for this asset yet.',
+  6: 'This action is not valid for the option in its current state.',
+  7: 'Only the option writer can do this.',
+  8: 'Only the option holder can do this.',
+  9: 'This option has expired.',
+  10: 'This option has not expired yet.',
+  11: 'You cannot buy your own offer.',
+  12: 'Amount overflow.',
+  13: 'Invalid contract configuration.',
+}
+
+// Codes 10-13 exist in both tables (options: NotExpired/SelfTrade/Overflow/InvalidConfig; SAC:
+// balance/deauthorized/trustline). Error(Contract, #n) carries no contract id, so we look at the
+// closest contract id mentioned before it in the diagnostic text.
+function lookupCode(raw: string, code: number, at: number): string | undefined {
+  const opt = OPTIONS_ERRORS[code]
+  const sac = SAC_ERRORS[code]
+  if (opt && !sac) return opt
+  if (sac && !opt) return sac
+  if (!opt || !sac) return undefined
+  const ids = [...raw.slice(0, at).matchAll(/C[A-Z2-7]{55}/g)]
+  const last = ids[ids.length - 1]?.[0]
+  if (last && config.optionsContractId) return last === config.optionsContractId ? opt : sac
+  return `${opt} (or, if raised by the token contract: ${sac})`
 }
 
 function messageOf(e: unknown): string {
@@ -39,13 +62,12 @@ export function describeError(e: unknown): string {
   if (/account entry is missing/.test(lower)) return 'Account not funded on Testnet. Fund it with friendbot first.'
   if (/trustline entry is missing/.test(lower)) return 'Missing trustline for this token. Add a trustline first.'
 
-  const codes = [...raw.matchAll(/Error\(Contract,\s*#(\d+)\)/g)].map((m) => Number(m[1]))
-  for (const c of codes) {
-    // SAC codes (>= 10) don't overlap the options table, so one lookup order is enough.
-    const msg = SAC_ERRORS[c] ?? OPTIONS_ERRORS[c]
+  const found = [...raw.matchAll(/Error\(Contract,\s*#(\d+)\)/g)].map((m) => ({ code: Number(m[1]), at: m.index ?? 0 }))
+  for (const { code, at } of found) {
+    const msg = lookupCode(raw, code, at)
     if (msg) return msg
   }
-  if (codes.length) return `Contract error #${codes[0]}.`
+  if (found.length) return `Contract error #${found[0].code}.`
 
   if (/reject|denied|declined|cancel/.test(lower) || (e instanceof Error && e.name === 'UserRejectedError'))
     return 'You rejected the request in your wallet.'

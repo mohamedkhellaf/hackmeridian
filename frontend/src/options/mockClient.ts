@@ -1,6 +1,6 @@
 import type { OptionsClient } from './client'
-import { requiredCollateral } from './types'
-import type { CollateralLine, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
+import { collateralLines, reservedOf } from './abi'
+import type { CollateralHealth, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
 
 // In-memory stand-in for the options contract. Fictional assets and accounts,
 // fake tx hashes. The UI shows a "mock data" banner while this is in use.
@@ -62,16 +62,20 @@ export class MockOptionsClient implements OptionsClient {
   }
 
   async openCollateral() {
-    const lines = new Map<string, CollateralLine>()
-    for (const o of this.options.map((x) => this.withExpiry(x))) {
-      const { token, amount } = requiredCollateral(o)
-      const line = lines.get(token.contractId) ?? { token, offered: 0n, active: 0n, pendingReclaim: 0n }
-      if (o.state === 'offered') line.offered += amount
-      else if (o.state === 'active') line.active += amount
-      else if (o.state === 'expired') line.pendingReclaim += amount
-      lines.set(token.contractId, line)
-    }
-    return [...lines.values()]
+    return collateralLines(this.options.map((x) => this.withExpiry(x)))
+  }
+
+  // The mock contract is never clawed back: held always equals reserved.
+  async collateralHealth(): Promise<CollateralHealth[]> {
+    return collateralLines(this.options.map((x) => this.withExpiry(x))).map((l) => ({
+      token: l.token,
+      reserved: reservedOf(l),
+      held: reservedOf(l),
+    }))
+  }
+
+  async isEligible(_token: string, _who: string) {
+    return true
   }
 
   async createOffer(offer: NewOffer, writer: string) {
@@ -90,6 +94,7 @@ export class MockOptionsClient implements OptionsClient {
       const o = this.find(id)
       if (o.state !== 'offered') throw new Error('Offer is no longer available')
       if (o.expiry <= now()) throw new Error('Offer has expired')
+      if (o.writer === buyer) throw new Error('You cannot buy your own offer')
       o.holder = buyer
       o.state = 'active'
     })
@@ -115,6 +120,16 @@ export class MockOptionsClient implements OptionsClient {
     })
   }
 
+  claimDelivery(id: bigint, writer: string) {
+    return this.tx(() => {
+      const o = this.find(id)
+      if (o.writer !== writer) throw new Error('Only the writer can claim')
+      if (o.state !== 'exercised') throw new Error('Nothing to claim')
+      o.state = 'settled'
+    })
+  }
+
+  // Allowed for unsold offers before or after expiry (ABI cancel_offer).
   cancelOffer(id: bigint, writer: string) {
     return this.tx(() => {
       const o = this.find(id)
