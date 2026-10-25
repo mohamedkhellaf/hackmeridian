@@ -1,0 +1,44 @@
+.issuer .issuer-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.issuer .issuer-mono {
+  font-family: var(--mono);
+  word-break: break-all;
+}
+
+.issuer .issuer-status {
+  margin: 0;
+}
+
+.issuer .issuer-danger {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.issuer .issuer-danger h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--err);
+}
+
+.issuer button.issuer-danger-btn {
+  background: var(--err);
+  border-color: var(--err);
+  color: #fff;
+}
+
+.issuer .issuer-confirm {
+  border: 1px solid var(--err);
+  background: var(--err-bg);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.issuer .issuer-confirm p {
+  margin: 0 0 10px;
+  word-break: break-all;
+}
