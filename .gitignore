@@ -1,0 +1,21 @@
+# Rust's output directory
+target
+
+# Local settings
+.soroban
+.stellar
+
+# Node
+node_modules
+dist
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.idea
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
