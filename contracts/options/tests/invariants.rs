@@ -89,7 +89,10 @@
 //! `PROPTEST_CASES=<n>` changes the number of cases. `PROPTEST_RNG_SEED=<u64>` fixes the RNG so a
 //! run, and any failure it finds, is reproducible; without it every run draws a fresh seed (no
 //! regression files are written). `INVARIANTS_TRACE=1 ... -- --nocapture` prints every passing
-//! sequence.
+//! sequence. At the end the property test prints a predicted / observed tally of every
+//! (call, outcome) pair (`-- --nocapture` shows it for a passing run), and a run of at least 100
+//! cases fails if one of the `REQUIRED_COVERAGE` pairs (the v1.3 `list_asset`, `prune_expired`
+//! and `TenorOutOfRange` paths among them) never happened.
 
 // Token/holder indices address several parallel tables (balances, names, reserves) at once.
 #![allow(clippy::needless_range_loop)]
@@ -106,6 +109,8 @@ use soroban_sdk::{
     xdr::{self, ScErrorType},
     Address, Env, Event as _, InvokeError, TryFromVal,
 };
+use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fmt::{self, Debug, Write as _};
 
 // ---------------------------------------------------------------------------------------------
@@ -424,7 +429,7 @@ enum Op {
     /// EQTY issuer `set_authorized(contract, bool)`.
     EqtyContractAuth(bool),
     /// v1.3 backstop: the contract's own address as writer / buyer / holder / transfer recipient
-    /// (kind, id selector).
+    /// / `list_asset` lister (kind, id or `LIST_CANDIDATES` selector).
     Backstop(u8, u8),
 }
 
@@ -797,7 +802,18 @@ impl Model {
                 let (pt, pa) = proceeds(o);
                 Ok(vec![(pt, CONTRACT, who, pa)])
             }
-            Act::List { code, issuer, .. } => self.list_target(code, issuer).map(|_| vec![]),
+            Act::List {
+                lister,
+                code,
+                issuer,
+            } => {
+                // v1.3 backstop (ABI §12.3: the contract is rejected as any party), right after
+                // auth, before the code/issuer checks.
+                if lister == CONTRACT {
+                    return Err(Error::InvalidArgs);
+                }
+                self.list_target(code, issuer).map(|_| vec![])
+            }
             Act::Prune { ids, len } => self.plan_prune(&ids[..len as usize]).map(|(_, t)| t),
             Act::SetTime { .. }
             | Act::SetAuthRwa { .. }
@@ -1018,6 +1034,127 @@ fn outcome_matches(expect: Expect, outcome: Outcome, direct_sac: bool) -> bool {
         (Expect::Sac(s), Outcome::Typed(c)) => direct_sac && s == c,
         _ => false,
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Coverage tally: (call, outcome) -> predicted / observed, printed by the property test
+// ---------------------------------------------------------------------------------------------
+
+/// Every options `Error`, to name an observed code.
+const ALL_ERRORS: [Error; 19] = [
+    Error::NotFound,
+    Error::InvalidArgs,
+    Error::AssetNotAllowed,
+    Error::NotEligible,
+    Error::ContractNotAuthorized,
+    Error::WrongState,
+    Error::NotWriter,
+    Error::NotHolder,
+    Error::Expired,
+    Error::NotExpired,
+    Error::SelfTrade,
+    Error::Overflow,
+    Error::InvalidConfig,
+    Error::OpenListFull,
+    Error::CollateralShortfall,
+    Error::WriterOpenLimit,
+    Error::AlreadyListed,
+    Error::AssetNotDeployed,
+    Error::TenorOutOfRange,
+];
+
+/// Pseudo-call under which `prune_expired` tallies the number of ids it pruned.
+const PRUNED_IDS: &str = "prune_expired ids";
+
+thread_local! {
+    /// (call, outcome) -> [predicted, observed]. Filled by `World::run` on whatever thread runs
+    /// it; the property test resets it first and reports it last (libtest runs each test on its
+    /// own thread, or sequentially on one thread with `--test-threads=1`).
+    static TALLY: RefCell<BTreeMap<(&'static str, String), [u64; 2]>> =
+        const { RefCell::new(BTreeMap::new()) };
+}
+
+fn tally(call: &'static str, outcome: String, slot: usize, n: u64) {
+    TALLY.with(|t| t.borrow_mut().entry((call, outcome)).or_default()[slot] += n);
+}
+
+fn tally_get(call: &'static str, outcome: &str) -> [u64; 2] {
+    TALLY.with(|t| {
+        t.borrow()
+            .get(&(call, outcome.to_string()))
+            .copied()
+            .unwrap_or_default()
+    })
+}
+
+/// Name of an options call (`None` for time warps and issuer actions, which are not tallied).
+fn call_name(act: &Act) -> Option<&'static str> {
+    Some(match act {
+        Act::Create { .. } => "create_offer",
+        Act::Buy { .. } => "buy",
+        Act::Exercise { .. } => "exercise",
+        Act::Transfer { .. } => "transfer",
+        Act::Cancel { .. } => "cancel_offer",
+        Act::Reclaim { .. } => "reclaim",
+        Act::Claim { .. } => "claim_delivery",
+        Act::List { .. } => "list_asset",
+        Act::Prune { .. } => "prune_expired",
+        Act::SetTime { .. }
+        | Act::SetAuthRwa { .. }
+        | Act::SetAuthUsdx { .. }
+        | Act::SetAuthEqty { .. }
+        | Act::ClawbackRwa { .. } => return None,
+    })
+}
+
+/// `Ok` outcomes of `prune_expired` are split by whether anything was pruned.
+fn ok_label(act: &Act, pruned: usize) -> String {
+    match (act, pruned) {
+        (Act::Prune { .. }, 0) => "Ok (pruned 0)".to_string(),
+        (Act::Prune { .. }, _) => "Ok (pruned >= 1)".to_string(),
+        _ => "Ok".to_string(),
+    }
+}
+
+fn expect_label(act: &Act, expect: Expect, pruned: usize) -> String {
+    match expect {
+        Expect::Ok => ok_label(act, pruned),
+        Expect::Contract(e) => format!("{e:?}"),
+        Expect::Sac(c) => format!("SAC #{c}"),
+    }
+}
+
+fn outcome_label(act: &Act, outcome: Outcome, ret: &Ret) -> String {
+    match outcome {
+        Outcome::Ok => ok_label(
+            act,
+            match ret {
+                Ret::U32(n) => *n as usize,
+                _ => 0,
+            },
+        ),
+        Outcome::Typed(c) => ALL_ERRORS
+            .iter()
+            .find(|&&e| e as u32 == c)
+            .map(|e| format!("{e:?}"))
+            .unwrap_or_else(|| format!("unknown options error #{c}")),
+        Outcome::Raw(c) => format!("SAC #{c}"),
+        Outcome::Abort => "Abort".to_string(),
+        Outcome::Conversion => "Conversion".to_string(),
+    }
+}
+
+fn tally_report(cases: u32) -> String {
+    let mut s = format!(
+        "invariants: operations over {cases} cases (call, outcome: predicted / observed; \
+         deterministic regressions not included)\n"
+    );
+    TALLY.with(|t| {
+        for ((call, outcome), [p, o]) in t.borrow().iter() {
+            let _ = writeln!(s, "  {call:<18} {outcome:<22} {p:>7} / {o:>7}");
+        }
+    });
+    s
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1328,7 +1465,7 @@ impl World {
                 target: CONTRACT,
                 authorized,
             },
-            Op::Backstop(kind, s) => match kind % 5 {
+            Op::Backstop(kind, s) => match kind % 6 {
                 0 => Act::Create {
                     writer: CONTRACT,
                     underlying: [RWA, BOND, EQTY, USDX][s as usize % 4],
@@ -1355,12 +1492,20 @@ impl World {
                     from: CONTRACT,
                     to: HOLDER2,
                 },
-                _ => {
+                4 => {
                     let id = pick(s, &[State::Active]);
                     Act::Transfer {
                         id,
                         from: who_of(id, Who::Holder),
                         to: CONTRACT,
+                    }
+                }
+                _ => {
+                    let (code, issuer) = LIST_CANDIDATES[s as usize % LIST_CANDIDATES.len()];
+                    Act::List {
+                        lister: CONTRACT,
+                        code,
+                        issuer,
                     }
                 }
             },
@@ -1412,6 +1557,16 @@ impl World {
             detail,
             expect
         ));
+        if let Some(call) = call_name(&act) {
+            tally(call, expect_label(&act, expect, pruned.len()), 0, 1);
+            tally(call, outcome_label(&act, outcome, &ret), 1, 1);
+            if let (Act::Prune { .. }, Expect::Ok) = (act, expect) {
+                tally(PRUNED_IDS, "pruned".to_string(), 0, pruned.len() as u64);
+            }
+            if let (Act::Prune { .. }, Ret::U32(n)) = (act, &ret) {
+                tally(PRUNED_IDS, "pruned".to_string(), 1, u64::from(*n));
+            }
+        }
         let direct_sac = matches!(
             act,
             Act::SetAuthRwa { .. }
@@ -2492,7 +2647,7 @@ fn op() -> impl Strategy<Value = Op> {
         2 => (0..N_ACTORS, any::<u8>()).prop_map(|(l, s)| Op::List(l, s)),
         2 => prune_op(),
         1 => prop_oneof![3 => Just(true), 1 => Just(false)].prop_map(Op::EqtyContractAuth),
-        1 => (0u8..5, any::<u8>()).prop_map(|(k, s)| Op::Backstop(k, s)),
+        1 => (0u8..6, any::<u8>()).prop_map(|(k, s)| Op::Backstop(k, s)),
     ]
 }
 
@@ -2510,28 +2665,66 @@ fn config() -> ProptestConfig {
     }
 }
 
-proptest! {
-    #![proptest_config(config())]
+/// (call, outcome) rows every run of at least `MIN_CASES_FOR_COVERAGE` cases must observe, so
+/// that a generator change cannot silently stop exercising the v1.3 paths (each row occurs
+/// dozens of times per 200 cases).
+const REQUIRED_COVERAGE: [(&str, &str); 10] = [
+    ("list_asset", "Ok"),
+    ("list_asset", "AlreadyListed"),
+    ("list_asset", "AssetNotDeployed"),
+    ("list_asset", "InvalidArgs"),
+    ("prune_expired", "Ok (pruned >= 1)"),
+    ("prune_expired", "Ok (pruned 0)"),
+    ("prune_expired", "NotFound"),
+    ("create_offer", "Ok"),
+    ("create_offer", "TenorOutOfRange"),
+    ("create_offer", "InvalidArgs"),
+];
+const MIN_CASES_FOR_COVERAGE: u32 = 100;
 
-    /// `eqty_ready`: about half of the cases start with EQTY listed by an outsider and the escrow
-    /// authorized by the EQTY issuer (two checked operations), so random EQTY offers settle; the
-    /// other half exercises the unlisted / unauthorized paths.
-    #[test]
-    fn invariants_hold_for_random_operation_sequences(
-        eqty_ready in any::<bool>(),
-        ops in prop::collection::vec(op(), 1..=40),
-    ) {
-        let mut w = World::new();
-        if eqty_ready {
-            w.run(Act::List { lister: OUTSIDER, code: SAC_CODE, issuer: Issuer::Of(EQTY) });
-            w.run(Act::SetAuthEqty { target: CONTRACT, authorized: true });
-        }
-        for op in &ops {
-            w.step(op);
-        }
-        // `INVARIANTS_TRACE=1 cargo test ... -- --nocapture` prints every passing sequence too.
-        if std::env::var_os("INVARIANTS_TRACE").is_some() {
-            eprintln!("--- case ---\n{}", w.history.join("\n"));
+/// `eqty_ready`: about half of the cases start with EQTY listed by an outsider and the escrow
+/// authorized by the EQTY issuer (two checked operations), so random EQTY offers settle; the
+/// other half exercises the unlisted / unauthorized paths. Prints the predicted / observed
+/// operation tally at the end (`-- --nocapture` shows it for a passing run).
+#[test]
+fn invariants_hold_for_random_operation_sequences() {
+    TALLY.with(|t| t.borrow_mut().clear());
+    let cfg = config();
+    let cases = cfg.cases;
+    let mut runner = proptest::test_runner::TestRunner::new(cfg);
+    let result = runner.run(
+        &(any::<bool>(), prop::collection::vec(op(), 1..=40)),
+        |(eqty_ready, ops)| {
+            let mut w = World::new();
+            if eqty_ready {
+                w.run(list(OUTSIDER, SAC_CODE, Issuer::Of(EQTY)));
+                w.run(Act::SetAuthEqty {
+                    target: CONTRACT,
+                    authorized: true,
+                });
+            }
+            for op in &ops {
+                w.step(op);
+            }
+            // `INVARIANTS_TRACE=1 cargo test ... -- --nocapture` prints every passing sequence.
+            if std::env::var_os("INVARIANTS_TRACE").is_some() {
+                eprintln!("--- case ---\n{}", w.history.join("\n"));
+            }
+            Ok(())
+        },
+    );
+    eprintln!("{}", tally_report(cases));
+    if let Err(e) = result {
+        panic!("{e}\n{runner}");
+    }
+    if cases >= MIN_CASES_FOR_COVERAGE {
+        for (call, outcome) in REQUIRED_COVERAGE {
+            let [p, o] = tally_get(call, outcome);
+            assert!(
+                p > 0 && o > 0,
+                "COVERAGE: `{call}` -> {outcome} never happened in {cases} cases \
+                 (predicted {p}, observed {o})"
+            );
         }
     }
 }
@@ -4007,8 +4200,8 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
 }
 
 /// ABI §3/§12.3 backstop: the contract's own address is rejected with `InvalidArgs` as writer,
-/// buyer, holder and transfer recipient, right after auth (before `AssetNotAllowed` and
-/// `NotFound`).
+/// buyer, holder, transfer recipient and `list_asset` lister ("any party"), right after auth
+/// (before `AssetNotAllowed`, `NotFound`, `AssetNotDeployed` and `AlreadyListed`).
 #[test]
 fn contract_address_is_rejected_as_any_party() {
     let mut w = World::new();
@@ -4106,4 +4299,22 @@ fn contract_address_is_rejected_as_any_party() {
     });
     assert_eq!(w.snap.writer_open[CONTRACT], 0);
     assert_eq!(w.snap.opts[0].holder, Some(HOLDER2));
+    // `list_asset` with the contract as lister lists nothing, whatever the request: a valid EQTY
+    // request, one that would be AlreadyListed (RWA) and one that would be AssetNotDeployed.
+    w.err(
+        list(CONTRACT, SAC_CODE, Issuer::Of(EQTY)),
+        Error::InvalidArgs,
+    );
+    w.err(
+        list(CONTRACT, SAC_CODE, Issuer::Of(RWA)),
+        Error::InvalidArgs,
+    );
+    w.err(list(CONTRACT, "ZZZ", Issuer::Of(EQTY)), Error::InvalidArgs);
+    assert_eq!(w.snap.asset_count, 2); // the constructor underlyings RWA and BOND
+    w.ok(list(OUTSIDER, SAC_CODE, Issuer::Of(EQTY)));
+    w.err(
+        list(CONTRACT, SAC_CODE, Issuer::Of(EQTY)),
+        Error::InvalidArgs,
+    );
+    assert_eq!(w.snap.asset_count, 3);
 }
