@@ -90,7 +90,7 @@ export function ConnectWalletDialog({ dialog }: { dialog: DialogState }) {
         <span className="cw-wallet-name">{w.name}</span>
         {compact ? null : <span className="cw-wallet-kind">{w.kind}</span>}
       </span>
-      {w.isAvailable ? <span className="cw-pill">{busyId === w.id ? 'Waiting…' : 'Detected'}</span> : null}
+      {w.availability === 'installed' ? <span className="cw-pill">{busyId === w.id ? 'Waiting…' : 'Detected'}</span> : null}
     </button>
   )
 
@@ -135,28 +135,45 @@ export function ConnectWalletDialog({ dialog }: { dialog: DialogState }) {
               {installed.length > 0 ? (
                 <div className="cw-list">{installed.map((w) => walletButton(w, false))}</div>
               ) : (
-                <p className="cw-muted">No wallet detected in this browser. Pick one below to install it.</p>
+                <p className="cw-muted">No wallet extension detected in this browser. Use a web wallet below or install one.</p>
               )}
               {more.length > 0 ? (
                 <>
                   <span className="cw-lbl">More wallets</span>
                   <div className="cw-grid">
-                    {more.map((w) => (
-                      <a
-                        key={w.id}
-                        className="cw-wallet cw-wallet-compact"
-                        href={w.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`Get ${w.name} (opens in a new tab)`}
-                      >
-                        <Badge name={w.name} />
-                        <span className="cw-wallet-text">
-                          <span className="cw-wallet-name">{w.name}</span>
-                        </span>
-                        <span className="cw-get-tag">Get ↗</span>
-                      </a>
-                    ))}
+                    {more.map((w) =>
+                      w.availability === 'web' ? (
+                        <button
+                          key={w.id}
+                          type="button"
+                          className="cw-wallet cw-wallet-compact"
+                          disabled={busyId !== null}
+                          aria-busy={busyId === w.id}
+                          onClick={() => pick(w.id)}
+                        >
+                          <Badge name={w.name} />
+                          <span className="cw-wallet-text">
+                            <span className="cw-wallet-name">{w.name}</span>
+                          </span>
+                          <span className="cw-web-tag">{busyId === w.id ? 'Waiting…' : 'Web'}</span>
+                        </button>
+                      ) : (
+                        <a
+                          key={w.id}
+                          className="cw-wallet cw-wallet-compact"
+                          href={w.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Get ${w.name} (opens in a new tab)`}
+                        >
+                          <Badge name={w.name} />
+                          <span className="cw-wallet-text">
+                            <span className="cw-wallet-name">{w.name}</span>
+                          </span>
+                          <span className="cw-get-tag">Get ↗</span>
+                        </a>
+                      ),
+                    )}
                   </div>
                 </>
               ) : null}
