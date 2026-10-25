@@ -27,3 +27,22 @@ export function groupSeries(offers: OptionOffer[]): Series[] {
     .map(([key, list]) => ({ key, offers: [...list].sort(byPremiumPerUnit) }))
     .sort((a, b) => a.offers[0].expiry - b.offers[0].expiry)
 }
+
+// "in 3d 0h", "in 5h 12m", "in 12m", "expired". Pure; `nowMs` is injectable for tests.
+export function formatCountdown(expiryUnix: number, nowMs: number = Date.now()): string {
+  const secs = Math.floor(expiryUnix - nowMs / 1000)
+  if (secs <= 0) return 'expired'
+  const d = Math.floor(secs / 86400)
+  const h = Math.floor((secs % 86400) / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  if (d > 0) return `in ${d}d ${h}h`
+  if (h > 0) return `in ${h}h ${m}m`
+  return `in ${Math.max(m, 1)}m`
+}
+
+export type KindFilter = 'all' | 'put' | 'call'
+
+// Asset/kind filters. `asset` is an underlying token code or 'all'.
+export function filterOffers(offers: OptionOffer[], asset: string, kind: KindFilter): OptionOffer[] {
+  return offers.filter((o) => (asset === 'all' || o.underlying.code === asset) && (kind === 'all' || o.kind === kind))
+}

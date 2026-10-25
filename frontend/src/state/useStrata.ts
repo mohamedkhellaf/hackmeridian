@@ -9,7 +9,9 @@ import type { Notice } from '../ui'
 import { useBalances } from '../wallet/useBalances'
 import { useFreighter } from '../wallet/useFreighter'
 
-export type PositionAction = NonNullable<Parameters<typeof OptionRow>[0]['action']>
+export type TxOutcome = { ok: true; hash: string; mock: boolean } | { ok: false; error: string }
+
+export type PositionAction =NonNullable<Parameters<typeof OptionRow>[0]['action']>
 
 /**
  * All app state and actions (previously in App.tsx): wallet, options client, listings, collateral,
@@ -54,8 +56,8 @@ export function useStrata() {
     void refresh()
   }, [refresh])
 
-  // Returns whether the transaction went through.
-  const run = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>) => {
+  // Runs a transaction, sets the toast and refreshes state. Returns the hash on success.
+  const runDetailed = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>): Promise<TxOutcome> => {
     setBusyId(id)
     setNotice(null)
     let ok = false
@@ -63,16 +65,20 @@ export function useStrata() {
       const { hash } = await fn()
       ok = true
       setNotice({ kind: 'ok', text: `${label} confirmed`, hash, mock: client.isMock })
-      return true
+      return { ok: true, hash, mock: client.isMock }
     } catch (e) {
-      setNotice({ kind: 'err', text: e instanceof Error ? e.message : String(e) })
-      return false
+      const error = e instanceof Error ? e.message : String(e)
+      setNotice({ kind: 'err', text: error })
+      return { ok: false, error }
     } finally {
       setBusyId(null)
       await refresh()
       if (ok) void refreshBalances()
     }
   }
+
+  // Returns whether the transaction went through.
+  const run = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>) => (await runDetailed(id, label, fn)).ok
 
   const me = wallet.address
   const market = options.filter((o) => o.state === 'offered')
@@ -82,12 +88,14 @@ export function useStrata() {
 
   const writeOffer = (offer: NewOffer) => run(-1n, 'Offer published', () => client.createOffer(offer, me!))
 
-  /** Confirm the purchase currently open in the buy dialog. */
-  const confirmBuy = () => {
+  /**
+   * Confirm the purchase open in the buy dialog. The dialog stays mounted (`buying` is not cleared) so it can show the
+   * confirmed step; it closes itself via `setBuying(null)`. Resolves with the outcome (null if nothing to buy).
+   */
+  const confirmBuy = async (): Promise<TxOutcome | null> => {
     const o = buying
-    if (!o || !me) return
-    setBuying(null)
-    void run(o.id, 'Purchase', () => client.buy(o.id, me))
+    if (!o || !me) return null
+    return runDetailed(o.id, 'Purchase', () => client.buy(o.id, me))
   }
 
   /** The next action the connected wallet can take on a position, if any. */
