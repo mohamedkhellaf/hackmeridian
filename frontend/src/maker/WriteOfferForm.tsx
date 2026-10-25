@@ -15,7 +15,7 @@ function defaultExpiry(): string {
 
 type Draft = { offer: NewOffer } | { error: string }
 
-function buildOffer(
+export function buildOffer(
   assets: SupportedAssets,
   f: { kind: OptionKind; underlyingId: string; qty: string; strike: string; premium: string; expiry: string },
 ): Draft {
