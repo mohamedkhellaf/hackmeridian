@@ -1,127 +1,108 @@
-# Agent instructions
+# AGENTS.md — HackMeridian execution rules
 
-<!-- Keep this file short and current. -->
+<!-- Operational instructions for humans and coding agents. Keep accurate, short, and aligned with the running code. -->
 
-## Project
+## Mission and constraints
 
-- **Name:** Backstop (working name; repo is `hackmeridian`)
-- **Event:** HackMeridian, Lisbon, Oct 25–26 2026 (Stellar)
-- **Category:** Genesis (new idea → working MVP)
-- **Track:** Stellar Unlocked: classic asset controls (approval required, revocable, clawback) combined with Soroban custody
-- **Deadline:** Mon Oct 26, 12:00 Lisbon (no late submissions). Feature freeze 06:00, submit by 11:00. Judged async on demo video, pitch deck, repo, and submission answers.
-- **Pitch:** Fully collateralized, physically settled put and call options on any permissioned tokenized real-world asset (funds, bonds, stocks…). Collateral is locked in a contract nobody holds a key to, exercise swaps the asset and USDC in one all-or-nothing transaction, and the asset's own Stellar rules decide who may trade.
-- **Status:** Plan agreed; **do not start coding until the team says go.** Core flow already proven on testnet in a throwaway spike (`research/decision/20_rwa_options_spike.md`). Decision history: `WINNING_IDEAS.md`, `research/decision/`.
+- **Product:** Strata (working name; previously Backstop). Repository: `hackmeridian`.
+- **Event:** HackMeridian Genesis / Stellar Unlocked, Lisbon, October 25–26, 2026.
+- **Hard deadline:** Monday, **October 26 at 12:00 Lisbon time**. Target submission by 11:00; feature freeze by 06:00. The demo, deck, README, GitHub repository, and submission answers are deliverables, not afterthoughts.
+- **Thesis:** Stellar has tokenized assets, but many lack useful risk-management products. Build a **multi-asset, fully collateralized options layer** that turns eligible tokenized assets into physically settled calls/puts, with transparent collateral and issuer-enforced transfer rules. Simple strategies sit on top of this layer.
+- **Honest claim:** *Any supported, eligible Stellar asset* — NOT every token automatically. The MVP uses fictional Testnet assets; real RWA integrations need issuer cooperation, legal permission, and technical compatibility.
+- **Existing evidence:** A put exercise was proven in a Testnet spike; see `research/decision/20_rwa_options_spike.md`. Original decision context: `WINNING_IDEAS.md` and `research/decision/`.
+- **Coding gate:** Respect a human team's explicit **GO** before implementing. Once GO is given, work autonomously within your assigned scope. Never wait for blanket permission on each small task. If a freeze/stop is called, obey it.
 
-## Scope
+## The three human owners — no ambiguity
 
-- **T1 (must, by 21:00 Sun):** 2–3 test RWA tokens with restrictions (e.g. fund, bond, stock) plus test USDC `USDx`; cash-secured put: write → buy → exercise → reclaim; hosted frontend on testnet.
-- **T2 (must, by 01:00 Mon):** covered call (issuer approves the contract), eligibility checks, issuer panel (approve / freeze / claw back), competing writers, collateral-proof page, Impaired state with premium refund, tests + CI.
-- **T3 (stretch, only if T2 is green):** transfer positions, positions as tokens, capped options with a labelled demo price feed.
-- **Out:** real fund integrations, mainnet, pricing engine, margin, leverage, ZK, cash settlement with a real oracle.
+| Owner | Role | Owns and decides | Primary code / artifacts |
+|---|---|---|---|
+| **Dev 1 — Founder / Product Architect / Quant Lead** | Financial logic, product and integration owner | Financial semantics, scope, payoff and risk formulas, strategy composition, RFQ requirements, maker economics, user story, financial acceptance criteria, trade-offs, final demo narrative | `PRODUCT_SPEC.md`, `packages/payoff/`, `packages/rfq/` (or frontend-side RFQ model), shared financial types, quantitative tests, `docs/demo-script.md` |
+| **Dev 2 — Blockchain / Contract Lead** | On-chain correctness and security owner | Soroban contract ABI, collateral accounting, auth, options lifecycle, atomic settlement, Stellar asset issuance/permissions, deployment, contract tests, security review | `contracts/`, `scripts/setup-testnet/`, `scripts/deploy/`, contract tests, deployed IDs |
+| **Dev 3 — Frontend / Stellar Integration Lead** | User experience and working dApp owner | React app, investor/maker/issuer journeys, payoff chart integration, Freighter/wallet UX, Stellar SDK transaction building, generated TS bindings consumption, hosting and end-to-end UI | `frontend/`, wallet/contract client integration, app deployment, UI/e2e tests, video capture support |
 
-## Team
+**Decision rights:** Dev 1 owns *what* the instrument promises; Dev 2 owns *how* it can safely execute on-chain; Dev 3 owns *how* users interact with it. Any mismatch between promise and code is a **stop-ship blocker**. All three review the public claims and end-to-end demo. Dev 1 coordinates priorities and submission; Dev 2 has veto on unsafe contract behavior.
 
-| Who | Owns |
-|-----|------|
-| Claude | Writes most code in small PRs (contract, tests, scripts, bindings, frontend); runs tests before every PR; keeps README claims matching tests |
-| Dev 1: contracts lead | Reviews and merges contract PRs; testnet deploys; updates **Deployed contracts**; security checklist |
-| Dev 2: frontend and UX | App structure, role switcher, pages, hosting, error copy, judge-style testing after each merge |
-| Dev 3: assets, integration, story | Testnet asset setup, integration checks, README, deck, video, submission answers |
+## Interfaces to lock at kickoff (first 20–30 minutes)
 
-## Architecture
+1. **Dev 1 publishes `PRODUCT_SPEC.md`:** define CALL/PUT, American-style exercise before expiry, physical token delivery, one position per funded offer, no partial exercise in MVP, premium timing, expiry behavior, maker delivery claims, option ownership, cancellation/impairment policy. Include worked examples and acceptance tests. Explicitly decide when the maker earns the premium and whether/when it can be refunded; do not silently assume an economically sound policy.
+2. **Agree on one financial data contract:** underlying token ID, quote token ID, option type, underlying quantity, **total** strike, **total** premium, expiry timestamp, writer, current holder, and lifecycle state. Use exact integer token units on-chain and for signing; `number` is allowed **only** for illustrative chart computation. Store asset decimals explicitly.
+3. **Dev 2 publishes the actual Soroban ABI / generated client as soon as compiled:** `create_offer`, `buy`, `exercise`, `cancel_offer`, `reclaim`, `claim_delivery`, `get_option`, `list_open`, `open_collateral`, plus only the states/functions implemented. Function names above are illustrative until the compiled ABI is authoritative.
+4. **Dev 3 mocks against this schema immediately**, then swaps to generated bindings. Dev 1's payoff/RFQ packages must be usable by Dev 3 without custom financial logic in React components.
+5. **RFQ truth rule:** an off-chain quote is only *indicative*; it becomes *executable* only when Dev 2's contract confirms a valid, funded, available offer. Two demo maker accounts can publish competing **on-chain offers**; no backend is required for P0. A live RFQ service is optional and must never be critical to exercise.
 
-- **Underlying = any permissioned tokenized real-world asset** (funds, bonds, stocks, credit…), not one asset class. The demo issues 2–3 labelled test RWA tokens (e.g. a fund, a bond, a stock) and shows the same options market on each.
-- **Contract** (`contracts/options`, Soroban): holds all collateral in its own token balance, per-option accounting. `__constructor` fixes the USDx SAC and the list of supported underlying RWA SACs; each option names one of them (never a caller-supplied token address). **No admin, not upgradeable.**
-  - Lifecycle: Offered → Active (`buy`: premium escrowed, buyer recorded as holder) → Exercised → writer `claim_delivery`; or Expired → writer `reclaim`; or Impaired (clawback detected) → holder `cancel_impaired` gets the premium back; or Cancelled (`cancel_offer` before anyone buys).
-  - Put exercise: the underlying goes holder → **contract** (not the writer), USDx contract → holder, so a frozen writer can't block the holder.
-  - Read-only: `get_option`, `list_open`, `open_collateral` (for the collateral-proof page).
-- **Classic assets:** test RWA tokens (issuer flags: auth required, revocable, clawback) and `USDx` (separate issuer); each RWA issuer must `set_authorized` the contract address before it can hold that asset.
-- **Scripts** (`scripts/`): `setup-testnet` (issue assets, set flags, deploy SACs, approve holders, fund demo roles) and `integration` (replays the testnet checks).
-- **Frontend** (`frontend/`): Market, Write, Portfolio, Issuer panel, Collateral proof; in-app testnet keys per demo role (Issuer, Writer A, Writer B, Alice, Bob, Eve), Freighter optional; contract calls through generated TS bindings.
-- **No backend.**
+## Scope and time gates (all times Lisbon)
 
-### Contract rules (every function)
+- **P0 — by ~21:00 Sunday:** existing Testnet spike integrated into the repo; one cash-secured PUT on fictional `RWA` + test `USDx`; writer funds collateral → holder buys → holder exercises → immutable transaction proof. Minimal UI wired to contract, not a simulation.
+- **P0+ — by ~01:00 Monday:** covered CALL; two distinct underlying Testnet assets using the *same* contract; maker competition (funded offers), eligibility checks, issuer authorization demo, collateral-proof UI, automated Rust tests and working hosted frontend.
+- **P1 — only after P0+ succeeds:** transfer of option ownership; position token if feasible; issuer freeze/clawback failure demo; financial strategy presets (protective put, covered call, collar) with **accurate payoff previews**; trustworthy impairment/refund logic if fully specified and tested.
+- **P2 — optional:** multi-leg on-chain execution and composed strategies, a more sophisticated RFQ backend, third asset class, Trustless Work integration. Do not claim that a multi-leg structured product is issued or guaranteed unless **all** legs are funded and settle consistently.
+- **06:00 Monday:** freeze features. Then integration fixes, tests, README, deck, demo recording and submission only. **Submit by 11:00**, leaving a one-hour buffer.
+- **Never in this hackathon:** Mainnet or real customer funds; real regulated-fund integrations without permission; margin, leverage, uncollateralized promises, unaudited claims of production security, hidden oracle assumptions.
 
-- `require_auth` on each address whose money moves; never trust a caller-supplied token address.
-- Check eligibility through the underlying asset SAC's `authorized(addr)` for writer, buyer and holder.
-- Checked `i128` math; reject amounts ≤ 0; update state before transfers; exercise at most once.
-- Extend storage lifetime (instance, code, option entries) past expiry and through judging (Wed Oct 28).
-- Every README claim links to a test or a testnet transaction. Disclose: test assets only, issuer can freeze or claw back, derivatives are regulated (prototype, not an offering).
+## Contract and asset architecture
 
-## How we work
+- `contracts/options/`: Soroban contract that **holds collateral itself** and tracks reserves per option. Immutable constructor allowlists quote `USDx` SAC and supported underlying SACs for the MVP. Never accept arbitrary untrusted token contracts at runtime. **No admin; no upgrades.** This allowlist is a current deployment limitation, not permissionless support for every newly issued token.
+- Issuer demo assets: **fictional Testnet** fund/bond/stock-style tokens (labels only, not ownership claims), authorization-required, revocable and clawback-enabled where tested; separate `USDx` Testnet issuer. The issuer must authorize the escrow contract as needed for it to receive regulated assets.
+- Lifecycle from existing implementation plan: `Offered` → `Active` → `Exercised` (writer may later `claim_delivery`); or `Expired` → `reclaim`; or `Cancelled` (before purchase). An `Impaired` state with any premium refund is **not approved until the product owner specifies its economics and Dev 2 proves detection and settlement safely**.
+- PUT exercise: option holder delivers underlying to the **contract**, receives locked `USDx` in the same invocation; writer claims the delivered asset when authorized. Do not allow a frozen writer to block payment to the holder when transfers otherwise remain permitted.
+- CALL exercise: contract holds underlying beforehand; holder pays strike; contract transfers underlying to holder atomically. Writer's proceeds are accounted for correctly.
+- Enforce signer authorization using `require_auth`, ensure eligibility where relevant, check exact balances/allowances, and reject unapproved asset IDs. Every state-changing path must be tested for replay/double exercise, unauthorized cancellation and withdrawn/insufficient collateral.
+- Checked `i128` math; positive quantities/premiums as specified; no floating-point token accounting. State transitions and cross-contract calls must be atomic; any failure reverts the complete exercise. Maintain Soroban TTL beyond expiry and judging (through at least October 28).
+- Issuer freeze/revoke/clawback can prevent settlement or alter collateral availability. Do **not** market a restricted-asset option as an unconditional guarantee against issuer action. Readme and UI must disclose limitations.
+- Never embed private keys/seeds or reusable funded identities in the public frontend/repo. Demo roles may use disposable **Testnet-only** accounts with controlled signing; Freighter preferred for the interactive user flow.
 
-- `main` must always be demoable. Changes to code (`contracts/`, `frontend/src`, build config like `Cargo.toml` / `package.json`, `.github/workflows`) go through a PR.
-- Small non-code changes (docs, `AGENTS.md`, README, `.mcp.json`, other config that can't break the build) can be pushed straight to `main`.
-- One short-lived branch per task: `feat/…`, `fix/…`, `chore/…`. Merge within a few hours, not days.
-- CI must be green before merging. Reviews are optional: tag a teammate if you want eyes, but don't wait on it.
-- Squash-merge, then delete the branch. Pull `main` often.
-- Split work by area (contracts / frontend / pitch) to avoid conflicts.
-- Commit messages: short, imperative. No AI/co-author attribution trailers.
-- When a contract is redeployed, update **Deployed contracts** below in the same PR.
+## Financial and market-data rules (Dev 1)
 
-## Deployed contracts (testnet)
+- Put buyer receives the **right to sell** the underlying at the strike; call buyer the **right to buy** it. The market maker is the option writer and receives a premium under the agreed premium policy.
+- Puts: reserve **total strike** in quote token. Covered calls: reserve **total underlying quantity**. Do not count one reserve twice across positions or legs. Keep offered vs active collateral accounted for.
+- `packages/payoff/`: deterministic, unit-tested long/short call and put payoffs; protective put, covered call and collar previews; include premium, underlying holdings and fees assumptions explicitly. Label charts *hypothetical*, not guaranteed executable prices.
+- `packages/rfq/`: model `QuoteRequest` and `MakerQuote`, show comparable terms (asset, lot, strike, maturity, quote token), expiry, maker, premium, funding state, and on-chain offer ID. A funded executable offer must be confirmed from chain immediately before purchase. Handle quote expiration and simultaneous buyers honestly.
+- No fabricated order-book depth or live market-maker liquidity. Demo makers use funded Testnet positions. No Black–Scholes output should be misrepresented as a real market quote.
+- Quant lead writes concrete numerical tests for premiums, collateral, payout profiles, exercise before/after expiry, holder transfers, and zero/double-use of collateral. Contract owner implements contract-level versions.
+
+## Coding agents and Git workflow
+
+- **Humans own decisions; agents own bounded tasks.** For each task, specify owner, files/directories, inputs, acceptance criteria, tests, expected output, and whether it may alter public interfaces. Coding agents must not redefine the product or silently change contract economics.
+- Separate agent lanes: **Dev 1:** quant/payoff agent, RFQ agent, financial red-team (read-only); **Dev 2:** contract implementer, Rust/test agent, security auditor (read-only); **Dev 3:** UI agent, wallet/bindings agent, e2e agent. A documentation/pitch agent works on docs only under Dev 1.
+- Never allow two agents to write the same files simultaneously. Use isolated branches/worktrees; coordinate API changes with all owners before merging. Human lead checks diffs, tests, and claims.
+- `main` stays demoable. Code, dependency, CI and contract changes use small short-lived PRs (`feat/…`, `fix/…`, `chore/…`). Docs-only changes may go directly to `main` if harmless. CI/build/tests must pass; **contract or financial-settlement changes require human review by Dev 2**. For other PRs, the relevant owner reviews if time permits. Squash-merge, delete branch, pull `main` frequently.
+- Every coding agent must report: **changed paths, commands/tests run, test results, blockers, and transaction/contract IDs if relevant**. Never claim success when it only compiled or rendered. Keep commit messages imperative; no AI/co-author attribution trailers.
+- Never merge a claim unsupported by a test or real Testnet transaction. Contract redeploys must update **Deployed contracts** in the same PR. If a gate slips, reduce scope rather than defer the submission.
+
+## Project layout
+
+- `Cargo.toml`, `contracts/options/src/`: Soroban Rust, `#![no_std]`, tests under contract crate.
+- `scripts/`: Testnet asset creation/issuer permissions, deployment, funding demo accounts, repeatable integration steps.
+- `frontend/`: Vite + React + TypeScript, Stellar SDK and Freighter, app and transaction UI, generated bindings.
+- `packages/payoff/` and `packages/rfq/`: **planned** shared financial modules owned by Dev 1. If the existing monorepo structure differs, agree on paths once rather than having agents create competing package trees.
+- `PRODUCT_SPEC.md`, `docs/`, `README.md`: product spec, risk assumptions, architecture, reproducible demo and submission materials.
+- `research/decision/`, `WINNING_IDEAS.md`: ideation record, existing spike evidence.
+
+## Deployed contracts (TESTNET ONLY)
 
 | Contract | Alias | Contract ID | Deployed by |
-|----------|-------|-------------|-------------|
-| _none yet_ | | | |
+|---|---|---|---|
+| _none recorded here yet_ | | | |
 
-## Layout
-
-- `Cargo.toml`: Rust workspace root; contract crates inherit `soroban-sdk` from here
-- `contracts/<name>/src/lib.rs`: Soroban contract implementation (`#![no_std]`)
-- `contracts/<name>/src/test.rs`: host-side unit tests
-- `contracts/options/`: the options contract (planned)
-- `scripts/`: testnet setup and integration scripts (planned)
-- `frontend/`: Vite + React + TypeScript app (`@stellar/stellar-sdk`, `@stellar/freighter-api`)
-- `research/decision/`, `WINNING_IDEAS.md`: how the idea was chosen, testnet spike evidence
-
-## Contracts
-
-### Build
-
-From the repo root:
+## Commands and references
 
 ```sh
+# At repository root
 stellar contract build
+cargo test
+# To build one crate: stellar contract build --package <name>
+
+# Frontend
+cd frontend && npm install && npm run dev
+npm run build && npm run lint
+
+# Confirm current CLI invocation syntax before using these examples
+stellar contract deploy --wasm target/wasm32v1-none/release/<name>.wasm --source-account <identity> --network testnet --alias <alias>
+stellar contract invoke --id <alias> --network testnet --source-account <identity> -- --help
+stellar contract bindings typescript --network testnet --id <alias> --output-dir frontend/packages/<name>
 ```
 
-Artifacts land in `target/wasm32v1-none/release/*.wasm`. Build one crate with `stellar contract build --package <name>`.
-
-Do not substitute `cargo build --target wasm32v1-none`; `stellar contract build` applies the flags and metadata the network expects. Requires the `wasm32v1-none` target (`rustup target add wasm32v1-none`, Rust ≥ 1.84).
-
-### Test
-
-```sh
-cargo test            # all crates
-cargo test -p <name>  # one crate
-```
-
-### Deploy and invoke (testnet)
-
-```sh
-stellar contract deploy \
-  --wasm target/wasm32v1-none/release/<name>.wasm \
-  --source-account <identity> \
-  --network testnet \
-  --alias <alias>
-
-stellar contract invoke --id <alias> --network testnet --source-account <identity> -- hello --to world
-```
-
-`stellar contract invoke --id <id> -- -h` prints the generated CLI for a deployed contract. Generate TS bindings for the frontend with `stellar contract bindings typescript --network testnet --id <alias> --output-dir frontend/packages/<name>`.
-
-## Frontend
-
-```sh
-cd frontend
-npm install
-npm run dev     # http://localhost:5173
-npm run build
-npm run lint
-```
-
-## References
-
-- https://developers.stellar.org/docs/build/smart-contracts/overview
-- https://github.com/stellar/soroban-examples
-- https://developers.stellar.org/docs/tools/developer-tools
+- Use `stellar contract build` for network-compatible Wasm artifacts, not an ordinary `cargo build` substitute. Follow the installed CLI's exact options and generated contract commands.
+- Stellar smart contracts: https://developers.stellar.org/docs/build/smart-contracts/overview
+- Soroban examples: https://github.com/stellar/soroban-examples
+- Stellar developer tools: https://developers.stellar.org/docs/tools/developer-tools
