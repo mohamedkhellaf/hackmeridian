@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { formatAmount, parseAmount } from '../options/format'
+import { formatAmount } from '../options/format'
+import { buildOffer } from './buildOffer'
 import { requiredCollateral } from '../options/types'
 import type { NewOffer, OptionKind, SupportedAssets } from '../options/types'
 
@@ -11,29 +12,6 @@ function defaultExpiry(): string {
   const d = new Date(Date.now() + 3 * DAY * 1000)
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
   return d.toISOString().slice(0, 16)
-}
-
-type Draft = { offer: NewOffer } | { error: string }
-
-export function buildOffer(
-  assets: SupportedAssets,
-  f: { kind: OptionKind; underlyingId: string; qty: string; strike: string; premium: string; expiry: string },
-): Draft {
-  const underlying = assets.underlyings.find((u) => u.contractId === f.underlyingId)
-  if (!underlying) return { error: 'Pick an underlying asset' }
-  const qty = parseAmount(f.qty, underlying.decimals)
-  if (!qty) return { error: `Quantity must be a positive amount of ${underlying.code}` }
-  const strike = parseAmount(f.strike, assets.quote.decimals)
-  if (!strike) return { error: `Strike must be a positive ${assets.quote.code} price` }
-  const premium = parseAmount(f.premium, assets.quote.decimals)
-  if (!premium) return { error: `Premium must be a positive ${assets.quote.code} amount` }
-  // Total strike must be an exact number of quote units; no rounding of settlement amounts.
-  const scaled = strike * qty
-  const base = 10n ** BigInt(underlying.decimals)
-  if (scaled % base !== 0n) return { error: 'Strike × quantity is not an exact amount; adjust one of them' }
-  const expiry = Math.floor(new Date(f.expiry).getTime() / 1000)
-  if (!Number.isFinite(expiry) || expiry <= Date.now() / 1000 + 60) return { error: 'Expiry must be in the future' }
-  return { offer: { kind: f.kind, underlying, underlyingQty: qty, totalStrike: scaled / base, totalPremium: premium, expiry } }
 }
 
 export function WriteOfferForm({
@@ -70,7 +48,7 @@ export function WriteOfferForm({
     <form className="card form" onSubmit={(e) => void submit(e)}>
       <h2>Write an option</h2>
       <p className="hint">
-        You are the writer. The contract locks your collateral now; a buyer pays you the premium and gets the right to{' '}
+        You are the writer. The contract locks your collateral now; a buyer pays you the premium at purchase (it is yours immediately and not refunded) and gets the right to{' '}
         {kind === 'put' ? `sell you ${underlyingCode} at the strike` : `buy your ${underlyingCode} at the strike`} until expiry.
       </p>
 
@@ -123,7 +101,7 @@ export function WriteOfferForm({
               {formatAmount(collateral!.amount, collateral!.token.decimals)} {collateral!.token.code}
             </strong>
           </dd>
-          <dt>Premium asked</dt>
+          <dt>Premium you receive at purchase</dt>
           <dd>
             {formatAmount(draft.offer.totalPremium, assets.quote.decimals)} {assets.quote.code}
           </dd>

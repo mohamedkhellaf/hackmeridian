@@ -44,6 +44,10 @@ export function BuyDialog({ offer, onConfirm, onCancel }: { offer: OptionOffer; 
           </dd>
         </dl>
         <p className="hint">
+          Your premium is paid to the writer immediately at purchase. It is not refunded if the option expires worthless or if settlement is blocked by
+          issuer action.
+        </p>
+        <p className="hint">
           Physically settled. Issuer controls on regulated assets (freeze, clawback) can block settlement; the collateral lock does not protect against issuer
           action.
         </p>

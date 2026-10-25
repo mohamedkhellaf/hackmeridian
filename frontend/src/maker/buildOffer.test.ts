@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildOffer } from './WriteOfferForm'
+import { buildOffer } from './buildOffer'
 import type { SupportedAssets } from '../options/types'
 
 const UNIT = 10_000_000n
