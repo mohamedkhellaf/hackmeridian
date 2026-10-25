@@ -14,7 +14,7 @@
 
 ## Scope
 
-- **T1 (must, by 21:00 Sun):** test fund token `FUND` with restrictions plus test USDC `USDx`; cash-secured put: write → buy → exercise → reclaim; hosted frontend on testnet.
+- **T1 (must, by 21:00 Sun):** 2–3 test RWA tokens with restrictions (e.g. fund, bond, stock) plus test USDC `USDx`; cash-secured put: write → buy → exercise → reclaim; hosted frontend on testnet.
 - **T2 (must, by 01:00 Mon):** covered call (issuer approves the contract), eligibility checks, issuer panel (approve / freeze / claw back), competing writers, collateral-proof page, Impaired state with premium refund, tests + CI.
 - **T3 (stretch, only if T2 is green):** transfer positions, positions as tokens, capped options with a labelled demo price feed.
 - **Out:** real fund integrations, mainnet, pricing engine, margin, leverage, ZK, cash settlement with a real oracle.
@@ -30,11 +30,12 @@
 
 ## Architecture
 
-- **Contract** (`contracts/options`, Soroban): holds all collateral in its own token balance, per-option accounting. Token addresses (FUND SAC, USDx SAC) fixed in `__constructor`; **no admin, not upgradeable**.
+- **Underlying = any permissioned tokenized real-world asset** (funds, bonds, stocks, credit…), not one asset class. The demo issues 2–3 labelled test RWA tokens (e.g. a fund, a bond, a stock) and shows the same options market on each.
+- **Contract** (`contracts/options`, Soroban): holds all collateral in its own token balance, per-option accounting. `__constructor` fixes the USDx SAC and the list of supported underlying RWA SACs; each option names one of them (never a caller-supplied token address). **No admin, not upgradeable.**
   - Lifecycle: Offered → Active (`buy`: premium escrowed, buyer recorded as holder) → Exercised → writer `claim_delivery`; or Expired → writer `reclaim`; or Impaired (clawback detected) → holder `cancel_impaired` gets the premium back; or Cancelled (`cancel_offer` before anyone buys).
-  - Put exercise: FUND holder → **contract** (not the writer), USDx contract → holder, so a frozen writer can't block the holder.
+  - Put exercise: the underlying goes holder → **contract** (not the writer), USDx contract → holder, so a frozen writer can't block the holder.
   - Read-only: `get_option`, `list_open`, `open_collateral` (for the collateral-proof page).
-- **Classic assets:** `FUND` (issuer flags: auth required, revocable, clawback) and `USDx` (separate issuer); the issuer must `set_authorized` the contract address before it can hold FUND.
+- **Classic assets:** test RWA tokens (issuer flags: auth required, revocable, clawback) and `USDx` (separate issuer); each RWA issuer must `set_authorized` the contract address before it can hold that asset.
 - **Scripts** (`scripts/`): `setup-testnet` (issue assets, set flags, deploy SACs, approve holders, fund demo roles) and `integration` (replays the testnet checks).
 - **Frontend** (`frontend/`): Market, Write, Portfolio, Issuer panel, Collateral proof; in-app testnet keys per demo role (Issuer, Writer A, Writer B, Alice, Bob, Eve), Freighter optional; contract calls through generated TS bindings.
 - **No backend.**
@@ -42,7 +43,7 @@
 ### Contract rules (every function)
 
 - `require_auth` on each address whose money moves; never trust a caller-supplied token address.
-- Check eligibility through the FUND SAC's `authorized(addr)` for writer, buyer and holder.
+- Check eligibility through the underlying asset SAC's `authorized(addr)` for writer, buyer and holder.
 - Checked `i128` math; reject amounts ≤ 0; update state before transfers; exercise at most once.
 - Extend storage lifetime (instance, code, option entries) past expiry and through judging (Wed Oct 28).
 - Every README claim links to a test or a testnet transaction. Disclose: test assets only, issuer can freeze or claw back, derivatives are regulated (prototype, not an offering).
