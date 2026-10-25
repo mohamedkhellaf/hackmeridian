@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getAddress, getNetworkDetails, isConnected, requestAccess, signAuthEntry, signTransaction } from '@stellar/freighter-api'
 import { config } from '../config'
 
-export function useFreighter() {
+function useRealFreighter() {
   const [address, setAddress] = useState<string | null>(null)
   const [networkPassphrase, setNetworkPassphrase] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -66,3 +66,23 @@ export function useFreighter() {
 
   return { address, wrongNetwork, error, connect, disconnect, sign, signAuthEntry: signAuth }
 }
+
+// Test-only wallet for Playwright (Freighter is a browser extension it cannot drive). Active only
+// when VITE_E2E=1; in normal builds the constant below folds to the real hook.
+const E2E_DEFAULT_ADDRESS = 'GBE65ZTLRGUEVNDQU65HG6EY36PW5QMJKXVSDVH72HOOIHTZYRZG3ZEG'
+
+function useE2eWallet() {
+  const [address, setAddress] = useState<string | null>(null)
+
+  // `?as=G...` is read at connect time, so a test can switch identity without reloading.
+  const connect = useCallback(async () => {
+    setAddress(new URLSearchParams(window.location.search).get('as') || E2E_DEFAULT_ADDRESS)
+  }, [])
+  const disconnect = useCallback(() => setAddress(null), [])
+  const sign = useCallback(async (xdr: string) => xdr, [])
+  const signAuth = useCallback(async (entryXdr: string) => entryXdr, [])
+
+  return { address, wrongNetwork: false, error: null as string | null, connect, disconnect, sign, signAuthEntry: signAuth }
+}
+
+export const useFreighter = import.meta.env.VITE_E2E === '1' ? useE2eWallet : useRealFreighter
