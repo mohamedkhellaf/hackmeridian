@@ -8,6 +8,11 @@
 //!   (`Key::Reserved`). PUT collateral = `strike_total` of quote; CALL collateral = `qty` of underlying.
 //! - Lifecycle: Offered -> Active -> Exercised -> Settled, or Offered -> Cancelled,
 //!   or Offered/Active -> Expired (reclaim after expiry). No other transition exists.
+//!   `transfer` (v1.2) hands an `Active` option to a new eligible holder; the state stays `Active`
+//!   and no tokens, reserved totals or open-list entries change.
+//! - Functions: `create_offer`, `buy`, `exercise`, `cancel_offer`, `reclaim`, `claim_delivery`,
+//!   `transfer` (v1.2), `extend_ttl`; views `config`, `get_option`, `get_options` (v1.2, paged,
+//!   at most `MAX_PAGE` entries), `list_open`, `option_count`, `open_collateral`, `is_eligible`.
 //! - No admin, no upgrade, immutable allowlist set in the constructor.
 //! - Check order in every state-changing function:
 //!   auth -> NotFound -> ownership -> state -> time -> eligibility -> transfers -> storage -> event.
@@ -38,6 +43,10 @@ const MAX_UNDERLYINGS: u32 = 8;
 /// instance-storage entry (64 KB limit), so `create_offer` refuses new offers with `OpenListFull`
 /// once this many offers are in state `Offered`.
 const MAX_OPEN: u32 = 1000;
+
+/// Maximum number of options returned by one `get_options` call (ABI §3 Views, §8; v1.2).
+/// Keeps a page well inside the read limits of a single simulation.
+const MAX_PAGE: u32 = 50;
 
 // ---------------------------------------------------------------------------------------------
 // Types (ABI §2)
@@ -186,6 +195,15 @@ pub struct DeliveryClaimed {
     pub id: u32,
 }
 
+/// v1.2: the holder of an `Active` option handed it to `to` (`transfer`). No tokens moved.
+#[contractevent]
+pub struct OptionTransferred {
+    #[topic]
+    pub id: u32,
+    pub from: Address,
+    pub to: Address,
+}
+
 // ---------------------------------------------------------------------------------------------
 // Storage keys (ABI §8)
 // ---------------------------------------------------------------------------------------------
@@ -197,13 +215,13 @@ enum Key {
     Quote,
     /// instance: Vec<Address> underlying allowlist.
     Underlyings,
-    /// instance: u32, next option id (= option_count).
+    /// instance: u32, next option id (= option_count; `get_options` pages over `0..Next`).
     Next,
     /// instance: Vec<u32>, ids in state Offered, oldest first.
     Open,
     /// instance: i128 per token, units the contract must hold for non-terminal options.
     Reserved(Address),
-    /// persistent: OptionData.
+    /// persistent: OptionData. Never deleted; `holder` changes on `buy` and `transfer` (v1.2).
     Opt(u32),
 }
 
@@ -673,9 +691,78 @@ impl OptionsContract {
         Ok(())
     }
 
+    /// v1.2. Holder hands an `Active` option to `to` before expiry. Only `holder` changes: the
+    /// state stays `Active`, no tokens move (any payment for the position is settled outside this
+    /// call), and collateral, reserved totals and the open list are untouched. The previous holder
+    /// can no longer exercise.
+    /// Check order: auth -> NotFound -> NotHolder -> WrongState -> Expired -> InvalidArgs (to ==
+    /// holder) -> SelfTrade (to == writer) -> NotEligible (to on the underlying).
+    pub fn transfer(env: Env, holder: Address, to: Address, id: u32) -> Result<(), Error> {
+        // auth
+        holder.require_auth();
+        // NotFound -> ownership -> state -> time
+        let mut opt = load_opt(&env, id)?;
+        if opt.holder != Some(holder.clone()) {
+            return Err(Error::NotHolder);
+        }
+        if opt.state != State::Active {
+            return Err(Error::WrongState);
+        }
+        if env.ledger().timestamp() >= opt.expiry {
+            return Err(Error::Expired);
+        }
+        // recipient: not the holder itself, not the writer, and able to settle (deliver the
+        // underlying for a PUT, receive it for a CALL)
+        if to == holder {
+            return Err(Error::InvalidArgs);
+        }
+        if to == opt.writer {
+            return Err(Error::SelfTrade);
+        }
+        if !eligible(&env, &opt.underlying, &to) {
+            return Err(Error::NotEligible);
+        }
+
+        // storage (no transfers)
+        opt.holder = Some(to.clone());
+        save_opt(&env, &opt);
+        bump_instance(&env);
+
+        // event
+        OptionTransferred {
+            id,
+            from: holder,
+            to,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
     /// Returns the stored option or `NotFound`. Pure read (no TTL change).
     pub fn get_option(env: Env, id: u32) -> Result<OptionData, Error> {
         load_opt(&env, id)
+    }
+
+    /// v1.2. The stored options with ids `from, from + 1, ...` in id order, stopping at
+    /// `option_count()` and after at most `min(limit, MAX_PAGE)` entries. Empty when
+    /// `from >= option_count()` or `limit == 0`. Pure read (no TTL change), never fails.
+    /// Clients page with `from += returned.len()`.
+    pub fn get_options(env: Env, from: u32, limit: u32) -> Vec<OptionData> {
+        let count: u32 = env.storage().instance().get(&Key::Next).unwrap_or(0);
+        let mut page = Vec::new(&env);
+        for i in 0..limit.min(MAX_PAGE) {
+            let id = match from.checked_add(i) {
+                Some(id) if id < count => id,
+                _ => break,
+            };
+            // Every id below `option_count` has a stored entry (options are never deleted), so
+            // the `Err` arm is unreachable; stopping keeps the page a contiguous run of ids.
+            match load_opt(&env, id) {
+                Ok(opt) => page.push_back(opt),
+                Err(_) => break,
+            }
+        }
+        page
     }
 
     /// Ids in state `Offered`, oldest first. May include offers past expiry; clients filter by
