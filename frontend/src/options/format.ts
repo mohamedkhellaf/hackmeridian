@@ -9,6 +9,16 @@ export function formatAmount(units: bigint, decimals: number, maxFraction = 2): 
   return `${neg ? '-' : ''}${whole.toLocaleString('en-US')}${frac ? '.' + frac : ''}`
 }
 
+// Parses a user-entered decimal ("12.5") into exact token units. Returns null if invalid
+// or if it has more fraction digits than the token supports.
+export function parseAmount(input: string, decimals: number): bigint | null {
+  const m = input.trim().match(/^(\d+)(?:\.(\d*))?$/)
+  if (!m) return null
+  const frac = m[2] ?? ''
+  if (frac.length > decimals) return null
+  return BigInt(m[1]) * 10n ** BigInt(decimals) + BigInt(frac.padEnd(decimals, '0') || '0')
+}
+
 // Strike per one unit of underlying, for display only.
 export function strikePerUnit(o: OptionOffer): string {
   if (o.underlyingQty === 0n) return '–'
