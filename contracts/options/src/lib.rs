@@ -341,7 +341,9 @@ fn open_remove(e: &Env, id: u32) {
 
 /// `CollateralShortfall` if the contract's SAC balance of `quote` or `underlying` is below the
 /// reserved total of that token (an issuer clawback hit the pooled balance). Used by
-/// `create_offer` and `buy` so a deficit cannot spread to new participants (ABI §6).
+/// `create_offer` and `buy` so no new offer can be listed or bought into a deficit. `transfer`
+/// deliberately does not call it: during a deficit an existing position can still move to a new
+/// holder, who then carries the first-come-first-served shortfall risk (ABI §6).
 fn check_collateral(e: &Env, quote: &Address, underlying: &Address) -> Result<(), Error> {
     let me = e.current_contract_address();
     for token in [quote, underlying] {

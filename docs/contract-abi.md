@@ -61,16 +61,16 @@ pub struct Config {
 #[contracterror] #[derive(Copy, Clone, Debug, Eq, PartialEq)] #[repr(u32)]
 pub enum Error {
     NotFound = 101,               // unknown option id
-    InvalidArgs = 102,            // qty/strike_total/premium_total <= 0, or expiry <= now
+    InvalidArgs = 102,            // qty/strike_total/premium_total <= 0, or expiry <= now; v1.2: transfer to self (to == holder)
     AssetNotAllowed = 103,        // underlying not in the constructor allowlist
-    NotEligible = 104,            // writer/buyer not authorized on the underlying SAC, or writer has no quote trustline (§6)
+    NotEligible = 104,            // writer/buyer not authorized on the underlying SAC, or writer has no quote trustline (§6); v1.2: transfer recipient not authorized on the underlying
     ContractNotAuthorized = 105,  // the contract itself is not authorized to hold the underlying (checked at create_offer AND buy)
     WrongState = 106,             // action not valid in the option's current State
     NotWriter = 107,              // caller is not the option's writer
     NotHolder = 108,              // caller is not the option's holder
-    Expired = 109,                // buy/exercise after expiry
+    Expired = 109,                // buy/exercise after expiry; v1.2: transfer at or after expiry
     NotExpired = 110,             // reclaim before expiry
-    SelfTrade = 111,              // writer tried to buy their own offer
+    SelfTrade = 111,              // writer tried to buy their own offer; v1.2: transfer to the writer
     Overflow = 112,               // checked i128 math failed
     InvalidConfig = 113,          // constructor: empty/duplicate/too many underlyings, or quote in underlyings
     OpenListFull = 114,           // create_offer: MAX_OPEN (1000) offers are already in state Offered
@@ -275,9 +275,13 @@ pub struct OptionTransferred { #[topic] pub id: u32, pub from: Address, pub to: 
   partial happens inside one call (a failing SAC transfer, #10, reverts the whole call). The deficit is visible as
   `open_collateral(token) > balance(contract)` and the UI must show it as a warning for **every** option on that
   token. While a deficit exists on a token, `create_offer` and `buy` involving that token fail with
-  `CollateralShortfall`, so the hole cannot spread to new participants; existing positions keep settling
-  first-come-first-served. There is **no** `Impaired` state, refund or pro-rata logic (AGENTS.md). `USDx` is
-  unflagged, so PUT strike collateral is not exposed to clawback.
+  `CollateralShortfall`, so no new offer can be listed or bought into the hole; existing positions keep settling
+  first-come-first-served. **`transfer` (v1.2) is deliberately not guarded** by `CollateralShortfall` or
+  `ContractNotAuthorized` (§3): during a deficit an existing `Active` position can still be handed to a new
+  account, possibly against an off-chain payment, and that account then carries the first-come-first-served
+  shortfall risk. The UI must show the deficit warning before any transfer or off-chain sale of a position.
+  There is **no** `Impaired` state, refund or pro-rata logic (AGENTS.md). `USDx` is unflagged, so PUT strike
+  collateral is not exposed to clawback.
 - Issuer de-authorization of the **contract address** itself blocks every SAC transfer into or out of the contract
   for that asset: PUT `exercise` and PUT `claim_delivery`, CALL `exercise` and CALL `reclaim` all fail until the
   issuer re-authorizes the contract. Writers can still `reclaim` PUT collateral (quote token) after expiry.
@@ -377,6 +381,12 @@ key the error map by name (codes 101–115); everything else is unchanged. The v
 ## 11. v1.2 additions (decided 2026-10-25 20:05 by Dev 2 with GO on P1 scope; deployed 2026-10-25 20:32 UTC as `CAJ2WJP4CUM2GGRB2A5P2M2H5GI45CTZSECV7SL3RTQMGYEKZ7ZDGBAX`)
 
 Additive only: two functions, one event, one constant. No error code, type or existing signature changes.
+`transfer` reuses four existing codes with a new trigger: `InvalidArgs` (to self), `NotEligible` (recipient),
+`Expired` and `SelfTrade` (to the writer); §2 lists both meanings. The per-case docs embedded in the deployed
+contract spec (`stellar contract info interface`) predate `transfer` and still give only the v1.1 meaning, so error
+maps should follow §2 and §3, not the generated bindings' comments. Changing them would change the wasm hash and
+needs a redeploy, so they stay as deployed. `transfer` runs no `CollateralShortfall` or `ContractNotAuthorized`
+check; see §6 for what that means during a deficit.
 
 1. **`transfer(holder, to, id)`** — P1 "transfer of option ownership" (§3, §4). Free transfer to an eligible new holder;
    no payment leg on-chain.
