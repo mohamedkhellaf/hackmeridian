@@ -14,18 +14,28 @@ export async function connect(page: Page) {
 }
 
 // The mock state lives in memory, so switching identity must not reload the page: the test wallet
-// reads `?as=` at connect time, so we rewrite the URL and reconnect.
+// reads `?as=` at connect time, so we rewrite the URL (keeping the hash route) and reconnect.
 export async function switchTo(page: Page, address: string | null) {
   await page.getByRole('button', { name: 'Disconnect' }).click()
-  await page.evaluate((a) => history.replaceState(null, '', a ? `/?as=${a}` : '/'), address)
+  await page.evaluate((a) => history.replaceState(null, '', (a ? `/?as=${a}` : '/') + window.location.hash), address)
   await connect(page)
 }
 
-export async function goTo(page: Page, name: 'Market' | 'Write' | 'My positions') {
-  await page.locator('nav').getByRole('button', { name: new RegExp(`^${name}`) }).click()
+// Sidebar navigation (hash routes: #/markets, #/write, #/portfolio, #/reserves, #/issuer).
+export async function goTo(page: Page, name: 'Markets' | 'Write' | 'Portfolio' | 'Reserves' | 'Issuer') {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: new RegExp(`^${name}`) }).click()
+  await expect(page).toHaveURL(new RegExp(`#/${name.toLowerCase()}$`))
 }
 
-// "Total held" cell of a token row in the collateral panel, as a number.
+// The "Open offers" KPI on the Markets page.
+export async function expectOpenOffers(page: Page, n: number) {
+  await expect(page.getByRole('group', { name: 'Open offers' })).toHaveText(new RegExp(`${n}$`))
+}
+
+// Transaction toast (role=status on success).
+export const toast = (page: Page) => page.getByRole('status')
+
+// "Total held" cell of a token row in the collateral panel (Reserves page), as a number.
 export async function totalHeld(page: Page, code: string): Promise<number> {
   const row = page
     .locator('section', { has: page.getByRole('heading', { name: 'Collateral held by the contract' }) })
