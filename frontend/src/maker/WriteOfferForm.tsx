@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { OptionsClient } from '../options/client'
 import type { FormEvent } from 'react'
 import { formatAmount } from '../options/format'
 import { buildOffer } from './buildOffer'
@@ -16,10 +17,14 @@ function defaultExpiry(): string {
 
 export function WriteOfferForm({
   assets,
+  client,
+  me,
   disabled,
   onSubmit,
 }: {
   assets: SupportedAssets
+  client: OptionsClient
+  me: string | null
   disabled: boolean
   onSubmit: (offer: NewOffer) => Promise<boolean>
 }) {
@@ -30,6 +35,21 @@ export function WriteOfferForm({
   const [premium, setPremium] = useState('2')
   const [expiry, setExpiry] = useState(defaultExpiry)
   const [submitting, setSubmitting] = useState(false)
+
+  const eligKey = me ? `${underlyingId}:${me}` : null
+  const [elig, setElig] = useState<{ key: string; ok: boolean } | null>(null)
+  useEffect(() => {
+    if (!me || !eligKey || !underlyingId) return
+    let live = true
+    client
+      .isEligible(underlyingId, me)
+      .then((ok) => live && setElig({ key: eligKey, ok }))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [client, me, eligKey, underlyingId])
+  const notEligible = elig !== null && elig.key === eligKey && !elig.ok
 
   const draft = buildOffer(assets, { kind, underlyingId, qty, strike, premium, expiry })
   const collateral = 'offer' in draft ? requiredCollateral({ ...draft.offer, quote: assets.quote }) : null
@@ -70,6 +90,11 @@ export function WriteOfferForm({
           ))}
         </select>
       </label>
+      {notEligible && (
+        <p className="form-error" role="alert">
+          Your account is not authorized by this asset's issuer; the transaction will likely fail with NotEligible.
+        </p>
+      )}
       <label>
         Quantity ({underlyingCode})
         <input inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} />

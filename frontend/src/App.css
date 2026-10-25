@@ -164,6 +164,41 @@ td {
   border-color: var(--ok);
 }
 
+.state-settled {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.state-expired {
+  color: #b7791f;
+  border-color: #b7791f;
+}
+
+.state-cancelled,
+.state-reclaimed {
+  opacity: 0.7;
+}
+
+.legend {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.health-ok {
+  color: var(--ok);
+}
+
+.health-bad {
+  color: #c0392b;
+  font-weight: 600;
+}
+
 .empty {
   color: var(--muted);
   padding: 24px 0;
