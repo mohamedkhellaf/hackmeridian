@@ -25,7 +25,8 @@ Outputs (git-ignored, public data only, never secrets):
 - `scripts/out/testnet.env`: shell-sourceable `KEY=VALUE`. Public keys (`RWA_ISSUER`, `USDX_ISSUER`, `MAKER1`,
   `MAKER2`, `INVESTOR`, `OUTSIDER`, `DEPLOYER`), asset strings (`RWA_ASSET`, `BOND_ASSET`, `USDX_ASSET`), SAC ids
   (`RWA_SAC`, `BOND_SAC`, `USDX_SAC`), network settings and one `TX_<STEP>=<hash>` line per transaction.
-  `scripts/deploy/deploy.sh` adds `OPTIONS_ID` and `DEPLOY_TX`.
+  `scripts/deploy/deploy.sh` adds `OPTIONS_ID` and `DEPLOY_TX`; `deploy.sh --throwaway` adds
+  `THROWAWAY_OPTIONS_ID` and `THROWAWAY_DEPLOY_TX` instead.
 - `scripts/out/tx-log.tsv`: every transaction hash the scripts saw, with timestamp, step and status.
 
 Secret keys stay in the CLI keystore (`~/.config/stellar/identity/strata-*.toml`) on the machine that ran
@@ -43,7 +44,23 @@ scripts/deploy/deploy.sh                 # see scripts/deploy/README.md; runs 03
 
 `03-authorize-contract.sh <options-contract-id>` runs `set_authorized(<contract>, true)` on the RWA and BOND
 SACs from `strata-rwa-issuer`. It is needed after **every** contract deploy: without it `create_offer` fails with
-`ContractNotAuthorized` (the contract cannot hold an `AUTH_REQUIRED` asset). `deploy.sh` calls it.
+`ContractNotAuthorized` (the contract cannot hold an `AUTH_REQUIRED` asset). `deploy.sh` calls it. An optional
+second argument names the env keys it records (`TX_<label>_RWA`, `TX_<label>_BOND`; default `AUTHORIZE_OPTIONS`).
+`deploy.sh --throwaway` passes `AUTHORIZE_THROWAWAY` so the main contract's authorization txs are not overwritten.
+
+## Issuer actions (freeze, de-authorize, clawback)
+
+`strata-rwa-issuer` is the admin of the RWA and BOND SACs, so it can call `set_authorized(<address>, false|true)`
+(freeze/unfreeze an account or a contract) and `clawback(<address>, <amount>)`.
+`scripts/deploy/issuer-demo-testnet.sh` records what each action does to the options contract (see
+`scripts/deploy/README.md`). It re-authorizes every account it froze before it exits, even if a step fails.
+If a manual freeze is left behind, `02-assets.sh` re-authorizes maker1, maker2 and investor (`verify.sh` reports
+them as mismatches), and `03-authorize-contract.sh <id>` re-authorizes a contract.
+
+> **Never claw back from the main demo contract (`OPTIONS_ID`).** The clawed tokens leave the contract's pooled
+> balance, and the deficit stays until the issuer sends them back. Until then every `create_offer`/`buy` on that
+> token fails with `CollateralShortfall` (#115). Clawback demos run only against a throwaway instance
+> (`scripts/deploy/deploy.sh --throwaway`).
 
 All scripts are idempotent and safe to re-run:
 

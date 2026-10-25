@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Authorize the options contract to hold the regulated underlyings (RWA and BOND) on Stellar TESTNET.
 #
-#   scripts/setup-testnet/03-authorize-contract.sh <options-contract-id>
+#   scripts/setup-testnet/03-authorize-contract.sh <options-contract-id> [label]
+#
+# [label] (default AUTHORIZE_OPTIONS) names the TX_<label>_<ASSET> env keys, so deploy.sh --throwaway can record its
+# own authorization txs (AUTHORIZE_THROWAWAY) without overwriting the main contract's.
 #
 # Required after EVERY options contract (re)deploy: an AUTH_REQUIRED asset cannot be held by an address the
 # issuer has not authorized, so create_offer fails with ContractNotAuthorized (contract-abi.md §6).
@@ -14,8 +17,10 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 require_tools stellar
 
-[[ $# -eq 1 ]] || die "usage: $0 <options-contract-id>"
+[[ $# -eq 1 || $# -eq 2 ]] || die "usage: $0 <options-contract-id> [label]"
 CONTRACT="$1"
+LABEL="${2:-AUTHORIZE_OPTIONS}"
+[[ "$LABEL" =~ ^[A-Z_][A-Z0-9_]*$ ]] || die "label '$LABEL' must be UPPER_SNAKE_CASE"
 load_env
 require_vars RWA_SAC BOND_SAC
 
@@ -40,7 +45,7 @@ for a in RWA BOND; do
     fi
     log "$a SAC $sac: contract authorized=${now:-unknown}, authorizing"
   fi
-  run_tx "AUTHORIZE_OPTIONS_${a}" stellar contract invoke --id "$sac" --network "$NETWORK" \
+  run_tx "${LABEL}_${a}" stellar contract invoke --id "$sac" --network "$NETWORK" \
     --source-account "$ID_RWA_ISSUER" -- set_authorized --id "$CONTRACT" --authorize true
   if [[ "${DRY_RUN:-0}" != 1 ]]; then
     after="$(sac_authorized "$sac" || true)"
