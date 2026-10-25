@@ -27,6 +27,7 @@ scripts/deploy/deploy.sh                        # build + deploy + authorize + p
 scripts/deploy/deploy.sh --wasm /path/to/options.wasm   # deploy a wasm built in another checkout
 DRY_RUN=1 scripts/deploy/deploy.sh              # print every command; send and write nothing
 scripts/deploy/bindings.sh                      # TypeScript client for OPTIONS_ID (or alias "options")
+scripts/deploy/smoke-testnet.sh                 # end-to-end smoke run on TESTNET (real txs; --p0-only to skip P0+)
 ```
 
 Transaction hashes are printed as `TX <STEP> <hash>` and appended to `scripts/out/tx-log.tsv`.
@@ -45,4 +46,5 @@ id.
       change.
 - [ ] `scripts/deploy/bindings.sh` regenerated the client; Dev 3 notified of the new id and bindings.
 - [ ] `scripts/setup-testnet/verify.sh` passes (it also checks the contract authorization once `OPTIONS_ID` is set).
-- [ ] Optional smoke test: one `create_offer` from `strata-maker1` with `stellar contract invoke --id options ...`.
+- [ ] `scripts/deploy/smoke-testnet.sh` ends with `P0: PASS` and `P0+: PASS` (PUT/CALL lifecycles on RWA and BOND,
+      expected contract errors in simulation, expiry/reclaim, maker competition). Full log in `scripts/out/smoke-*.log`.
