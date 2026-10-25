@@ -335,8 +335,11 @@ smoke run and the 53-test suite. v1.1 changes, all reflected in §2, §3, §6 an
    `CollateralShortfall = 115`.
 2. **`MAX_OPEN = 1000`** open offers; `create_offer` returns `OpenListFull` beyond that. Closes the instance-storage
    bloat / fee-griefing path (audit finding, 64 KB entry limit at roughly 8,000 ids).
-3. **Writer must be eligible on the quote token** at `create_offer` (`NotEligible`), so no unbuyable offers appear in
-   `list_open` (RFQ truth rule).
+3. **Writer must be eligible on the quote token** at `create_offer` (`NotEligible`), so an offer cannot be listed by
+   a writer who cannot receive the premium at creation time. The check is not repeated later: a writer can lose quote
+   eligibility afterwards (for example by deleting a zero-balance `USDx` trustline), and the offer then stays in
+   `list_open` while every `buy` fails in the premium transfer with a SAC error. `list_open` is not proof of
+   executability; clients must simulate `buy` immediately before showing an offer as executable (RFQ truth rule).
 4. **`buy` re-checks `is_eligible(underlying, contract)`** (`ContractNotAuthorized`): no non-refundable premium for an
    option the contract can no longer settle.
 5. **`CollateralShortfall` guard on new exposure**: `create_offer` and `buy` fail while `balance(contract) <
