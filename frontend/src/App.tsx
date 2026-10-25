@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { PresentationMode } from './demo/PresentationMode'
 import { IssuerConsole } from './issuer/IssuerConsole'
 import { createOptionsClient } from './options'
 import { config, explorerTx } from './config'
@@ -110,6 +111,7 @@ function App() {
 
   return (
     <div className="app">
+      <PresentationMode />
       <header>
         <div className="brand">
           <strong>Strata</strong>
