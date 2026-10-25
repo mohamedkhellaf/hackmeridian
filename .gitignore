@@ -22,3 +22,7 @@ dist
 
 # Third-party UI screenshots used as design references (not ours to publish)
 design/inspiration/
+scripts/out/
+*.secret
+keys.json
+env.sh
