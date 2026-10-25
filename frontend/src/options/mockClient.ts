@@ -1,5 +1,6 @@
 import type { OptionsClient } from './client'
-import type { OptionOffer, TokenInfo, TxResult } from './types'
+import { requiredCollateral } from './types'
+import type { CollateralLine, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
 
 // In-memory stand-in for the options contract. Fictional assets and accounts,
 // fake tx hashes. The UI shows a "mock data" banner while this is in use.
@@ -43,16 +44,45 @@ export class MockOptionsClient implements OptionsClient {
     return { hash: fakeHash() }
   }
 
+  private withExpiry(o: OptionOffer): OptionOffer {
+    return (o.state === 'active' || o.state === 'offered') && o.expiry <= now() ? { ...o, state: 'expired' } : { ...o }
+  }
+
+  async supportedAssets() {
+    return { quote: USDX, underlyings: [FUND, BOND] }
+  }
+
   async listOptions() {
     await delay(150)
-    const t = now()
-    return this.options.map((o) =>
-      (o.state === 'active' || o.state === 'offered') && o.expiry <= t ? { ...o, state: 'expired' as const } : { ...o },
-    )
+    return this.options.map((o) => this.withExpiry(o))
   }
 
   async getOption(id: bigint) {
-    return { ...this.find(id) }
+    return this.withExpiry(this.find(id))
+  }
+
+  async openCollateral() {
+    const lines = new Map<string, CollateralLine>()
+    for (const o of this.options.map((x) => this.withExpiry(x))) {
+      const { token, amount } = requiredCollateral(o)
+      const line = lines.get(token.contractId) ?? { token, offered: 0n, active: 0n, pendingReclaim: 0n }
+      if (o.state === 'offered') line.offered += amount
+      else if (o.state === 'active') line.active += amount
+      else if (o.state === 'expired') line.pendingReclaim += amount
+      lines.set(token.contractId, line)
+    }
+    return [...lines.values()]
+  }
+
+  async createOffer(offer: NewOffer, writer: string) {
+    let id = 0n
+    const res = await this.tx(() => {
+      if (offer.underlyingQty <= 0n || offer.totalStrike <= 0n || offer.totalPremium <= 0n) throw new Error('Amounts must be positive')
+      if (offer.expiry <= now()) throw new Error('Expiry must be in the future')
+      id = BigInt(this.options.length)
+      this.options.push({ ...offer, id, quote: USDX, writer, holder: null, state: 'offered' })
+    })
+    return { ...res, id }
   }
 
   buy(id: bigint, buyer: string) {
@@ -80,7 +110,8 @@ export class MockOptionsClient implements OptionsClient {
       const o = this.find(id)
       if (o.writer !== writer) throw new Error('Only the writer can reclaim')
       if (o.expiry > now()) throw new Error('Option has not expired yet')
-      o.state = 'expired'
+      if (o.state !== 'offered' && o.state !== 'active') throw new Error('Nothing to reclaim')
+      o.state = 'reclaimed'
     })
   }
 

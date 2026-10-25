@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { explorerTx } from './config'
+import { config, explorerTx } from './config'
+import { CollateralPanel } from './maker/CollateralPanel'
+import { WriteOfferForm } from './maker/WriteOfferForm'
 import { MockOptionsClient } from './options/mockClient'
 import type { OptionsClient } from './options/client'
-import type { OptionOffer } from './options/types'
+import type { CollateralLine, NewOffer, OptionOffer, SupportedAssets } from './options/types'
 import { formatAmount, formatExpiry, shortAddress, strikePerUnit } from './options/format'
 import { useFreighter } from './wallet/useFreighter'
 import './App.css'
 
-type Tab = 'market' | 'positions'
+type Tab = 'market' | 'write' | 'positions'
 type Notice = { kind: 'ok'; text: string; hash: string; mock: boolean } | { kind: 'err'; text: string }
 
 function OptionRow({
@@ -83,29 +85,41 @@ function App() {
   // Swap for the bindings-backed client once the contract is deployed.
   const client: OptionsClient = useMemo(() => new MockOptionsClient(), [])
   const [options, setOptions] = useState<OptionOffer[]>([])
+  const [assets, setAssets] = useState<SupportedAssets | null>(null)
+  const [collateral, setCollateral] = useState<CollateralLine[]>([])
   const [tab, setTab] = useState<Tab>('market')
   const [busyId, setBusyId] = useState<bigint | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
 
-  const refresh = useCallback(async () => setOptions(await client.listOptions()), [client])
+  const refresh = useCallback(async () => {
+    const [opts, assets, lines] = await Promise.all([client.listOptions(), client.supportedAssets(), client.openCollateral()])
+    setOptions(opts)
+    setAssets(assets)
+    setCollateral(lines)
+  }, [client])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
+  // Returns whether the transaction went through.
   const run = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>) => {
     setBusyId(id)
     setNotice(null)
     try {
       const { hash } = await fn()
       setNotice({ kind: 'ok', text: `${label} confirmed`, hash, mock: client.isMock })
+      return true
     } catch (e) {
       setNotice({ kind: 'err', text: e instanceof Error ? e.message : String(e) })
+      return false
     } finally {
       setBusyId(null)
       await refresh()
     }
   }
+
+  const writeOffer = (offer: NewOffer) => run(-1n, 'Offer published', () => client.createOffer(offer, me!))
 
   const me = wallet.address
   const market = options.filter((o) => o.state === 'offered')
@@ -154,6 +168,9 @@ function App() {
         <button type="button" className={tab === 'market' ? 'tab active' : 'tab'} onClick={() => setTab('market')}>
           Market ({market.length})
         </button>
+        <button type="button" className={tab === 'write' ? 'tab active' : 'tab'} onClick={() => setTab('write')}>
+          Write
+        </button>
         <button type="button" className={tab === 'positions' ? 'tab active' : 'tab'} onClick={() => setTab('positions')}>
           My positions ({positions.length})
         </button>
@@ -170,6 +187,13 @@ function App() {
             })}
           />
         )}
+        {tab === 'write' && (
+          <div className="write-grid">
+            {assets && <WriteOfferForm assets={assets} disabled={!me || busy} onSubmit={writeOffer} />}
+            <CollateralPanel lines={collateral} contractId={config.optionsContractId} />
+            {!me && <p className="empty">Connect Freighter to write an option.</p>}
+          </div>
+        )}
         {tab === 'positions' &&
           (me ? (
             <OptionsTable
@@ -180,6 +204,12 @@ function App() {
                     label: busyId === o.id ? 'Exercising…' : 'Exercise',
                     disabled: busy,
                     onClick: () => void run(o.id, 'Exercise', () => client.exercise(o.id, me)),
+                  }
+                if (o.writer === me && o.state === 'expired')
+                  return {
+                    label: busyId === o.id ? 'Reclaiming…' : 'Reclaim collateral',
+                    disabled: busy,
+                    onClick: () => void run(o.id, 'Reclaim', () => client.reclaim(o.id, me)),
                   }
                 if (o.writer === me && o.state === 'offered')
                   return {
