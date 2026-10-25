@@ -5,80 +5,15 @@ import { WriteOfferForm } from './maker/WriteOfferForm'
 import { MockOptionsClient } from './options/mockClient'
 import type { OptionsClient } from './options/client'
 import type { CollateralLine, NewOffer, OptionOffer, SupportedAssets } from './options/types'
-import { formatAmount, formatExpiry, shortAddress, strikePerUnit } from './options/format'
+import { shortAddress } from './options/format'
+import { OptionsTable } from './market/OptionsTable'
+import { MarketSeries } from './market/MarketSeries'
+import { BuyDialog } from './market/BuyDialog'
 import { useFreighter } from './wallet/useFreighter'
 import './App.css'
 
 type Tab = 'market' | 'write' | 'positions'
 type Notice = { kind: 'ok'; text: string; hash: string; mock: boolean } | { kind: 'err'; text: string }
-
-function OptionRow({
-  o,
-  action,
-}: {
-  o: OptionOffer
-  action?: { label: string; onClick: () => void; disabled?: boolean }
-}) {
-  return (
-    <tr>
-      <td>
-        <span className={`kind kind-${o.kind}`}>{o.kind.toUpperCase()}</span>
-      </td>
-      <td>
-        {formatAmount(o.underlyingQty, o.underlying.decimals)} {o.underlying.code}
-      </td>
-      <td>
-        {strikePerUnit(o)} {o.quote.code}
-      </td>
-      <td>
-        {formatAmount(o.totalStrike, o.quote.decimals)} {o.quote.code}
-      </td>
-      <td>
-        {formatAmount(o.totalPremium, o.quote.decimals)} {o.quote.code}
-      </td>
-      <td>{formatExpiry(o.expiry)}</td>
-      <td className="mono">{shortAddress(o.writer)}</td>
-      <td>
-        <span className={`state state-${o.state}`}>{o.state}</span>
-      </td>
-      <td>
-        {action && (
-          <button type="button" onClick={action.onClick} disabled={action.disabled}>
-            {action.label}
-          </button>
-        )}
-      </td>
-    </tr>
-  )
-}
-
-function OptionsTable({ rows, actionFor }: { rows: OptionOffer[]; actionFor: (o: OptionOffer) => Parameters<typeof OptionRow>[0]['action'] }) {
-  if (rows.length === 0) return <p className="empty">Nothing here yet.</p>
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Underlying</th>
-            <th>Strike / unit</th>
-            <th>Total strike</th>
-            <th>Premium</th>
-            <th>Expiry</th>
-            <th>Writer</th>
-            <th>State</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((o) => (
-            <OptionRow key={o.id.toString()} o={o} action={actionFor(o)} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
 
 function App() {
   const wallet = useFreighter()
@@ -90,6 +25,7 @@ function App() {
   const [tab, setTab] = useState<Tab>('market')
   const [busyId, setBusyId] = useState<bigint | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [buying, setBuying] = useState<OptionOffer | null>(null)
 
   const refresh = useCallback(async () => {
     const [opts, assets, lines] = await Promise.all([client.listOptions(), client.supportedAssets(), client.openCollateral()])
@@ -178,14 +114,7 @@ function App() {
 
       <main>
         {tab === 'market' && (
-          <OptionsTable
-            rows={market}
-            actionFor={(o) => ({
-              label: busyId === o.id ? 'Buying…' : 'Buy',
-              disabled: !me || busy || o.writer === me,
-              onClick: () => void run(o.id, 'Purchase', () => client.buy(o.id, me!)),
-            })}
-          />
+          <MarketSeries offers={market} me={me ?? null} busy={busy} busyId={busyId} onBuy={setBuying} />
         )}
         {tab === 'write' && (
           <div className="write-grid">
@@ -224,6 +153,18 @@ function App() {
             <p className="empty">Connect Freighter to see your positions.</p>
           ))}
       </main>
+
+      {buying && me && (
+        <BuyDialog
+          offer={buying}
+          onCancel={() => setBuying(null)}
+          onConfirm={() => {
+            const o = buying
+            setBuying(null)
+            void run(o.id, 'Purchase', () => client.buy(o.id, me))
+          }}
+        />
+      )}
 
       <footer>
         Physically settled, fully collateralized. Issuer controls (freeze, clawback) on regulated assets can block settlement. This is not a guarantee against issuer action.
