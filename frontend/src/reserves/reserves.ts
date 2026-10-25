@@ -51,11 +51,9 @@ export function backingFor(line: CollateralLine, health?: CollateralHealth): Bac
   }
 }
 
-// formatAmount trims trailing zeros; reserves rows read better with at least 2 decimals (1,080.00).
+// Fixed 2 decimals for reserves rows (1,080.00).
 export function formatFixed(units: bigint, decimals: number): string {
-  const s = formatAmount(units, decimals)
-  if (!s.includes('.')) return `${s}.00`
-  return s.split('.')[1].length === 1 ? `${s}0` : s
+  return formatAmount(units, decimals, 2, 2)
 }
 
 export function stellarExpertContract(id: string): string {

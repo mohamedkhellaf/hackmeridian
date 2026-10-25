@@ -72,7 +72,7 @@ export function describeError(e: unknown): string {
   if (/reject|denied|declined|cancel/.test(lower) || (e instanceof Error && e.name === 'UserRejectedError'))
     return 'You rejected the request in your wallet.'
   if (/wrong network|network passphrase|networkpassphrase|tx_bad_auth/.test(lower))
-    return 'Your wallet is on the wrong network. Switch Freighter to Testnet.'
+    return 'Your wallet is on the wrong network. Switch your wallet to Testnet.'
   if (/account not found|tx_no_source_account|txnosourceaccount/.test(lower))
     return 'Account not funded on Testnet. Fund it with friendbot first.'
   if (/tx_insufficient_balance/.test(lower)) return 'Not enough XLM to pay fees and reserves.'

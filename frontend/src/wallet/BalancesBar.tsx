@@ -1,4 +1,4 @@
-import { formatAmount } from '../options/format'
+import { formatDisplay } from '../options/format'
 import type { TokenBalance } from '../stellar/tokens'
 
 export interface BalanceToken {
@@ -33,7 +33,7 @@ export function BalancesBar({
         const note = b ? NOTE[b.status] : undefined
         return (
           <span key={t.contractId} className="balance" title={b?.error}>
-            <strong>{t.code}</strong> {b?.balance != null ? formatAmount(b.balance, t.decimals) : '–'}
+            <strong>{t.code}</strong> {b?.balance != null ? formatDisplay(b.balance, t.decimals) : '–'}
             {note ? <em> ({note})</em> : null}
           </span>
         )

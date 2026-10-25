@@ -89,7 +89,7 @@ export function PortfolioView({ me, rows, actionFor }: PortfolioViewProps) {
           />
         </>
       ) : (
-        <p className="pf-empty">Connect Freighter to see your positions.</p>
+        <p className="pf-empty">Connect a wallet to see your positions.</p>
       )}
     </div>
   )

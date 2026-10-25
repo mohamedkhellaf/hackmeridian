@@ -36,9 +36,9 @@ function App() {
             />
           ) : null
         }
-        wallet={<WalletChip address={me} onConnect={() => void wallet.connect()} onDisconnect={wallet.disconnect} />}
+        wallet={<WalletChip address={me} walletName={wallet.walletName} onConnect={() => void wallet.connect()} onDisconnect={wallet.disconnect} />}
       >
-        {wallet.wrongNetwork && <Banner tone="danger">Freighter is not on Testnet. Switch network in the extension.</Banner>}
+        {wallet.wrongNetwork && <Banner tone="danger">{wallet.networkMessage ?? 'Your wallet is not on Testnet. Switch network in the wallet.'}</Banner>}
         {wallet.error && <Banner tone="danger">{wallet.error}</Banner>}
 
         {route === 'markets' && (

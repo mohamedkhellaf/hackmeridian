@@ -1,4 +1,4 @@
-import { formatAmount, shortAddress } from '../options/format'
+import { formatDisplay, shortAddress } from '../options/format'
 import { requiredCollateral } from '../options/types'
 import type { OptionOffer, TokenInfo } from '../options/types'
 
@@ -11,9 +11,7 @@ export type PositionFilter = 'all' | 'holding' | 'writing'
 
 /** Amount with at least two decimals (5 -> "5.00"), at most four, thousands separators. */
 export function money(units: bigint, decimals: number): string {
-  const s = formatAmount(units, decimals, Math.min(decimals, 4))
-  const [whole, frac = ''] = s.split('.')
-  return `${whole}.${frac.padEnd(Math.min(2, Math.max(decimals, 0)), '0')}`.replace(/\.$/, '')
+  return formatDisplay(units, decimals)
 }
 
 export const moneyWith = (units: bigint, t: TokenInfo) => `${money(units, t.decimals)} ${t.code}`

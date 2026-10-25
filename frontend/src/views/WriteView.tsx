@@ -15,7 +15,7 @@ export function WriteView({ assets, client, me, busy, onSubmit }: WriteViewProps
   return (
     <div className="wr-stack">
       <PageHeader title="Write an option" subtitle="Lock collateral, publish an offer, and earn the premium when a buyer takes it." />
-      {!me && <Banner tone="info">Connect Freighter to write an option. You can fill in the form first.</Banner>}
+      {!me && <Banner tone="info">Connect a wallet to write an option. You can fill in the form first.</Banner>}
       {assets && <WriteOfferForm assets={assets} client={client} me={me} disabled={!me || busy} onSubmit={onSubmit} />}
     </div>
   )

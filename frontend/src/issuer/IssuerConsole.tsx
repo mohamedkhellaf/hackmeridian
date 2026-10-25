@@ -177,7 +177,7 @@ export function IssuerConsole({ address, sign, optionsContractId }: Props) {
   if (!address) {
     return (
       <Card title="Issuer console">
-        <p className="is-muted">Connect the asset issuer's account in Freighter (Testnet) to use the issuer console.</p>
+        <p className="is-muted">Connect the asset issuer's account in your wallet (Testnet) to use the issuer console.</p>
       </Card>
     )
   }

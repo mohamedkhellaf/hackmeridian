@@ -29,7 +29,7 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
 
   await goTo(page, 'Markets')
   await expectOpenOffers(page, 5)
-  await expect(page.getByRole('button', { name: /^Buy put on 5 FUND from GBE6…3ZEG/ })).toBeDisabled() // own offer
+  await expect(page.getByRole('button', { name: /^Buy put on 5.00 FUND from GBE6…3ZEG/ })).toBeDisabled() // own offer
 
   await goTo(page, 'Portfolio')
   const row = page.locator('tbody tr')

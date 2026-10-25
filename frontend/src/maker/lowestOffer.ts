@@ -1,4 +1,4 @@
-import { formatAmount, strikePerUnit } from '../options/format'
+import { formatDisplay, strikePerUnit } from '../options/format'
 import type { NewOffer, OptionOffer, TokenInfo } from '../options/types'
 
 const utcDay = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10)
@@ -28,7 +28,5 @@ export function lowestOpenInSeries(offers: OptionOffer[], draft: NewOffer, quote
 
 /** Premium per unit of underlying as display text, e.g. "0.40". */
 export function premiumPerUnitText(o: Sized, quoteDecimals: number): string {
-  const s = formatAmount(perUnit(o), quoteDecimals, Math.min(quoteDecimals, 4))
-  const [w, f = ''] = s.split('.')
-  return `${w}.${f.padEnd(2, '0')}`
+  return formatDisplay(perUnit(o), quoteDecimals)
 }

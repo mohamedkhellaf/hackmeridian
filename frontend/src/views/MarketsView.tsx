@@ -3,7 +3,7 @@ import { MarketSeries } from '../market/MarketSeries'
 import { filterOffers } from '../market/series'
 import type { KindFilter } from '../market/series'
 import '../market/market.css'
-import { formatAmount } from '../options/format'
+import { formatDisplay } from '../options/format'
 import type { CollateralHealth, CollateralLine, OptionOffer } from '../options/types'
 import { Amount, Card, Chip, PageHeader, Stat, StatGrid, Tag } from '../ui'
 
@@ -48,7 +48,7 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, collateral, healt
             locked.map((l, i) => (
               <Fragment key={l.token.contractId}>
                 {i > 0 && <span aria-hidden="true">·</span>}
-                <Amount value={formatAmount(l.total, l.token.decimals)} unit={l.token.code} />
+                <Amount value={formatDisplay(l.total, l.token.decimals)} unit={l.token.code} />
               </Fragment>
             ))
           )}

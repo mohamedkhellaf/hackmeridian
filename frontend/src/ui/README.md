@@ -35,7 +35,7 @@ legacy rules it no longer uses.
 
 - `AppShell` renders demo banner, sidebar, top bar, content slot, footer disclaimer and the mobile tab bar.
   Props: `route`, `portfolioBadge`, `mock`, `contractId`, `balances` (slot), `wallet` (slot), `children`.
-- `WalletChip` is the default `wallet` slot (Connect Freighter button, or address pill + Disconnect).
+- `WalletChip` is the default `wallet` slot (Connect wallet button, or address pill + Disconnect).
 - Routing: `useHashRoute()` returns `[route, navigate]`; routes `markets | write | portfolio | reserves | issuer`
   (`#/markets`, default). Unknown hashes fall back to markets. No router dependency.
 - Breakpoints: <= 768px sidebar hidden and bottom tab bar (Markets, Write, Portfolio, Reserves; Issuer is the person icon

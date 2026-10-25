@@ -4,7 +4,7 @@ import { config, explorerTx } from '../config'
 import type { OptionsClient } from '../options/client'
 import type { OptionOffer } from '../options/types'
 import { requiredCollateral } from '../options/types'
-import { formatAmount, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
+import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
 import type { TxOutcome } from '../state/useStrata'
 import { AssetBadge, Button, Dialog, Icon, Mono, Tag } from '../ui'
 import './market.css'
@@ -72,11 +72,11 @@ export function BuyDialog({
 
   const u = offer.underlying
   const q = offer.quote
-  const qty = `${formatAmount(offer.underlyingQty, u.decimals)} ${u.code}`
-  const strike = `${formatAmount(offer.totalStrike, q.decimals)} ${q.code}`
-  const premium = formatAmount(offer.totalPremium, q.decimals)
+  const qty = `${formatDisplay(offer.underlyingQty, u.decimals)} ${u.code}`
+  const strike = `${formatDisplay(offer.totalStrike, q.decimals)} ${q.code}`
+  const premium = formatDisplay(offer.totalPremium, q.decimals)
   const col = requiredCollateral(offer)
-  const locked = `${formatAmount(col.amount, col.token.decimals)} ${col.token.code} locked`
+  const locked = `${formatDisplay(col.amount, col.token.decimals)} ${col.token.code} locked`
   const kindWord = offer.kind === 'put' ? 'sell' : 'buy'
   const blocked = openCheck === 'fail' || eligCheck === 'fail'
   const where = client.isMock ? 'in the mock contract' : 'on-chain'

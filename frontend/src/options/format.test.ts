@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAmount, parseAmount, shortAddress, strikePerUnit } from './format'
+import { formatAmount, formatDisplay, parseAmount, shortAddress, strikePerUnit } from './format'
 import { requiredCollateral } from './types'
 import type { OptionOffer, TokenInfo } from './types'
 
@@ -67,22 +67,38 @@ describe('formatAmount', () => {
   })
 })
 
+describe('formatAmount minFraction / formatDisplay', () => {
+  it('pads to the minimum fraction digits', () => {
+    expect(formatAmount(2n * UNIT, 7, 2, 2)).toBe('2.00')
+    expect(formatAmount(4_000_000n, 7, 2, 2)).toBe('0.40')
+    expect(formatAmount(19_999_999n, 7, 2, 2)).toBe('1.99')
+  })
+  it('formatDisplay shows at least 2 and at most 4 decimals', () => {
+    expect(formatDisplay(1080n * UNIT, 7)).toBe('1,080.00')
+    expect(formatDisplay(18_000_000n, 7)).toBe('1.80')
+    expect(formatDisplay(12_345_678n, 7)).toBe('1.2345')
+    expect(formatDisplay(-5n * UNIT, 7)).toBe('-5.00')
+    expect(formatDisplay(42n, 0)).toBe('42')
+    expect(formatDisplay(5n, 1)).toBe('0.5')
+  })
+})
+
 describe('strikePerUnit', () => {
   const offer = (qty: bigint, strike: bigint): OptionOffer => ({
     id: 0n, kind: 'put', underlying: U, quote: Q, underlyingQty: qty, totalStrike: strike,
     totalPremium: UNIT, expiry: 0, writer: 'W', holder: null, state: 'offered',
   })
   it('divides total strike by quantity', () => {
-    expect(strikePerUnit(offer(5n * UNIT, 50n * UNIT))).toBe('10')
-    expect(strikePerUnit(offer(3n * UNIT, 36n * UNIT))).toBe('12')
-    expect(strikePerUnit(offer(4n * UNIT, 10n * UNIT))).toBe('2.5')
+    expect(strikePerUnit(offer(5n * UNIT, 50n * UNIT))).toBe('10.00')
+    expect(strikePerUnit(offer(3n * UNIT, 36n * UNIT))).toBe('12.00')
+    expect(strikePerUnit(offer(4n * UNIT, 10n * UNIT))).toBe('2.50')
   })
   it('returns a dash for zero quantity', () => {
     expect(strikePerUnit(offer(0n, 10n * UNIT))).toBe('–')
   })
   it('accounts for differing decimals', () => {
     const o = { ...offer(2n * 10n ** 6n, 30n * 10n ** 2n), underlying: { ...U, decimals: 6 }, quote: { ...Q, decimals: 2 } }
-    expect(strikePerUnit(o)).toBe('15')
+    expect(strikePerUnit(o)).toBe('15.00')
   })
 })
 
