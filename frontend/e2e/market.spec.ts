@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { openApp } from './helpers.ts'
+import { expectOpenOffers, goTo, openApp } from './helpers.ts'
 
 test('market lists the seeded series', async ({ page }) => {
   await openApp(page)
-  await expect(page.getByRole('button', { name: /^Market \(4\)/ })).toBeVisible()
+  await expectOpenOffers(page, 4)
   await expect(page.getByRole('heading', { name: /PUT FUND · strike 10 USDx/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: /CALL FUND · strike 12 USDx/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: /PUT BOND · strike 98 USDx/ })).toBeVisible()
@@ -21,4 +21,22 @@ test('buy is disabled until a wallet is connected', async ({ page }) => {
   const buys = page.getByRole('button', { name: /^Buy / })
   await expect(buys).toHaveCount(4)
   for (const b of await buys.all()) await expect(b).toBeDisabled()
+})
+
+test('hash routes drive the sidebar and every view renders', async ({ page }) => {
+  await page.goto('/#/reserves')
+  await expect(page.getByRole('heading', { level: 1, name: 'Reserves' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Reserves' })).toHaveAttribute('aria-current', 'page')
+  for (const [link, title] of [
+    ['Portfolio', 'Portfolio'],
+    ['Write', 'Write an option'],
+    ['Issuer', 'Issuer console'],
+    ['Markets', 'Markets'],
+  ] as const) {
+    await goTo(page, link)
+    await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+  }
+  // Unknown routes fall back to Markets.
+  await page.goto('/#/nope')
+  await expect(page.getByRole('heading', { level: 1, name: 'Markets' })).toBeVisible()
 })

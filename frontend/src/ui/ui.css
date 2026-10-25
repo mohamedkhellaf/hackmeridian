@@ -1,0 +1,622 @@
+/* Strata UI primitives. Tokens live in src/index.css. Class names are prefixed `ui-`. */
+
+.ui-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+}
+.ui-mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: #c9ced6;
+}
+.ui-amount {
+  font-variant-numeric: tabular-nums;
+}
+.ui-amount-unit {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.8em;
+}
+
+/* Button */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.ui-btn--sm {
+  font-size: 12.5px;
+  padding: 5px 12px;
+  min-height: 30px;
+}
+.ui-btn--md {
+  font-size: 13px;
+  padding: 8px 16px;
+  min-height: 36px;
+}
+.ui-btn--lg {
+  font-size: 15px;
+  padding: 14px 20px;
+  min-height: 48px;
+  border-radius: var(--r-lg);
+}
+.ui-btn--full {
+  width: 100%;
+}
+.ui-btn--secondary:hover:not(:disabled) {
+  border-color: #3a4350;
+  background: var(--surface-hover);
+}
+.ui-btn--primary {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  border-color: var(--primary-bg);
+}
+.ui-btn--primary:hover:not(:disabled) {
+  background: #fff;
+  border-color: #fff;
+}
+.ui-btn--danger {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+.ui-btn--danger:hover:not(:disabled) {
+  border-color: var(--danger);
+}
+.ui-btn--ghost {
+  border-color: transparent;
+  color: var(--text-2);
+}
+.ui-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.ui-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ui-btn[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.8;
+}
+.ui-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: ui-spin 0.7s linear infinite;
+}
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Tag */
+.ui-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  padding: 3px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.ui-tag--put {
+  color: var(--put);
+  background: var(--put-bg);
+}
+.ui-tag--call {
+  color: var(--call);
+  background: var(--call-bg);
+}
+.ui-tag--ok {
+  color: var(--ok);
+  background: var(--ok-bg);
+}
+.ui-tag--warn {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+.ui-tag--neutral {
+  color: var(--text-2);
+  background: var(--surface-active);
+}
+
+/* StatusDot */
+.ui-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.ui-dot--ok {
+  background: var(--ok-dot);
+}
+.ui-dot--warn {
+  background: var(--warn-dot);
+}
+.ui-dot--danger {
+  background: var(--danger);
+}
+.ui-dot--neutral {
+  background: var(--muted);
+}
+
+/* Chip */
+.ui-chip {
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-2);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ui-chip:hover {
+  background: var(--surface-hover);
+}
+.ui-chip.is-on {
+  background: #1b212b;
+  color: var(--text-strong);
+  border-color: var(--border-strong);
+}
+
+/* Segmented */
+.ui-seg {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+}
+.ui-seg-item {
+  flex: 1;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ui-seg-item:hover:not(:disabled) {
+  color: var(--text);
+}
+.ui-seg-item.is-on {
+  background: var(--surface-active);
+  color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.ui-seg-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* AssetBadge */
+.ui-asset-badge {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  font-weight: 700;
+  flex: none;
+  letter-spacing: 0.02em;
+}
+
+/* Card */
+.ui-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+.ui-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+.ui-card-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ui-card-title {
+  font-size: 15px;
+}
+.ui-card-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ui-card-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ui-card-body {
+  padding: 16px 20px 20px;
+}
+.ui-card-header + .ui-card-body {
+  padding-top: 0;
+}
+.ui-card-body--flush {
+  padding: 0 !important;
+}
+
+/* Page header */
+.ui-page-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ui-page-sub {
+  margin-top: 8px;
+  color: var(--text-2);
+  font-size: 14.5px;
+  max-width: 62ch;
+}
+.ui-page-actions {
+  margin-left: auto;
+}
+
+/* Stat / StatGrid */
+.ui-stat-grid {
+  display: grid;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.ui-stat-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ui-stat-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ui-stat-grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.ui-stat {
+  background: var(--surface);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.ui-stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.ui-stat-value .ui-amount-unit {
+  font-size: 14px;
+}
+.ui-stat-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .ui-stat-grid--2,
+  .ui-stat-grid--3,
+  .ui-stat-grid--4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ui-stat {
+    padding: 14px 16px;
+  }
+}
+
+/* Table: <table className="ui-table"> inside a scroll wrapper. First column left, the rest right-aligned.
+   Use <span className="ui-sub"> inside a cell for the dimmed second line. Add .ui-left to a th/td to left-align. */
+.ui-table-wrap {
+  overflow-x: auto;
+}
+.ui-table,
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.ui-table th,
+.table-wrap th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  text-align: right;
+  padding: 10px 20px;
+  border-bottom: 1px solid #1e232b;
+  white-space: nowrap;
+}
+.ui-table td,
+.table-wrap td {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+  color: var(--text);
+  font-size: 14px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.table-wrap td {
+  border-top: 1px solid var(--border);
+  border-bottom: 0;
+}
+.ui-table th:first-child,
+.ui-table td:first-child,
+.table-wrap th:first-child,
+.table-wrap td:first-child,
+.ui-table .ui-left {
+  text-align: left;
+}
+.ui-table tbody tr:first-child td {
+  border-top: 0;
+}
+.ui-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.015);
+}
+.ui-table tr.is-best td {
+  background: rgba(84, 196, 160, 0.04);
+}
+.ui-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+  font-weight: 400;
+}
+.ui-table .ui-strong {
+  font-weight: 600;
+}
+
+/* Banner */
+.ui-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.ui-banner-icon {
+  margin-top: 2px;
+  flex: none;
+}
+.ui-banner-body {
+  min-width: 0;
+}
+.ui-banner-title {
+  display: block;
+  margin-bottom: 2px;
+}
+.ui-banner--info {
+  background: var(--surface);
+  color: var(--text-2);
+}
+.ui-banner--warn {
+  background: var(--banner-bg);
+  border-color: var(--banner-border);
+  color: var(--warn);
+}
+.ui-banner--ok {
+  background: var(--ok-bg);
+  border-color: rgba(84, 196, 160, 0.3);
+  color: var(--ok);
+}
+.ui-banner--danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+/* Dialog: centered modal; bottom sheet on phones */
+.ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(5, 6, 8, 0.72);
+}
+.ui-dialog {
+  width: 100%;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px 22px;
+  background: var(--surface);
+  border: 1px solid #222832;
+  border-radius: var(--r-2xl);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+}
+.ui-dialog:focus {
+  outline: none;
+}
+.ui-dialog-grabber {
+  display: none;
+}
+.ui-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ui-dialog-title {
+  font-size: 16px;
+}
+.ui-dialog-close {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ui-dialog-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.ui-dialog-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+.ui-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  .ui-dialog-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .ui-dialog {
+    max-width: none !important;
+    max-height: calc(100dvh - 24px);
+    border-radius: 20px 20px 0 0;
+    border-bottom: 0;
+    padding: 10px 18px calc(22px + env(safe-area-inset-bottom));
+  }
+  .ui-dialog-grabber {
+    display: block;
+    align-self: center;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+  }
+  .ui-dialog-close {
+    width: 44px;
+    height: 44px;
+    margin-right: -10px;
+  }
+  .ui-dialog-footer {
+    flex-direction: column-reverse;
+  }
+  .ui-dialog-footer .ui-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* Toast */
+.ui-toast-region {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 120;
+  width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.ui-toast {
+  pointer-events: auto;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border-strong);
+  background: #11151b;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  font-size: 13.5px;
+}
+.ui-toast--ok {
+  border-color: rgba(84, 196, 160, 0.4);
+}
+.ui-toast--ok .ui-toast-icon {
+  color: var(--ok);
+}
+.ui-toast--err {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+.ui-toast--err .ui-toast-icon {
+  color: var(--danger);
+}
+.ui-toast-icon {
+  margin-top: 2px;
+  flex: none;
+}
+.ui-toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  color: var(--text-strong);
+}
+.ui-toast-tx,
+.ui-toast-msg {
+  color: var(--text-2);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.ui-toast-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ui-toast-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+@media (max-width: 768px) {
+  .ui-toast-region {
+    right: 16px;
+    left: 16px;
+    width: auto;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}
