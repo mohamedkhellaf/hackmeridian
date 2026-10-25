@@ -1,0 +1,5460 @@
+{
+ "version": "pro-v0",
+ "units": {
+  "amount": "USDx, 7 décimales (1 USDx = 10_000_000)",
+  "qty": "lots entiers",
+  "time": "secondes Unix"
+ },
+ "scenario_order": "index 0..13 : prix {0,+1/3,-1/3,+2/3,-2/3,+1,-1} x U, vol {x1.25, x0.75} ; 14 : +ext ; 15 : -ext",
+ "errors": {
+  "InvalidArgs": 201,
+  "NotFound": 202,
+  "Unauthorized": 203,
+  "WrongState": 204,
+  "SeriesExpired": 205,
+  "NotExpired": 206,
+  "StaleSnapshot": 207,
+  "BadSnapshot": 208,
+  "InsufficientMargin": 209,
+  "OiCapExceeded": 210,
+  "NotLiquidable": 211,
+  "VaultCapacity": 212,
+  "NoSettlementPrice": 213,
+  "SettlementWindowClosed": 214,
+  "WithdrawLocked": 215,
+  "TooManySeries": 216,
+  "SelfTrade": 217,
+  "InsolventTakeover": 218,
+  "Overflow": 219,
+  "TooManyPositions": 220
+ },
+ "scenarios": [
+  {
+   "name": "happy_path_otm",
+   "description": "Vente nue, retrait de l'excédent, expiration hors de la monnaie.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 20000,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "lp_notice": 604800,
+    "settle_window": 86400
+   },
+   "initial_wallets": {
+    "MAKER_A": 1000000000000,
+    "ALICE": 100000000000,
+    "LP1": 5000000000000
+   },
+   "steps": [
+    {
+     "op": "lp_deposit",
+     "args": [
+      "LP1",
+      2000000000000
+     ],
+     "expect": "ok",
+     "result": 2000000000000,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2000000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 2000000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 3000000000000,
+       "MAKER_A": 1000000000000
+      },
+      "series": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2000000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 2000000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 3000000000000,
+       "MAKER_A": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1000000000,
+       "mark": 5628819,
+       "ra": [
+        5249763,
+        -3753884,
+        18699597,
+        3416907,
+        -1673198,
+        -5412102,
+        40401735,
+        21997654,
+        -4511958,
+        -5616658,
+        70604552,
+        54384485,
+        -5396884,
+        -5628534,
+        195246392,
+        -5628817
+       ],
+       "smin": 50000000,
+       "liq": 708083
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2000000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 2000000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 3000000000000,
+       "MAKER_A": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      264999381940
+     ],
+     "expect": "ok",
+     "note": "dépôt calculé pour être exactement à l'IM après la vente",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2264999381940,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 264999381940,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2000000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 3000000000000,
+       "MAKER_A": 735000618060
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      1000,
+      6191700900,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2264999381940,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 264999381940,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2000000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 3000000000000,
+       "MAKER_A": 735000618060
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2271191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 270571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 735000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "get_requirement",
+     "args": [
+      "MAKER_A"
+     ],
+     "expect": "ok",
+     "result": {
+      "nlv": 264943093750,
+      "liability": 5628819000,
+      "scan": 195246392000,
+      "smin": 50000000000,
+      "liq": 708083000,
+      "mm": 195954475000,
+      "im": 244943093750,
+      "worst": 14
+     },
+     "note": "MM = max(scan, plancher) + liquidité ; IM = ceil(1,25 x MM)"
+    },
+    {
+     "op": "withdraw",
+     "args": [
+      "MAKER_A",
+      20000000001
+     ],
+     "expect": {
+      "error": "InsufficientMargin",
+      "code": 209
+     },
+     "note": "1 unité de trop",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2271191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 270571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 735000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "withdraw",
+     "args": [
+      "MAKER_A",
+      20000000000
+     ],
+     "expect": "ok",
+     "note": "retrait exact de l'excédent au-dessus de l'IM",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 755000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1801814400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 2,
+       "ts": 1801814400,
+       "spot": 950000000,
+       "mark": 0,
+       "ra": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        135000000,
+        0
+       ],
+       "smin": 47500000,
+       "liq": 0
+      }
+     ],
+     "expect": {
+      "error": "SeriesExpired",
+      "code": 205
+     },
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 755000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "KEEPER",
+      "MAKER_A",
+      "VAULT"
+     ],
+     "expect": {
+      "error": "SeriesExpired",
+      "code": 205
+     },
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 755000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "publish_settlement",
+     "args": [
+      "PUBLISHER",
+      0,
+      950000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 755000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": 950000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "settle",
+     "args": [
+      "MAKER_A",
+      0
+     ],
+     "expect": "ok",
+     "result": {
+      "due": 0,
+      "from_writer": 0,
+      "from_vault": 0,
+      "deficit": 0,
+      "alloc": [
+       0
+      ]
+     },
+     "note": "hors de la monnaie : dû 0",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 755000618060
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": 950000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": true,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    },
+    {
+     "op": "withdraw",
+     "args": [
+      "MAKER_A",
+      250571912750
+     ],
+     "expect": "ok",
+     "note": "plus de position : tout le cash est retirable",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 2000619170090,
+      "accounts": {
+       "VAULT": {
+        "cash": 2000619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 3000000000000,
+       "MAKER_A": 1005572530810
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": 950000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": true,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2000000000000
+      },
+      "total_shares": 2000000000000
+     }
+    }
+   ]
+  },
+  {
+   "name": "insufficient_margin_reverts",
+   "description": "Un fill sous-financé ne crée rien et ne déplace aucun fonds.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 20000,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "lp_notice": 604800,
+    "settle_window": 86400
+   },
+   "initial_wallets": {
+    "MAKER_A": 50000000000,
+    "ALICE": 100000000000
+   },
+   "steps": [
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 50000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1000000000,
+       "mark": 5628819,
+       "ra": [
+        5249763,
+        -3753884,
+        18699597,
+        3416907,
+        -1673198,
+        -5412102,
+        40401735,
+        21997654,
+        -4511958,
+        -5616658,
+        70604552,
+        54384485,
+        -5396884,
+        -5628534,
+        195246392,
+        -5628817
+       ],
+       "smin": 50000000,
+       "liq": 708083
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 50000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      30000000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 30000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 30000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 20000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      1000,
+      6191700900,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 30000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 30000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 20000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": {
+      "error": "InsufficientMargin",
+      "code": 209
+     },
+     "note": "rollback complet : prime non prélevée",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 30000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 30000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 20000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      20000000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 50000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 50000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 0
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": {
+      "error": "InsufficientMargin",
+      "code": 209
+     },
+     "note": "toujours insuffisant à 5 000",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 50000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 50000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 0
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "cancel_offer",
+     "args": [
+      "MAKER_A",
+      0
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 50000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 50000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 0
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": {
+      "error": "WrongState",
+      "code": 204
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 50000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 50000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "MAKER_A": 0
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "snapshot_bounds",
+   "description": "Le contrat borne le publieur : prix hors arbitrage, plancher extrême, fraîcheur.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 20000,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "lp_notice": 604800,
+    "settle_window": 86400
+   },
+   "initial_wallets": {},
+   "steps": [
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 99999999,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "BadSnapshot",
+      "code": 208
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 2,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 1200000001,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "BadSnapshot",
+      "code": 208
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 3,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510551,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "BadSnapshot",
+      "code": 208
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 4,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 59999999,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "BadSnapshot",
+      "code": 208
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 5,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "BadSnapshot",
+      "code": 208
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 6,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": -1
+      }
+     ],
+     "expect": {
+      "error": "BadSnapshot",
+      "code": 208
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 7,
+       "ts": 1799996399,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "StaleSnapshot",
+      "code": 207
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 8,
+       "ts": 1800000001,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "StaleSnapshot",
+      "code": 207
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "MAKER_A",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": {
+      "error": "Unauthorized",
+      "code": 203
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 9,
+       "ts": 1800000000,
+       "spot": 1200000000,
+       "mark": 107489448,
+       "ra": [
+        6262315,
+        -4730428,
+        58200948,
+        52919688,
+        -37936069,
+        -54954428,
+        114618364,
+        112552235,
+        -71182762,
+        -88960386,
+        173215366,
+        172513561,
+        -92138118,
+        -103742984,
+        352510931,
+        -107475179
+       ],
+       "smin": 60000000,
+       "liq": 13335387
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800000060
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 8,
+       "ts": 1800000060,
+       "spot": 1210000000,
+       "mark": 116191366,
+       "ra": [
+        5774546,
+        -4129089,
+        59128221,
+        54590252,
+        -40299831,
+        -56562691,
+        116545563,
+        114835019,
+        -75682223,
+        -93854332,
+        175873683,
+        175310387,
+        -98586147,
+        -111293752,
+        356808875,
+        -116170760
+       ],
+       "smin": 60500000,
+       "liq": 13939501
+      }
+     ],
+     "expect": {
+      "error": "BadSnapshot",
+      "code": 208
+     },
+     "state": {
+      "now": 1800000060,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 11,
+       "ts": 1800000060,
+       "spot": 1210000000,
+       "mark": 116191366,
+       "ra": [
+        5774546,
+        -4129089,
+        59128221,
+        54590252,
+        -40299831,
+        -56562691,
+        116545563,
+        114835019,
+        -75682223,
+        -93854332,
+        175873683,
+        175310387,
+        -98586147,
+        -111293752,
+        356808875,
+        -116170760
+       ],
+       "smin": 60500000,
+       "liq": 13939501
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000060,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {},
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    }
+   ]
+  },
+  {
+   "name": "liquidation_to_private_taker",
+   "description": "Hausse progressive : NLV < MM, reprise solvable par un autre maker.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 20000,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "lp_notice": 604800,
+    "settle_window": 86400
+   },
+   "initial_wallets": {
+    "MAKER_A": 1000000000000,
+    "MAKER_B": 2000000000000,
+    "ALICE": 100000000000,
+    "LP1": 1000000000000
+   },
+   "steps": [
+    {
+     "op": "lp_deposit",
+     "args": [
+      "LP1",
+      500000000000
+     ],
+     "expect": "ok",
+     "result": 500000000000,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "MAKER_A": 1000000000000,
+       "MAKER_B": 2000000000000
+      },
+      "series": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "MAKER_A": 1000000000000,
+       "MAKER_B": 2000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1000000000,
+       "mark": 5628819,
+       "ra": [
+        5249763,
+        -3753884,
+        18699597,
+        3416907,
+        -1673198,
+        -5412102,
+        40401735,
+        21997654,
+        -4511958,
+        -5616658,
+        70604552,
+        54384485,
+        -5396884,
+        -5628534,
+        195246392,
+        -5628817
+       ],
+       "smin": 50000000,
+       "liq": 708083
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "MAKER_A": 1000000000000,
+       "MAKER_B": 2000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      244999381940
+     ],
+     "expect": "ok",
+     "note": "dépôt calculé pour être exactement à l'IM après la vente",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 744999381940,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 244999381940,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 2000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      1000,
+      6191700900,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 744999381940,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 244999381940,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 2000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 751191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 2000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_B",
+      1500000000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "MAKER_B",
+      "MAKER_A",
+      "MAKER_B"
+     ],
+     "expect": {
+      "error": "NotLiquidable",
+      "code": 211
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800003600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 2,
+       "ts": 1800003600,
+       "spot": 1005000000,
+       "mark": 6328214,
+       "ra": [
+        5533921,
+        -4089542,
+        19832077,
+        4020057,
+        -1946469,
+        -6056454,
+        42573696,
+        24176608,
+        -5069245,
+        -6312115,
+        73838798,
+        58157444,
+        -6061733,
+        -6327815,
+        200914476,
+        -6328212
+       ],
+       "smin": 50250000,
+       "liq": 816833
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800003600,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800007200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 3,
+       "ts": 1800007200,
+       "spot": 1010000000,
+       "mark": 7094273,
+       "ra": [
+        5817026,
+        -4435161,
+        20989765,
+        4690060,
+        -2249954,
+        -6755418,
+        44782464,
+        26461572,
+        -5678061,
+        -7073090,
+        77102889,
+        61996085,
+        -6788770,
+        -7093717,
+        206534291,
+        -7094271
+       ],
+       "smin": 50500000,
+       "liq": 938021
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800007200,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800010800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 4,
+       "ts": 1800010800,
+       "spot": 1015000000,
+       "mark": 7930853,
+       "ra": [
+        6097512,
+        -4788411,
+        22170002,
+        5429067,
+        -2585400,
+        -7510692,
+        47023508,
+        28846289,
+        -6341019,
+        -7903144,
+        80390300,
+        65887589,
+        -7581371,
+        -7930083,
+        212099712,
+        -7930851
+       ],
+       "smin": 50750000,
+       "liq": 1072398
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800010800,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800014400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 5,
+       "ts": 1800014400,
+       "spot": 1020000000,
+       "mark": 8841774,
+       "ra": [
+        6373772,
+        -5146681,
+        23369981,
+        6238637,
+        -2954482,
+        -8323653,
+        49291953,
+        31323527,
+        -7060632,
+        -8805741,
+        83694422,
+        69819083,
+        -8442833,
+        -8840713,
+        217604886,
+        -8841772
+       ],
+       "smin": 51000000,
+       "liq": 1220666
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800014400,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800018000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 6,
+       "ts": 1800018000,
+       "spot": 1025000000,
+       "mark": 9830791,
+       "ra": [
+        6644179,
+        -5507112,
+        24586762,
+        7119683,
+        -3358790,
+        -9195320,
+        51582791,
+        33885220,
+        -7839289,
+        -9784202,
+        87008605,
+        73777785,
+        -9376348,
+        -9829338,
+        223044240,
+        -9830788
+       ],
+       "smin": 51250000,
+       "liq": 1383468
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800018000,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800021600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 7,
+       "ts": 1800021600,
+       "spot": 1030000000,
+       "mark": 10901565,
+       "ra": [
+        6907098,
+        -5866633,
+        25817308,
+        8072430,
+        -3799805,
+        -10126306,
+        53890919,
+        36522570,
+        -8679227,
+        -10841674,
+        90326202,
+        77751137,
+        -10384973,
+        -10899588,
+        228412490,
+        -10901562
+       ],
+       "smin": 51500000,
+       "liq": 1561372
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800021600,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800025200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 8,
+       "ts": 1800025200,
+       "spot": 1035000000,
+       "mark": 12057642,
+       "ra": [
+        7160907,
+        -6221998,
+        27058502,
+        9096387,
+        -4278880,
+        -11116787,
+        56211171,
+        39226158,
+        -9582504,
+        -11981080,
+        93640612,
+        81726930,
+        -11471604,
+        -12054967,
+        233704657,
+        -12057637
+       ],
+       "smin": 51750000,
+       "liq": 1754859
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800025200,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800028800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 9,
+       "ts": 1800028800,
+       "spot": 1040000000,
+       "mark": 13302419,
+       "ra": [
+        7404013,
+        -6569845,
+        28307181,
+        10190341,
+        -4797225,
+        -12166464,
+        58538357,
+        41986073,
+        -10550977,
+        -13205089,
+        96945327,
+        85693412,
+        -12638942,
+        -13298820,
+        238916076,
+        -13302413
+       ],
+       "smin": 52000000,
+       "liq": 1964313
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800028800,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "get_requirement",
+     "args": [
+      "MAKER_A"
+     ],
+     "expect": "ok",
+     "result": {
+      "nlv": 237269493750,
+      "liability": 13302419000,
+      "scan": 238916076000,
+      "smin": 52000000000,
+      "liq": 1964313000,
+      "mm": 240880389000,
+      "im": 301100486250,
+      "worst": 14
+     },
+     "note": "à S=104.0 : NLV < MM, compte liquidable mais encore solvable"
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "MAKER_C",
+      "MAKER_A",
+      "MAKER_B"
+     ],
+     "expect": {
+      "error": "Unauthorized",
+      "code": 203
+     },
+     "note": "le repreneur doit signer",
+     "state": {
+      "now": 1800028800,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 1500000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "MAKER_B",
+      "MAKER_A",
+      "MAKER_B"
+     ],
+     "expect": "ok",
+     "result": {
+      "x": 13967539950,
+      "paid": 13967539950,
+      "deficit": 0
+     },
+     "note": "X = qté x mark x 1,05 versé par A à B ; positions d'Alice inchangées sauf le vendeur",
+     "state": {
+      "now": 1800028800,
+      "contract_balance": 2251191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 236604372800,
+        "shorts": {}
+       },
+       "MAKER_B": {
+        "cash": 1513967539950,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_B",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "get_requirement",
+     "args": [
+      "MAKER_B"
+     ],
+     "expect": "ok",
+     "result": {
+      "nlv": 1500665120950,
+      "liability": 13302419000,
+      "scan": 238916076000,
+      "smin": 52000000000,
+      "liq": 1964313000,
+      "mm": 240880389000,
+      "im": 301100486250,
+      "worst": 14
+     },
+     "note": "le repreneur reste au-dessus de son IM"
+    },
+    {
+     "op": "withdraw",
+     "args": [
+      "MAKER_A",
+      236604372800
+     ],
+     "expect": "ok",
+     "note": "le reliquat de A est libre : il n'a plus de position",
+     "state": {
+      "now": 1800028800,
+      "contract_balance": 2014586710040,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 1513967539950,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "MAKER_A": 991604990860,
+       "MAKER_B": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_B",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    }
+   ]
+  },
+  {
+   "name": "gap_to_vault",
+   "description": "Saut de prix : reprise privée refusée, le vault reprend et porte le déficit.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 20000,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "lp_notice": 604800,
+    "settle_window": 86400
+   },
+   "initial_wallets": {
+    "MAKER_A": 1000000000000,
+    "MAKER_B": 5000000000000,
+    "ALICE": 100000000000,
+    "LP1": 3000000000000,
+    "LP2": 1000000000000
+   },
+   "steps": [
+    {
+     "op": "lp_deposit",
+     "args": [
+      "LP1",
+      2500000000000
+     ],
+     "expect": "ok",
+     "result": 2500000000000,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 2500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 1000000000000,
+       "MAKER_B": 5000000000000
+      },
+      "series": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 2500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 1000000000000,
+       "MAKER_B": 5000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1000000000,
+       "mark": 5628819,
+       "ra": [
+        5249763,
+        -3753884,
+        18699597,
+        3416907,
+        -1673198,
+        -5412102,
+        40401735,
+        21997654,
+        -4511958,
+        -5616658,
+        70604552,
+        54384485,
+        -5396884,
+        -5628534,
+        195246392,
+        -5628817
+       ],
+       "smin": 50000000,
+       "liq": 708083
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 2500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 1000000000000,
+       "MAKER_B": 5000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      244999381940
+     ],
+     "expect": "ok",
+     "note": "dépôt calculé pour être exactement à l'IM après la vente",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2744999381940,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 244999381940,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 5000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      1000,
+      6191700900,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2744999381940,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 244999381940,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 5000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 2751191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 2500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 5000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_B",
+      4000000000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800172800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 2,
+       "ts": 1800172800,
+       "spot": 1500000000,
+       "mark": 400001215,
+       "ra": [
+        32110,
+        -1212,
+        75003995,
+        74998786,
+        -74814580,
+        -75001092,
+        149999512,
+        149998786,
+        -149103834,
+        -149995361,
+        224998878,
+        224998786,
+        -221371225,
+        -224842986,
+        449998786,
+        -385117172
+       ],
+       "smin": 75000000,
+       "liq": 20915134
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800172800,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "get_requirement",
+     "args": [
+      "MAKER_A"
+     ],
+     "expect": "ok",
+     "result": {
+      "nlv": -149429302250,
+      "liability": 400001215000,
+      "scan": 449998786000,
+      "smin": 75000000000,
+      "liq": 20915134000,
+      "mm": 470913920000,
+      "im": 588642400000,
+      "worst": 14
+     },
+     "note": "après le gap : NLV < 0, X > cash"
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "MAKER_B",
+      "MAKER_A",
+      "MAKER_B"
+     ],
+     "expect": {
+      "error": "InsolventTakeover",
+      "code": 218
+     },
+     "state": {
+      "now": 1800172800,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2500619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "KEEPER",
+      "MAKER_A",
+      "VAULT"
+     ],
+     "expect": "ok",
+     "result": {
+      "x": 420001275750,
+      "paid": 250571912750,
+      "deficit": 169429363000
+     },
+     "note": "déclenchable par n'importe qui ; déficit absorbé par le vault",
+     "state": {
+      "now": 1800172800,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2751191082840,
+        "shorts": {
+         "0": 1000
+        }
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "get_requirement",
+     "args": [
+      "VAULT"
+     ],
+     "expect": "ok",
+     "result": {
+      "nlv": 2351189867840,
+      "liability": 400001215000,
+      "scan": 449998786000,
+      "smin": 75000000000,
+      "liq": 20915134000,
+      "mm": 470913920000,
+      "im": 588642400000,
+      "worst": 14
+     },
+     "note": "le vault porte maintenant le short"
+    },
+    {
+     "op": "lp_request_withdraw",
+     "args": [
+      "LP1",
+      2500000000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800172800,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2751191082840,
+        "shorts": {
+         "0": 1000
+        }
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "lp_withdraw",
+     "args": [
+      "LP1"
+     ],
+     "expect": {
+      "error": "WithdrawLocked",
+      "code": 215
+     },
+     "state": {
+      "now": 1800172800,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2751191082840,
+        "shorts": {
+         "0": 1000
+        }
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800777600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 3,
+       "ts": 1800777600,
+       "spot": 1500000000,
+       "mark": 400000008,
+       "ra": [
+        1071,
+        -7,
+        75000056,
+        74999993,
+        -74985504,
+        -75000007,
+        149999996,
+        149999993,
+        -149850123,
+        -149999904,
+        224999993,
+        224999993,
+        -223852460,
+        -224985057,
+        449999993,
+        -390791581
+       ],
+       "smin": 75000000,
+       "liq": 20916487
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800777600,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2751191082840,
+        "shorts": {
+         "0": 1000
+        }
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "lp_withdraw",
+     "args": [
+      "LP1"
+     ],
+     "expect": {
+      "error": "VaultCapacity",
+      "code": 212
+     },
+     "note": "le capital engagé sur la position reprise reste bloqué",
+     "state": {
+      "now": 1800777600,
+      "contract_balance": 6751191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2751191082840,
+        "shorts": {
+         "0": 1000
+        }
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 1000000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000
+      },
+      "total_shares": 2500000000000
+     }
+    },
+    {
+     "op": "lp_deposit",
+     "args": [
+      "LP2",
+      500000000000
+     ],
+     "expect": "ok",
+     "result": 531645434255,
+     "note": "parts émises à la valeur nette du vault, pertes comprises",
+     "state": {
+      "now": 1800777600,
+      "contract_balance": 7251191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 3251191082840,
+        "shorts": {
+         "0": 1000
+        }
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000,
+       "LP2": 531645434255
+      },
+      "total_shares": 3031645434255
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1801814400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_settlement",
+     "args": [
+      "PUBLISHER",
+      0,
+      1500000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 7251191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 3251191082840,
+        "shorts": {
+         "0": 1000
+        }
+       }
+      },
+      "wallets": {
+       "ALICE": 93808299100,
+       "LP1": 500000000000,
+       "LP2": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": 1500000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000,
+       "LP2": 531645434255
+      },
+      "total_shares": 3031645434255
+     }
+    },
+    {
+     "op": "settle",
+     "args": [
+      "VAULT",
+      0
+     ],
+     "expect": "ok",
+     "result": {
+      "due": 400000000000,
+      "from_writer": 400000000000,
+      "from_vault": 0,
+      "deficit": 0,
+      "alloc": [
+       400000000000
+      ]
+     },
+     "note": "le vault paie Alice intégralement",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 6851191082840,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 2851191082840,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 493808299100,
+       "LP1": 500000000000,
+       "LP2": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": 1500000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": true,
+        "paid": 400000000000,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 2500000000000,
+       "LP2": 531645434255
+      },
+      "total_shares": 3031645434255
+     }
+    },
+    {
+     "op": "lp_withdraw",
+     "args": [
+      "LP1"
+     ],
+     "expect": "ok",
+     "result": 2351191081437,
+     "note": "après règlement, le capital est libéré à la valeur nette",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 4500000001403,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 4000000000000,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 500000001403,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 493808299100,
+       "LP1": 2851191081437,
+       "LP2": 500000000000,
+       "MAKER_A": 755000618060,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": 1500000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "VAULT",
+        "qty": 1000,
+        "settled": true,
+        "paid": 400000000000,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP2": 531645434255
+      },
+      "total_shares": 531645434255
+     }
+    }
+   ]
+  },
+  {
+   "name": "settlement_pro_rata_deficit",
+   "description": "Aucun keeper : saut à l'échéance, marge et vault insuffisants, paiement au prorata et déficit affiché.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 20000,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "lp_notice": 604800,
+    "settle_window": 86400
+   },
+   "initial_wallets": {
+    "MAKER_A": 500000000000,
+    "ALICE": 100000000000,
+    "DAVE": 100000000000,
+    "LP1": 100000000000
+   },
+   "steps": [
+    {
+     "op": "lp_deposit",
+     "args": [
+      "LP1",
+      10000000000
+     ],
+     "expect": "ok",
+     "result": 10000000000,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 10000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 10000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 10000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 10000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1000000000,
+       "mark": 5628819,
+       "ra": [
+        5249763,
+        -3753884,
+        18699597,
+        3416907,
+        -1673198,
+        -5412102,
+        40401735,
+        21997654,
+        -4511958,
+        -5616658,
+        70604552,
+        54384485,
+        -5396884,
+        -5628534,
+        195246392,
+        -5628817
+       ],
+       "smin": 50000000,
+       "liq": 708083
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 10000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 10000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      146999629164
+     ],
+     "expect": "ok",
+     "note": "dépôt calculé pour être exactement à l'IM après la vente",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 156999629164,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 146999629164,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 10000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 353000370836
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      600,
+      3715020540,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 156999629164,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 146999629164,
+        "shorts": {}
+       },
+       "VAULT": {
+        "cash": 10000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 353000370836
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 160714649704,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 150343147650,
+        "shorts": {
+         "0": 600
+        }
+       },
+       "VAULT": {
+        "cash": 10371502054,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 96284979460,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 353000370836
+      },
+      "series": {
+       "0": {
+        "oi": 600,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      97999752776
+     ],
+     "expect": "ok",
+     "note": "dépôt calculé pour être exactement à l'IM après la vente",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 258714402480,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 248342900426,
+        "shorts": {
+         "0": 600
+        }
+       },
+       "VAULT": {
+        "cash": 10371502054,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 96284979460,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 600,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      400,
+      2476680360,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 1,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 258714402480,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 248342900426,
+        "shorts": {
+         "0": 600
+        }
+       },
+       "VAULT": {
+        "cash": 10371502054,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 96284979460,
+       "DAVE": 100000000000,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 600,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "DAVE",
+      1
+     ],
+     "expect": "ok",
+     "result": 1,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 261191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 10619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 96284979460,
+       "DAVE": 97523319640,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "DAVE",
+        "writer": "MAKER_A",
+        "qty": 400,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1801814400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "settle",
+     "args": [
+      "MAKER_A",
+      0
+     ],
+     "expect": {
+      "error": "NoSettlementPrice",
+      "code": 213
+     },
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 261191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 10619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 96284979460,
+       "DAVE": 97523319640,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "DAVE",
+        "writer": "MAKER_A",
+        "qty": 400,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "publish_settlement",
+     "args": [
+      "PUBLISHER",
+      0,
+      1600000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 261191082840,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 250571912750,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 10619170090,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 96284979460,
+       "DAVE": 97523319640,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": 1600000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "DAVE",
+        "writer": "MAKER_A",
+        "qty": 400,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "settle",
+     "args": [
+      "MAKER_A",
+      0
+     ],
+     "expect": "ok",
+     "result": {
+      "due": 500000000000,
+      "from_writer": 250571912750,
+      "from_vault": 10619170090,
+      "deficit": 238808917160,
+      "alloc": [
+       156714649704,
+       104476433136
+      ]
+     },
+     "note": "dû 50/lot ; marge puis vault ; reste = déficit",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {
+       "ALICE": 252999629164,
+       "DAVE": 201999752776,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": 1600000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": true,
+        "paid": 156714649704,
+        "deficit": 143285350296
+       },
+       "1": {
+        "holder": "DAVE",
+        "writer": "MAKER_A",
+        "qty": 400,
+        "settled": true,
+        "paid": 104476433136,
+        "deficit": 95523566864
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "settle",
+     "args": [
+      "MAKER_A",
+      0
+     ],
+     "expect": {
+      "error": "WrongState",
+      "code": 204
+     },
+     "note": "un seul règlement",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {
+       "ALICE": 252999629164,
+       "DAVE": 201999752776,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": 1600000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": true,
+        "paid": 156714649704,
+        "deficit": 143285350296
+       },
+       "1": {
+        "holder": "DAVE",
+        "writer": "MAKER_A",
+        "qty": 400,
+        "settled": true,
+        "paid": 104476433136,
+        "deficit": 95523566864
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    },
+    {
+     "op": "publish_settlement",
+     "args": [
+      "PUBLISHER",
+      0,
+      1000000000
+     ],
+     "expect": {
+      "error": "WrongState",
+      "code": 204
+     },
+     "note": "prix final immuable",
+     "state": {
+      "now": 1801814400,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {
+       "ALICE": 252999629164,
+       "DAVE": 201999752776,
+       "LP1": 90000000000,
+       "MAKER_A": 255000618060
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": 1600000000
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 600,
+        "settled": true,
+        "paid": 156714649704,
+        "deficit": 143285350296
+       },
+       "1": {
+        "holder": "DAVE",
+        "writer": "MAKER_A",
+        "qty": 400,
+        "settled": true,
+        "paid": 104476433136,
+        "deficit": 95523566864
+       }
+      },
+      "lp_shares": {
+       "LP1": 10000000000
+      },
+      "total_shares": 10000000000
+     }
+    }
+   ]
+  },
+  {
+   "name": "limits_and_staleness",
+   "description": "Plafonds d'OI, snapshot périmé, fenêtre de règlement.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 1500,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "lp_notice": 604800,
+    "settle_window": 86400
+   },
+   "initial_wallets": {
+    "MAKER_A": 2000000000000,
+    "ALICE": 100000000000,
+    "DAVE": 100000000000
+   },
+   "steps": [
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "MAKER_A": 2000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1000000000,
+       "mark": 5628819,
+       "ra": [
+        5249763,
+        -3753884,
+        18699597,
+        3416907,
+        -1673198,
+        -5412102,
+        40401735,
+        21997654,
+        -4511958,
+        -5616658,
+        70604552,
+        54384485,
+        -5396884,
+        -5628534,
+        195246392,
+        -5628817
+       ],
+       "smin": 50000000,
+       "liq": 193917
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 0,
+      "accounts": {},
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "MAKER_A": 2000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      1500000000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 1500000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      1000,
+      6191700000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 1500000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      600,
+      3715020000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 1,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 1500000000000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1500000000000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 100000000000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null
+       }
+      },
+      "positions": {},
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 1506191700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505572530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "DAVE",
+      1
+     ],
+     "expect": {
+      "error": "OiCapExceeded",
+      "code": 210
+     },
+     "note": "1 600 > plafond vendeur de 1 500",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 1506191700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505572530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "MAKER_A",
+      1
+     ],
+     "expect": {
+      "error": "SelfTrade",
+      "code": 217
+     },
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 1506191700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505572530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800003601
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "withdraw",
+     "args": [
+      "MAKER_A",
+      10000000
+     ],
+     "expect": {
+      "error": "StaleSnapshot",
+      "code": 207
+     },
+     "state": {
+      "now": 1800003601,
+      "contract_balance": 1506191700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505572530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "KEEPER",
+      "MAKER_A",
+      "VAULT"
+     ],
+     "expect": {
+      "error": "StaleSnapshot",
+      "code": 207
+     },
+     "state": {
+      "now": 1800003601,
+      "contract_balance": 1506191700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505572530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 500000000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      10000000
+     ],
+     "expect": "ok",
+     "note": "le top-up reste toujours possible",
+     "state": {
+      "now": 1800003601,
+      "contract_balance": 1506201700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505582530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 499990000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "publish_settlement",
+     "args": [
+      "PUBLISHER",
+      0,
+      1000000000
+     ],
+     "expect": {
+      "error": "NotExpired",
+      "code": 206
+     },
+     "state": {
+      "now": 1800003601,
+      "contract_balance": 1506201700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505582530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 499990000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1801900801
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_settlement",
+     "args": [
+      "PUBLISHER",
+      0,
+      1000000000
+     ],
+     "expect": {
+      "error": "SettlementWindowClosed",
+      "code": 214
+     },
+     "note": "v0 : fonds bloqués jusqu'à une décision hors protocole ; v1 : oracle de repli",
+     "state": {
+      "now": 1801900801,
+      "contract_balance": 1506201700000,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 1505582530000,
+        "shorts": {
+         "0": 1000
+        }
+       },
+       "VAULT": {
+        "cash": 619170000,
+        "shorts": {}
+       }
+      },
+      "wallets": {
+       "ALICE": 93808300000,
+       "DAVE": 100000000000,
+       "MAKER_A": 499990000000
+      },
+      "series": {
+       "0": {
+        "oi": 1000,
+        "settlement_price": null
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "writer": "MAKER_A",
+        "qty": 1000,
+        "settled": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {},
+      "total_shares": 0
+     }
+    }
+   ]
+  }
+ ]
+}

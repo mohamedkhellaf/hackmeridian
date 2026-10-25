@@ -7,7 +7,7 @@
 - **Product:** Strata (working name; previously Backstop). Repository: `hackmeridian`.
 - **Event:** HackMeridian Genesis / Stellar Unlocked, Lisbon, October 25–26, 2026.
 - **Hard deadline:** Monday, **October 26 at 12:00 Lisbon time**. Target submission by 11:00; feature freeze by 06:00. The demo, deck, README, GitHub repository, and submission answers are deliverables, not afterthoughts.
-- **Thesis:** Stellar has tokenized assets, but many lack useful risk-management products. Build a **multi-asset, fully collateralized options layer** that turns eligible tokenized assets into physically settled calls/puts, with transparent collateral and issuer-enforced transfer rules. Simple strategies sit on top of this layer.
+- **Thesis:** Stellar has tokenized assets, but many lack useful risk-management products. Build a **multi-asset, fully collateralized options layer** that turns eligible tokenized assets into physically settled calls/puts, with transparent collateral and issuer-enforced transfer rules. Simple strategies sit on top of this layer. **Strata Pro (experimental, decided 2026-10-25 by Dev 1):** a separate contract for naked, cash-settled European calls with partial margin, liquidation by takeover and a pre-funded backstop vault; see "Strata Pro" below. Pro never weakens the fully collateralized guarantees of `contracts/options/`.
 - **Honest claim:** *Any supported, eligible Stellar asset* — NOT every token automatically. The MVP uses fictional Testnet assets; real RWA integrations need issuer cooperation, legal permission, and technical compatibility.
 - **Existing evidence:** A put exercise was proven in a Testnet spike; see `research/decision/20_rwa_options_spike.md`. Original decision context: `WINNING_IDEAS.md` and `research/decision/`.
 - **Coding gate:** Respect a human team's explicit **GO** before implementing. Once GO is given, work autonomously within your assigned scope. Never wait for blanket permission on each small task. If a freeze/stop is called, obey it.
@@ -37,7 +37,8 @@
 - **P1 — only after P0+ succeeds:** transfer of option ownership; position token if feasible; issuer freeze/clawback failure demo; financial strategy presets (protective put, covered call, collar) with **accurate payoff previews**; trustworthy impairment/refund logic if fully specified and tested.
 - **P2 — optional:** multi-leg on-chain execution and composed strategies, a more sophisticated RFQ backend, third asset class, Trustless Work integration. Do not claim that a multi-leg structured product is issued or guaranteed unless **all** legs are funded and settle consistently.
 - **06:00 Monday:** freeze features. Then integration fixes, tests, README, deck, demo recording and submission only. **Submit by 11:00**, leaving a one-hour buffer.
-- **Never in this hackathon:** Mainnet or real customer funds; real regulated-fund integrations without permission; margin, leverage, uncollateralized promises, unaudited claims of production security, hidden oracle assumptions.
+- **Strata Pro track — in parallel, never at the expense of P0/P0+:** `contracts/pro/` v0 per `docs/pro-v0-brief-dev2.md`. Go/no-go at **04:00**: fill → price move → liquidation to the vault → settlement proven by tests and on Testnet, otherwise Pro ships as spec + simulator only and the demo says so.
+- **Never in this hackathon:** Mainnet or real customer funds; real regulated-fund integrations without permission; unaudited claims of production security, hidden oracle assumptions. Margin and partial collateral are allowed **only** inside `contracts/pro/`, under the rules below; never present a Pro position as fully collateralized.
 
 ## Contract and asset architecture
 
@@ -50,6 +51,15 @@
 - Checked `i128` math; positive quantities/premiums as specified; no floating-point token accounting. State transitions and cross-contract calls must be atomic; any failure reverts the complete exercise. Maintain Soroban TTL beyond expiry and judging (through at least October 28).
 - Issuer freeze/revoke/clawback can prevent settlement or alter collateral availability. Do **not** market a restricted-asset option as an unconditional guarantee against issuer action. Readme and UI must disclose limitations.
 - Never embed private keys/seeds or reusable funded identities in the public frontend/repo. Demo roles may use disposable **Testnet-only** accounts with controlled signing; Freighter preferred for the interactive user flow.
+
+## Strata Pro (experimental, `contracts/pro/`)
+
+- **Isolation:** separate crate and deployment. No storage, balance or call is shared with `contracts/options/`; Pro losses can never touch options collateral. The locked options ABI is not modified for Pro.
+- **Product:** naked European calls, cash-settled in `USDx` (unflagged, so margin is not exposed to clawback). One underlying market per deployment. The payoff is `qty × max(S_T − K, 0)`, paid from writer margin, then the backstop vault; any remainder is a recorded deficit and a haircut on the holder. Never call it guaranteed.
+- **Roles (exception to "no admin", Pro only):** `admin` lists series (market parameters are fixed at deployment in v0); `publisher` publishes risk snapshots and the settlement price. Neither can move user balances, change a live series' terms, rewrite a final price, or delete a long position. Roles are disclosed in README and UI.
+- **Oracle:** demo feed operated by the team, labelled as such. The contract bounds every snapshot (mark within arbitrage bounds, extreme-scenario floor, freshness, monotonic sequence); bounds limit, but do not remove, trust in the publisher.
+- **Margin model:** owned by Dev 1 in `packages/risk/` (reference engine, integer reference model, fixtures). Contract tests must reproduce `packages/risk/fixtures/pro_v0.json` exactly. Parameters are illustrative, not calibrated on real data.
+- **Claims:** "partial margin with liquidation and a pre-funded backstop; residual default risk is disclosed". Not: "safe", "insured", "fully backed".
 
 ## Financial and market-data rules (Dev 1)
 
@@ -72,6 +82,7 @@
 ## Project layout
 
 - `Cargo.toml`, `contracts/options/src/`: Soroban Rust, `#![no_std]`, tests under contract crate.
+- `contracts/pro/`: experimental Strata Pro contract (Dev 2). `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
 - `scripts/`: Testnet asset creation/issuer permissions, deployment, funding demo accounts, repeatable integration steps.
 - `frontend/`: Vite + React + TypeScript, Stellar SDK and Freighter, app and transaction UI, generated bindings.
 - `packages/payoff/` and `packages/rfq/`: **planned** shared financial modules owned by Dev 1. If the existing monorepo structure differs, agree on paths once rather than having agents create competing package trees.
