@@ -4340,3 +4340,91 @@ fn list_asset_and_create_offer_extend_registry_ttls() {
     let wo = key_ttl(&t, "WriterOpen", t.writer.clone().into_val(&t.env));
     assert!(wo >= 29 * DAY, "WriterOpen(writer) TTL {wo}");
 }
+
+#[test]
+fn writer_open_limit_check_order() {
+    // ABI §3 create_offer: ... NotEligible / ContractNotAuthorized ... OpenListFull,
+    // then WriterOpenLimit, then CollateralShortfall.
+    let t = setup();
+    for i in 0..WRITER_CAP {
+        let id =
+            t.c.create_offer(&t.writer, &t.rwa, &OptionType::Put, &1, &1, &1, &EXPIRY);
+        assert_eq!(id, i);
+    }
+    // maker2's CALL puts RWA in the pool; a 1-unit clawback leaves a deficit
+    t.call(&t.maker2);
+    t.sac(&t.rwa).clawback(&t.contract, &UNIT);
+    assert!(t.bal(&t.rwa, &t.contract) < t.c.open_collateral(&t.rwa));
+    let create = |w: &Address, ty: OptionType| {
+        t.c.try_create_offer(w, &t.rwa, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY)
+    };
+    let before = t.snap();
+
+    // a writer at the cap on a token in deficit: WriterOpenLimit comes first
+    for ty in [OptionType::Put, OptionType::Call] {
+        assert_err(create(&t.writer, ty), Error::WriterOpenLimit);
+    }
+    // control: a writer below the cap reaches CollateralShortfall
+    assert_err(
+        create(&t.maker2, OptionType::Put),
+        Error::CollateralShortfall,
+    );
+    // ContractNotAuthorized comes before WriterOpenLimit
+    t.sac(&t.rwa).set_authorized(&t.contract, &false);
+    assert_err(
+        create(&t.writer, OptionType::Put),
+        Error::ContractNotAuthorized,
+    );
+    t.sac(&t.rwa).set_authorized(&t.contract, &true);
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.c.writer_open_count(&t.writer), WRITER_CAP);
+    assert_eq!(t.c.writer_open_count(&t.maker2), 1);
+}
+
+#[test]
+fn prune_expired_skips_when_contract_cannot_pay() {
+    // ABI §3 prune_expired: a failing collateral transfer skips the id and
+    // changes nothing about it; it never fails the call.
+    let t = setup();
+    let clawed = t.call(&t.writer); // RWA collateral, clawed back below
+    let p = t.put(&t.writer); // USDx collateral
+    let b = t.offer(&t.maker2, &t.bond, OptionType::Call); // BOND collateral
+    t.at(EXPIRY);
+
+    // the issuer claws back the CALL's whole RWA collateral from the contract
+    // and de-authorizes the contract on BOND
+    t.sac(&t.rwa).clawback(&t.contract, &QTY);
+    t.sac(&t.bond).set_authorized(&t.contract, &false);
+    assert_eq!(t.bal(&t.rwa, &t.contract), 0);
+    let before = t.snap();
+
+    assert_eq!(t.c.prune_expired(&vec![&t.env, clawed, b]), 0);
+    assert!(pruned_events(&t).is_empty());
+    assert_eq!(t.snap(), before);
+
+    // in a batch only the USDx-backed PUT is pruned
+    assert_eq!(t.c.prune_expired(&vec![&t.env, clawed, p, b]), 1);
+    assert_eq!(pruned_ids(&t), [p]);
+    assert_eq!(t.state(clawed), State::Offered);
+    assert_eq!(t.state(b), State::Offered);
+    assert_eq!(t.state(p), State::Expired);
+    assert_eq!(t.open(), [clawed, b]);
+    assert_eq!(t.bal(&t.usdx, &t.writer), USDX_START);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    // the deficit stays visible: reserve QTY, balance 0
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY);
+    assert_eq!(t.bal(&t.rwa, &t.writer), UNDERLYING_START - QTY);
+    assert_eq!(t.c.writer_open_count(&t.writer), 1);
+    assert_eq!(t.c.writer_open_count(&t.maker2), 1);
+
+    // once the issuer re-authorizes the contract, the BOND offer is pruned
+    t.sac(&t.bond).set_authorized(&t.contract, &true);
+    assert_eq!(t.c.prune_expired(&vec![&t.env, clawed, b]), 1);
+    assert_eq!(pruned_ids(&t), [b]);
+    assert_eq!(t.state(b), State::Expired);
+    assert_eq!(t.bal(&t.bond, &t.maker2), UNDERLYING_START);
+    assert_eq!(t.bal(&t.bond, &t.contract), 0);
+    assert_eq!(t.c.open_collateral(&t.bond), 0);
+    assert_eq!(t.c.writer_open_count(&t.maker2), 0);
+    assert_eq!(t.open(), [clawed]);
+}
