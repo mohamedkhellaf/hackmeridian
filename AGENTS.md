@@ -1,23 +1,51 @@
 # Agent instructions
 
-<!-- TODO: fill in during the hackathon. Keep this file short and current. -->
+<!-- Keep this file short and current. -->
 
 ## Project
 
-- **Name:** TBD (repo is `hackmeridian` for now)
+- **Name:** Backstop (working name; repo is `hackmeridian`)
 - **Event:** HackMeridian, Lisbon, Oct 25–26 2026 (Stellar)
 - **Category:** Genesis (new idea → working MVP)
-- **Track:** TBD (Stellar Unlocked / Stellar Composed)
-- **Deadline:** Mon Oct 26, 12:00 (no late submissions). Judged async on demo video, pitch deck, repo, and submission answers.
-- **Pitch:** TBD, one or two sentences on what we're building and for whom
+- **Track:** Stellar Unlocked: classic asset controls (approval required, revocable, clawback) combined with Soroban custody
+- **Deadline:** Mon Oct 26, 12:00 Lisbon (no late submissions). Feature freeze 06:00, submit by 11:00. Judged async on demo video, pitch deck, repo, and submission answers.
+- **Pitch:** Fully collateralized, physically settled put and call options on permissioned tokenized funds. Collateral is locked in a contract nobody holds a key to, exercise swaps the fund token and USDC in one all-or-nothing transaction, and the fund's own Stellar rules decide who may trade.
+- **Status:** Plan agreed; **do not start coding until the team says go.** Core flow already proven on testnet in a throwaway spike (`research/decision/20_rwa_options_spike.md`). Decision history: `WINNING_IDEAS.md`, `research/decision/`.
+
+## Scope
+
+- **T1 (must, by 21:00 Sun):** test fund token `FUND` with restrictions plus test USDC `USDx`; cash-secured put: write → buy → exercise → reclaim; hosted frontend on testnet.
+- **T2 (must, by 01:00 Mon):** covered call (issuer approves the contract), eligibility checks, issuer panel (approve / freeze / claw back), competing writers, collateral-proof page, Impaired state with premium refund, tests + CI.
+- **T3 (stretch, only if T2 is green):** transfer positions, positions as tokens, capped options with a labelled demo price feed.
+- **Out:** real fund integrations, mainnet, pricing engine, margin, leverage, ZK, cash settlement with a real oracle.
 
 ## Team
 
-TBD: who owns what.
+| Who | Owns |
+|-----|------|
+| Claude | Writes most code in small PRs (contract, tests, scripts, bindings, frontend); runs tests before every PR; keeps README claims matching tests |
+| Dev 1: contracts lead | Reviews and merges contract PRs; testnet deploys; updates **Deployed contracts**; security checklist |
+| Dev 2: frontend and UX | App structure, role switcher, pages, hosting, error copy, judge-style testing after each merge |
+| Dev 3: assets, integration, story | Testnet asset setup, integration checks, README, deck, video, submission answers |
 
 ## Architecture
 
-TBD: how contracts, frontend and any backend talk to each other.
+- **Contract** (`contracts/options`, Soroban): holds all collateral in its own token balance, per-option accounting. Token addresses (FUND SAC, USDx SAC) fixed in `__constructor`; **no admin, not upgradeable**.
+  - Lifecycle: Offered → Active (`buy`: premium escrowed, buyer recorded as holder) → Exercised → writer `claim_delivery`; or Expired → writer `reclaim`; or Impaired (clawback detected) → holder `cancel_impaired` gets the premium back; or Cancelled (`cancel_offer` before anyone buys).
+  - Put exercise: FUND holder → **contract** (not the writer), USDx contract → holder, so a frozen writer can't block the holder.
+  - Read-only: `get_option`, `list_open`, `open_collateral` (for the collateral-proof page).
+- **Classic assets:** `FUND` (issuer flags: auth required, revocable, clawback) and `USDx` (separate issuer); the issuer must `set_authorized` the contract address before it can hold FUND.
+- **Scripts** (`scripts/`): `setup-testnet` (issue assets, set flags, deploy SACs, approve holders, fund demo roles) and `integration` (replays the testnet checks).
+- **Frontend** (`frontend/`): Market, Write, Portfolio, Issuer panel, Collateral proof; in-app testnet keys per demo role (Issuer, Writer A, Writer B, Alice, Bob, Eve), Freighter optional; contract calls through generated TS bindings.
+- **No backend.**
+
+### Contract rules (every function)
+
+- `require_auth` on each address whose money moves; never trust a caller-supplied token address.
+- Check eligibility through the FUND SAC's `authorized(addr)` for writer, buyer and holder.
+- Checked `i128` math; reject amounts ≤ 0; update state before transfers; exercise at most once.
+- Extend storage lifetime (instance, code, option entries) past expiry and through judging (Wed Oct 28).
+- Every README claim links to a test or a testnet transaction. Disclose: test assets only, issuer can freeze or claw back, derivatives are regulated (prototype, not an offering).
 
 ## How we work
 
@@ -41,7 +69,10 @@ TBD: how contracts, frontend and any backend talk to each other.
 - `Cargo.toml`: Rust workspace root; contract crates inherit `soroban-sdk` from here
 - `contracts/<name>/src/lib.rs`: Soroban contract implementation (`#![no_std]`)
 - `contracts/<name>/src/test.rs`: host-side unit tests
+- `contracts/options/`: the options contract (planned)
+- `scripts/`: testnet setup and integration scripts (planned)
 - `frontend/`: Vite + React + TypeScript app (`@stellar/stellar-sdk`, `@stellar/freighter-api`)
+- `research/decision/`, `WINNING_IDEAS.md`: how the idea was chosen, testnet spike evidence
 
 ## Contracts
 

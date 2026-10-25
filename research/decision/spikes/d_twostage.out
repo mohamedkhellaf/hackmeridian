@@ -1,0 +1,6 @@
+13:15:07 stage2 before stage1                         {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_bad_seq"}}
+13:15:27 stage1 after 17s silence                     {"ok":true,"hash":"3eefd5f8c40a00bef6c4d679b17eea3f493bf402aaed380ec683d5d4e14773a8"}
+13:15:27 heir(low) payment from owner                 {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_bad_auth\"]}"}
+13:15:28 stage2 immediately after stage1              {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_bad_minseq_age_or_gap"}}
+13:15:47 stage2 after 17s grace                       {"ok":true,"hash":"d5b4dd1912773c043030805c6e95c12b08c097f0fb1115661b0490f8916c4485"}
+13:15:52 heir(high) payment from owner                {"ok":true,"hash":"414ad6f1eac998c41784eca9bb725e40b2b670f724814d46608e807806f2249a"}

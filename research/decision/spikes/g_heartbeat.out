@@ -1,0 +1,6 @@
+13:25:57 init bump                                {"ok":true,"hash":"96c37a9a71c02b43bc30bee4b1518547128d2550d99daa237ed6f8d644d78edb"}
+13:25:57 mum seq/seqTime t0                       ["23116514714451969","1792934757"]
+13:26:07 inbound payment son->mum                 {"ok":true,"hash":"5dc794fae185e99d437324bc344e075f1b434db8a0cf3bf490888eefc78d8fe0"}
+13:26:07 mum seq/seqTime after inbound            ["23116514714451969","1792934757"]
+13:26:17 mum no-op bumpSequence(0)                {"ok":true,"hash":"aa6f1a49133417341936421b6b08eaed60d5a9f1ed2b155bb2cb31c37bfecbc1"}
+13:26:17 mum seq/seqTime after heartbeat          ["23116514714451970","1792934777"]

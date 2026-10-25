@@ -1,0 +1,11 @@
+13:21:22 setup signers/thresholds                             {"ok":true,"hash":"7a8fbe4881c8d76f313122a180f1b14333f427026127a0f393b6aa63f0045ceb"}
+13:21:22 (1) Mum alone Payment                                {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_bad_auth\"]}"}
+13:21:27 (2) Mum+Policy Payment                               {"ok":true,"hash":"85aeea3b80bf00780814c59977f6c773031fa548141d87d5b54b2be6bfdba2a1"}
+13:21:32 (3a) Mum+Policy 24h CB                               {"ok":true,"hash":"167349e95c83afdcc0337658bbc1ca2a4212961ebf652cc2b4b21d2d971732ad"}
+13:21:37 (3b) guardian undo (tx src guardian, op src Mum)     {"ok":true,"hash":"e40661324b08a6eeec4b3964b4c10ba8b626a6873c098315a49b73b5b637ddd5"}
+13:21:37      Mum XLM / seq / seqTime before→after            ["9939.9999500","9989.9999500",true,true]
+13:21:38 (4) Guardian+Policy Payment                          {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_bad_auth\"]}"}
+13:21:39 (5) Guardian+Policy SetOptions remove Mum            {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_bad_auth\"]}"}
+13:21:42 (7) sponsored CB: family sponsors Mum CB reserve     {"ok":true,"hash":"0f7b18bd6fcf8b02bde091078153a2348f280672e6df02ef89685077eb372c5c"}
+13:21:42      CB sponsors                                     ["GB3VQW=family"]
+13:21:47 (6) Mum+Guardian SetOptions remove Policy            {"ok":true,"hash":"de4ecad5a3ca22be29a6ef046c9a5e205b26dc2af23028fd281aa553fc4f0a3e"}

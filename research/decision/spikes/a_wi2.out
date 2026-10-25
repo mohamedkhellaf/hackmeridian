@@ -1,0 +1,14 @@
+setOptions weights                               {"ok":true,"hash":"9145cd5a2cd567673a4f51bf37f21c43c05196c62369d126a01ba02ed250fc54"}
+createClaimableBalance (parent signs)            {"ok":true,"hash":"0b12600faddabea241122a9bd49878e39538a61f09637fcd33277155fc494a7a"}
+recipient claims early                           {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_cannot_claim\"]}"}
+guardian-only Payment from parent                {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_bad_auth\"]}"}
+guardian-only Claim (undo) on parent acct        {"ok":true,"hash":"58f700354c48e9b9003ff9e5b9fd27dcea7a76c30ae241505a6ddb7fd833ea3c"}
+parent XLM before/after undo                     ["9899.9999700","9999.9999600"]
+recipient claims after window                    {"ok":true,"hash":"9dc6c3549df6fbd26c495a222731b24989d8f645e9fc7bc07e31aa23231646d7"}
+guardian-only setOptions (high)                  {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_bad_auth\"]}"}
+guardian-only bumpSequence (low)                 {"ok":true,"hash":"7e72ca758d60cdcf212c249146669536b70e18e902c1ffd43fc3d47e46b9f602"}
+accounts {
+  parent: 'GCDN6RLWKBLEWFWVZE242KQICSASIFKGNMYV5JW75XR775VQD6GWMPZN',
+  guardian: 'GA2XMULG3OEEEBDGV7R6IFQSMAWZK3G3TWBDYUAH7PVMFLHMHYZP57YM',
+  recip: 'GAQ7CIBSWX47MELEPC64GXBCSFHS7JH6SAGSV35JGDGQVJWXOCUJIZ7B'
+}

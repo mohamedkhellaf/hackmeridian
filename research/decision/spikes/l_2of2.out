@@ -1,0 +1,12 @@
+14:32:17 cheque1 setup (2-of-2, master 0)                           true
+14:32:17 (1) payer alone bumpSequence on cheque acct                {"ok":false,"codes":"{\"transaction\":\"tx_bad_auth\"}"}
+14:32:18 (1) payer alone accountMerge cheque acct                   {"ok":false,"codes":"{\"transaction\":\"tx_bad_auth\"}"}
+14:32:22 (2) supplier cashes face 1 (open window)                   {"ok":true,"hash":"9659652bc5a86f2b755ba06d12cd264f9bef27642c4cc38c61cf97c184c742ae"}
+14:32:22 (2) sibling face 3 (open window) after                     {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_bad_seq"}}
+14:32:37 (3) payer drains main acct to ~min                         {"ok":true,"hash":"b69938376b021d26ff596591271807a0433b3997534f019b2a682df96ee42f66"}
+14:32:42 (3) supplier cashes face (payer empty)                     {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_failed","operations":["op_underfunded"]}}
+14:32:43 (3) cheque acct seq consumed by bounce?                    ["23119946393321473","23119946393321474",true]
+14:32:43 (3) sibling after bounce                                   {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_bad_seq"}}
+14:32:43 (3) bounce visible on Horizon (successful=false)?          [["d8bf727f",false]]
+14:33:02 (4) payer rotates main key: add K, master 0                {"ok":true,"hash":"a45a26b5afa5ac4bafb4ddd635bd87d403771e41ba5af5c25e356009b313a22c"}
+14:33:02 (4) supplier cashes face after rotation                    {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_failed","operations":["op_bad_auth"]}}

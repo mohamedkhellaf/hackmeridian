@@ -1,0 +1,6 @@
+14:28:27 trustlines                                         [true,true,true]
+14:28:32 issue                                              true
+14:28:37 MM offer sell EURC buy BRZ @6.2                    {"ok":true,"hash":"2606acbe8c33db4165ec95f79d59b3fc4f92f018e02ce3e83d599c5c0cf9e53c"}
+14:28:37 horizon strictReceivePaths BRZ->10 EURC            []
+14:28:42 cust pathPaymentStrictReceive 10 EURC to cafe      {"ok":true,"hash":"52eb099a4935e8606f22e5ac11deb9f23593b0460454cb8607a3abef0a4a7de4"}
+14:28:42 cafe EURC / cust BRZ / mm BRZ                      ["10.0000000","938.0000000","62.0000000"]

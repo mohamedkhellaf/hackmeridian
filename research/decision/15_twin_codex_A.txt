@@ -1,0 +1,21 @@
+Ranked for **winning potential with three developers and ~20 hours**. Each assumes a focused testnet MVP with one memorable live demo.
+
+1. **LoopClear — settle circular business debts with less cash.** Three businesses owe each other money; your app calculates the net obligations and collects signatures for one atomic Stellar settlement, reducing the cash needed to clear invoices. **Unlocked:** demo a €100 debt triangle settling with zero transfers, then an uneven triangle settling only the differences.
+
+2. **Agent Allowance — give AI agents spending power with enforceable limits.** Let an agent buy services or swap tokens while a smart account enforces approved destinations, spending caps, and expiry; demo a legitimate purchase succeeding and a malicious instruction failing. **Unlocked + Composed:** combine [OpenZeppelin Stellar smart accounts](https://docs.openzeppelin.com/stellar-contracts/accounts/smart-account) with [Soroswap](https://soroswap.finance/) for constrained swaps.
+
+3. **Threshold Tickets — events that happen only when enough people commit.** Organizers set a minimum ticket count and deadline; a Soroban contract holds payments, releases funding if the threshold is reached, and lets attendees reclaim funds otherwise. **Unlocked:** demo both outcomes with a live countdown—an immediately understandable product for meetups, workshops, and community events.
+
+4. **AidPass — emergency aid people can actually use.** An NGO allocates funds to recipients who have not yet configured their wallets, with sponsored onboarding and a deadline after which the NGO can reclaim uncollected aid. **Unlocked:** combine [claimable balances](https://github.com/stellar/stellar-docs/blob/main/docs/build/guides/transactions/claimable-balances.mdx), sponsored reserves, and fee sponsorship; demo allocation → first wallet setup → claim.
+
+5. **Runway Guard — treasury savings with a payroll reserve.** A small team keeps its next payroll liquid while allocating surplus to Blend, with Soroswap converting supported incoming assets into its chosen treasury asset. **Composed:** integrate [Blend lending](https://docs.blend.capital/users/lending-borrowing/lending) and Soroswap; demo a deposit being split automatically and make withdrawal liquidity visible.
+
+6. **PayOnce — subscriptions that cannot silently overcharge you.** Customers authorize a merchant, maximum charge, billing interval, and expiry; a Soroban contract rejects duplicate, early, or oversized charges and lets customers revoke future payments. **Unlocked:** demo a normal renewal followed by three blocked billing abuses—a clear consumer benefit with an equally clear merchant API.
+
+7. **FairSplit Checkout — one payment, every contributor paid.** A marketplace purchase swaps the buyer’s token through Soroswap and distributes proceeds to the seller, creator, and platform through one Soroban contract invocation, reverting if any required step fails. **Composed:** use Soroswap plus OpenZeppelin Stellar contract components; demo a three-party sale and a failed minimum-output check with no partial payout.
+
+8. **Milestone Passport — freelance escrow that builds verifiable work history.** Clients fund milestones, approve completed work, and release payment; each completion generates a receipt linked to both parties that freelancers can carry between marketplaces. **Unlocked:** scope the demo to funding, one approval, one payout, and receipt verification, with explicit refund rules for unfinished work.
+
+9. **FX Payroll Lock — everyone gets the amount they were promised.** An employer specifies exact recipient amounts in different Stellar assets, and the app builds one atomic batch of strict-receive path payments with maximum spending limits. **Unlocked:** seed two currency markets and demo either every employee receiving the promised amount or the entire batch failing when one conversion exceeds its limit.
+
+10. **ReturnLoop — reusable-container deposits that follow the container.** Customers return a cup or food container to any participating merchant, whose signed acceptance releases the customer’s deposit and records the merchants’ settlement obligations. **Unlocked:** use Soroban for deposit custody and single-use return authorization; demo two merchant screens and a rejected duplicate redemption.

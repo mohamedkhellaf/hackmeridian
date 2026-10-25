@@ -1,0 +1,7 @@
+14:31:22 P creates cheque account CA (5 XLM)                      {"ok":true,"hash":"ce0a60cdda0a4cac420742e537ab796cd36118278d02cd7e6c78e27ec1141ac3"}
+14:31:27 lock CA: 3 preAuth signers, master 0, thresholds 1       {"ok":true,"hash":"3be7619b440d512135780428557598bc2b67853fb457b6954c01010e599b4663"}
+14:31:27 (a) CA master key tries bumpSequence                     {"ok":false,"codes":"{\"transaction\":\"tx_bad_auth\"}"}
+14:31:28 (a) P tries bumpSequence on CA (P not a signer)          {"ok":false,"codes":"{\"transaction\":\"tx_bad_auth\"}"}
+14:31:32 (c) underfunded face submitted                           {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_failed","operations":["op_underfunded"]}}
+14:31:33 (c) CA seq after / signers left                          ["23119890558746626",["preauth_tx:1","preauth_tx:1","ed25519_public_key:0"]]
+14:31:33 (b) early face after bounce                              {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_bad_seq"}}

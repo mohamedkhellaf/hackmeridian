@@ -1,0 +1,8 @@
+14:30:02 issuer flags REQ|REV|CLAWBACK                      {"ok":true,"hash":"e73b810c442935e96dceceaf12b71a23315054169b3ac292b8430ffd4e63e0d3"}
+14:30:27 authorize 4 + issue 900 to mum                     {"ok":true,"hash":"77b81df61d7cda82576d20bf5369bb793a045f10d37bbf7df122bb40b90ad2e7"}
+14:30:32 scam: mum->m1 900                                  {"ok":true,"hash":"312dc4b3a344cd6b1c6eab893b52fe6d998181bb75ee3b3e46bffcf235a5bb03"}
+14:30:37 fan-out m1->m2 400, m1->m3 400                     {"ok":true,"hash":"02abfe4d14f712e99c82937dddad02d7732a0033558b74907b4e67a3881ab150"}
+14:30:42 m3 posts DEX offer (escape attempt) sell 100 EURT for XLM {"ok":true,"hash":"3807778f1da53d456dc9565bc2c991b41c5c7f4905d7411b04a31dc9c76afe91"}
+14:30:47 ONE tx: freeze 3 + clawback 3 + restitution        {"ok":true,"hash":"1d5edb8fa4544fba013a462f841d177cad4122313f915a7de39c8eff5202f083"}
+14:30:47 balances mum/m1/m2/m3                              [["900.0000000",true],["0.0000000",false],["0.0000000",false],["0.0000000",false]]
+14:30:48 m3 offers left                                     0
