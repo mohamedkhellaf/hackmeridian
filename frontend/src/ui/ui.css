@@ -623,3 +623,11 @@
     bottom: calc(76px + env(safe-area-inset-bottom));
   }
 }
+
+/* Phones: keep the toast above the fixed tab bar. */
+@media (max-width: 768px) {
+  .ui-toast-region {
+    right: 16px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}
