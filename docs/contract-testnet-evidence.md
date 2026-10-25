@@ -343,29 +343,66 @@ buy `389d1b6617bf9b67b690d824920d1ec06bc64a0c25e5073a22d242ae0bd9265c`):
 - `writer_open_count` is 0 for maker1 and for maker2.
 - The contract's balance and `open_collateral` are both 0 for USDx, RWA, BOND and EQTY.
 
-This deployment did not re-run the unit, invariant or negative test suites. The "Off-chain assurance" section below
-describes the v1.2 tree.
+The unit, invariant and negative suites were run after this deployment, on the merged v1.3 tree. The results are in
+"Off-chain assurance" below.
 
 ## Off-chain assurance
 
-On the merged v1.2 tree, whose `lib.rs` builds to the deployed v1.2 wasm (sha256 `8778dc77…422f`, section above):
+On the merged v1.3 tree (branch `feat/contract-v1-3`). Its `lib.rs` is the `c3db0a6` file. `stellar contract build
+--package options --meta source_repo=github:mohamedkhellaf/hackmeridian` on this tree gives sha256 `fdd6fc16…97e6`,
+26,966 bytes, byte-identical to the v1.3 wasm fetched back from chain (section above). `cargo test -p options`:
+171 passed, 0 failed, 1 ignored.
 
-- 81 unit tests in `contracts/options/src/test.rs`: the 80-test v1.2 suite, which includes the 10 TTL and
-  transfer-order tests added after mutation testing, plus `is_eligible_false_for_g_account_without_trustline` (the
-  SAC #13 branch of `is_eligible`).
-- 7 tests in `contracts/options/tests/invariants.rs`: 1 property test (an executable reference model of the ABI plus
-  invariants, checked after every step of random sequences of 1–40 operations, holder transfers and paged reads
-  included; 200 cases by default, and a 1,000-case run is also clean) and 6 deterministic regression tests.
-- 41 negative security tests in `contracts/options/tests/negative.rs` (40 run; the 41st is the `#[ignore]`d F-1
-  test): auth replay and forged auth trees, contract-as-party, 37-operation accounting trace, repeated/out-of-order
-  releases, id monotonicity and u32 exhaustion, expiry boundaries, terminal states (150 rejections), TTL griefing
-  bounds (≤398 ids per `extend_ttl`), amount edges (1 unit, 0/negative, i128::MAX, i64 cap for G accounts),
-  token/trustline edges, allowlist, one event per success and none per failure, immutable offer terms, nonce
-  replay, constructor re-entry, and the v1.2 surface: `transfer` (third-party and replayed auth trees, non-holder
-  callers, ineligible and no-trustline recipients, every non-`Active` state with 180 rejections, the expiry
-  boundary, no token or reserved-total movement) and `get_options` at `from`/`limit` edges (0, u32::MAX) never
-  failing or returning an id ≥ `option_count`. All misuse paths are rejected with no state change. One documented
-  availability finding (F-1, `docs/contract-abi.md` §6).
+- 105 unit tests in `contracts/options/src/test.rs`: the 81 v1.2 tests plus 24 for v1.3. The new tests cover:
+  - `list_asset`: canonical SAC derivation for alphanum-4 and alphanum-12 codes, lister auth, a bad code, a contract
+    issuer, a duplicate and the quote asset, an undeployed SAC, no authorization granted, and a PUT on a newly listed
+    asset that settles. Also the constructor-seeded registry, `list_assets` paging and `create_offer` on an unlisted
+    SAC.
+  - The per-writer cap (the 51st offer, and its check order) and the tenor cap.
+  - `prune_expired`: collateral goes back to the writer; live and bought offers are skipped, and so are offers whose
+    CALL writer is frozen or that the contract cannot pay; it needs no auth and extends TTLs.
+  - Registry TTL extension, the contract-address backstop, the v1.3 events and the appended error codes 116–119.
+
+  The two v1.2 tests that had one writer create more than 50 offers (`open_list_cap_returns_open_list_full`,
+  `get_options_pages_in_order`) now spread those offers over several writers.
+- 12 tests in `contracts/options/tests/invariants.rs`:
+  - 1 property test. Its reference model now includes `list_asset`, `prune_expired`, the per-writer cap, the tenor
+    cap, listing EQTY and authorizing the escrow on it, and the contract-address backstop. Invariants 1–10 are
+    checked after every step of random sequences of 1–40 operations, 200 cases by default. Any run of 100 or more
+    cases fails unless each of 10 required v1.3 (call, outcome) pairs happens. A 1,000-case run
+    (`PROPTEST_CASES=1000`) on this tree is also clean.
+  - 11 deterministic regression tests: the 6 from v1.2 plus `contract_address_is_rejected_as_any_party`,
+    `tenor_cap_is_inclusive_at_two_years_from_now`, `list_asset_derives_the_sac_and_authorizes_nothing`,
+    `prune_expired_skips_live_bought_frozen_and_underfunded_offers` and
+    `writer_open_limit_is_exactly_fifty_offers_per_writer`.
+- 55 negative security tests in `contracts/options/tests/negative.rs`: 54 run and 1 is `#[ignore]`d.
+  - The v1.2 sections stay, adapted for v1.3: `transfer` to the contract, the F-1 griefing test, and more than 50
+    offers from one writer.
+  - New sections 18–23 cover permissionless listing, `prune_expired`, the per-writer cap, the tenor cap, the
+    contract-address backstop, and the v1.3 events and views.
+  - The test that was `#[ignore]`d for F-1, `finding_f1_dust_offers_must_not_block_other_writers`, is now the
+    passing `griefing8_f1_writer_cap_blocks_the_squatter_at_50_and_others_still_list`: v1.3 stops one writer at
+    50 open offers, and other writers can still list.
+- `cargo clippy -p options --all-targets`: 0 warnings. `cargo fmt -p options --check`: clean.
+
+Ignored test (1):
+
+- `finding_f1r_sybil_writers_on_a_self_listed_asset_must_not_block_other_writers`, reason `finding F-1R: 20 sybil
+  writers on a self-listed unflagged asset still fill MAX_OPEN for up to MAX_TENOR`.
+  - The test asserts the secure behaviour, so it fails against v1.3 on purpose. Run on this tree with `--ignored`,
+    it fails with `an honest maker is locked out by sybil dust on a self-listed asset` (`left: Err(Ok(OpenListFull))`).
+  - Why: `MAX_OPEN` (1000) is one list over all assets, and listing is permissionless. 20 writers × 50 dust CALLs,
+    each collateralized with 1 unit of an attacker's own unflagged, self-listed asset at the maximum tenor, fill the
+    list. Honest makers on every asset then get `OpenListFull` until the sybils cancel, or until their offers expire
+    and are pruned, which can take up to `MAX_TENOR` (2 years).
+  - Impact: availability only. `OpenListFull` is raised only by `create_offer`, so it blocks new offers and does
+    not touch collateral or existing options.
+  - Candidate fixes are an economic decision for Dev 1 / Dev 2: per-underlying open lists, a minimum collateral in
+    quote units, or not counting self-listed assets against the shared list. `docs/contract-abi.md` §12 says
+    `prune_expired` closes F-1 and does not mention this residual yet.
+
+Earlier assurance, not re-run on the v1.3 `lib.rs`:
+
 - Mutation testing of `lib.rs` (cargo-mutants 27.1.0 plus hand-written mutants; logs are not committed):
   - First run, on the v1.1 `lib.rs` with the suite of the time (59 unit and 6 invariant tests): cargo-mutants
     97 mutants → 79 caught, 0 survived, 18 unviable. 34 hand-written mutants (per-call TTL extension, guards,
