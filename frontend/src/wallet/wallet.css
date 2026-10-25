@@ -1,0 +1,272 @@
+/* Connect-wallet dialog. Tokens come from :root (foundation); fallbacks keep it readable standalone. */
+.cw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 5, 8, 0.62);
+}
+
+.cw-dialog {
+  width: 100%;
+  max-width: 760px;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  background: var(--surface, #0f1217);
+  color: var(--text, #e8eaed);
+  border: 1px solid var(--border, #222832);
+  border-radius: var(--r-2xl, 16px);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  text-align: left;
+}
+.cw-dialog:focus {
+  outline: none;
+}
+
+.cw-side {
+  flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px;
+  background: var(--surface-sunken, #0c0f13);
+  border-right: 1px solid var(--border, #1c2129);
+}
+.cw-side-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong, #fff);
+}
+.cw-fact h3 {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-strong, #fff);
+}
+.cw-fact p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2, #a3abb8);
+}
+.cw-get {
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--link, #9db1ff);
+  text-decoration: none;
+}
+.cw-get:hover {
+  text-decoration: underline;
+}
+
+.cw-main {
+  flex: 1 1 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  min-width: 0;
+}
+.cw-head {
+  display: flex;
+  align-items: center;
+}
+.cw-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong, #fff);
+}
+.cw-close {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted, #8a93a1);
+  cursor: pointer;
+}
+.cw-close:hover {
+  color: var(--text, #e8eaed);
+  background: var(--surface-hover, #151920);
+}
+.cw-lbl {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #8a93a1);
+}
+.cw-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #8a93a1);
+}
+.cw-error {
+  padding: 10px 12px;
+  border-radius: var(--r-md, 10px);
+  border: 1px solid var(--danger, #e5484d);
+  color: var(--danger, #ff8a8f);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cw-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cw-wallet {
+  font: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--r-lg, 12px);
+  border: 1px solid var(--border, #232933);
+  background: transparent;
+  color: var(--text, #e8eaed);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.cw-wallet:hover:not(:disabled) {
+  background: var(--surface-hover, #151920);
+  border-color: var(--border-2, #2c333e);
+}
+.cw-wallet:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.cw-wallet-compact {
+  padding: 11px 12px;
+  gap: 10px;
+}
+.cw-badge {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--surface-hover, #1e2a3a);
+  color: var(--text-strong, #a9c8f0);
+  font-size: 12px;
+  font-weight: 700;
+}
+.cw-wallet-compact .cw-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.cw-wallet-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cw-wallet-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.cw-wallet-compact .cw-wallet-name {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.cw-wallet-kind {
+  font-size: 12px;
+  color: var(--muted, #8a93a1);
+}
+.cw-pill {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ok-bg, rgba(84, 196, 160, 0.12));
+  color: var(--ok, #7fd4b7);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cw-get-tag {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--link, #9db1ff);
+  white-space: nowrap;
+}
+
+.cw-note {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #1c2129);
+  background: var(--surface-sunken, #0b0e12);
+  color: var(--text-2, #a3abb8);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.cw-collapse {
+  display: none;
+}
+
+.cw-dialog button:focus-visible,
+.cw-dialog a:focus-visible {
+  outline: 2px solid var(--link, #9db1ff);
+  outline-offset: 2px;
+}
+
+/* Phone: bottom sheet, explainer collapsed below the list. */
+@media (max-width: 640px) {
+  .cw-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .cw-dialog {
+    max-width: none;
+    max-height: 92dvh;
+    border-radius: var(--r-2xl, 16px) var(--r-2xl, 16px) 0 0;
+    border-bottom: 0;
+  }
+  .cw-side {
+    display: none;
+  }
+  .cw-main {
+    flex-basis: 100%;
+    padding: 20px 16px 24px;
+  }
+  .cw-collapse {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2, #a3abb8);
+  }
+  .cw-collapse summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-strong, #fff);
+    padding: 6px 0;
+  }
+  .cw-collapse .cw-fact {
+    margin-top: 12px;
+  }
+  .cw-collapse .cw-get {
+    display: inline-block;
+    margin-top: 12px;
+  }
+}
