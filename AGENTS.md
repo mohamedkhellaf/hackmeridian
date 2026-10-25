@@ -6,7 +6,9 @@
 
 - **Name:** TBD (repo is `hackmeridian` for now)
 - **Event:** HackMeridian, Lisbon, Oct 25–26 2026 (Stellar)
-- **Track:** TBD (Genesis / Scale)
+- **Category:** Genesis (new idea → working MVP)
+- **Track:** TBD (Stellar Unlocked / Stellar Composed)
+- **Deadline:** Mon Oct 26, 12:00 (no late submissions). Judged async on demo video, pitch deck, repo, and submission answers.
 - **Pitch:** TBD, one or two sentences on what we're building and for whom
 
 ## Team
