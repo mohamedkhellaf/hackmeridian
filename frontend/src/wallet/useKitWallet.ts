@@ -4,6 +4,7 @@ import {
   describeWalletError,
   isWrongNetwork,
   readStoredWalletId,
+  probeWallets,
   toWalletInfos,
   wrongNetworkMessage,
   writeStoredWalletId,
@@ -80,7 +81,7 @@ export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
     setLoading(true)
     try {
       const kit = await loadKit()
-      setWallets(toWalletInfos(await kit.refreshSupportedWallets()))
+      setWallets(toWalletInfos(await kit.refreshSupportedWallets(), probeWallets()))
     } catch (e) {
       setDialogError(describeWalletError(e))
     } finally {

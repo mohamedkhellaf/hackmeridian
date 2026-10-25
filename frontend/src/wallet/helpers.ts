@@ -8,10 +8,18 @@ export const WALLET_STORAGE_KEY = 'strata.wallet'
 // when VITE_WALLETCONNECT_PROJECT_ID is set, so it simply is not in the kit's list otherwise.
 const HIDDEN_WALLET_IDS = new Set(['ledger', 'trezor'])
 
+/**
+ * How a wallet is reachable right now:
+ * - installed: a browser extension that responded (shown as "Detected")
+ * - web: works without an extension (web app, popup or QR); never claims to be detected
+ * - missing: an extension that is not present
+ */
+export type WalletAvailability = 'installed' | 'web' | 'missing'
+
 export interface WalletInfo {
   id: string
   name: string
-  isAvailable: boolean
+  availability: WalletAvailability
   url: string
   /** Short caption under the name, e.g. "Browser extension". */
   kind: string
@@ -25,6 +33,18 @@ interface SupportedWalletLike {
   url: string
 }
 
+/** Browser-only facts the kit does not expose. */
+export interface WalletProbe {
+  /** The xBull extension injected window.xBullSDK. */
+  xbullExtension: boolean
+}
+
+// The kit's isAvailable() is unconditionally true for these (no extension needed): Albedo is a pure
+// web wallet, and the xBull module always returns true because xBullWalletConnect falls back to a
+// popup at wallet.xbull.app when window.xBullSDK (the extension) is absent.
+const ALWAYS_WEB_IDS = new Set(['albedo'])
+const XBULL_ID = 'xbull'
+
 const KIND: Record<string, string> = {
   HOT_WALLET: 'Browser extension or web wallet',
   BRIDGE_WALLET: 'Mobile via WalletConnect',
@@ -32,14 +52,39 @@ const KIND: Record<string, string> = {
   AIR_GAPED_WALLET: 'Air-gapped wallet',
 }
 
-export function toWalletInfos(list: SupportedWalletLike[]): WalletInfo[] {
-  return list
-    .filter((w) => !HIDDEN_WALLET_IDS.has(w.id) && w.type !== 'HW_WALLET')
-    .map((w) => ({ id: w.id, name: w.name, isAvailable: w.isAvailable, url: w.url, kind: KIND[w.type] ?? 'Wallet' }))
+export function walletAvailability(w: SupportedWalletLike, probe: WalletProbe): WalletAvailability {
+  if (ALWAYS_WEB_IDS.has(w.id) || w.type === 'BRIDGE_WALLET') return 'web'
+  if (w.id === XBULL_ID) return probe.xbullExtension ? 'installed' : 'web'
+  return w.isAvailable ? 'installed' : 'missing'
 }
 
+export function toWalletInfos(list: SupportedWalletLike[], probe: WalletProbe = { xbullExtension: false }): WalletInfo[] {
+  return list
+    .filter((w) => !HIDDEN_WALLET_IDS.has(w.id) && w.type !== 'HW_WALLET')
+    .map((w) => ({
+      id: w.id,
+      name: w.name,
+      availability: walletAvailability(w, probe),
+      url: w.url,
+      kind: KIND[w.type] ?? 'Wallet',
+    }))
+}
+
+/** Installed extensions first; everything else (web wallets and missing extensions) under "more". */
 export function splitWallets(list: WalletInfo[]): { installed: WalletInfo[]; more: WalletInfo[] } {
-  return { installed: list.filter((w) => w.isAvailable), more: list.filter((w) => !w.isAvailable) }
+  return {
+    installed: list.filter((w) => w.availability === 'installed'),
+    more: list.filter((w) => w.availability !== 'installed'),
+  }
+}
+
+/** Isolated browser probing for extensions the kit cannot report on. Safe outside a browser. */
+export function probeWallets(): WalletProbe {
+  try {
+    return { xbullExtension: typeof window !== 'undefined' && !!(window as unknown as { xBullSDK?: unknown }).xBullSDK }
+  } catch {
+    return { xbullExtension: false }
+  }
 }
 
 export function initials(name: string): string {

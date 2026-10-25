@@ -6,11 +6,13 @@ import {
   readStoredWalletId,
   splitWallets,
   toWalletInfos,
+  walletAvailability,
   walletErrorKind,
   writeStoredWalletId,
 } from './helpers'
 
 const w = (id: string, isAvailable: boolean, type = 'HOT_WALLET') => ({ id, name: id, type, isAvailable, url: 'u' })
+const none = { xbullExtension: false }
 
 describe('wallet helpers', () => {
   it('hides hardware wallets and splits by availability', () => {
@@ -19,6 +21,21 @@ describe('wallet helpers', () => {
     const { installed, more } = splitWallets(list)
     expect(installed.map((x) => x.id)).toEqual(['freighter'])
     expect(more.map((x) => x.id)).toEqual(['lobstr'])
+  })
+
+  it('does not call web wallets "installed"', () => {
+    // The kit reports isAvailable=true for albedo and xbull even with no extension.
+    expect(walletAvailability(w('albedo', true), { xbullExtension: true })).toBe('web')
+    expect(walletAvailability(w('xbull', true), none)).toBe('web')
+    expect(walletAvailability(w('xbull', true), { xbullExtension: true })).toBe('installed')
+    expect(walletAvailability(w('wallet_connect', true, 'BRIDGE_WALLET'), none)).toBe('web')
+    expect(walletAvailability(w('freighter', true), none)).toBe('installed')
+    expect(walletAvailability(w('freighter', false), none)).toBe('missing')
+    const { installed, more } = splitWallets(
+      toWalletInfos([w('freighter', true), w('xbull', true), w('albedo', true), w('rabet', false)], none),
+    )
+    expect(installed.map((x) => x.id)).toEqual(['freighter'])
+    expect(more.map((x) => x.id)).toEqual(['xbull', 'albedo', 'rabet'])
   })
 
   it('classifies errors', () => {
