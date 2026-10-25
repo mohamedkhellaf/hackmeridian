@@ -2,8 +2,22 @@
 
 Stellar **testnet** only (protocol 29). Every hash below was confirmed `successful: true` on Horizon
 (`https://horizon-testnet.stellar.org/transactions/<hash>`). Amounts are 7-decimal units. Roles are disposable
-testnet identities created by `scripts/setup-testnet/`; their public keys are in the Deployed contracts table of
-`AGENTS.md` and in the git-ignored `scripts/out/testnet.env`. Re-run everything with `scripts/deploy/smoke-testnet.sh`.
+testnet identities created by `scripts/setup-testnet/`; their public keys are listed below (also in the git-ignored
+`scripts/out/testnet.env`). Re-run everything with `scripts/deploy/smoke-testnet.sh`.
+
+## Roles (testnet public keys, no secrets)
+
+| Role (CLI identity) | Public key |
+|---|---|
+| deployer (`strata-deployer`) | `GBVPEL6MT4IZ4XL5J7TTMB3GND7TPRS54KOJTUFCUOVFVFPZKE5HDA73` |
+| rwa-issuer (`strata-rwa-issuer`), issues RWA and BOND | `GCNWQR5OA24X7LPTCXUEL4V4ZLSIFKUNIEZEO3UVCVXECPPGX7ERFDGM` |
+| usdx-issuer (`strata-usdx-issuer`), issues USDx | `GAE6ONGU5S3JHDBR5Z3BUVXCL4WLEHQVLBDNTCKHKOYFBYBPBW4IARFS` |
+| maker1 (`strata-maker1`) | `GDNPA7N3WIUJLR6TJ2Z2EO3MXFWWZPN4D6P2L4YHSX3M4PZVTKMWDJCI` |
+| maker2 (`strata-maker2`) | `GC27F4643RPJT6WCZUD5AFC3PCXRZNE3FGNOBCBOSTGFC37IVVSD55ZE` |
+| investor (`strata-investor`) | `GAXXQZK5RJRZZH3QDMVWFBRWL45CWHZZZXI4PQSAVPAWKILQJYHBJAR5` |
+| outsider (`strata-outsider`), not authorized on RWA/BOND | `GAP7GDJ372IX2VTGCBIYAS3H3YIGGKH623FGLWCFPSD6INFBFQUB4VPA` |
+
+Each flow transaction's Horizon `source_account` is the role named in its row.
 
 ## v1 deployment (2026-10-25 19:06 UTC)
 
@@ -84,13 +98,23 @@ Expected failures, all rejected in simulation with the v1.1 code: `SelfTrade` #1
 `is_eligible`: contract true on RWA and BOND; investor true; outsider false; USDx: maker1 true, an account with no
 USDx trustline false. `get_option(999)` → `NotFound` #101. State after the run: `option_count` 7, `list_open` [].
 
-## Off-chain assurance on the same code
+## Off-chain assurance
 
-- 59 unit tests on v1.1 (53 on v1; `contracts/options/src/test.rs`), 5 property tests over 256 random operation sequences with a
-  reference model of the ABI (`contracts/options/tests/invariants.rs`; 2,000-case run also clean).
-- Mutation sweep: 21 of 22 mutants killed; the survivor is an equivalent mutant (redundant code-TTL extension).
+On v1.1 (the deployed `CBRTU…MSQC` code):
+
+- 60 unit tests in `contracts/options/src/test.rs` (PR #21; the v1 suite had 53, PR #18).
+- 1 property test (reference model of the ABI plus invariants, 256 random sequences of 1–40 operations; a 2,000-case
+  run is also clean) and 5 deterministic regression tests, in `contracts/options/tests/invariants.rs` (PR #20, not
+  yet on this branch).
+
+On v1 only (53-test suite, PRs #16 and #18), not re-run on v1.1:
+
+- Mutation sweep over `lib.rs`: 21 of 22 mutants killed; the survivor removes the redundant `deployer().extend_ttl`
+  call, which is equivalent because `instance().extend_ttl` already extends the code entry. No mutant list or log is
+  committed, so the count cannot be reproduced from the repository.
 - 4-lens audit with adversarial refutation, CoinFabrik Scout, clippy pedantic, cargo audit: no authorization, arithmetic
-  or state-machine defect. Confirmed limitations and the v1.1 hardening are in `docs/contract-abi.md` §6 and §10.
+  or state-machine defect. Its two confirmed findings (pooled clawback exposure, unbounded open-offer list) are
+  handled in `docs/contract-abi.md` §6 and the v1.1 hardening in §10.
 
 ## What this does not show
 
