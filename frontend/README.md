@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# Strata frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Vite + React 19 + TypeScript app for collateralized options on tokenized Stellar assets (Testnet).
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install
+npm run dev     # http://localhost:5173
+npm test        # Vitest unit tests
+npm run build
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Running against a deployed contract
+
+Copy `.env.example` to `.env` and set the contract ID (see "Deployed contracts" in `AGENTS.md`):
+
+```sh
+VITE_OPTIONS_CONTRACT_ID=C...
+```
+
+- **Unset (mock mode):** an in-memory `MockOptionsClient` with fictional assets and options. A banner says so; state resets on reload.
+- **Set (real mode):** `SorobanOptionsClient` talks to the contract on Testnet through Stellar RPC, signing with Freighter (set Freighter to Testnet). The Issuer tab operates the asset issuer account.
+
+Restart `npm run dev` after changing the env file.

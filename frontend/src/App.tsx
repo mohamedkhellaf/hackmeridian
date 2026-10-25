@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { IssuerConsole } from './issuer/IssuerConsole'
+import { createOptionsClient } from './options'
 import { config, explorerTx } from './config'
 import { CollateralPanel } from './maker/CollateralPanel'
 import { WriteOfferForm } from './maker/WriteOfferForm'
 import { MockOptionsClient } from './options/mockClient'
 import type { OptionsClient } from './options/client'
-import type { CollateralLine, NewOffer, OptionOffer, SupportedAssets } from './options/types'
+import type { CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets } from './options/types'
 import { shortAddress } from './options/format'
 import { OptionsTable } from './market/OptionsTable'
 import { MarketSeries } from './market/MarketSeries'
@@ -17,13 +19,42 @@ import './App.css'
 type Tab = 'market' | 'write' | 'positions' | 'issuer'
 type Notice = { kind: 'ok'; text: string; hash: string; mock: boolean } | { kind: 'err'; text: string }
 
+const LEGEND: [string, string][] = [
+  ['offered', 'listed, collateral locked, no buyer yet'],
+  ['active', 'sold; the holder can exercise until expiry'],
+  ['exercised', 'awaiting writer claim: proceeds wait in the contract'],
+  ['settled', 'writer claimed the proceeds; done'],
+  ['expired', 'collateral reclaimable by the writer'],
+  ['reclaimed', 'writer took the collateral back'],
+  ['cancelled', 'offer withdrawn before any buyer'],
+]
+
+function StateLegend() {
+  return (
+    <ul className="legend">
+      {LEGEND.map(([s, d]) => (
+        <li key={s}>
+          <span className={`state state-${s}`}>{s}</span> {d}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function App() {
   const wallet = useFreighter()
-  // Swap for the bindings-backed client once the contract is deployed.
-  const client: OptionsClient = useMemo(() => new MockOptionsClient(), [])
+  // One mock for the whole session (recreating it would wipe the demo state). The Soroban client
+  // captures the signer, so it is rebuilt when the wallet address or signers change.
+  const [mock] = useState(() => (config.optionsContractId ? null : new MockOptionsClient()))
+  const { address: walletAddress, sign: walletSign, signAuthEntry: walletSignAuth } = wallet
+  const client: OptionsClient = useMemo(
+    () => mock ?? createOptionsClient({ address: walletAddress, sign: walletSign, signAuthEntry: walletSignAuth }),
+    [mock, walletAddress, walletSign, walletSignAuth],
+  )
   const [options, setOptions] = useState<OptionOffer[]>([])
   const [assets, setAssets] = useState<SupportedAssets | null>(null)
   const [collateral, setCollateral] = useState<CollateralLine[]>([])
+  const [health, setHealth] = useState<CollateralHealth[]>([])
   const [tab, setTab] = useState<Tab>('market')
   const [busyId, setBusyId] = useState<bigint | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
@@ -34,10 +65,16 @@ function App() {
   const refreshBalances = balances.refresh
 
   const refresh = useCallback(async () => {
-    const [opts, assets, lines] = await Promise.all([client.listOptions(), client.supportedAssets(), client.openCollateral()])
+    const [opts, assets, lines, hl] = await Promise.all([
+      client.listOptions(),
+      client.supportedAssets(),
+      client.openCollateral(),
+      client.collateralHealth().catch(() => [] as CollateralHealth[]),
+    ])
     setOptions(opts)
     setAssets(assets)
     setCollateral(lines)
+    setHealth(hl)
   }, [client])
 
   useEffect(() => {
@@ -148,8 +185,8 @@ function App() {
         )}
         {tab === 'write' && (
           <div className="write-grid">
-            {assets && <WriteOfferForm assets={assets} disabled={!me || busy} onSubmit={writeOffer} />}
-            <CollateralPanel lines={collateral} contractId={config.optionsContractId} />
+            {assets && <WriteOfferForm assets={assets} client={client} me={me ?? null} disabled={!me || busy} onSubmit={writeOffer} />}
+            <CollateralPanel lines={collateral} health={health} contractId={config.optionsContractId} />
             {!me && <p className="empty">Connect Freighter to write an option.</p>}
           </div>
         )}
@@ -158,11 +195,17 @@ function App() {
             <OptionsTable
               rows={positions}
               actionFor={(o) => {
-                if (o.holder === me && o.state === 'active')
+                if (o.holder === me && o.state === 'active' && Date.now() / 1000 < o.expiry)
                   return {
                     label: busyId === o.id ? 'Exercising…' : 'Exercise',
                     disabled: busy,
                     onClick: () => void run(o.id, 'Exercise', () => client.exercise(o.id, me)),
+                  }
+                if (o.writer === me && o.state === 'exercised')
+                  return {
+                    label: busyId === o.id ? 'Claiming…' : 'Claim delivery',
+                    disabled: busy,
+                    onClick: () => void run(o.id, 'Claim delivery', () => client.claimDelivery(o.id, me)),
                   }
                 if (o.writer === me && o.state === 'expired')
                   return {
@@ -182,12 +225,15 @@ function App() {
           ) : (
             <p className="empty">Connect Freighter to see your positions.</p>
           ))}
-        {tab === 'issuer' && <p className="empty">Issuer console coming soon.</p>}
+        {tab === 'positions' && me && <StateLegend />}
+        {tab === 'issuer' && <IssuerConsole address={wallet.address} sign={wallet.sign} optionsContractId={config.optionsContractId} />}
       </main>
 
       {buying && me && (
         <BuyDialog
           offer={buying}
+          client={client}
+          me={me}
           onCancel={() => setBuying(null)}
           onConfirm={() => {
             const o = buying
