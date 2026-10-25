@@ -17,11 +17,21 @@ TBD: who owns what.
 
 TBD: how contracts, frontend and any backend talk to each other.
 
-## Conventions
+## How we work
 
+- `main` must always be demoable. Don't push directly to it; open a PR.
+- One short-lived branch per task: `feat/…`, `fix/…`, `chore/…`. Merge within a few hours, not days.
+- CI must be green before merging. Reviews are optional: tag a teammate if you want eyes, but don't wait on it.
+- Squash-merge, then delete the branch. Pull `main` often.
+- Split work by area (contracts / frontend / pitch) to avoid conflicts.
 - Commit messages: short, imperative. No AI/co-author attribution trailers.
-- Branches: TBD
-- TBD
+- When a contract is redeployed, update **Deployed contracts** below in the same PR.
+
+## Deployed contracts (testnet)
+
+| Contract | Alias | Contract ID | Deployed by |
+|----------|-------|-------------|-------------|
+| _none yet_ | | | |
 
 ## Layout
 
