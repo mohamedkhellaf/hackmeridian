@@ -19,3 +19,6 @@ dist
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# Third-party UI screenshots used as design references (not ours to publish)
+design/inspiration/
