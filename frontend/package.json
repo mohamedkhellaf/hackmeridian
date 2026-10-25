@@ -12,6 +12,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@jsr/creit-tech__stellar-wallets-kit": "2.7.1",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^17.3.0",
     "react": "^19.3.1",
