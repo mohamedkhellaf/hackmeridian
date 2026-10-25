@@ -1,0 +1,195 @@
+/* Portfolio view: KPI strip, toolbar, positions table (desktop) and cards (mobile). */
+
+.pf {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.pf > .ui-page-header {
+  margin-bottom: 0;
+}
+.pf-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 18px;
+}
+.pf-pos {
+  color: var(--ok);
+}
+
+.pf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pf-toolbar .ui-seg {
+  flex: none;
+}
+.pf-closed {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  min-height: 32px;
+}
+.pf-closed input {
+  accent-color: var(--primary-bg);
+  width: 16px;
+  height: 16px;
+}
+
+.pf-empty {
+  margin: 0;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--r-lg);
+}
+
+/* Table */
+.pf-table {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.pf-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.pf-prem--neg {
+  color: var(--text);
+}
+.pf-prem--pos {
+  color: var(--ok);
+}
+.pf-prem--muted {
+  color: var(--muted);
+}
+.pf-prem--ask {
+  color: var(--text-2);
+}
+.pf-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Status: dot + text, never colour only */
+.pf-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.pf-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.pf-status--info {
+  color: var(--link);
+}
+.pf-status--warn {
+  color: var(--warn);
+}
+.pf-status--ok {
+  color: var(--ok);
+}
+.pf-status--neutral {
+  color: var(--text-2);
+}
+
+/* Mobile cards replace the table */
+.pf-cards {
+  display: none;
+}
+.pf-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.pf-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.pf-card-role {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pf-card-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.pf-card .pf-status {
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .pf-table {
+    display: none;
+  }
+  .pf-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+/* Phones: KPIs as a 2x2 grid; the closed toggle sits under the filter */
+@media (max-width: 640px) {
+  .pf {
+    gap: 16px;
+  }
+  .pf-kpis .ui-stat-grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pf-kpis .ui-stat {
+    padding: 12px 14px;
+    gap: 4px;
+  }
+  .pf-kpis .ui-stat-value {
+    font-size: 17px;
+  }
+  .pf-multi {
+    font-size: 15px;
+  }
+  .pf-toolbar .ui-seg {
+    flex: 1 1 100%;
+  }
+  .pf-toolbar .ui-seg-item {
+    min-height: 40px;
+  }
+  .pf-closed {
+    margin-left: 0;
+  }
+}
+
+.pf-toolbar .ui-seg-item {
+  white-space: nowrap;
+}

@@ -1,7 +1,7 @@
 import { WriteOfferForm } from '../maker/WriteOfferForm'
 import type { OptionsClient } from '../options/client'
 import type { NewOffer, SupportedAssets } from '../options/types'
-import { PageHeader } from '../ui'
+import { Banner, PageHeader } from '../ui'
 
 export interface WriteViewProps {
   assets: SupportedAssets | null
@@ -13,12 +13,10 @@ export interface WriteViewProps {
 
 export function WriteView({ assets, client, me, busy, onSubmit }: WriteViewProps) {
   return (
-    <>
+    <div className="wr-stack">
       <PageHeader title="Write an option" subtitle="Lock collateral, publish an offer, and earn the premium when a buyer takes it." />
-      <div className="write-grid">
-        {assets && <WriteOfferForm assets={assets} client={client} me={me} disabled={!me || busy} onSubmit={onSubmit} />}
-        {!me && <p className="empty">Connect Freighter to write an option.</p>}
-      </div>
-    </>
+      {!me && <Banner tone="info">Connect Freighter to write an option. You can fill in the form first.</Banner>}
+      {assets && <WriteOfferForm assets={assets} client={client} me={me} disabled={!me || busy} onSubmit={onSubmit} />}
+    </div>
   )
 }
