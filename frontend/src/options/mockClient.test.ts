@@ -160,7 +160,7 @@ describe('openCollateral accounting', () => {
   // Seed offers are in 'offered' state; measure deltas against that baseline.
   type Lines = Awaited<ReturnType<MockOptionsClient['openCollateral']>>
   const line = (lines: Lines, id: string) =>
-    lines.find((l) => l.token.contractId === id) ?? { offered: 0n, active: 0n, pendingReclaim: 0n }
+    lines.find((l) => l.token.contractId === id) ?? { offered: 0n, active: 0n, pendingReclaim: 0n, unclaimed: 0n }
   const delta = (lines: Lines, base: ReturnType<typeof line>, id: string) => {
     const l = line(lines, id)
     return [l.offered - base.offered, l.active - base.active, l.pendingReclaim - base.pendingReclaim]
