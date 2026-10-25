@@ -445,7 +445,7 @@ Additive only: two functions, one event, one constant. No error code, type or ex
 Not in v1.2, deliberately: position token (second token system, untestable before freeze), impairment/refund logic
 (economics unspecified, AGENTS.md precondition), partial exercise, multi-leg.
 
-## 12. v1.3: open-book hardening and permissionless asset listing (decided 2026-10-25 22:10 by Dev 2; one redeploy)
+## 12. v1.3: open-book hardening and permissionless asset listing (decided 2026-10-25 22:10 by Dev 2; deployed 2026-10-25 23:06 UTC as `CAMY4ZKY7JLKZMONDOTVHDSXWLMDSLERFS7YJEH5JYZDIKV5HOAT2KRJ`)
 
 Additive: six functions, two events, four error codes (116–119), one lifecycle edge, four storage keys. No existing
 signature, type or event changes; `Config` keeps its constructor-time meaning.

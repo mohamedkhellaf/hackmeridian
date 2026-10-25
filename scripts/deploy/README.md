@@ -17,10 +17,13 @@ keystore. `deploy.sh` stops with an error if the env file is missing.
    stellar contract deploy --wasm <wasm> --source-account strata-deployer --network testnet --alias options \
      -- --quote $USDX_SAC --underlyings '["<RWA_SAC>","<BOND_SAC>"]'
    ```
-   The allowlist is immutable: changing the quote token or the underlyings means a new deploy.
-3. **Authorize** the new contract on every underlying SAC (`scripts/setup-testnet/03-authorize-contract.sh <id>`):
-   `set_authorized(<contract>, true)` from `strata-rwa-issuer` on the RWA and BOND SACs. Without it
-   `create_offer` fails with `ContractNotAuthorized`.
+   The constructor list is immutable. From v1.3 on, more classic assets can be added after deploy with the
+   permissionless `list_asset` (`docs/contract-abi.md` §12), but the quote token and the constructor list never change.
+   **`EQTY` is deliberately not in the constructor**: it is the v1.3 listing demo asset, listed by the smoke run.
+3. **Authorize** the new contract on the constructor underlyings (`scripts/setup-testnet/03-authorize-contract.sh <id>
+   <label> RWA BOND`): `set_authorized(<contract>, true)` from `strata-rwa-issuer` on the RWA and BOND SACs. Without
+   it `create_offer` fails with `ContractNotAuthorized`. `deploy.sh` never authorizes the contract on EQTY: the v1.3
+   smoke run first checks that `create_offer` on EQTY fails with #105, then authorizes it.
 4. **Record** `OPTIONS_ID`, `DEPLOY_TX`, `OPTIONS_WASM_SHA256` in `scripts/out/testnet.env` (done by `deploy.sh`)
    and paste the printed rows into the **Deployed contracts** table in `AGENTS.md`.
 5. **Bindings**: `scripts/deploy/bindings.sh [out-dir]` generates the TypeScript client
@@ -32,12 +35,52 @@ scripts/deploy/deploy.sh --wasm /path/to/options.wasm   # deploy a wasm built in
 DRY_RUN=1 scripts/deploy/deploy.sh              # print every command; send and write nothing
 scripts/deploy/bindings.sh                      # TypeScript client for OPTIONS_ID (or alias "options")
 scripts/deploy/smoke-testnet.sh                 # end-to-end smoke run on TESTNET (real txs; --p0-only to skip P0+)
+scripts/deploy/smoke-testnet.sh --no-v13        # same, without the V1.3 section (contract v1.2 or older)
+scripts/deploy/smoke-testnet.sh --full          # V1.3 also fills maker2 to the 50-offer writer cap (see below)
 scripts/deploy/deploy.sh --throwaway            # second instance for destructive demos; OPTIONS_ID untouched
 scripts/deploy/issuer-demo-testnet.sh           # issuer freeze / de-authorize / clawback failure modes (real txs)
 scripts/deploy/extend-ttl.sh                    # TTL keeper: extend_ttl over every non-terminal option
 ```
 
 Transaction hashes are printed as `TX <STEP> <hash>` and appended to `scripts/out/tx-log.tsv`.
+
+## Smoke run sections
+
+`smoke-testnet.sh` runs PRE (config, eligibility), P0 (RWA PUT lifecycle, expected contract errors, expiry/reclaim,
+maker competition), P0+ (covered CALL, BOND PUT), V1.2 (holder transfer, `get_options` paging) and V1.3. Expected
+failures are simulated only (`--send=no`, no fee) and pass only with the exact error code. `DRY_RUN` is refused: every
+step is a real testnet transaction. `--p0-only` stops after P0; `--no-v13` skips V1.3 (a v1.2 contract has no
+`asset_count`, so the V1.3 probe would fail).
+
+### V1.3 (needs contract v1.3 and the EQTY asset from `02-assets.sh`)
+
+| Check | What happens | Pass condition |
+|---|---|---|
+| `V13_INTERFACE` | `asset_count()` | readable u32 (else the rest of V1.3 is skipped and this fails) |
+| `V13_LIST` | maker1 `list_asset(lister=maker1, code=EQTY, issuer=rwa-issuer)` | tx succeeds, `asset_listed` event, returned address `== EQTY_SAC` |
+| `V13_IS_LISTED`, `V13_LIST_ASSETS`, `V13_ASSET_COUNT` | views | `is_listed(EQTY)`, `list_assets(0,50)` contains EQTY and starts with `[RWA, BOND]`, `asset_count() == 3` |
+| `V13_FAIL_ALREADY_LISTED` / `V13_FAIL_LIST_QUOTE` | list EQTY again / list `USDx` | #117 `AlreadyListed` |
+| `V13_FAIL_NOT_DEPLOYED` | list `ZZZZ:<usdx-issuer>` (its SAC is checked to be undeployed first) | #118 `AssetNotDeployed` |
+| `V13_FAIL_BAD_CODE` / `V13_FAIL_ISSUER_NOT_ACCOUNT` | code `bad code!` / issuer = a contract address | #102 `InvalidArgs` |
+| `V13_FAIL_CONTRACT_NOT_AUTHORIZED` | `create_offer` on EQTY before the issuer acts | #105 `ContractNotAuthorized` |
+| `V13_AUTHORIZE_EQTY` | `scripts/setup-testnet/03-authorize-contract.sh <OPTIONS_ID> EQTY` | exits 0; `is_eligible(EQTY, contract)` true, outsider false |
+| `V13_EQTY_PUT_*` | maker1 PUT on EQTY: create → investor buy → exercise → claim_delivery | state and exact balance / `open_collateral` deltas after every step |
+| `V13_FAIL_TENOR` / `V13_TENOR_INSIDE_SIM` | `create_offer` with expiry now + 3 years / now + 2 years − 1 h | #119 `TenorOutOfRange` / simulation succeeds |
+| `PRUNE_LIVE_*` | maker2 `prune_expired([live id])` on a 1 h offer, then maker1 cancels it | returns 0, offer stays `Offered` and in `list_open`, no balance moves |
+| `PRUNE_*` | maker1 45 s offer nobody buys; after expiry maker2 `prune_expired([id])` | returns 1, `offer_pruned` event, state `Expired`, maker1 gets the USDx back (maker2 gets nothing), `writer_open_count(maker1)` −1, gone from `list_open`; pruning it again returns 0; an unknown id fails with #101 |
+| `CAP_*` (`--full` only) | maker2 creates dust PUTs (1 unit each) up to `writer_open_count == 50`, then one more | #116 `WriterOpenLimit` on the 51st; maker1 can still create (simulated); every dust offer is cancelled and the count returns to its start value |
+
+Listing and authorizing EQTY are one-time steps per contract. On a re-run against the same contract,
+`V13_LIST` and `V13_FAIL_CONTRACT_NOT_AUTHORIZED` are reported as `SKIP` (the summary line counts skips separately)
+and `V13_AUTHORIZE_EQTY` passes without a transaction. The first run on a freshly deployed v1.3 contract is the one
+that records the listing evidence.
+
+**`--full` cost.** Up to 50 `create_offer` and 50 `cancel_offer` transactions from `strata-maker2` (fewer if maker2
+already has open offers), about 2 test XLM in fees (measured on v1.2: `create_offer` about 0.038 XLM including the
+30-day rent of the new option entry, `cancel_offer` about 0.0012 XLM) and 10–20 minutes. Each dust offer locks 1 unit
+(0.0000001) of USDx. An EXIT trap cancels the dust offers if the run dies halfway; if that also fails, the run
+prints the `cancel_offer` command for each leftover id. It is off by default because it adds nothing to the demo
+beyond the #116 evidence.
 
 ## Throwaway instance (`deploy.sh --throwaway`)
 
@@ -113,4 +156,7 @@ id.
 - [ ] `scripts/setup-testnet/verify.sh` passes (it also checks the contract authorization once `OPTIONS_ID` is set;
       if a rehearsal left a demo balance below target, re-run `scripts/setup-testnet/02-assets.sh` first).
 - [ ] `scripts/deploy/smoke-testnet.sh` ends with `P0: PASS` and `P0+: PASS` (PUT/CALL lifecycles on RWA and BOND,
-      expected contract errors in simulation, expiry/reclaim, maker competition). Full log in `scripts/out/smoke-*.log`.
+      expected contract errors in simulation, expiry/reclaim, maker competition), `V1.2: PASS` and, on v1.3,
+      `V1.3: PASS` with 0 skipped on the first run (EQTY listing, #105 before the issuer authorizes the escrow, EQTY
+      PUT, tenor cap, prune). Run `--full` once to record the #116 writer-cap evidence. Full log in
+      `scripts/out/smoke-*.log`.

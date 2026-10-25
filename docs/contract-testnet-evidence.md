@@ -218,6 +218,134 @@ Expected failures of the P0 sections, all rejected in simulation with the same c
 `NotEligible` #104, `Expired` #109. State after the run: `option_count` 7, `list_open` [], contract balance 0 and
 `open_collateral` 0 for USDx, RWA and BOND.
 
+## v1.3 deployment (2026-10-25 23:06 UTC): permissionless listing, per-writer cap, prune_expired, tenor cap
+
+Additive over v1.2 (`docs/contract-abi.md` §12). Diffing `stellar contract info interface` of the v1.2 and v1.3
+wasms, both fetched from chain, only adds lines; nothing is removed or changed. The added lines are six functions
+(`list_asset`, `is_listed`, `list_assets`, `asset_count`, `prune_expired`, `writer_open_count`), the error codes
+`WriterOpenLimit` 116, `AlreadyListed` 117, `AssetNotDeployed` 118 and `TenorOutOfRange` 119, and two events:
+`AssetListed { sac, code, issuer, lister }` and `OfferPruned { id, pruner }`.
+
+| Item | Value |
+|---|---|
+| Options contract v1.3 | `CAMY4ZKY7JLKZMONDOTVHDSXWLMDSLERFS7YJEH5JYZDIKV5HOAT2KRJ` |
+| Constructor | `quote` = USDx SAC, `underlyings` = [RWA SAC, BOND SAC]. EQTY is left out on purpose |
+| Wasm upload / deploy tx | `7ab77c564edfd0d93cbb6dd932b9ea7a1c40e246729157272dd91e0089ce232e` / `d3a267f92b1c48f166ef4904ee6f7ee281b7c3d5d8a6fd02889495f323eea350` (ledgers 5389203 / 5389204) |
+| Wasm sha256, 26,966 bytes (fetched back from chain; identical to the local build of `c3db0a6`) | `fdd6fc161533586d07779b4455dfd4f33cd17b21ecff282e63236a84f59697e6` |
+| Issuer authorizes the contract on RWA / BOND (`deploy.sh`) | `d625ef80af95fbf22eff796cab64c059ef5877f2f667bbf437241f06df71a629` / `7c59c5a8947508b34222ea32845773913a78985ae049dcd6226d475f4a189b70` |
+| EQTY SAC (`EQTY:GCNW…FDGM`, fictional tokenized-equity label; same issuer and flags as RWA and BOND) | `CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU` |
+
+Built with `stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian`
+(stellar-cli 28.1.0). Output of `stellar contract info meta --wasm` on the wasm fetched from chain:
+
+```
+ • rsver: 1.99.1 (Rust version)
+ • rssdkver: 28.0.0#48d506712f964094d14176e2f0b02afcd1054567 (Soroban SDK version and its commit hash)
+ • rssdk_spec_shaking: 2
+ • cliver: 28.1.0#c0f4d0da891bbf214c08b8c5035ae6db80e9a3bd
+ • source_repo: github:mohamedkhellaf/hackmeridian
+```
+
+Smoke runs against v1.3 (`scripts/deploy/smoke-testnet.sh`):
+
+- Run 1, log `smoke-20261025T230723Z`: PRE 6/6, P0 36/36, P0+ 24/24, V1.2 26/26, V1.3 53/53. One check was
+  skipped: the writer cap only runs with `--full`. Horizon confirms all 34 transactions of the run as successful.
+- Run 2, `--full`, log `smoke-20261025T231908Z`: PRE 6/6, P0 36/36, V1.2 26/26, V1.3 53/53 including the four writer-cap checks. Two checks were
+  skipped: `V13_LIST` and `V13_FAIL_CONTRACT_NOT_AUTHORIZED` are one-time steps that run 1 already did. P0+ passed
+  17 of 21. The CALL path stopped after `buy` of option #14, because the snapshot could not read balances: the host
+  disk was full (`tr: write error: No space left on device` in the script's temp files). This was a local read
+  failure, not a contract result, and it left #14 `Active`. The investor then exercised #14 and maker1 claimed it by
+  hand (`105e501e41e4d1384ec69e499037fff16beb5c94a3fb2407b2607e370a56c378`,
+  `d05dcd3a3f885a331b336156a999c6ee7e66d95ab208d3d5dab419431664a9b7`). Horizon confirms all 132 transactions as
+  successful: 130 from the run and the 2 sent by hand.
+
+**Permissionless listing of EQTY.** EQTY is not in the constructor. Before listing, `is_listed(EQTY)` was `false` and
+`asset_count` was 2.
+
+| Step | Effect | Tx |
+|---|---|---|
+| `list_asset(maker1, "EQTY", rwa-issuer)`, sent by maker1 (no admin) | Returns `CDBHRG…NIFU`, the canonical SAC address of `EQTY:GCNW…FDGM` derived on chain. Event `AssetListed { sac: CDBHRG…NIFU, code: "EQTY", issuer: GCNW…FDGM, lister: maker1 }`. `asset_count` goes from 2 to 3 | `5b90b69e71a78640c4603621b8f3dfcd86aaac2d724277db3c759c391bdc2899` |
+| `create_offer` PUT on EQTY before the issuer authorizes the escrow | `ContractNotAuthorized` #105 (simulation): listing authorizes nothing | — |
+| Issuer `set_authorized(contract, true)` on the EQTY SAC (strata-rwa-issuer) | `is_eligible(EQTY, ·)`: contract `true`, maker1 `true`, investor `true`, outsider `false` | `d1563c4cca55d81d159445ef09781979fb5494e5010df70597b2f8bc2b764850` |
+| EQTY PUT (#8): `create_offer` (maker1), `buy` (investor), `exercise` (investor), `claim_delivery` (maker1); same amounts as P0 (5 EQTY, total strike 50 USDx, premium 1 USDx) | Same balance and `open_collateral` deltas as the RWA PUT, checked at every step | `10ac795670485ddb93497cb0882590ccc08cd1940965343e7762a0ab1fd3857a` / `b070407a4c1ffa92d16d61d4b91df8f2d99087b1083832072f2013f7e6f324c8` / `b6f047042127767f47d9a49dae6014b710f9881b83b1b67f481cc2456d2ac645` / `993cd4ad4ea78abcd29371e5529eb1fd53f01a15d287b62278a5af55ac102849` |
+
+State after listing:
+- `list_assets(0, 50)` = [RWA `CCVY…LR7U`, BOND `CADC…QGHP`, EQTY `CDBH…NIFU`], in that order.
+- `list_assets(2, 50)` = [EQTY] and `list_assets(3, 5)` = [].
+- `is_listed(EQTY)` = `true` and `is_listed(USDx)` = `false`.
+- `config().underlyings` is still [RWA, BOND].
+
+**`prune_expired` (option #7).** maker1 writes a PUT on 5 RWA (total strike 50 USDx) with expiry +45 s, and nobody
+buys it. `writer_open_count(maker1)` goes from 0 to 1.
+
+| Step | Effect | Tx |
+|---|---|---|
+| `create_offer` (maker1), expiry +45 s | maker1 −50 USDx, contract +50 USDx | `963395e6008a80a57170fcb1b91ba031f4259f4b729a4ac3a1f96d313b4b052a` |
+| After expiry, `prune_expired([7])` sent by **maker2** (not the writer) | Returns 1. maker1 +50 USDx, contract −50 USDx, `open_collateral(USDx)` −50. State `Expired`; #7 leaves `list_open`; `writer_open_count(maker1)` goes from 1 to 0. Event `OfferPruned { id: 7, pruner: CAMY…2KRJ }` | `e970a1203fa31a5f5c96d2ab4a5c4c5c389e0dc96ca372093d5f563228208631` |
+| Live offer #9 (expiry +1 h): `create_offer` (maker1), then `prune_expired([9])` (maker2), then `cancel_offer` (maker1) | The prune returns 0, moves nothing and leaves #9 `Offered` in `list_open`. Only the writer can withdraw it | `d64f4df479924fa19b679ff8012b89e9725fa20d4c0b730de954d8e5fef09885`, `8b9a67e8a1b0c43fa37bcc58d68294b6b2e0179d8ee9254e415c0310dd4a9eca`, `4d3a4de8b8f4b3f4c78cb978b32d498911e006b37fe371468fb4bb7d3bddd663` |
+
+`prune_expired` takes no caller argument and needs no auth, so the event's `pruner` field is always the contract's
+own address, as the comment on `OfferPruned` in `lib.rs` says. The account that pruned is the transaction's source
+account on Horizon (maker2 here). Calling `prune_expired([7])` again returns 0 in simulation, and an unknown id fails
+with `NotFound` #101.
+
+**Tenor cap.** In simulation, `create_offer` with `expiry` = now + 3 years fails with `TenorOutOfRange` #119, and
+`expiry` = now + 2 years − 1 h succeeds (it would return id 9). Nothing was sent for either check.
+
+**Per-writer open cap (run 2, `--full`).** maker2 creates 50 dust PUT offers on RWA, each with qty = strike_total =
+premium_total = 1 unit (ids 20–69, ledgers 5389420–5389495; first `1dbb1970e0bbc35cbca7060521662bf8edeea94911cad6759f6b54d946f3d70f`,
+last `1f16f763db45c7cdf0473e8d2017a8d99064025c458497b8b87c3b7ac26a33cf`). `writer_open_count(maker2)` is then 50. A 51st
+`create_offer` by maker2 fails in simulation with `WriterOpenLimit` #116. The same offer from maker1 still succeeds in
+simulation (it would return id 70), so the cap applies per writer, not to the whole book. maker2 then cancels all 50
+(ledgers 5389497–5389563; first `272c702a2e3a245f1d5f803b2a083369fe4d99ccba2fd911c095f5cb3d11008c`, last
+`547573330cf7d48cd2f4d6da5fed0d2c5bf7366093b16b248466800440a76af8`), and `writer_open_count(maker2)` returns to 0.
+
+**Expected failures, all rejected in simulation with the code in `docs/contract-abi.md` §2:**
+
+| Call | Error |
+|---|---|
+| `list_asset` EQTY a second time (maker2) | `AlreadyListed` #117 |
+| `list_asset` USDx, the quote token | `AlreadyListed` #117 |
+| `list_asset` `ZZZZ:<usdx-issuer>`, whose SAC `CCTNHAXK…QWPJN` is not deployed | `AssetNotDeployed` #118 |
+| `list_asset` with code `bad code!` | `InvalidArgs` #102 |
+| `list_asset` with a contract address (the USDx SAC) as `issuer` | `InvalidArgs` #102 |
+| `create_offer` on EQTY before the issuer authorizes the escrow | `ContractNotAuthorized` #105 |
+| `create_offer` with `expiry` = now + 3 years | `TenorOutOfRange` #119 |
+| `prune_expired([1010])`, an unknown id | `NotFound` #101 |
+| `create_offer` by maker2 while it already has 50 open offers (run 2) | `WriterOpenLimit` #116 |
+
+**Earlier flows, re-run on v1.3 (run 1):**
+
+| Flow | create / buy / exercise / claim_delivery |
+|---|---|
+| P0 PUT on RWA (#0) | `cc2d55b7073d151e7fae02681f8bc039af758fd26c50c456c1c2710d2661954a` / `9bacca67c7fcabd37d216c85b9a77b33a26b162967dd040cc6f0e50bd754d22d` / `579047248806bad74dd899d3159e8fd582224a16c98941740909d828d8c58334` / `9d2729f4b03e95f578748cdb50f8a4281825a7c6bc6be6f7d99661bc355e2a94` |
+| P0+ CALL on RWA (#4) | `6d99e76bcd325978a5b6dcf26a1af3f28fd9c0ccba7e16c54ab6a3b1b8ace299` / `9ab951238b5a2727742009d99826c7f3c452f8413c8a2b2cb9ff735daaf6b2e5` / `86c2c204815845c1cfa70a5eec4d651f901b8bad06f5ff9828cdae5e90b21084` / `5a2bae60f840007ecc1c4c7ef17c38bbc837476cc77b76cb24fc9283f5a65521` |
+| P0+ PUT on BOND (#5) | `880c008d8be26738f80943541d824c9c5dfdafd634643486a4f2668cf7523d7f` / `04caca5a73e1d818a93c3fff7945cb2d065f1ab7ad0eadba0deaba9babbab6eb` / `518bade3e4406fdac58807fc4e8d0ac68347c91f211e588e95d189105c317421` / `9e05e1002b596e0fca184c66136595d1bc52e354e129e025af3609a7fbc91175` |
+| V1.2 transfer (#6): create / buy / transfer investor → maker2 / exercise (maker2) / claim_delivery | `8a1aad0070a0f316dfa1c6a52a83db9c190b7eb9e9f0514a927f74b90abee33b` / `be17c9238cb086de1863124c3598e6628bea22c87b83ebfc7aaaa3ebcf30cefa` / `b6ba95b491162dc96e61342f7584ebb821132f92c6518cfbb03a5eb3a5954cec` / `251629c4c47733022b5330fbc32c13526ac522f4372f5f697d70d7fe45e7c1de` / `9a5d1ff6ae1febbe2c1505ca209e68eaabcc30f771e2b21a0663f4263aa56bcf` |
+
+| Step | Tx |
+|---|---|
+| Expiry path (#1): create; `buy` after expiry → `Expired` #109 (simulation); reclaim | `d667d89821d32e0867058ebda4245609f9501870d07bbd84e900c39162d83a37`; `0f3087b4d779895f11d58f82b8a9fbd94e1829066e53d5fa4f7c0549d99400f5` |
+| Competition (#2 maker1, #3 maker2), then both cancelled | `16a03cec988bb15d40b88845e8d64ff7f10410c3ae98dbf200323208ac5372e9`, `815944cea9dd884620141665c002baf9c37a9abe00236c700489aabcc953e84e`; `ed64724a6b3d2d196c51d682c503842a6c57df4825e9d76fc26e6707b63cc3d7`, `19a534281ee1e584f27f75286506043a098fbc96bf5c68cadd982576ad27e423` |
+
+The expected failures of the P0 and V1.2 sections were rejected in simulation with the same codes as on v1.2:
+`SelfTrade` #111, `NotHolder` #108, `NotExpired` #110, `WrongState` #106, `AssetNotAllowed` #103, `InvalidArgs` #102,
+`NotWriter` #107, `NotEligible` #104 and `Expired` #109.
+
+State after run 1:
+- `option_count` 10, `list_open` [].
+- `writer_open_count` is 0 for maker1 and for maker2.
+- The contract's balance and `open_collateral` are both 0 for USDx, RWA, BOND and EQTY.
+
+State after run 2 and the hand completion of #14 (CALL create `caabba6bdda08128820272c747e16be549afebc41ae3d11802b865fd1ccfce7b`,
+buy `389d1b6617bf9b67b690d824920d1ec06bc64a0c25e5073a22d242ae0bd9265c`):
+- `option_count` 70, `list_open` [], `asset_count` 3.
+- `writer_open_count` is 0 for maker1 and for maker2.
+- The contract's balance and `open_collateral` are both 0 for USDx, RWA, BOND and EQTY.
+
+This deployment did not re-run the unit, invariant or negative test suites. The "Off-chain assurance" section below
+describes the v1.2 tree.
+
 ## Off-chain assurance
 
 On the merged v1.2 tree, whose `lib.rs` builds to the deployed v1.2 wasm (sha256 `8778dc77…422f`, section above):
@@ -262,7 +390,7 @@ On v1 only (53-test suite, PRs #16 and #18), not re-run since:
 ## What this does not show
 
 Issuer freeze, contract de-authorization and clawback ran on chain against v1.1 only (section above; clawback only
-on a throwaway instance), not against v1.2 (the spike on 2026-10-25 also exercised them, see
+on a throwaway instance), not against v1.2 or v1.3 (the spike on 2026-10-25 also exercised them, see
 `research/decision/20_rwa_options_spike.md`). v1.2 adds code without changing the existing settlement paths: the
 `lib.rs` diff from `afda0da` ("Redeploy options v1.1 to testnet") to `627bac3` adds `transfer`, `get_options`,
 `MAX_PAGE` and the event, and removes only two comment lines. Testnet resets quarterly;
