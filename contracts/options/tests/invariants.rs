@@ -1,13 +1,15 @@
-//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`, LOCKED).
+//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`, v1.1:
+//! error codes 101–115, quote eligibility, `OpenListFull`, `CollateralShortfall`, contract
+//! re-authorization check in `buy`; see ABI §10).
 //!
 //! A random sequence of operations (offers, buys, exercises, cancellations, reclaims, delivery
-//! claims, time warps, issuer freeze/unfreeze and clawback on RWA) is applied through the `try_`
-//! client methods; failures are allowed and expected. After EVERY operation the on-chain state is
-//! read back and checked against:
+//! claims, time warps, issuer freeze/unfreeze of accounts and of the contract address, and
+//! clawback from the contract on RWA) is applied through the `try_` client methods; failures are
+//! allowed and expected. After EVERY operation the on-chain state is read back and checked against:
 //!
 //! * an executable reference model of the ABI (`Model`) that predicts the outcome of each call
-//!   (Ok / options `Error` / SAC error) from the check order in ABI §3 and the SAC semantics of
-//!   soroban-env-host, and the exact state afterwards;
+//!   (Ok / options `Error` by name / SAC error) from the check order in ABI §3 and the SAC
+//!   semantics of soroban-env-host, and the exact state afterwards;
 //! * the invariants in `World::check_state` and `check_transition`:
 //!   1. `open_collateral(T)` equals the sum of the ABI §2 derived reserves of every option;
 //!   2. SAC `balance(contract, T) == open_collateral(T)`, except RWA where the deficit equals the
@@ -62,8 +64,12 @@ const NAMES: [&str; N_HOLDERS] = [
 ];
 
 /// Accounts the RWA issuer may freeze/unfreeze in the random model (outsider excluded: unfreezing
-/// it would authorize it, which contradicts its role).
-const FREEZE_TARGETS: [usize; 5] = [WRITER1, WRITER2, HOLDER1, HOLDER2, CONTRACT];
+/// it would authorize it, which contradicts its role). The contract address has its own operation
+/// (`Op::ContractAuth`).
+const FREEZE_TARGETS: [usize; 4] = [WRITER1, WRITER2, HOLDER1, HOLDER2];
+
+/// ABI §10 `MAX_OPEN`: `create_offer` fails with `OpenListFull` at this many `Offered` ids.
+const MAX_OPEN: usize = 1000;
 
 /// SAC `ContractError` codes (soroban-env-host `builtin_contracts/contract_error.rs`).
 const SAC_BALANCE: u32 = 10; // BalanceError: insufficient balance
@@ -142,6 +148,17 @@ impl fmt::Display for Act {
             Act::Claim { id, who } => write!(f, "claim_delivery({}, id={})", NAMES[who], id),
             Act::SetTime { t } => write!(f, "advance_time(to {t})"),
             Act::SetAuthRwa {
+                target: CONTRACT,
+                authorized,
+            } => {
+                let verb = if authorized {
+                    "reauthorize"
+                } else {
+                    "deauthorize"
+                };
+                write!(f, "issuer_{verb}_contract(RWA)")
+            }
+            Act::SetAuthRwa {
                 target,
                 authorized: false,
             } => write!(f, "issuer_freeze(RWA, {})", NAMES[target]),
@@ -190,6 +207,8 @@ enum Op {
     WarpToExpiry(u8, i8),
     Freeze(usize),
     Unfreeze(usize),
+    /// RWA issuer `set_authorized(contract, bool)` (ABI §6 "contract de-authorized").
+    ContractAuth(bool),
     Clawback(i128),
 }
 
@@ -307,6 +326,19 @@ impl Model {
         self.opts.get(id as usize)
     }
 
+    /// Model of `open_collateral(token)`: the ABI-derived reserves of every option.
+    fn reserved(&self, token: usize) -> i128 {
+        self.opts.iter().map(|o| expected_reserved(o, token)).sum()
+    }
+
+    /// ABI §3 `CollateralShortfall`: `balance(contract) < open_collateral(token)` for the quote or
+    /// the underlying of the option.
+    fn shortfall(&self, underlying: usize) -> bool {
+        [USDX, underlying]
+            .iter()
+            .any(|&t| self.bal[t][CONTRACT] < self.reserved(t))
+    }
+
     /// Contract-level checks in the fixed ABI §3 order, then the SAC transfers the call performs.
     fn plan(&self, act: &Act) -> Result<Vec<Transfer>, Error> {
         let now = self.now;
@@ -327,11 +359,24 @@ impl Model {
                 if qty <= 0 || strike <= 0 || premium <= 0 || expiry <= now {
                     return Err(Error::InvalidArgs);
                 }
-                if !self.auth[underlying][writer] {
+                // Writer eligible on the underlying, then on the quote (USDx is unflagged, so the
+                // second check holds for every contract-address actor in this universe).
+                if !self.auth[underlying][writer] || !self.auth[USDX][writer] {
                     return Err(Error::NotEligible);
                 }
                 if !self.auth[underlying][CONTRACT] {
                     return Err(Error::ContractNotAuthorized);
+                }
+                let open = self
+                    .opts
+                    .iter()
+                    .filter(|o| o.state == State::Offered)
+                    .count();
+                if open >= MAX_OPEN {
+                    return Err(Error::OpenListFull);
+                }
+                if self.shortfall(underlying) {
+                    return Err(Error::CollateralShortfall);
                 }
                 Ok(match ty {
                     OptionType::Put => vec![(USDX, writer, CONTRACT, strike)],
@@ -351,6 +396,13 @@ impl Model {
                 }
                 if !self.auth[o.underlying][who] {
                     return Err(Error::NotEligible);
+                }
+                // v1.1: the issuer may have de-authorized the contract since the offer was created.
+                if !self.auth[o.underlying][CONTRACT] {
+                    return Err(Error::ContractNotAuthorized);
+                }
+                if self.shortfall(o.underlying) {
+                    return Err(Error::CollateralShortfall);
                 }
                 // PROVISIONAL premium policy: buyer -> writer inside `buy`.
                 Ok(vec![(USDX, who, o.writer, o.premium)])
@@ -572,12 +624,16 @@ fn classify<T, C: Debug, E: ErrCode>(
     }
 }
 
-fn outcome_matches(expect: Expect, outcome: Outcome) -> bool {
+fn outcome_matches(expect: Expect, outcome: Outcome, direct_sac: bool) -> bool {
     match (expect, outcome) {
         (Expect::Ok, Outcome::Ok) => true,
         (Expect::Contract(e), Outcome::Typed(c)) => e as u32 == c,
         // A SAC error inside a cross-contract call propagates with its own contract error code.
-        (Expect::Sac(s), Outcome::Typed(c) | Outcome::Raw(c)) => s == c,
+        // Since v1.1 (codes 101+) no options `Error` has a SAC code, so the typed options client
+        // must report it as `Err(Err(Contract(code)))`, never as an options error.
+        (Expect::Sac(s), Outcome::Raw(c)) => !direct_sac && s == c,
+        // Direct SAC client calls (issuer actions) decode any contract code as `soroban_sdk::Error`.
+        (Expect::Sac(s), Outcome::Typed(c)) => direct_sac && s == c,
         _ => false,
     }
 }
@@ -790,6 +846,10 @@ impl World {
                 target: FREEZE_TARGETS[i],
                 authorized: true,
             },
+            Op::ContractAuth(authorized) => Act::SetAuthRwa {
+                target: CONTRACT,
+                authorized,
+            },
             Op::Clawback(amount) => Act::ClawbackRwa { amount },
         }
     }
@@ -818,7 +878,8 @@ impl World {
             detail,
             expect
         ));
-        if !outcome_matches(expect, outcome) {
+        let direct_sac = matches!(act, Act::SetAuthRwa { .. } | Act::ClawbackRwa { .. });
+        if !outcome_matches(expect, outcome, direct_sac) {
             self.fail(format!(
                 "ORACLE MISMATCH on `{act}`: the ABI reference model predicted {expect:?}, the \
                  contract returned {outcome}{detail}"
@@ -1339,6 +1400,7 @@ fn op() -> impl Strategy<Value = Op> {
         1 => (id_sel(), -1i8..=1).prop_map(|(i, d)| Op::WarpToExpiry(i, d)),
         1 => (0..FREEZE_TARGETS.len()).prop_map(Op::Freeze),
         1 => (0..FREEZE_TARGETS.len()).prop_map(Op::Unfreeze),
+        1 => any::<bool>().prop_map(Op::ContractAuth),
         1 => (1i128..=1_000).prop_map(Op::Clawback),
     ]
 }
@@ -1392,13 +1454,14 @@ impl World {
     }
 
     /// The SAC rejected a token movement (frozen account or insufficient balance). The SAC error
-    /// code reaches the caller unchanged, so the typed client decodes it as the options `Error`
-    /// with the same number (SAC #10 -> `NotExpired`, SAC #11 -> `SelfTrade`).
+    /// code reaches the caller unchanged; since v1.1 it matches no options `Error` (101+), so the
+    /// typed client reports `Err(Err(InvokeError::Contract(code)))`.
     fn sac_err(&mut self, act: Act, code: u32) {
         let o = self.run(act);
-        assert!(
-            matches!(o, Outcome::Typed(c) | Outcome::Raw(c) if c == code),
-            "`{act}` should fail inside the SAC with #{code}, got {o}"
+        assert_eq!(
+            o,
+            Outcome::Raw(code),
+            "`{act}` should fail inside the SAC with #{code}"
         );
     }
 
@@ -1617,11 +1680,11 @@ fn claim_delivery_while_writer_frozen_then_after_unfreeze() {
         },
         SAC_DEAUTHORIZED,
     );
-    // What a client sees: SAC BalanceDeauthorizedError (#11) collides with options
-    // `Error::SelfTrade` (#11), so the typed result is misleading. Documented, not endorsed.
+    // What a client sees: SAC BalanceDeauthorizedError (#11) as a raw contract error. In v1 it
+    // decoded as options `SelfTrade` (#11); the v1.1 renumbering (101+) removed the collision.
     assert_eq!(
         w.client.try_claim_delivery(&w.holders[WRITER1], &0),
-        Err(Ok(Error::SelfTrade))
+        Err(Err(InvokeError::Contract(SAC_DEAUTHORIZED)))
     );
     assert_eq!(w.state(0), State::Exercised);
     assert_eq!(w.oc(RWA), qty);
@@ -1862,6 +1925,25 @@ fn clawback_deficit_falls_on_the_last_rwa_settlement() {
     assert_eq!(w.oc(RWA), 200);
     assert_eq!(w.bal(RWA, CONTRACT), 150);
 
+    // v1.1: no new exposure on RWA while the deficit exists (a PUT on RWA too: its underlying is
+    // RWA), but other tokens are unaffected.
+    w.err(
+        create(WRITER1, RWA, OptionType::Put, 1, 1, 1, expiry),
+        Error::CollateralShortfall,
+    );
+    w.err(
+        Act::Buy {
+            id: 0,
+            who: HOLDER1,
+        },
+        Error::CollateralShortfall,
+    );
+    w.ok(create(WRITER1, BOND, OptionType::Put, 1, 1, 1, expiry));
+    w.ok(Act::Buy {
+        id: 2,
+        who: HOLDER1,
+    });
+
     w.ok(Act::SetTime { t: expiry });
     // The first writer out is made whole...
     w.ok(Act::Reclaim {
@@ -1887,4 +1969,126 @@ fn clawback_deficit_falls_on_the_last_rwa_settlement() {
     assert_eq!(w.state(0), State::Offered);
     assert_eq!(w.oc(RWA), 100);
     assert_eq!(w.bal(RWA, CONTRACT), 50);
+    // The deficit (= clawed amount) never closes, so RWA stays closed to new exposure.
+    w.err(
+        create(WRITER2, RWA, OptionType::Call, 1, 1, 1, expiry + 100),
+        Error::CollateralShortfall,
+    );
+}
+
+/// ABI §6/§10: the RWA issuer de-authorizes the contract address itself.
+#[test]
+fn contract_deauthorized_on_rwa_blocks_buy_and_rwa_settlement() {
+    let mut w = World::new();
+    let (qty, strike, premium, expiry) = (5 * UNIT, 50 * UNIT, 2 * UNIT, T0 + 1_000);
+    // id 0: PUT on RWA (quote collateral); id 1: CALL on RWA (RWA collateral); id 2: PUT on RWA.
+    w.ok(create(
+        WRITER1,
+        RWA,
+        OptionType::Put,
+        qty,
+        strike,
+        premium,
+        expiry,
+    ));
+    w.ok(create(
+        WRITER2,
+        RWA,
+        OptionType::Call,
+        qty,
+        strike,
+        premium,
+        expiry,
+    ));
+    w.ok(create(
+        WRITER1,
+        RWA,
+        OptionType::Put,
+        qty,
+        strike,
+        premium,
+        expiry,
+    ));
+    w.ok(Act::Buy {
+        id: 1,
+        who: HOLDER2,
+    });
+
+    w.ok(Act::SetAuthRwa {
+        target: CONTRACT,
+        authorized: false,
+    });
+    // No new offers and no sales on RWA: the premium is non-refundable.
+    w.err(
+        create(WRITER2, RWA, OptionType::Put, qty, strike, premium, expiry),
+        Error::ContractNotAuthorized,
+    );
+    w.err(
+        Act::Buy {
+            id: 0,
+            who: HOLDER1,
+        },
+        Error::ContractNotAuthorized,
+    );
+    // Eligibility of the buyer is checked first.
+    w.err(
+        Act::Buy {
+            id: 0,
+            who: OUTSIDER,
+        },
+        Error::NotEligible,
+    );
+    // CALL exercise needs RWA out of the contract: SAC #11, nothing moves.
+    w.sac_err(
+        Act::Exercise {
+            id: 1,
+            who: HOLDER2,
+        },
+        SAC_DEAUTHORIZED,
+    );
+    // Cancelling a PUT returns quote collateral (USDx): unaffected.
+    w.ok(Act::Cancel {
+        id: 2,
+        who: WRITER1,
+    });
+
+    w.ok(Act::SetAuthRwa {
+        target: CONTRACT,
+        authorized: true,
+    });
+    w.ok(Act::Buy {
+        id: 0,
+        who: HOLDER1,
+    });
+    w.ok(Act::Exercise {
+        id: 1,
+        who: HOLDER2,
+    });
+
+    // De-authorized again: PUT exercise (RWA into the contract) fails; the CALL writer's claim
+    // (USDx out of the contract) still works.
+    w.ok(Act::SetAuthRwa {
+        target: CONTRACT,
+        authorized: false,
+    });
+    w.sac_err(
+        Act::Exercise {
+            id: 0,
+            who: HOLDER1,
+        },
+        SAC_DEAUTHORIZED,
+    );
+    w.ok(Act::Claim {
+        id: 1,
+        who: WRITER2,
+    });
+    // After expiry the PUT writer reclaims its USDx collateral even while the contract is
+    // de-authorized on RWA.
+    w.ok(Act::SetTime { t: expiry });
+    w.ok(Act::Reclaim {
+        id: 0,
+        who: WRITER1,
+    });
+    assert_eq!([w.oc(USDX), w.oc(RWA), w.oc(BOND)], [0, 0, 0]);
+    assert_eq!(w.bal(USDX, WRITER1), FUND + premium);
 }
