@@ -35,13 +35,9 @@ export async function expectOpenOffers(page: Page, n: number) {
 // Transaction toast (role=status on success).
 export const toast = (page: Page) => page.getByRole('status')
 
-// "Total held" cell of a token row in the collateral panel (Reserves page), as a number.
+// "Owed" figure of a token card on the Reserves page (= total collateral locked), as a number.
 export async function totalHeld(page: Page, code: string): Promise<number> {
-  const row = page
-    .locator('section', { has: page.getByRole('heading', { name: 'Collateral held by the contract' }) })
-    .getByRole('row')
-    .filter({ hasText: code })
-  const text = (await row.getByRole('cell').nth(5).innerText()).replace(/,/g, '')
+  const text = (await page.getByRole('region', { name: `${code} reserves` }).getByTestId('owed').innerText()).replace(/,/g, '')
   return Number(text)
 }
 

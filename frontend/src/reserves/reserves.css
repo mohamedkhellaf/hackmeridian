@@ -1,0 +1,141 @@
+.rs-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.rs-fresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.rs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.rs-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.rs-card--short {
+  border-color: #3a2e1a;
+}
+.rs-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rs-head > .ui-tag {
+  margin-left: auto;
+}
+.rs-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rs-code {
+  font-size: 15px;
+  font-weight: 600;
+}
+.rs-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.rs-ratio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rs-ratio-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rs-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+.rs-bar-fill {
+  height: 100%;
+}
+.rs-bar-fill--ok {
+  background: var(--ok-dot);
+}
+.rs-bar-fill--warn {
+  background: var(--warn-dot);
+}
+.rs-pct {
+  font-size: 26px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.rs-pct--idle {
+  font-size: 16px;
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.rs-rows {
+  display: flex;
+  flex-direction: column;
+}
+.rs-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid #1c2129;
+  font-size: 13.5px;
+}
+.rs-row > span:first-child {
+  color: var(--muted);
+}
+.rs-row--strong {
+  font-weight: 600;
+}
+.rs-row--strong > span:first-child {
+  color: var(--text);
+}
+.rs-empty {
+  margin: 0;
+  color: var(--muted);
+}
+.rs-verify {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.rs-verify--muted {
+  color: var(--muted);
+  margin: 0;
+}
+.rs-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+@media (max-width: 860px) {
+  .rs-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rs-card {
+    padding: 18px;
+  }
+}
