@@ -75,6 +75,7 @@ export function MarketSeries({
                             type="button"
                             onClick={() => onBuy(o)}
                             disabled={!me || busy || o.writer === me}
+                            title={!me ? 'Connect Freighter to buy' : o.writer === me ? 'This is your own offer' : busy ? 'Another transaction is in progress' : undefined}
                             aria-label={`Buy ${o.kind} on ${formatAmount(o.underlyingQty, o.underlying.decimals)} ${o.underlying.code} from ${shortAddress(o.writer)}`}
                           >
                             {busyId === o.id ? 'Buying…' : 'Buy'}

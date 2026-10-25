@@ -10,9 +10,11 @@ import { OptionsTable } from './market/OptionsTable'
 import { MarketSeries } from './market/MarketSeries'
 import { BuyDialog } from './market/BuyDialog'
 import { useFreighter } from './wallet/useFreighter'
+import { useBalances } from './wallet/useBalances'
+import { BalancesBar } from './wallet/BalancesBar'
 import './App.css'
 
-type Tab = 'market' | 'write' | 'positions'
+type Tab = 'market' | 'write' | 'positions' | 'issuer'
 type Notice = { kind: 'ok'; text: string; hash: string; mock: boolean } | { kind: 'err'; text: string }
 
 function App() {
@@ -26,6 +28,10 @@ function App() {
   const [busyId, setBusyId] = useState<bigint | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [buying, setBuying] = useState<OptionOffer | null>(null)
+
+  const balanceTokens = useMemo(() => (assets ? [assets.quote, ...assets.underlyings] : []), [assets])
+  const balances = useBalances(wallet.address, balanceTokens)
+  const refreshBalances = balances.refresh
 
   const refresh = useCallback(async () => {
     const [opts, assets, lines] = await Promise.all([client.listOptions(), client.supportedAssets(), client.openCollateral()])
@@ -42,8 +48,10 @@ function App() {
   const run = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>) => {
     setBusyId(id)
     setNotice(null)
+    let ok = false
     try {
       const { hash } = await fn()
+      ok = true
       setNotice({ kind: 'ok', text: `${label} confirmed`, hash, mock: client.isMock })
       return true
     } catch (e) {
@@ -52,6 +60,7 @@ function App() {
     } finally {
       setBusyId(null)
       await refresh()
+      if (ok) void refreshBalances()
     }
   }
 
@@ -83,6 +92,24 @@ function App() {
         )}
       </header>
 
+      {me && assets && (
+        <BalancesBar
+          tokens={balanceTokens.map((t) => ({ contractId: t.contractId, code: t.code, decimals: t.decimals }))}
+          balances={balances.balances}
+          loading={balances.loading}
+          onRefresh={() => void refreshBalances()}
+        />
+      )}
+
+      <details className="how">
+        <summary>How it works</summary>
+        <ol>
+          <li>The maker locks collateral in the contract and publishes an offer.</li>
+          <li>A buyer pays the premium to the maker and holds the option.</li>
+          <li>The holder exercises before expiry: atomic delivery-versus-payment, all or nothing.</li>
+        </ol>
+      </details>
+
       {client.isMock && <div className="banner warn">Mock data: no contract connected. Assets, makers and transactions are fictional.</div>}
       {wallet.wrongNetwork && <div className="banner err">Freighter is not on Testnet. Switch network in the extension.</div>}
       {wallet.error && <div className="banner err">{wallet.error}</div>}
@@ -109,6 +136,9 @@ function App() {
         </button>
         <button type="button" className={tab === 'positions' ? 'tab active' : 'tab'} onClick={() => setTab('positions')}>
           My positions ({positions.length})
+        </button>
+        <button type="button" className={tab === 'issuer' ? 'tab active' : 'tab'} onClick={() => setTab('issuer')}>
+          Issuer
         </button>
       </nav>
 
@@ -152,6 +182,7 @@ function App() {
           ) : (
             <p className="empty">Connect Freighter to see your positions.</p>
           ))}
+        {tab === 'issuer' && <p className="empty">Issuer console coming soon.</p>}
       </main>
 
       {buying && me && (

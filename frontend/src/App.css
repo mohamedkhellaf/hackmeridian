@@ -330,3 +330,69 @@ tr.best td {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* Balances, how-it-works, polish */
+.balances-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.balances-bar[aria-busy='true'] {
+  opacity: 0.7;
+}
+.balances-bar .balance em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 12px;
+}
+.balances-bar button {
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 13px;
+}
+.how {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.how summary {
+  cursor: pointer;
+  color: var(--text-h);
+}
+.how ol {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+nav {
+  overflow-x: auto;
+}
+button.tab {
+  white-space: nowrap;
+}
+@media (max-width: 400px) {
+  .app {
+    padding: 16px 12px 32px;
+  }
+  .wallet {
+    flex-wrap: wrap;
+  }
+  .card {
+    padding: 14px;
+  }
+  .form input,
+  .form select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .modal-actions button {
+    flex: 1;
+  }
+}

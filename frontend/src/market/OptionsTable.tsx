@@ -32,7 +32,8 @@ export function OptionRow({
       </td>
       <td>
         {action && (
-          <button type="button" onClick={action.onClick} disabled={action.disabled}>
+          <button type="button" onClick={action.onClick} disabled={action.disabled}
+            title={action.disabled ? 'Another transaction is in progress' : undefined}>
             {action.label}
           </button>
         )}
