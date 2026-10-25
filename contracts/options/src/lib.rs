@@ -11,6 +11,8 @@
 //! - No admin, no upgrade, immutable allowlist set in the constructor.
 //! - Check order in every state-changing function:
 //!   auth -> NotFound -> ownership -> state -> time -> eligibility -> transfers -> storage -> event.
+//!   `create_offer` and `buy` add two guards between eligibility and transfers: the open-list cap
+//!   (`create_offer` only, `OpenListFull`) and the pooled-collateral check (`CollateralShortfall`).
 //!   Any failure reverts the whole invocation (the transaction is the atomicity boundary).
 //! - All amounts are exact `i128` token units; every addition/subtraction is checked.
 #![no_std]
@@ -31,6 +33,11 @@ const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
 
 /// Maximum number of allowlisted underlyings accepted by the constructor (ABI §2 `Config`).
 const MAX_UNDERLYINGS: u32 = 8;
+
+/// Maximum number of ids in the open list (`Key::Open`, ABI §8). The list lives in the single
+/// instance-storage entry (64 KB limit), so `create_offer` refuses new offers with `OpenListFull`
+/// once this many offers are in state `Offered`.
+const MAX_OPEN: u32 = 1000;
 
 // ---------------------------------------------------------------------------------------------
 // Types (ABI §2)
@@ -97,31 +104,36 @@ pub struct Config {
 #[repr(u32)]
 pub enum Error {
     /// Unknown option id.
-    NotFound = 1,
+    NotFound = 101,
     /// qty/strike_total/premium_total <= 0, or expiry <= now.
-    InvalidArgs = 2,
+    InvalidArgs = 102,
     /// Underlying not in the constructor allowlist.
-    AssetNotAllowed = 3,
-    /// Writer/buyer not authorized on the underlying SAC.
-    NotEligible = 4,
-    /// The contract itself is not authorized to hold the underlying.
-    ContractNotAuthorized = 5,
+    AssetNotAllowed = 103,
+    /// Writer/buyer not authorized on the underlying SAC, or writer not authorized on the quote SAC.
+    NotEligible = 104,
+    /// The contract itself is not authorized to hold the underlying (create_offer and buy).
+    ContractNotAuthorized = 105,
     /// Action not valid in the option's current State.
-    WrongState = 6,
+    WrongState = 106,
     /// Caller is not the option's writer.
-    NotWriter = 7,
+    NotWriter = 107,
     /// Caller is not the option's holder.
-    NotHolder = 8,
+    NotHolder = 108,
     /// buy/exercise after expiry.
-    Expired = 9,
+    Expired = 109,
     /// reclaim before expiry.
-    NotExpired = 10,
+    NotExpired = 110,
     /// Writer tried to buy their own offer.
-    SelfTrade = 11,
+    SelfTrade = 111,
     /// Checked i128 math failed.
-    Overflow = 12,
+    Overflow = 112,
     /// Constructor: empty/duplicate/too many underlyings, or quote in underlyings.
-    InvalidConfig = 13,
+    InvalidConfig = 113,
+    /// create_offer: `MAX_OPEN` offers are already in state Offered.
+    OpenListFull = 114,
+    /// create_offer/buy: SAC balance(contract) < open_collateral(token) for the option's quote or
+    /// underlying token (an issuer clawback left a pooled deficit; no new exposure on that token).
+    CollateralShortfall = 115,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -309,6 +321,19 @@ fn open_remove(e: &Env, id: u32) {
     }
 }
 
+/// `CollateralShortfall` if the contract's SAC balance of `quote` or `underlying` is below the
+/// reserved total of that token (an issuer clawback hit the pooled balance). Used by
+/// `create_offer` and `buy` so a deficit cannot spread to new participants (ABI §6).
+fn check_collateral(e: &Env, quote: &Address, underlying: &Address) -> Result<(), Error> {
+    let me = e.current_contract_address();
+    for token in [quote, underlying] {
+        if TokenClient::new(e, token).balance(&me) < reserved(e, token) {
+            return Err(Error::CollateralShortfall);
+        }
+    }
+    Ok(())
+}
+
 /// `true` iff the SAC at `token` reports `authorized(who) == true`. Any SAC error (for example
 /// SAC #13, a `G` account without a trustline) or a non-bool result is treated as `false`.
 fn eligible(e: &Env, token: &Address, who: &Address) -> bool {
@@ -362,6 +387,8 @@ impl OptionsContract {
     /// Writer funds a new offer. Pulls the collateral (PUT: `strike_total` quote; CALL: `qty`
     /// underlying) from the writer into the contract, stores the option as `Offered`, appends it to
     /// the open list and adds the collateral to the reserved total. Returns the new id.
+    /// Check order: auth -> AssetNotAllowed -> InvalidArgs -> NotEligible (writer on underlying,
+    /// then on quote) -> ContractNotAuthorized -> OpenListFull -> CollateralShortfall -> transfers.
     #[allow(clippy::too_many_arguments)]
     pub fn create_offer(
         env: Env,
@@ -383,22 +410,30 @@ impl OptionsContract {
         {
             return Err(Error::InvalidArgs);
         }
-        // eligibility: the writer, and the contract itself (it must be able to receive the
-        // underlying: CALL collateral now, PUT delivery at exercise).
+        // eligibility: the writer on the underlying and on the quote token (it receives the
+        // premium and CALL proceeds in quote), and the contract itself (it must be able to receive
+        // the underlying: CALL collateral now, PUT delivery at exercise).
         let me = env.current_contract_address();
-        if !eligible(&env, &underlying, &writer) {
+        let quote = quote_addr(&env);
+        if !eligible(&env, &underlying, &writer) || !eligible(&env, &quote, &writer) {
             return Err(Error::NotEligible);
         }
         if !eligible(&env, &underlying, &me) {
             return Err(Error::ContractNotAuthorized);
         }
+        // capacity: the open list lives in instance storage and is bounded
+        if open_list(&env).len() >= MAX_OPEN {
+            return Err(Error::OpenListFull);
+        }
+        // solvency: no new exposure on a token whose pooled balance is below its reserved total
+        check_collateral(&env, &quote, &underlying)?;
 
         let id: u32 = env.storage().instance().get(&Key::Next).unwrap_or(0);
         let next_id = id.checked_add(1).ok_or(Error::Overflow)?;
         let opt = OptionData {
             id,
             underlying: underlying.clone(),
-            quote: quote_addr(&env),
+            quote,
             option_type,
             qty,
             strike_total,
@@ -438,10 +473,12 @@ impl OptionsContract {
     /// Buyer purchases an `Offered` option before expiry. Pays the premium to the writer
     /// (PROVISIONAL policy), becomes the holder, and the option becomes `Active`. Reserved totals
     /// do not change (the collateral stays locked).
+    /// Check order: auth -> NotFound -> WrongState -> Expired -> SelfTrade -> NotEligible ->
+    /// ContractNotAuthorized -> CollateralShortfall -> premium transfer.
     pub fn buy(env: Env, buyer: Address, id: u32) -> Result<(), Error> {
         // auth
         buyer.require_auth();
-        // NotFound -> state -> time -> self-trade -> eligibility (ABI §3 `buy`)
+        // NotFound -> state -> time -> self-trade -> eligibility -> solvency (ABI §3 `buy`)
         let mut opt = load_opt(&env, id)?;
         if opt.state != State::Offered {
             return Err(Error::WrongState);
@@ -455,6 +492,12 @@ impl OptionsContract {
         if !eligible(&env, &opt.underlying, &buyer) {
             return Err(Error::NotEligible);
         }
+        // the issuer may have de-authorized the contract since the offer was created; the premium
+        // is non-refundable, so do not sell an option the contract can no longer settle
+        if !eligible(&env, &opt.underlying, &env.current_contract_address()) {
+            return Err(Error::ContractNotAuthorized);
+        }
+        check_collateral(&env, &opt.quote, &opt.underlying)?;
 
         // transfers
         // PROVISIONAL: premium policy not yet specified by Dev 1 (ABI §3, §7.1). The premium is paid

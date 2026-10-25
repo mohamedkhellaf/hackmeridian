@@ -7,10 +7,9 @@
 //! - Typed contract errors come back from `try_*` as `Err(Ok(Error::X))`.
 //! - A SAC failure inside an options call (insufficient balance #10, deauthorized
 //!   #11, overflow #12) propagates out of the options contract unchanged as
-//!   `Error(Contract, #n)`. The options `Error` enum reuses codes 10..=13, so the
-//!   generated client decodes a SAC #10/#11/#12 as `Err(Ok(Error::NotExpired /
-//!   SelfTrade / Overflow))`. `assert_sac_err` checks the numeric code and accepts
-//!   either decoding; the state/balance assertions around it tell the two apart.
+//!   `Error(Contract, #n)`. The options `Error` codes start at 101 (v1.1), so a
+//!   SAC code never decodes as an options `Error`: the client returns
+//!   `Err(Err(InvokeError::Contract(n)))`, which is all `assert_sac_err` accepts.
 //! - `env.auths()` and `env.events().all()` only describe the most recent
 //!   invocation, so they are read immediately after the call under test.
 extern crate std;
@@ -21,7 +20,7 @@ use soroban_sdk::{
     testutils::{
         storage::{Instance as _, Persistent as _},
         Address as _, AuthorizedFunction, AuthorizedInvocation, Deployer as _, Events as _,
-        IssuerFlags, Ledger as _, MockAuth, MockAuthInvoke,
+        IssuerFlags, Ledger as _, MockAuth, MockAuthInvoke, StellarAssetIssuer,
     },
     token::{StellarAssetClient, TokenClient},
     vec, Address, Env, Event as _, IntoVal, InvokeError, Symbol, Val, Vec,
@@ -66,6 +65,8 @@ struct T {
     usdx_issuer: Address,
     /// SAC admin of RWA and BOND (regulated issuer).
     rwa_issuer: Address,
+    /// Classic issuer account behind the USDx SAC (to change its flags in a test).
+    usdx_flags: StellarAssetIssuer,
     writer: Address,
     holder: Address,
     maker2: Address,
@@ -124,6 +125,7 @@ fn setup_with(authorize_contract: bool) -> T {
         issuer.set_flag(IssuerFlags::ClawbackEnabledFlag);
     }
     let usdx = usdx_sac.address();
+    let usdx_flags = usdx_sac.issuer();
     let rwa = rwa_sac.address();
     let bond = bond_sac.address();
 
@@ -162,6 +164,7 @@ fn setup_with(authorize_contract: bool) -> T {
         bond,
         usdx_issuer,
         rwa_issuer,
+        usdx_flags,
         writer,
         holder,
         maker2,
@@ -260,16 +263,13 @@ fn assert_err<T: Debug>(res: Result<T, Result<Error, InvokeError>>, expected: Er
     }
 }
 
-/// The call failed inside a SAC sub-invocation with SAC error `code`.
-/// See the module docs for why both decodings are accepted.
+/// The call failed inside a SAC sub-invocation with SAC error `code`. Since v1.1
+/// the options codes (101+) cannot collide with SAC codes, so the error must not
+/// decode as an options `Error`.
 #[track_caller]
 fn assert_sac_err<T: Debug>(res: Result<T, Result<Error, InvokeError>>, code: u32) {
     match res {
         Err(Err(InvokeError::Contract(c))) => assert_eq!(c, code, "SAC error code"),
-        Err(Ok(e)) => assert_eq!(
-            e as u32, code,
-            "expected SAC error #{code} (surfaces as options {e:?} because the codes collide)"
-        ),
         other => panic!("expected SAC error #{code}, got {other:?}"),
     }
 }
@@ -796,7 +796,7 @@ fn deploy_err(build: impl FnOnce(&Env, &Address) -> Vec<Address>) -> Option<std:
 
 #[test]
 fn constructor_rejects_invalid_config() {
-    // InvalidConfig = 13. `Env::try_register` does not exist in soroban-sdk 28,
+    // InvalidConfig = 113. `Env::try_register` does not exist in soroban-sdk 28,
     // so each case deploys in a fresh Env inside catch_unwind.
     let sac = |env: &Env| {
         let a = Address::generate(env);
@@ -835,8 +835,8 @@ fn constructor_rejects_invalid_config() {
         let msg = deploy_err(|env, q| build(env, q));
         let msg = msg.unwrap_or_else(|| panic!("constructor accepted invalid config: {name}"));
         assert!(
-            msg.contains("Error(Contract, #13)"),
-            "{name}: expected InvalidConfig (#13), panic was: {msg}"
+            msg.contains("Error(Contract, #113)"),
+            "{name}: expected InvalidConfig (#113), panic was: {msg}"
         );
     }
 
@@ -1594,8 +1594,8 @@ fn reserved_total_overflow_returns_overflow_or_sac_rejects() {
     // Two huge PUT offers on USDx. The locked check order puts transfers before
     // storage, so the SAC's own checked add on the contract's USDx balance fails
     // first (SAC OverflowError #12) before the contract updates its reserved
-    // total. A contract that pre-computes the reserved total would instead
-    // return Error::Overflow (= 12). Both surface as code 12; either is accepted.
+    // total. (A contract that pre-computed the reserved total would return
+    // Error::Overflow = 112 instead; since v1.1 the two codes are distinct.)
     let t = setup();
     t.sac(&t.usdx).mint(&t.writer, &(i128::MAX - USDX_START));
     assert_eq!(t.bal(&t.usdx, &t.writer), i128::MAX);
@@ -1633,12 +1633,17 @@ fn reserved_total_overflow_returns_overflow_or_sac_rejects() {
 #[test]
 fn reserved_total_overflow_after_clawback_returns_contract_overflow() {
     // Forces the contract's own checked i128 math: after a clawback the SAC
-    // balance is far below the reserved total, so the SAC transfer succeeds and
-    // only `reserved + qty` overflows -> Error::Overflow.
+    // balance is far below the reserved total, so a SAC transfer into the
+    // contract succeeds and only `reserved + qty` overflows -> Error::Overflow.
+    // Since v1.1, create_offer refuses new exposure on a token in deficit
+    // (CollateralShortfall), so the overflow is reached through the exercise of
+    // a PUT bought before the clawback (its delivery adds qty to the reserve).
     let t = setup();
+    let put = t.offer(&t.maker2, &t.rwa, OptionType::Put);
+    t.c.buy(&t.holder, &put);
     t.sac(&t.rwa)
         .mint(&t.writer, &(i128::MAX - UNDERLYING_START));
-    let id = t.c.create_offer(
+    let call = t.c.create_offer(
         &t.writer,
         &t.rwa,
         &OptionType::Call,
@@ -1652,6 +1657,7 @@ fn reserved_total_overflow_after_clawback_returns_contract_overflow() {
     assert_eq!(t.c.open_collateral(&t.rwa), i128::MAX);
     let before = t.snap();
 
+    // new exposure on RWA is refused before any transfer or reserve update
     assert_err(
         t.c.try_create_offer(
             &t.maker2,
@@ -1662,11 +1668,17 @@ fn reserved_total_overflow_after_clawback_returns_contract_overflow() {
             &PREMIUM,
             &EXPIRY,
         ),
-        Error::Overflow,
+        Error::CollateralShortfall,
     );
     assert_eq!(t.snap(), before);
+
+    // the PUT bought before the clawback still settles up to the point where
+    // adding its delivery to the RWA reserve overflows; the whole call reverts
+    assert_err(t.c.try_exercise(&t.holder, &put), Error::Overflow);
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.state(put), State::Active);
     assert_eq!(t.bal(&t.rwa, &t.maker2), UNDERLYING_START);
-    assert_eq!(t.open(), [id]);
+    assert_eq!(t.open(), [call]);
 }
 
 // ---------------------------------------------------------------------------
@@ -2231,4 +2243,298 @@ fn reclaim_and_claim_delivery_require_writer_signature() {
     t.c.claim_delivery(&t.writer, &sold);
     assert_eq!(t.state(put), State::Expired);
     assert_eq!(t.state(sold), State::Settled);
+}
+
+// ---------------------------------------------------------------------------
+// v1.1 hardening (ABI §10)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn error_codes_are_101_plus() {
+    // Error codes are public ABI (ABI §2): 101.. so they never collide with SAC #1..#13.
+    let codes = [
+        (Error::NotFound, 101),
+        (Error::InvalidArgs, 102),
+        (Error::AssetNotAllowed, 103),
+        (Error::NotEligible, 104),
+        (Error::ContractNotAuthorized, 105),
+        (Error::WrongState, 106),
+        (Error::NotWriter, 107),
+        (Error::NotHolder, 108),
+        (Error::Expired, 109),
+        (Error::NotExpired, 110),
+        (Error::SelfTrade, 111),
+        (Error::Overflow, 112),
+        (Error::InvalidConfig, 113),
+        (Error::OpenListFull, 114),
+        (Error::CollateralShortfall, 115),
+    ];
+    for (e, code) in codes {
+        assert_eq!(e as u32, code, "{e:?}");
+    }
+    assert_eq!(Error::NotFound as u32, 101);
+    assert_eq!(Error::CollateralShortfall as u32, 115);
+}
+
+#[test]
+fn open_list_cap_returns_open_list_full() {
+    let t = setup();
+    assert_eq!(MAX_OPEN, 1000);
+    // 1-unit PUTs: 1000 offers lock 1000 USDx units of the writer's USDX_START.
+    let tiny_put = |writer: &Address| {
+        t.c.try_create_offer(writer, &t.rwa, &OptionType::Put, &1, &1, &1, &EXPIRY)
+    };
+    for i in 0..MAX_OPEN {
+        assert_eq!(tiny_put(&t.writer), Ok(Ok(i)));
+    }
+    assert_eq!(t.c.list_open().len(), MAX_OPEN);
+    assert_eq!(t.c.open_collateral(&t.usdx), MAX_OPEN as i128);
+    let before = t.snap();
+
+    // the cap is global: any writer, any underlying, PUT or CALL
+    assert_err(tiny_put(&t.writer), Error::OpenListFull);
+    assert_err(tiny_put(&t.maker2), Error::OpenListFull);
+    assert_err(
+        t.c.try_create_offer(&t.maker2, &t.bond, &OptionType::Call, &1, &1, &1, &EXPIRY),
+        Error::OpenListFull,
+    );
+    // check order: InvalidArgs and NotEligible come before OpenListFull
+    assert_err(
+        t.c.try_create_offer(&t.writer, &t.rwa, &OptionType::Put, &0, &1, &1, &EXPIRY),
+        Error::InvalidArgs,
+    );
+    assert_err(tiny_put(&t.outsider), Error::NotEligible);
+    assert_eq!(t.snap(), before);
+
+    // a cancelled or bought offer frees exactly one slot
+    t.c.cancel_offer(&t.writer, &0);
+    assert_eq!(tiny_put(&t.maker2), Ok(Ok(MAX_OPEN)));
+    assert_err(tiny_put(&t.maker2), Error::OpenListFull);
+    t.c.buy(&t.holder, &1);
+    assert_eq!(tiny_put(&t.maker2), Ok(Ok(MAX_OPEN + 1)));
+    assert_err(tiny_put(&t.maker2), Error::OpenListFull);
+    assert_eq!(t.c.list_open().len(), MAX_OPEN);
+}
+
+#[test]
+fn create_offer_rejects_writer_without_quote_trustline() {
+    let t = setup();
+    // authorized and funded on RWA, nothing on USDx
+    let w = Address::generate(&t.env);
+    t.sac(&t.rwa).set_authorized(&w, &true);
+    t.sac(&t.rwa).mint(&w, &UNDERLYING_START);
+    assert!(t.c.is_eligible(&t.rwa, &w));
+    // USDx has no flags, and a contract address with no USDx balance reads as
+    // authorized, so the "cannot hold the quote token" case is built through the
+    // issuer: with AUTH_REVOCABLE the SAC admin writes an explicit deauthorized
+    // USDx balance for `w`. (A classic G account without a USDx trustline reads
+    // the same way, SAC #13 -> false, but this env cannot create the RWA
+    // trustline such an account would also need.)
+    assert!(t.c.is_eligible(&t.usdx, &w));
+    t.usdx_flags.set_flag(IssuerFlags::RevocableFlag);
+    t.sac(&t.usdx).set_authorized(&w, &false);
+    assert!(!t.c.is_eligible(&t.usdx, &w));
+    let before = t.snap();
+
+    // CALL collateral is RWA, which `w` holds: only the quote check stops it
+    for ty in [OptionType::Put, OptionType::Call] {
+        assert_err(
+            t.c.try_create_offer(&w, &t.rwa, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+            Error::NotEligible,
+        );
+    }
+    // check order: writer eligibility (both tokens) before the contract's
+    t.sac(&t.rwa).set_authorized(&t.contract, &false);
+    assert_err(
+        t.c.try_create_offer(
+            &w,
+            &t.rwa,
+            &OptionType::Call,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::NotEligible,
+    );
+    t.sac(&t.rwa).set_authorized(&t.contract, &true);
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.bal(&t.rwa, &w), UNDERLYING_START);
+    assert_eq!(t.c.option_count(), 0);
+
+    // once `w` may hold USDx again it can write, and receives the premium
+    t.sac(&t.usdx).set_authorized(&w, &true);
+    let id = t.c.create_offer(
+        &w,
+        &t.rwa,
+        &OptionType::Call,
+        &QTY,
+        &STRIKE,
+        &PREMIUM,
+        &EXPIRY,
+    );
+    t.c.buy(&t.holder, &id);
+    assert_eq!(t.bal(&t.usdx, &w), PREMIUM);
+    assert_eq!(t.state(id), State::Active);
+}
+
+#[test]
+fn buy_rejects_when_contract_deauthorized_after_offer() {
+    let t = setup();
+    let put = t.put(&t.writer);
+    let call = t.call(&t.maker2);
+    let bond = t.offer(&t.writer, &t.bond, OptionType::Put);
+
+    // issuer de-authorizes the contract on RWA after the offers exist
+    t.sac(&t.rwa).set_authorized(&t.contract, &false);
+    assert!(!t.c.is_eligible(&t.rwa, &t.contract));
+    let before = t.snap();
+
+    assert_err(t.c.try_buy(&t.holder, &put), Error::ContractNotAuthorized);
+    assert_err(t.c.try_buy(&t.holder, &call), Error::ContractNotAuthorized);
+    // check order: SelfTrade and buyer NotEligible come first
+    assert_err(t.c.try_buy(&t.writer, &put), Error::SelfTrade);
+    assert_err(t.c.try_buy(&t.outsider, &put), Error::NotEligible);
+    // no premium moved, nothing changed
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.bal(&t.usdx, &t.holder), USDX_START);
+    assert_eq!(t.state(put), State::Offered);
+    assert_eq!(t.state(call), State::Offered);
+    assert_eq!(t.open(), [put, call, bond]);
+
+    // BOND offers are unaffected
+    t.c.buy(&t.holder, &bond);
+    assert_eq!(t.state(bond), State::Active);
+
+    // re-authorization makes the RWA offers purchasable again
+    t.sac(&t.rwa).set_authorized(&t.contract, &true);
+    t.c.buy(&t.holder, &put);
+    assert_eq!(t.state(put), State::Active);
+    assert_eq!(t.bal(&t.usdx, &t.holder), USDX_START - 2 * PREMIUM);
+}
+
+#[test]
+fn shortfall_blocks_new_exposure_after_clawback() {
+    let t = setup();
+    let active_call = t.call(&t.writer);
+    t.c.buy(&t.holder, &active_call);
+    // two more RWA offers still Offered: a PUT (collateral USDx) and a CALL
+    let offered_put = t.put(&t.maker2);
+    let offered_call = t.call(&t.maker2);
+    assert_eq!(t.bal(&t.rwa, &t.contract), 2 * QTY);
+
+    // issuer claws 1 RWA back from the contract's pooled balance
+    t.sac(&t.rwa).clawback(&t.contract, &UNIT);
+    assert_eq!(t.bal(&t.rwa, &t.contract), 2 * QTY - UNIT);
+    assert_eq!(t.c.open_collateral(&t.rwa), 2 * QTY);
+    let before = t.snap();
+
+    // no new exposure on RWA: neither new offers (CALL or PUT) nor purchases
+    assert_err(
+        t.c.try_create_offer(
+            &t.maker2,
+            &t.rwa,
+            &OptionType::Call,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::CollateralShortfall,
+    );
+    assert_err(
+        t.c.try_create_offer(
+            &t.writer,
+            &t.rwa,
+            &OptionType::Put,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::CollateralShortfall,
+    );
+    assert_err(
+        t.c.try_buy(&t.holder, &offered_put),
+        Error::CollateralShortfall,
+    );
+    assert_err(
+        t.c.try_buy(&t.holder, &offered_call),
+        Error::CollateralShortfall,
+    );
+    // check order: every eligibility check comes before CollateralShortfall
+    assert_err(
+        t.c.try_create_offer(
+            &t.outsider,
+            &t.rwa,
+            &OptionType::Put,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::NotEligible,
+    );
+    assert_err(t.c.try_buy(&t.outsider, &offered_put), Error::NotEligible);
+    assert_err(t.c.try_buy(&t.maker2, &offered_put), Error::SelfTrade);
+    t.sac(&t.rwa).set_authorized(&t.contract, &false);
+    assert_err(
+        t.c.try_buy(&t.holder, &offered_put),
+        Error::ContractNotAuthorized,
+    );
+    t.sac(&t.rwa).set_authorized(&t.contract, &true);
+    // no premium moved, no collateral pulled
+    assert_eq!(t.snap(), before);
+
+    // BOND has no deficit: offers and purchases still work
+    let bond_call = t.offer(&t.writer, &t.bond, OptionType::Call);
+    t.c.buy(&t.holder, &bond_call);
+    assert_eq!(t.state(bond_call), State::Active);
+    let bond_put = t.offer(&t.maker2, &t.bond, OptionType::Put);
+    assert_eq!(t.state(bond_put), State::Offered);
+
+    // existing RWA positions are not blocked by the guard
+    t.c.cancel_offer(&t.maker2, &offered_call);
+    assert_eq!(t.state(offered_call), State::Cancelled);
+    assert_eq!(t.bal(&t.rwa, &t.contract), QTY - UNIT);
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY);
+
+    // the guard lifts once the pooled balance covers the reserve again
+    t.sac(&t.rwa).mint(&t.contract, &UNIT);
+    t.c.buy(&t.holder, &offered_put);
+    assert_eq!(t.state(offered_put), State::Active);
+    let id = t.call(&t.maker2);
+    assert_eq!(t.state(id), State::Offered);
+}
+
+#[test]
+fn shortfall_on_quote_blocks_every_underlying() {
+    let t = setup();
+    // USDx is unflagged in the demo; make it clawback-enabled before the
+    // contract's USDx balance exists so the quote side of the guard can be hit
+    t.usdx_flags.set_flag(IssuerFlags::RevocableFlag);
+    t.usdx_flags.set_flag(IssuerFlags::ClawbackEnabledFlag);
+    let _put = t.put(&t.writer);
+    let bond_call = t.offer(&t.maker2, &t.bond, OptionType::Call);
+    t.sac(&t.usdx).clawback(&t.contract, &UNIT);
+    assert_eq!(t.bal(&t.usdx, &t.contract), STRIKE - UNIT);
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE);
+    let before = t.snap();
+
+    // every option shares the quote token, so a USDx deficit blocks BOND too
+    for (token, ty) in [
+        (&t.rwa, OptionType::Call),
+        (&t.bond, OptionType::Put),
+        (&t.bond, OptionType::Call),
+    ] {
+        assert_err(
+            t.c.try_create_offer(&t.writer, token, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+            Error::CollateralShortfall,
+        );
+    }
+    assert_err(
+        t.c.try_buy(&t.holder, &bond_call),
+        Error::CollateralShortfall,
+    );
+    assert_eq!(t.snap(), before);
 }
