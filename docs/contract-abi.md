@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:40, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11.** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:40, see §10.** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -114,9 +114,6 @@ pub fn option_count(env: Env) -> u32;
 pub fn open_collateral(env: Env, token: Address) -> i128;
 pub fn is_eligible(env: Env, token: Address, who: Address) -> bool;
 pub fn extend_ttl(env: Env, ids: Vec<u32>) -> Result<(), Error>;
-// v1.2 additions (see §11)
-pub fn transfer(env: Env, holder: Address, to: Address, id: u32) -> Result<(), Error>;
-pub fn get_options(env: Env, from: u32, limit: u32) -> Vec<OptionData>;
 ```
 
 Check order inside every state-changing function is fixed: **auth → NotFound → ownership (NotWriter/NotHolder)
@@ -187,19 +184,7 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
 - If the writer is frozen on the underlying the SAC transfer fails and the whole call reverts; the proceeds stay in
   the contract and the writer retries once re-authorized. Nothing else can move them.
 
-### `transfer(holder, to, id)` (v1.2)
-- `holder.require_auth()`; `NotFound`; `NotHolder` unless `Some(holder) == option.holder`; `WrongState` unless `Active`;
-  `Expired` unless `now < expiry`; `InvalidArgs` if `to == holder`; `SelfTrade` if `to == writer`;
-  `NotEligible` unless `is_eligible(underlying, to)` (the new holder must be able to settle: deliver the underlying
-  for a PUT, receive it for a CALL).
-- Sets `holder = Some(to)`. State stays `Active`; collateral, reserved totals and `list_open` are untouched.
-  **No tokens move**: any payment for the position is settled outside this call (a separate quote-token payment, or a
-  future on-chain position market). Emits `OptionTransferred`. The previous holder can no longer exercise.
-
 ### Views
-- `get_options(from, limit)` (v1.2): the stored `OptionData` for ids `from, from+1, …` in id order, stopping at
-  `option_count()` and after at most `min(limit, MAX_PAGE = 50)` entries. Returns an empty `Vec` when
-  `from >= option_count()` or `limit == 0`. Never fails. Clients page with `from += returned.len()`.
 - `get_option(id)`: the stored `OptionData` or `NotFound`. Pure read.
 - `list_open()`: ids whose state is `Offered`, oldest first. May include offers past `expiry`; clients filter by
   `expiry` before showing them as purchasable. The list lives in instance storage, so it is bounded (see §10).
@@ -226,7 +211,6 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
                                   │ buy (premium buyer → writer, PROVISIONAL)
                                   ▼
                                Active ──────► reclaim (now >= expiry)
-                                  │   ↻ transfer (holder → new eligible holder, state stays Active, v1.2)
                                   │                (Expired)
                                   │ exercise (now < expiry; holder pays into contract,
                                   │           contract pays holder)
@@ -237,8 +221,8 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
                                Settled
 ```
 
-No other transition exists. In particular: no partial exercise, no `Impaired` state, no admin path, no upgrade.
-Holder transfer (v1.2) changes `holder` without changing `state`.
+No other transition exists. In particular: no transfer of the holder position (P1), no partial exercise, no
+`Impaired` state, no admin path, no upgrade.
 
 ## 5. Events (`#[contractevent]`, default topic = snake_case name, `#[topic]` fields follow)
 
@@ -250,7 +234,6 @@ pub struct OptionExercised{ #[topic] pub id: u32, pub holder: Address }
 pub struct OfferCancelled { #[topic] pub id: u32 }
 pub struct OptionReclaimed{ #[topic] pub id: u32 }
 pub struct DeliveryClaimed{ #[topic] pub id: u32 }
-pub struct OptionTransferred { #[topic] pub id: u32, pub from: Address, pub to: Address }   // v1.2
 ```
 
 ## 6. Eligibility and issuer actions (what the contract does and does not promise)
@@ -290,7 +273,7 @@ goes through Dev 2.
 4. **Expiry bounds:** only `expiry > now` is enforced; no minimum or maximum tenor.
 5. **Unsold expired offers:** writer may use either `cancel_offer` or `reclaim`; both return the collateral.
 6. **Impaired/refund logic:** not implemented (AGENTS.md: not approved until specified and proven).
-7. **Holder transfer:** implemented in v1.2 as a free transfer to an eligible address (no payment leg). **Position token:** not implemented.
+7. **Holder transfer / position token:** not implemented (P1).
 
 ## 8. Storage and TTL
 
@@ -304,7 +287,6 @@ enum Key {
     Opt(u32),           // persistent: OptionData
 }
 const MAX_OPEN: u32 = 1000;        // cap on ids in Key::Open (instance storage is one 64 KB entry)
-const MAX_PAGE: u32 = 50;          // get_options page cap (v1.2)
 const DAY_LEDGERS: u32 = 17_280;
 const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
@@ -319,7 +301,7 @@ TTL is never used as a security mechanism; `expiry` lives in the value.
 ## 9. Deployment and client notes
 
 ```sh
-stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian   # SEP-55 metadata (v1.2+)
+stellar contract build --package options
 stellar contract deploy --wasm target/wasm32v1-none/release/options.wasm \
   --source-account <deployer> --network testnet --alias options \
   -- --quote <USDx SAC id> --underlyings '["<RWA SAC id>","<BOND SAC id>"]'
@@ -360,21 +342,3 @@ smoke run and the 53-test suite. v1.1 changes, all reflected in §2, §3, §6 an
 Not changed: function names, argument order, types, events, lifecycle (verified by diffing `stellar contract info
 interface` of both wasms: only the Error enum differs). Frontend action: switch the contract id to the v1.1 id above and
 key the error map by name (codes 101–115); everything else is unchanged. The v1 contract remains on testnet.
-
-## 11. v1.2 additions (decided 2026-10-25 20:05 by Dev 2 with GO on P1 scope; one redeploy)
-
-Additive only: two functions, one event, one constant. No error code, type or existing signature changes.
-
-1. **`transfer(holder, to, id)`** — P1 "transfer of option ownership" (§3, §4). Free transfer to an eligible new holder;
-   no payment leg on-chain.
-2. **`get_options(from, limit)`** — paged read (§3) so clients fetch the book in one or two simulations instead of 1+N.
-3. **`OptionTransferred { id, from, to }`** event (§5).
-4. **SEP-55 build metadata** `source_repo=github:mohamedkhellaf/hackmeridian` stamped into the wasm at build time (§9),
-   readable with `stellar contract info meta --wasm …`.
-5. **Operational scripts** (no contract change): `scripts/deploy/issuer-demo-testnet.sh` records the issuer-action
-   failure modes of §6 on chain (freeze holder → exercise fails with SAC #11; de-authorize the contract → `buy` fails
-   with #105; clawback from a throwaway deployment → `create_offer`/`buy` fail with #115 and `open_collateral >
-   balance`), and `scripts/deploy/extend-ttl.sh` calls `extend_ttl` over every non-terminal id (keeper).
-
-Not in v1.2, deliberately: position token (second token system, untestable before freeze), impairment/refund logic
-(economics unspecified, AGENTS.md precondition), partial exercise, multi-leg.
