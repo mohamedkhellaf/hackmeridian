@@ -1,44 +1,227 @@
-.issuer .issuer-row {
+.is-layout {
   display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.is-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.is-col:first-child {
+  flex: 999 1 520px;
+}
+.is-col:nth-child(2) {
+  flex: 1 1 320px;
+}
+.is-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.is-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.is-error {
+  color: var(--danger);
+  font-size: 12.5px;
+}
+.is-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.is-note--body {
+  font-size: 13px;
+  color: #c9ced6;
+  line-height: 1.55;
+}
+.is-break {
+  word-break: break-all;
+}
+
+.is-asset {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.is-asset input {
+  width: 110px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.is-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.is-field-label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.is-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+  padding: 0 14px;
+  height: 46px;
+}
+.is-input:focus-within {
+  border-color: var(--link);
+}
+.is-input input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-strong);
+  font-size: 14.5px;
+}
+.is-input input.is-mono-input {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+}
+.is-input--grow {
+  flex: 1 1 200px;
+}
+.is-unit {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.is-pill {
+  font-size: 11.5px;
+  color: var(--text-2);
+  border: 1px solid var(--border-2);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.is-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-sunken);
+  border: 1px solid #1c2129;
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.is-status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #c9ced6;
+  min-width: 0;
+}
+.is-status > .is-status-text {
+  flex: 1 1 200px;
+}
+.is-link {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--link);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.is-link:hover:not(:disabled) {
+  color: var(--link-hover);
+}
+.is-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.is-actions {
+  display: flex;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-.issuer .issuer-mono {
-  font-family: var(--mono);
-  word-break: break-all;
+.is-danger-card {
+  border-color: #3a2120;
 }
-
-.issuer .issuer-status {
-  margin: 0;
+.is-danger-card .ui-card-body {
+  padding-top: 20px;
 }
-
-.issuer .issuer-danger {
-  margin-top: 20px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+.is-danger-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--danger);
 }
-
-.issuer .issuer-danger h3 {
-  margin: 0 0 8px;
+.is-danger-title h2 {
   font-size: 15px;
-  color: var(--err);
+  color: var(--text);
+}
+.is-claw-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.is-confirm-text {
+  margin: 0;
+  line-height: 1.55;
+  font-size: 14px;
 }
 
-.issuer button.issuer-danger-btn {
-  background: var(--err);
-  border-color: var(--err);
-  color: #fff;
+.is-flags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.is-flag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #c9ced6;
+}
+.is-flag--ok svg {
+  color: var(--ok);
+}
+.is-flag--bad svg {
+  color: var(--warn);
+}
+.is-flag-missing {
+  color: var(--warn);
+  font-size: 12px;
+}
+.is-sep {
+  border-top: 1px solid #1c2129;
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.issuer .issuer-confirm {
-  border: 1px solid var(--err);
-  background: var(--err-bg);
-  border-radius: 6px;
-  padding: 10px 12px;
-}
-
-.issuer .issuer-confirm p {
-  margin: 0 0 10px;
-  word-break: break-all;
+@media (max-width: 640px) {
+  .is-actions > button {
+    flex: 1 1 140px;
+  }
+  .is-claw-row > button {
+    flex: 1 1 100%;
+  }
 }
