@@ -19,3 +19,9 @@ dist
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# Testnet script output (public keys, ids, tx hashes) and anything key-shaped
+scripts/out/
+*.secret
+keys.json
+env.sh
