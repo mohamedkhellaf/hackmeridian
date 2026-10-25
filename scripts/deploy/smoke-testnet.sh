@@ -2,11 +2,17 @@
 # Smoke-test the deployed options contract on Stellar TESTNET with real transactions (test XLM fees only).
 #
 #   scripts/deploy/smoke-testnet.sh             # P0 (PUT lifecycle, expected failures, expiry, competition), then P0+,
-#                                               # then V1.2 (holder transfer, paged reads; needs contract v1.2+)
+#                                               # then V1.2 (holder transfer, paged reads; needs contract v1.2+),
+#                                               # then V1.3 (EQTY listing, prune_expired, tenor cap; needs v1.3)
 #   scripts/deploy/smoke-testnet.sh --p0-only   # stop after P0
+#   scripts/deploy/smoke-testnet.sh --no-v13    # skip V1.3 (for a v1.2 contract)
+#   scripts/deploy/smoke-testnet.sh --full      # V1.3 also fills maker2 to the 50-offer writer cap, expects #116 on
+#                                               # the 51st, then cancels them (~100 extra txs, ~2 test XLM, 10-20 min)
 #
 # Reads OPTIONS_ID (written by deploy.sh), the SAC ids and the role public keys from scripts/out/testnet.env.
 # Re-runnable: every run creates fresh offers and takes each option id from create_offer's return value.
+# V1.3 lists EQTY (not in the constructor) with list_asset and has the issuer authorize the escrow on it; both are
+# one-time steps per contract, so on a re-run V13_LIST and V13_FAIL_CONTRACT_NOT_AUTHORIZED are reported as SKIP.
 # Expected failures are simulated with --send=no (no fee, no state change) and pass only with the exact contract
 # error code from docs/contract-abi.md §2. Every submitted transaction prints "TX <label> <hash>" and is appended
 # to scripts/out/tx-log.tsv. The whole output is also saved to scripts/out/smoke-<UTC time>.log.
@@ -18,18 +24,30 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 require_tools stellar jq curl
 
 RUN_P0PLUS=1
-case "${1:-}" in
-  "") ;;
-  --p0-only) RUN_P0PLUS=0 ;;
-  -h | --help)
-    sed -n '2,13p' "$0"
-    exit 0
-    ;;
-  *) die "unknown argument: $1 (usage: $0 [--p0-only])" ;;
-esac
+RUN_V13=1
+RUN_FULL=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --p0-only) RUN_P0PLUS=0 ;;
+    --no-v13) RUN_V13=0 ;;
+    --full) RUN_FULL=1 ;;
+    -h | --help)
+      sed -n '2,19p' "$0"
+      exit 0
+      ;;
+    *) die "unknown argument: $1 (usage: $0 [--p0-only | --no-v13 | --full])" ;;
+  esac
+  shift
+done
+if [[ $RUN_FULL == 1 && ($RUN_P0PLUS == 0 || $RUN_V13 == 0) ]]; then
+  die "--full runs inside the V1.3 section; do not combine it with --p0-only or --no-v13"
+fi
+[[ $RUN_P0PLUS == 1 ]] || RUN_V13=0
+[[ "${DRY_RUN:-0}" != 1 ]] || die "DRY_RUN is not supported: the smoke run always sends real testnet transactions"
 
 load_env
 require_vars OPTIONS_ID USDX_SAC RWA_SAC BOND_SAC MAKER1 MAKER2 INVESTOR OUTSIDER
+[[ $RUN_V13 == 0 ]] || require_vars EQTY_SAC RWA_ISSUER USDX_ISSUER
 is_contract_id "$OPTIONS_ID" || die "OPTIONS_ID='$OPTIONS_ID' is not a contract id; run scripts/deploy/deploy.sh first"
 RPC_URL="${RPC_URL:-https://soroban-testnet.stellar.org}"
 O="$OPTIONS_ID"
@@ -49,7 +67,8 @@ COMP_PREM=8000000     # maker2's competing premium, 0.8 USDx
 EXP_SECS=45           # tenor of the offer used for the expiry path
 
 # ---------- results ----------
-declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [PRE]=0) NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [PRE]=0)
+declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [PRE]=0) NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [PRE]=0)
+declare -A NSKIP=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [PRE]=0)
 GROUP=PRE
 SUMMARY=()
 pass() {
@@ -60,6 +79,12 @@ fail() {
   NFAIL[$GROUP]=$((NFAIL[$GROUP] + 1))
   SUMMARY+=("$GROUP|$1|FAIL|$2")
   echo "   !! FAIL $1: $2"
+}
+# skip: a check that cannot apply on this run (one-time step already done, or an opt-in flag not given).
+skip() {
+  NSKIP[$GROUP]=$((NSKIP[$GROUP] + 1))
+  SUMMARY+=("$GROUP|$1|SKIP|$2")
+  echo "   -- SKIP $1: $2"
 }
 section() { printf '\n==================== %s ====================\n' "$*"; }
 
@@ -529,6 +554,350 @@ paging() {
   fi
 }
 
+# ---------- V1.3 (contract-abi.md §3, §8, §12) ----------
+MAX_TENOR=63072000      # 2 years in seconds
+MAX_OPEN_PER_WRITER=50  # open (Offered) offers per writer
+PRUNE_SECS=45           # tenor of the offer used for the prune path
+
+# expect_eq <label> <got> <want> <what>
+expect_eq() {
+  if [[ "$2" == "$3" ]]; then
+    pass "$1" "$4 = $2"
+    return 0
+  fi
+  fail "$1" "$4 = ${2:-unreadable}; wanted $3"
+  return 1
+}
+
+# sim_ok <label> <identity> <fn> [args...]: simulate only (nothing sent); passes iff the call succeeds. Sets SIM_RESULT.
+SIM_RESULT=""
+sim_ok() {
+  local label="$1" who="$2"
+  shift 2
+  SIM_RESULT=""
+  echo "-> [$label] expect success; simulate as $who: $*"
+  if inv "$O" "$who" no "$@"; then
+    SIM_RESULT="$(printf '%s\n' "$OUT" | sed '/^$/d' | tail -1)"
+    pass "$label" "simulation succeeded (return: ${SIM_RESULT:-void}); nothing sent"
+    return 0
+  fi
+  printf '%s\n' "$ERR" | head -12 | sed 's/^/   | /'
+  fail "$label" "simulation failed: $(err_line "$ERR")"
+  return 1
+}
+
+# submit_quiet <label> <identity> <fn> [args...]: like send, but adds no PASS/FAIL row (bulk txs of --full).
+# Sets RESULT and HASH, appends the hash to tx-log.tsv. Returns non-zero unless a signed tx succeeded.
+submit_quiet() {
+  local label="$1" who="$2"
+  shift 2
+  RESULT=""
+  if inv "$O" "$who" yes "$@" && [[ -n "$HASH" ]]; then
+    RESULT="$(printf '%s\n' "$OUT" | sed '/^$/d' | tail -1)"
+    echo "   TX $label $HASH  (return: ${RESULT:-void})"
+    printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "SMOKE_$label" "$HASH" ok >>"$TX_LOG"
+    return 0
+  fi
+  echo "   FAILED $label (tx ${HASH:-not signed}): $(err_line "$ERR")"
+  [[ -z "$HASH" ]] || printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "SMOKE_$label" "$HASH" failed >>"$TX_LOG"
+  return 1
+}
+
+woc() { view "$O" writer_open_count --writer "$1" | num; }
+
+v13_probe() {
+  local n
+  n="$(view "$O" asset_count | num)"
+  if [[ "$n" =~ ^[0-9]+$ ]]; then
+    pass V13_INTERFACE "asset_count() = $n: $O exposes the v1.3 interface"
+    return 0
+  fi
+  fail V13_INTERFACE "asset_count() unreadable: $O is not a v1.3 contract (use --no-v13 against older contracts)"
+  return 1
+}
+
+# prune path, part 1: maker1 PUT on RWA expiring in PRUNE_SECS that nobody buys.
+P_ID=""
+P_EXP=""
+prune_create() {
+  local w0 w1
+  w0="$(woc "$MAKER1")"
+  P_EXP=$(($(date +%s) + PRUNE_SECS))
+  send PRUNE_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" --option_type Put \
+    --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" --premium_total "$PUT_PREM" --expiry "$P_EXP" || return 1
+  [[ "$RESULT" =~ ^[0-9]+$ ]] || {
+    fail PRUNE_CREATE_ID "create_offer returned '$RESULT', not a u32 id"
+    return 1
+  }
+  P_ID="$RESULT"
+  echo "   prune-path option id $P_ID (Put, RWA), expiry $P_EXP (now+${PRUNE_SECS}s); nobody buys it"
+  w1="$(woc "$MAKER1")"
+  if [[ "$w0" =~ ^[0-9]+$ ]]; then
+    expect_eq PRUNE_CREATE_WOC "$w1" "$((w0 + 1))" "writer_open_count(maker1) after create_offer (was $w0)"
+  else
+    fail PRUNE_CREATE_WOC "writer_open_count(maker1) unreadable before create_offer: '$w0'"
+  fi
+}
+
+# Permissionless listing of EQTY (not in the constructor). Returns 0 iff EQTY is listed afterwards.
+v13_listing() {
+  local listed got assets n len zz
+  listed="$(view "$O" is_listed --token "$EQTY_SAC")"
+  echo "   is_listed(EQTY $EQTY_SAC) before listing = ${listed:-unreadable}"
+  echo "   config().underlyings = $(view "$O" config | jq -c '.underlyings' 2>/dev/null)"
+  case "$listed" in
+    false)
+      send V13_LIST "$ID_MAKER1" list_asset --lister "$MAKER1" --code EQTY --issuer "$RWA_ISSUER" || return 1
+      if grep -qi 'asset_listed' <<<"$ERR"; then
+        pass V13_LIST_EVENT "asset_listed event in tx $HASH"
+      else
+        fail V13_LIST_EVENT "no asset_listed event in the CLI output of tx $HASH"
+      fi
+      got="$(num <<<"$RESULT")"
+      expect_eq V13_LIST_ADDR "$got" "$EQTY_SAC" "list_asset(EQTY, rwa-issuer) returned address (want EQTY_SAC)"
+      ;;
+    true)
+      skip V13_LIST "EQTY was already listed on $O by an earlier run (its list_asset return value was checked then)"
+      ;;
+    *)
+      fail V13_LIST "is_listed(EQTY) unreadable: '$listed'"
+      return 1
+      ;;
+  esac
+
+  listed="$(view "$O" is_listed --token "$EQTY_SAC")"
+  expect_eq V13_IS_LISTED "$listed" true "is_listed(EQTY)"
+  assets="$(view "$O" list_assets --from 0 --limit 50)"
+  echo "   list_assets(0, 50) = ${assets:-unreadable}"
+  if jq -e --arg a "$EQTY_SAC" 'any(.[]; . == $a)' <<<"$assets" >/dev/null 2>&1; then
+    pass V13_LIST_ASSETS "list_assets(0, 50) contains EQTY $EQTY_SAC"
+  else
+    fail V13_LIST_ASSETS "list_assets(0, 50) = ${assets:-unreadable}; EQTY $EQTY_SAC missing"
+  fi
+  got="$(jq -c '.[0:2]' <<<"$assets" 2>/dev/null)"
+  expect_eq V13_LIST_ASSETS_SEED "$got" "$(jq -cn --arg a "$RWA_SAC" --arg b "$BOND_SAC" '[$a, $b]')" \
+    "list_assets(0, 50)[0..2] (constructor seed RWA, BOND)"
+  n="$(view "$O" asset_count | num)"
+  len="$(jq length <<<"$assets" 2>/dev/null)"
+  expect_eq V13_ASSET_COUNT "$n" 3 "asset_count() (RWA + BOND from the constructor, EQTY listed; list_assets length ${len:-?})"
+
+  expect_fail V13_FAIL_ALREADY_LISTED 117 AlreadyListed "$ID_MAKER2" list_asset --lister "$MAKER2" --code EQTY \
+    --issuer "$RWA_ISSUER"
+  expect_fail V13_FAIL_LIST_QUOTE 117 AlreadyListed "$ID_MAKER2" list_asset --lister "$MAKER2" --code USDx \
+    --issuer "$USDX_ISSUER"
+  zz="$(stellar contract id asset --asset "ZZZZ:$USDX_ISSUER" --network "$NETWORK" 2>/dev/null)"
+  if ! is_contract_id "$zz"; then
+    fail V13_FAIL_NOT_DEPLOYED "could not derive the SAC id of ZZZZ:$USDX_ISSUER"
+  elif contract_exists "$zz"; then
+    fail V13_FAIL_NOT_DEPLOYED "precondition broken: the SAC $zz of ZZZZ:$USDX_ISSUER is deployed; pick another code"
+  else
+    echo "   SAC of ZZZZ:<usdx-issuer> would be $zz and is not deployed (precondition for #118)"
+    expect_fail V13_FAIL_NOT_DEPLOYED 118 AssetNotDeployed "$ID_MAKER1" list_asset --lister "$MAKER1" --code ZZZZ \
+      --issuer "$USDX_ISSUER"
+  fi
+  expect_fail V13_FAIL_BAD_CODE 102 InvalidArgs "$ID_MAKER1" list_asset --lister "$MAKER1" --code 'bad code!' \
+    --issuer "$RWA_ISSUER"
+  expect_fail V13_FAIL_ISSUER_NOT_ACCOUNT 102 InvalidArgs "$ID_MAKER1" list_asset --lister "$MAKER1" --code EQTY \
+    --issuer "$USDX_SAC"
+  [[ "$listed" == true ]]
+}
+
+# EQTY: create_offer fails with ContractNotAuthorized until the issuer authorizes the escrow, then a PUT settles.
+v13_eqty() {
+  local auth out rc h now spec who addr want got
+  now="$(date +%s)"
+  auth="$(view "$O" is_eligible --token "$EQTY_SAC" --who "$O")"
+  echo "   is_eligible(EQTY, contract) = ${auth:-unreadable}"
+  case "$auth" in
+    false)
+      expect_fail V13_FAIL_CONTRACT_NOT_AUTHORIZED 105 ContractNotAuthorized "$ID_MAKER1" create_offer \
+        --writer "$MAKER1" --underlying "$EQTY_SAC" --option_type Put --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" \
+        --premium_total "$PUT_PREM" --expiry "$((now + 3600))"
+      ;;
+    true) skip V13_FAIL_CONTRACT_NOT_AUTHORIZED "the issuer already authorized $O on EQTY in an earlier run" ;;
+    *) fail V13_FAIL_CONTRACT_NOT_AUTHORIZED "is_eligible(EQTY, contract) unreadable: '$auth'" ;;
+  esac
+
+  echo "-> [V13_AUTHORIZE_EQTY] strata-rwa-issuer authorizes the escrow on EQTY:" \
+    "scripts/setup-testnet/03-authorize-contract.sh $O EQTY"
+  out="$(mktemp)"
+  rc=0
+  "$SCRIPTS_DIR/setup-testnet/03-authorize-contract.sh" "$O" EQTY 2>&1 | tee "$out" | sed 's/^/   | /' || rc=$?
+  h="$(grep -oE '^TX AUTHORIZE_OPTIONS_EQTY [0-9a-f]{64}' "$out" | awk '{print $3}' | tail -1 || true)"
+  rm -f "$out"
+  if [[ $rc != 0 ]]; then
+    fail V13_AUTHORIZE_EQTY "03-authorize-contract.sh $O EQTY exited $rc"
+    return 1
+  fi
+  if [[ -n "$h" ]]; then
+    echo "   https://stellar.expert/explorer/testnet/tx/$h"
+    pass V13_AUTHORIZE_EQTY "issuer set_authorized(contract, true) on the EQTY SAC, tx $h"
+  else
+    pass V13_AUTHORIZE_EQTY "contract was already authorized on EQTY (03-authorize-contract.sh sent no tx)"
+  fi
+  for spec in "contract:$O:true" "maker1:$MAKER1:true" "investor:$INVESTOR:true" "outsider:$OUTSIDER:false"; do
+    IFS=: read -r who addr want <<<"$spec"
+    got="$(view "$O" is_eligible --token "$EQTY_SAC" --who "$addr")"
+    expect_eq "V13_ELIGIBLE_EQTY_$who" "$got" "$want" "is_eligible(EQTY, $who)"
+  done
+
+  lifecycle V13_EQTY_PUT Put "$EQTY_SAC" EQTY "$PUT_QTY" "$PUT_STRIKE" "$PUT_PREM"
+}
+
+v13_tenor() {
+  local now
+  now="$(date +%s)"
+  expect_fail V13_FAIL_TENOR 119 TenorOutOfRange "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" \
+    --option_type Put --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" --premium_total "$PUT_PREM" \
+    --expiry "$((now + 3 * 365 * 86400))"
+  sim_ok V13_TENOR_INSIDE_SIM "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" \
+    --option_type Put --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" --premium_total "$PUT_PREM" \
+    --expiry "$((now + MAX_TENOR - 3600))"
+}
+
+# prune_expired on a live offer: returns 0, moves nothing, the offer stays Offered; the writer then cancels it.
+prune_live() {
+  local exp id open
+  exp=$(($(date +%s) + 3600))
+  send PRUNE_LIVE_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" --option_type Put \
+    --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" --premium_total "$PUT_PREM" --expiry "$exp" || return 1
+  id="$RESULT"
+  [[ "$id" =~ ^[0-9]+$ ]] || {
+    fail PRUNE_LIVE_CREATE_ID "create_offer returned '$id', not a u32 id"
+    return 1
+  }
+  echo "   live option id $id, expiry $exp (now+3600s)"
+  snap_reset
+  snapshot "PRUNE_LIVE before prune_expired [#$id]" "$RWA_SAC" RWA
+  send PRUNE_LIVE "$ID_MAKER2" prune_expired --ids "[$id]"
+  expect_eq PRUNE_LIVE_RET "$RESULT" 0 "prune_expired([$id]) on a live offer, return value"
+  expect_option PRUNE_LIVE_STATE "$id" Offered
+  snapshot "PRUNE_LIVE after prune_expired [#$id]" "$RWA_SAC" RWA
+  check_deltas PRUNE_LIVE_BAL ""
+  open="$(view "$O" list_open)"
+  if in_list "$open" "$id"; then
+    pass PRUNE_LIVE_OPEN "#$id still in list_open"
+  else
+    fail PRUNE_LIVE_OPEN "#$id missing from list_open ${open:-unreadable}"
+  fi
+  echo "   cleanup: only the writer can withdraw a live offer"
+  send PRUNE_LIVE_CANCEL "$ID_MAKER1" cancel_offer --writer "$MAKER1" --id "$id"
+}
+
+# prune path, part 2: after expiry maker2 (not the writer) prunes maker1's unsold offer; collateral returns to maker1.
+prune_finish() {
+  local w0 w1 open count
+  [[ -n "$P_ID" ]] || {
+    fail PRUNE_EXPIRED "skipped: the prune offer was not created"
+    return 1
+  }
+  wait_past "$P_EXP" || {
+    fail PRUNE_WAIT "ledger did not pass expiry $P_EXP"
+    return 1
+  }
+  expect_option PRUNE_PRE_STATE "$P_ID" Offered || return 1
+  w0="$(woc "$MAKER1")"
+  snap_reset
+  snapshot "PRUNE before prune_expired [#$P_ID]" "$RWA_SAC" RWA
+  send PRUNE_EXPIRED "$ID_MAKER2" prune_expired --ids "[$P_ID]" || return 1
+  if grep -qi 'offer_pruned' <<<"$ERR"; then
+    pass PRUNE_EVENT "offer_pruned event in tx $HASH"
+  else
+    fail PRUNE_EVENT "no offer_pruned event in the CLI output of tx $HASH"
+  fi
+  expect_eq PRUNE_EXPIRED_RET "$RESULT" 1 "prune_expired([$P_ID]) sent by maker2 (not the writer), return value"
+  expect_option PRUNE_EXPIRED_STATE "$P_ID" Expired
+  snapshot "PRUNE after prune_expired [#$P_ID]" "$RWA_SAC" RWA
+  check_deltas PRUNE_EXPIRED_BAL "m1Q=$PUT_STRIKE ctrQ=-$PUT_STRIKE ocQ=-$PUT_STRIKE"
+  w1="$(woc "$MAKER1")"
+  if [[ "$w0" =~ ^[0-9]+$ ]]; then
+    expect_eq PRUNE_EXPIRED_WOC "$w1" "$((w0 - 1))" "writer_open_count(maker1) after prune_expired (was $w0)"
+  else
+    fail PRUNE_EXPIRED_WOC "writer_open_count(maker1) unreadable before prune_expired: '$w0'"
+  fi
+  open="$(view "$O" list_open)"
+  if [[ -n "$open" ]] && ! in_list "$open" "$P_ID"; then
+    pass PRUNE_EXPIRED_OPEN "#$P_ID gone from list_open"
+  else
+    fail PRUNE_EXPIRED_OPEN "#$P_ID still in list_open ${open:-unreadable}"
+  fi
+  sim_ok PRUNE_AGAIN_SIM "$ID_MAKER2" prune_expired --ids "[$P_ID]" &&
+    expect_eq PRUNE_AGAIN_RET "$SIM_RESULT" 0 "prune_expired([$P_ID]) again (simulated), return value"
+  count="$(view "$O" option_count | num)"
+  if [[ "$count" =~ ^[0-9]+$ ]]; then
+    expect_fail PRUNE_FAIL_NOT_FOUND 101 NotFound "$ID_MAKER2" prune_expired --ids "[$((count + 1000))]"
+  else
+    fail PRUNE_FAIL_NOT_FOUND "option_count unreadable: '$count'"
+  fi
+}
+
+# --full: maker2 fills its MAX_OPEN_PER_WRITER open offers with dust, the next create_offer fails with #116, then
+# maker2 cancels every dust offer. An EXIT trap cancels them too if the run dies halfway.
+CAP_IDS=()
+CAP_CANCELLED=0
+CAP_CANCEL_FAILED=0
+cap_cleanup() {
+  local id
+  ((${#CAP_IDS[@]} > 0)) || return 0
+  echo "   cleanup: maker2 cancels ${#CAP_IDS[@]} dust offers"
+  for id in "${CAP_IDS[@]}"; do
+    if submit_quiet "CAP_CANCEL_$id" "$ID_MAKER2" cancel_offer --writer "$MAKER2" --id "$id"; then
+      CAP_CANCELLED=$((CAP_CANCELLED + 1))
+    else
+      CAP_CANCEL_FAILED=$((CAP_CANCEL_FAILED + 1))
+      echo "   !! dust offer #$id is still open; cancel it with: stellar contract invoke --id $O --network testnet" \
+        "--source-account $ID_MAKER2 -- cancel_offer --writer $MAKER2 --id $id"
+    fi
+  done
+  CAP_IDS=()
+}
+v13_writer_cap() {
+  local w0 w1 w2 need i exp n range=""
+  w0="$(woc "$MAKER2")"
+  [[ "$w0" =~ ^[0-9]+$ ]] || {
+    fail CAP_FILL "writer_open_count(maker2) unreadable: '$w0'"
+    return 1
+  }
+  need=$((MAX_OPEN_PER_WRITER - w0))
+  ((need >= 0)) || need=0
+  exp=$(($(date +%s) + 3600))
+  echo "   maker2 has $w0 open offers; creating $need dust offers (PUT on RWA, qty = strike_total = premium_total = 1 unit)"
+  trap cap_cleanup EXIT
+  for ((i = 1; i <= need; i++)); do
+    submit_quiet "CAP_DUST_$i" "$ID_MAKER2" create_offer --writer "$MAKER2" --underlying "$RWA_SAC" --option_type Put \
+      --qty 1 --strike_total 1 --premium_total 1 --expiry "$exp" || break
+    [[ "$RESULT" =~ ^[0-9]+$ ]] || {
+      echo "   create_offer returned '$RESULT', not a u32 id"
+      break
+    }
+    CAP_IDS+=("$RESULT")
+  done
+  n="${#CAP_IDS[@]}"
+  ((n == 0)) || range="ids ${CAP_IDS[0]}..${CAP_IDS[$((n - 1))]}"
+  w1="$(woc "$MAKER2")"
+  if ((n == need)) && [[ "$w1" == "$MAX_OPEN_PER_WRITER" ]]; then
+    pass CAP_FILL "maker2 created $n dust offers (${range:-none needed}); writer_open_count(maker2) = $w1"
+  else
+    fail CAP_FILL "created $n/$need dust offers; writer_open_count(maker2) = ${w1:-unreadable}, wanted $MAX_OPEN_PER_WRITER"
+  fi
+  if [[ "$w1" == "$MAX_OPEN_PER_WRITER" ]]; then
+    expect_fail CAP_FAIL_WRITER_LIMIT 116 WriterOpenLimit "$ID_MAKER2" create_offer --writer "$MAKER2" \
+      --underlying "$RWA_SAC" --option_type Put --qty 1 --strike_total 1 --premium_total 1 --expiry "$exp"
+    sim_ok CAP_OTHER_WRITER_SIM "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" \
+      --option_type Put --qty 1 --strike_total 1 --premium_total 1 --expiry "$exp"
+  else
+    fail CAP_FAIL_WRITER_LIMIT "not checked: maker2 is not at the cap (writer_open_count = ${w1:-unreadable})"
+  fi
+  cap_cleanup
+  trap - EXIT
+  w2="$(woc "$MAKER2")"
+  if ((CAP_CANCEL_FAILED == 0)) && [[ "$w2" == "$w0" ]]; then
+    pass CAP_CLEANUP "cancelled $CAP_CANCELLED dust offers; writer_open_count(maker2) back to $w2"
+  else
+    fail CAP_CLEANUP "cancelled $CAP_CANCELLED, failed $CAP_CANCEL_FAILED; writer_open_count(maker2) = ${w2:-unreadable}, wanted $w0"
+  fi
+}
+
 # ---------- run ----------
 section "Strata options smoke run on Stellar TESTNET ($(date -u +%FT%TZ))"
 echo "options contract  $O"
@@ -536,6 +905,7 @@ echo "                  https://stellar.expert/explorer/testnet/contract/$O"
 echo "USDx SAC (quote)  $USDX_SAC"
 echo "RWA SAC           $RWA_SAC"
 echo "BOND SAC          $BOND_SAC"
+[[ $RUN_V13 == 0 ]] || echo "EQTY SAC          $EQTY_SAC (not in the constructor; listed in V1.3)"
 echo "maker1 $MAKER1 | maker2 $MAKER2"
 echo "investor $INVESTOR | outsider $OUTSIDER"
 echo "log file          $SMOKE_LOG"
@@ -588,6 +958,34 @@ if [[ $RUN_P0PLUS == 1 ]]; then
   paging || echo "   paging checks stopped"
 fi
 
+if [[ $RUN_V13 == 1 ]]; then
+  GROUP=V1.3
+  section "V1.3-0 interface probe"
+  if v13_probe; then
+    section "V1.3-1 prune path, part 1: maker1 offer expiring in ${PRUNE_SECS}s that nobody buys"
+    prune_create || echo "   prune path stopped"
+    section "V1.3-2 permissionless listing of EQTY (list_asset; not in the constructor)"
+    if v13_listing; then
+      section "V1.3-3 EQTY: ContractNotAuthorized until the issuer authorizes the escrow, then a PUT settles"
+      v13_eqty || echo "   EQTY path stopped"
+    else
+      fail V13_EQTY "skipped: EQTY is not listed, so no EQTY offer can exist"
+    fi
+    section "V1.3-4 tenor cap (MAX_TENOR = 2 years)"
+    v13_tenor
+    section "V1.3-5 prune_expired leaves a live offer alone"
+    prune_live || echo "   live prune path stopped"
+    section "V1.3-1 prune path, part 2: maker2 prunes maker1's expired offer"
+    prune_finish || echo "   prune path stopped"
+    section "V1.3-6 per-writer open cap (MAX_OPEN_PER_WRITER = 50)"
+    if [[ $RUN_FULL == 1 ]]; then
+      v13_writer_cap || echo "   writer-cap path stopped"
+    else
+      skip CAP_FILL "writer cap not exercised: run with --full (50 dust offers + 50 cancels, ~2 test XLM)"
+    fi
+  fi
+fi
+
 # Every required check must have run (a stopped path leaves its later checks unreached).
 require_ran() {
   local g="$1" l
@@ -606,12 +1004,20 @@ require_ran P0 P0_PUT_CREATE P0_PUT_BUY P0_PUT_EXERCISE P0_PUT_CLAIM P0_PUT_CLAI
   FAIL_XFER_TO_WRITER FAIL_XFER_NOT_ELIGIBLE XFER_TRANSFER XFER_EVENT XFER_TRANSFER_STATE XFER_TRANSFER_BAL \
   FAIL_XFER_OLD_HOLDER XFER_EXERCISE XFER_EXERCISE_BAL FAIL_XFER_AFTER_EXERCISE XFER_CLAIM XFER_CLAIM_BAL PAGE_FIRST3 \
   PAGE_PAST_END PAGE_CAP
+[[ $RUN_V13 != 1 ]] || require_ran V1.3 V13_INTERFACE PRUNE_CREATE PRUNE_CREATE_WOC V13_LIST V13_IS_LISTED \
+  V13_LIST_ASSETS V13_LIST_ASSETS_SEED V13_ASSET_COUNT V13_FAIL_ALREADY_LISTED V13_FAIL_LIST_QUOTE V13_FAIL_NOT_DEPLOYED \
+  V13_FAIL_BAD_CODE V13_FAIL_ISSUER_NOT_ACCOUNT V13_FAIL_CONTRACT_NOT_AUTHORIZED V13_AUTHORIZE_EQTY \
+  V13_ELIGIBLE_EQTY_contract V13_ELIGIBLE_EQTY_outsider V13_EQTY_PUT_CREATE V13_EQTY_PUT_BUY V13_EQTY_PUT_EXERCISE \
+  V13_EQTY_PUT_CLAIM V13_EQTY_PUT_CLAIM_BAL V13_FAIL_TENOR V13_TENOR_INSIDE_SIM PRUNE_LIVE PRUNE_LIVE_RET \
+  PRUNE_LIVE_STATE PRUNE_LIVE_BAL PRUNE_LIVE_CANCEL PRUNE_EXPIRED PRUNE_EVENT PRUNE_EXPIRED_RET PRUNE_EXPIRED_STATE \
+  PRUNE_EXPIRED_BAL PRUNE_EXPIRED_WOC PRUNE_EXPIRED_OPEN PRUNE_AGAIN_RET PRUNE_FAIL_NOT_FOUND CAP_FILL
+[[ $RUN_FULL != 1 ]] || require_ran V1.3 CAP_FAIL_WRITER_LIMIT CAP_OTHER_WRITER_SIM CAP_CLEANUP
 
 section "SUMMARY"
-printf '%-5s %-30s %-5s %s\n' GROUP CHECK RESULT DETAIL
+printf '%-5s %-32s %-5s %s\n' GROUP CHECK RESULT DETAIL
 for row in "${SUMMARY[@]}"; do
   IFS='|' read -r g l r d <<<"$row"
-  printf '%-5s %-30s %-5s %s\n' "$g" "$l" "$r" "$d"
+  printf '%-5s %-32s %-5s %s\n' "$g" "$l" "$r" "$d"
 done
 echo
 verdict() { if ((NFAIL[$1] == 0)); then echo PASS; else echo FAIL; fi; }
@@ -619,6 +1025,11 @@ echo "PRE: $(verdict PRE) (${NPASS[PRE]} passed, ${NFAIL[PRE]} failed)"
 echo "P0:  $(verdict P0) (${NPASS[P0]} passed, ${NFAIL[P0]} failed)"
 if [[ $RUN_P0PLUS == 1 ]]; then echo "P0+: $(verdict P0+) (${NPASS[P0+]} passed, ${NFAIL[P0+]} failed)"; else echo "P0+: not run (--p0-only)"; fi
 if [[ $RUN_P0PLUS == 1 ]]; then echo "V1.2: $(verdict V1.2) (${NPASS[V1.2]} passed, ${NFAIL[V1.2]} failed)"; else echo "V1.2: not run (--p0-only)"; fi
+if [[ $RUN_V13 == 1 ]]; then
+  echo "V1.3: $(verdict V1.3) (${NPASS[V1.3]} passed, ${NFAIL[V1.3]} failed, ${NSKIP[V1.3]} skipped)"
+else
+  echo "V1.3: not run (--p0-only or --no-v13)"
+fi
 echo "log: $SMOKE_LOG"
-total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2]))
+total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2] + NFAIL[V1.3]))
 exit $((total_fail > 0 ? 1 : 0))

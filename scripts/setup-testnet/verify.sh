@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Check the Strata testnet setup against Horizon (read-only). Exits non-zero on any mismatch.
 #   scripts/setup-testnet/verify.sh
-# With OPTIONS_ID in scripts/out/testnet.env it also checks that the contract is authorized on RWA and BOND.
+# With OPTIONS_ID in scripts/out/testnet.env it also checks that the contract is authorized on RWA and BOND, and reports
+# (without failing) whether it is authorized on EQTY: EQTY is not a constructor underlying; on contract v1.3 the smoke
+# run lists it and authorizes the escrow itself.
 set -euo pipefail
 
 # shellcheck source=../lib/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 require_tools stellar curl jq
 load_env
-require_vars RWA_ISSUER USDX_ISSUER MAKER1 MAKER2 INVESTOR OUTSIDER RWA_SAC BOND_SAC USDX_SAC
+require_vars RWA_ISSUER USDX_ISSUER MAKER1 MAKER2 INVESTOR OUTSIDER RWA_SAC BOND_SAC EQTY_SAC USDX_SAC
 
 fail=0
 check() { # check <label> <actual> <expected>
@@ -45,14 +47,16 @@ holding() { # holding <label> <G> <CODE> <ISSUER> <min whole tokens>
 for who in MAKER1 MAKER2 INVESTOR; do
   holding "$who RWA" "${!who}" RWA "$RWA_ISSUER" 1000
   holding "$who BOND" "${!who}" BOND "$RWA_ISSUER" 1000
+  holding "$who EQTY" "${!who}" EQTY "$RWA_ISSUER" 1000
 done
 for who in MAKER1 MAKER2 INVESTOR OUTSIDER; do
   holding "$who USDx" "${!who}" USDx "$USDX_ISSUER" 100000
 done
 check "OUTSIDER RWA (must be unauthorized)" "$(line "$OUTSIDER" RWA "$RWA_ISSUER")" "0.0000000 false"
 check "OUTSIDER BOND (must be unauthorized)" "$(line "$OUTSIDER" BOND "$RWA_ISSUER")" "0.0000000 false"
+check "OUTSIDER EQTY (must be unauthorized)" "$(line "$OUTSIDER" EQTY "$RWA_ISSUER")" "0.0000000 false"
 
-for a in RWA BOND USDX; do
+for a in RWA BOND EQTY USDX; do
   sac_var="${a}_SAC"
   if contract_exists "${!sac_var}"; then check "$a SAC deployed" yes yes; else check "$a SAC deployed" no yes; fi
 done
@@ -64,6 +68,9 @@ if [[ -n "${OPTIONS_ID:-}" ]]; then
       -- authorized --id "$OPTIONS_ID" 2>/dev/null | tail -1 || true)"
     check "options contract authorized on $a" "$got" true
   done
+  got="$(stellar contract invoke --id "$EQTY_SAC" --network "$NETWORK" --source-account "$ID_RWA_ISSUER" \
+    -- authorized --id "$OPTIONS_ID" 2>/dev/null | tail -1 || true)"
+  printf 'info  %-40s %s\n' "options contract authorized on EQTY" "${got:-<read failed>} (true only after the v1.3 smoke run)"
 fi
 
 echo "(balances drift once the demo starts trading; re-run 02-assets.sh to top up any balance below target)"
