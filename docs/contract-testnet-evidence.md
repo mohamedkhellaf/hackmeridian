@@ -53,9 +53,40 @@ USDx as underlying → `AssetNotAllowed` #3 · qty 0 → `InvalidArgs` #2 · wri
 The full run (`scripts/deploy/smoke-testnet.sh`) passed twice: P0 36/36 checks, P0+ 24/24, including balance deltas
 and `open_collateral` at every step; the contract ended at balance 0 and `open_collateral` 0 for all three tokens.
 
+## v1.1 deployment (2026-10-25 19:38 UTC): hardening redeploy
+
+Same functions, types and events as v1; `Error` codes 101–113 (same names and order) plus `OpenListFull = 114` and
+`CollateralShortfall = 115`; three extra preconditions (`docs/contract-abi.md` §10).
+
+| Item | Value |
+|---|---|
+| Options contract v1.1 | `CBRTUM4NF5P5ENYSPPOTT3NMRCPT65QSKMD2BB3AJPLU2C4YCFOCMSQC` |
+| Wasm upload / deploy tx | `a06877d96b18bc2805e72148fbcc85a755c575fb7af3128d9c6295b0f0976da1` / `a7ed7420db6be3d6a88ceebf7f54cdd4f44300df3c9ce7bcf744f6ed75911c08` (ledger 5386703) |
+| Wasm sha256 (fetched back from chain, matches) | `cd2ddf0cecd12cbd70bffbee3f7a1e061a8bd6a432693e0c4d0cccae55d45659` |
+| Issuer authorizes the contract on RWA / BOND | `b5e81ad95611e45aeaf39e631cafef4609ee922f78c6e12ad96c3fbd757271a7` / `7e1030432773012fd670de07cec9176fc8526a020f94f56da81f6bb78e1976ac` |
+
+Smoke run against v1.1 (`scripts/deploy/smoke-testnet.sh`, log `smoke-20261025T193854Z`): PRE 6/6, P0 36/36, P0+ 24/24.
+
+| Flow | create / buy / exercise / claim_delivery |
+|---|---|
+| P0 PUT on RWA (#0) | `261a96fd943a116be96211b63af3827a2ef7b8b87f6df82fdfd70e0a36c29e38` / `1e6b03406331f4dccf4d23a7f6cc8346a4a65fa62b61018f892ace1569552b40` / `45141e2cf008c292c73811f0e458fcab3a394a070b2c4b856201f51879c0d5b8` / `65ffc1fdf8e99acf204bee6f040fbbf4b9e510a04e9e8cb690e9b33dedce12aa` |
+| P0+ CALL on RWA (#4) | `6e0b113a9e1d36e097891a3f4ea23fcdfea10c0fd5e0c6c20f9aeb369563674c` / `8329023a32a72000eaed3b525fa5c7fb55c12b9bf4c04cd0a297497420ac3769` / `79fec39db0e8786b97b74c301adcbf22f279feed5ba38ce8397437674e070be4` / `89f48a0a6668094d7fe229ba3430e48d4ea6952c13d5f67489c3ab0e39a23e70` |
+| P0+ PUT on BOND (#5) | `88954ba2deec4e59146a00336d308364919bf5d7bc53cf357a6557f003caf657` / `f73444dfa471a8c61f513bc990f959675db05192ec248917f651e5a6ce437bd9` / `6f3c32827f0a2938da5e9ff267c8a09606ddbd1bba8d2927b7a4ff77cad2ad03` / `ad82ea44f1aee456fee41f5a28f657fb0919e2fabac97263c641884aa7eeb085` |
+
+| Step | Tx |
+|---|---|
+| Expiry path (#1): create; buy after expiry → `Expired` #109 (simulation); reclaim | `3f447fc5da6e98f8b64cc82446bd6e509fa2bdf6109af8f9dca97959ebbb67d6`; `cbc47a635e40ae8fd78e41a606019fc094a3eb1539e5fbae5f921493c6956bc0` |
+| Competition (#2 maker1, #3 maker2), then both cancelled | `a4944fcf7c4cd414de1d77501a5bb92bb0e7b92e6c04c96802693cb0f71aec97`, `9aa2bc734a8eaec66b5edef086e1ed8397fb238df41e6d5f715bb417c35050e0`; `112f4fd1b1dfca14727a57411576ad30b7d0b01a4c930a2fa6ba2d16f6b804fd`, `43d70339b66598ba65235d9dca69b40a43111429f1f0ab9a737118557328b55f` |
+| Extra: maker1 creates #6, then tries to buy it → `SelfTrade` #111 (simulation); cancels #6 | `b31f7da1857d54834cdbfe7f18a308966a2096cc8823e08e9e55496397375f48`; `b79efdd7db82d0e467284f7520f65179e09f12c213058f61f819a20b1b423fb5` |
+
+Expected failures, all rejected in simulation with the v1.1 code: `SelfTrade` #111, `NotHolder` #108, `NotExpired` #110,
+`WrongState` #106, `AssetNotAllowed` #103, `InvalidArgs` #102, `NotWriter` #107, `NotEligible` #104, `Expired` #109.
+`is_eligible`: contract true on RWA and BOND; investor true; outsider false; USDx: maker1 true, an account with no
+USDx trustline false. `get_option(999)` → `NotFound` #101. State after the run: `option_count` 7, `list_open` [].
+
 ## Off-chain assurance on the same code
 
-- 53 unit tests (`contracts/options/src/test.rs`), 5 property tests over 256 random operation sequences with a
+- 59 unit tests on v1.1 (53 on v1; `contracts/options/src/test.rs`), 5 property tests over 256 random operation sequences with a
   reference model of the ABI (`contracts/options/tests/invariants.rs`; 2,000-case run also clean).
 - Mutation sweep: 21 of 22 mutants killed; the survivor is an equivalent mutant (redundant code-TTL extension).
 - 4-lens audit with adversarial refutation, CoinFabrik Scout, clippy pedantic, cargo audit: no authorization, arithmetic
