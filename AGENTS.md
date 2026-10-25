@@ -9,7 +9,7 @@
 - **Category:** Genesis (new idea → working MVP)
 - **Track:** Stellar Unlocked: classic asset controls (approval required, revocable, clawback) combined with Soroban custody
 - **Deadline:** Mon Oct 26, 12:00 Lisbon (no late submissions). Feature freeze 06:00, submit by 11:00. Judged async on demo video, pitch deck, repo, and submission answers.
-- **Pitch:** Fully collateralized, physically settled put and call options on permissioned tokenized funds. Collateral is locked in a contract nobody holds a key to, exercise swaps the fund token and USDC in one all-or-nothing transaction, and the fund's own Stellar rules decide who may trade.
+- **Pitch:** Fully collateralized, physically settled put and call options on any permissioned tokenized real-world asset (funds, bonds, stocks…). Collateral is locked in a contract nobody holds a key to, exercise swaps the asset and USDC in one all-or-nothing transaction, and the asset's own Stellar rules decide who may trade.
 - **Status:** Plan agreed; **do not start coding until the team says go.** Core flow already proven on testnet in a throwaway spike (`research/decision/20_rwa_options_spike.md`). Decision history: `WINNING_IDEAS.md`, `research/decision/`.
 
 ## Scope
