@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:40, see §10.** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10.** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -195,8 +195,12 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
   Returns 0 for unknown tokens.
 - `is_eligible(token, who)`: `true` iff the SAC reports `authorized(who) == true`. Implemented with
   `StellarAssetClient::try_authorized`; a SAC error (for example a `G` account with no trustline, SAC error #13)
-  returns `false`. For a non-AUTH_REQUIRED asset this is `true` for every account that holds a trustline and for
-  every contract address; a `G` account with no trustline is still `false`.
+  returns `false`. What the SAC reports: the asset's **issuer** account is always authorized (it holds no trustline),
+  so `is_eligible(token, issuer)` is `true`; any other `G` account needs an authorized trustline. A contract address
+  reads its balance's `authorized` flag, or, with no balance yet, `true` unless the asset is AUTH_REQUIRED. So for an
+  unflagged asset (`USDx`) every trustline holder, the issuer and every contract address read `true`, and only a
+  non-issuer `G` account with no trustline reads `false`; on an AUTH_REVOCABLE asset a revoked trustline or contract
+  balance reads `false`.
 - `extend_ttl(ids)`: anyone may call. Extends the contract instance and code TTL and the persistent entry of every
   id in `ids` (`NotFound` for an unknown id). See §8.
 
@@ -318,10 +322,10 @@ Auth: every mutating call is signed by its first `Address` argument; SAC sub-inv
 tree by simulation (Freighter signs them with the transaction).
 
 Demo asset plan (fictional, Testnet only): `USDx` (quote, unflagged issuer), `RWA` and `BOND` (underlyings,
-one regulated issuer with `AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED`). The deployed IDs live only
-in the **Deployed contracts** table of `AGENTS.md`.
+one regulated issuer with `AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED`). The deployed IDs are recorded
+in the **Deployed contracts** table of `AGENTS.md` (and in §2, §10 and `docs/contract-testnet-evidence.md`).
 
-## 10. v1 → v1.1 hardening (decided 2026-10-25 19:40 by Dev 2 after the P0 audit; deployed 19:38 UTC as `CBRTUM4NF5P5ENYSPPOTT3NMRCPT65QSKMD2BB3AJPLU2C4YCFOCMSQC`)
+## 10. v1 → v1.1 hardening (decided 2026-10-25 19:26 Lisbon, which is UTC on that date, by Dev 2 after the P0 audit; deployed 19:38 UTC as `CBRTUM4NF5P5ENYSPPOTT3NMRCPT65QSKMD2BB3AJPLU2C4YCFOCMSQC`)
 
 The deployed v1 (`CDRS3BBFHUTB66OBP6Z3744QM7C7XDXLV5ZJ5URSFTAQMBJQCMZTL673`, codes 1–13) passed the P0/P0+ testnet
 smoke run and the 53-test suite. v1.1 changes, all reflected in §2, §3, §6 and §8 above:
