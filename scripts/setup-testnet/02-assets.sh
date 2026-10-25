@@ -8,8 +8,9 @@
 # Holders: maker1, maker2, investor are authorized on RWA and BOND; strata-outsider has trustlines but is
 # deliberately NOT authorized on RWA/BOND (ineligible-buyer demo). Everyone gets USDx.
 #
-# Idempotent: flags, trustlines and authorizations that already exist are skipped. Balances are topped up to
-# the target amount (never above it), so a re-run also restores demo balances.
+# Idempotent: flags, trustlines and authorizations that already exist are skipped. A balance below the target is
+# topped up to it; a balance at or above it is left alone (a rehearsal leaves some above target; nothing burns
+# them back). A failed Horizon read stops the script instead of being read as "no trustline" or a zero balance.
 # Requires 01-identities.sh. Writes public data only to scripts/out/testnet.env.
 set -euo pipefail
 
@@ -65,7 +66,9 @@ usdx_flags="$(horizon_account "$USDX_ISSUER" | jq -r '[.flags | to_entries[] | s
 # ---------- 2. Trustlines ----------
 for who in MAKER1 MAKER2 INVESTOR OUTSIDER; do
   for a in RWA BOND USDX; do
-    if [[ -n "$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" balance)" ]]; then
+    bal="$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" balance)" ||
+      die "Horizon read failed for $who ${CODE[$a]}; re-run once Horizon responds"
+    if [[ -n "$bal" ]]; then
       log "trustline: $who -> ${CODE[$a]} exists"
     else
       run_tx "TRUST_${who}_${a}" stellar tx new change-trust --source-account "${IDENT[$who]}" --network "$NETWORK" \
@@ -77,7 +80,9 @@ done
 # ---------- 3. Issuer authorization on RWA and BOND ----------
 for a in RWA BOND; do
   for who in MAKER1 MAKER2 INVESTOR; do
-    if [[ "$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" is_authorized)" == true ]]; then
+    auth="$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" is_authorized)" ||
+      die "Horizon read failed for $who ${CODE[$a]}; re-run once Horizon responds"
+    if [[ "$auth" == true ]]; then
       log "authorize: $who on ${CODE[$a]} already authorized"
     else
       run_tx "AUTH_${who}_${a}" stellar tx new set-trustline-flags --source-account "$ID_RWA_ISSUER" --network "$NETWORK" \
@@ -85,7 +90,9 @@ for a in RWA BOND; do
     fi
   done
   # The outsider must stay ineligible. Undo any authorization left by a manual step or an earlier demo.
-  if [[ "$(trustline_field "${G[OUTSIDER]}" "${CODE[$a]}" "${ISSUER[$a]}" is_authorized)" == true ]]; then
+  auth="$(trustline_field "${G[OUTSIDER]}" "${CODE[$a]}" "${ISSUER[$a]}" is_authorized)" ||
+    die "Horizon read failed for OUTSIDER ${CODE[$a]}; cannot confirm it is unauthorized"
+  if [[ "$auth" == true ]]; then
     log "authorize: OUTSIDER is authorized on ${CODE[$a]}; revoking to keep the ineligible-buyer demo valid"
     run_tx "DEAUTH_OUTSIDER_${a}" stellar tx new set-trustline-flags --source-account "$ID_RWA_ISSUER" --network "$NETWORK" \
       --trustor "${G[OUTSIDER]}" --asset "$(asset "$a")" --clear-authorize
@@ -96,8 +103,11 @@ done
 
 # ---------- 4. Issuance (top up to target) ----------
 issue() { # issue <ASSET_KEY> <WHO> <whole tokens>
-  local a="$1" who="$2" target=$(($3 * UNIT)) have diff
-  have="$(to_units "$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" balance)")"
+  local a="$1" who="$2" target=$(($3 * UNIT)) bal have diff
+  # Read first and stop on failure: an empty read would look like a zero balance and re-issue the full target.
+  bal="$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" balance)" ||
+    die "Horizon read failed for $who ${CODE[$a]}; not issuing, re-run once Horizon responds"
+  have="$(to_units "$bal")"
   if ((have >= target)); then
     log "issue: $who already holds $((have / UNIT)) ${CODE[$a]} (target $3)"
     return 0

@@ -49,8 +49,9 @@ All scripts are idempotent and safe to re-run:
 
 - existing identities and funded accounts are reused;
 - flags, trustlines and authorizations that already exist are skipped;
-- balances are **topped up to the target** (never above it), so re-running `02-assets.sh` also restores the
-  demo balances after a rehearsal;
+- a balance **below the target is topped up to it**; a balance at or above it is left alone. A rehearsal moves
+  tokens between the demo accounts, so re-running `02-assets.sh` tops up the ones that fell below target and
+  leaves the rest above it (`verify.sh` requires `>=` target, an authorized trustline, and nothing more);
 - if `strata-outsider` was authorized on RWA/BOND during a demo (issuer-authorization scene), `02-assets.sh`
   revokes it again so the ineligible-buyer scene keeps working;
 - existing SACs are detected and their ids resolved with `stellar contract id asset`.
@@ -89,7 +90,8 @@ To start a completely fresh world (new keys), first remove the identities:
 
 - Horizon can lag the ledger by a few seconds. The scripts only use Horizon to decide what to skip; every write
   goes through the CLI, so a re-run after a lagging read is harmless (trustline and flag operations are idempotent;
-  payments only top up).
+  payments only top up). A failed Horizon read (429, 5xx, timeout) stops `02-assets.sh` with an error instead of
+  being read as a missing trustline or a zero balance.
 - Friendbot is rate-limited. If funding fails, wait a minute and re-run `01-identities.sh`.
 - SAC error `#11` ("balance is deauthorized") on a contract call means the issuer has not authorized that address:
   run `03-authorize-contract.sh` for the contract, or `02-assets.sh` for the demo accounts.

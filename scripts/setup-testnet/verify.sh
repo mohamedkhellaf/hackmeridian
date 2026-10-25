@@ -29,12 +29,25 @@ line() { # line <G> <CODE> <ISSUER> -> "balance authorized"
   horizon_account "$1" | jq -r --arg c "$2" --arg i "$3" \
     '[.balances[] | select(.asset_code == $c and .asset_issuer == $i)][0] | if . == null then "none" else "\(.balance) \(.is_authorized)" end'
 }
+# Demo holdings: trustline present, authorized, balance >= target. Trading moves tokens between the demo
+# accounts, so after a rehearsal some balances sit above target (02-assets.sh never burns them back).
+holding() { # holding <label> <G> <CODE> <ISSUER> <min whole tokens>
+  local got="" bal="" auth=""
+  got="$(line "$2" "$3" "$4")" || got="<horizon read failed>"
+  read -r bal auth <<<"$got" || true
+  if [[ "$auth" == true && "$bal" =~ ^[0-9]+(\.[0-9]+)?$ ]] && (($(to_units "$bal") >= $5 * UNIT)); then
+    printf 'ok    %-40s %s\n' "$1" "$got"
+  else
+    printf 'FAIL  %-40s got %s, want >= %s true\n' "$1" "${got:-<none>}" "$5"
+    fail=1
+  fi
+}
 for who in MAKER1 MAKER2 INVESTOR; do
-  check "$who RWA" "$(line "${!who}" RWA "$RWA_ISSUER")" "1000.0000000 true"
-  check "$who BOND" "$(line "${!who}" BOND "$RWA_ISSUER")" "1000.0000000 true"
+  holding "$who RWA" "${!who}" RWA "$RWA_ISSUER" 1000
+  holding "$who BOND" "${!who}" BOND "$RWA_ISSUER" 1000
 done
 for who in MAKER1 MAKER2 INVESTOR OUTSIDER; do
-  check "$who USDx" "$(line "${!who}" USDx "$USDX_ISSUER")" "100000.0000000 true"
+  holding "$who USDx" "${!who}" USDx "$USDX_ISSUER" 100000
 done
 check "OUTSIDER RWA (must be unauthorized)" "$(line "$OUTSIDER" RWA "$RWA_ISSUER")" "0.0000000 false"
 check "OUTSIDER BOND (must be unauthorized)" "$(line "$OUTSIDER" BOND "$RWA_ISSUER")" "0.0000000 false"
@@ -53,5 +66,5 @@ if [[ -n "${OPTIONS_ID:-}" ]]; then
   done
 fi
 
-echo "(balances drift once the demo starts trading; re-run 02-assets.sh to top them back up)"
+echo "(balances drift once the demo starts trading; re-run 02-assets.sh to top up any balance below target)"
 exit "$fail"

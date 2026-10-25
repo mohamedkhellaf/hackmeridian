@@ -45,6 +45,7 @@ id.
 - [ ] `AGENTS.md` **Deployed contracts** table updated with the printed rows **in the same PR** as the contract
       change.
 - [ ] `scripts/deploy/bindings.sh` regenerated the client; Dev 3 notified of the new id and bindings.
-- [ ] `scripts/setup-testnet/verify.sh` passes (it also checks the contract authorization once `OPTIONS_ID` is set).
+- [ ] `scripts/setup-testnet/verify.sh` passes (it also checks the contract authorization once `OPTIONS_ID` is set;
+      if a rehearsal left a demo balance below target, re-run `scripts/setup-testnet/02-assets.sh` first).
 - [ ] `scripts/deploy/smoke-testnet.sh` ends with `P0: PASS` and `P0+: PASS` (PUT/CALL lifecycles on RWA and BOND,
       expected contract errors in simulation, expiry/reclaim, maker competition). Full log in `scripts/out/smoke-*.log`.
