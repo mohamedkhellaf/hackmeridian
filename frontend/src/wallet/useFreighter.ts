@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getAddress, getNetworkDetails, isConnected, requestAccess, signTransaction } from '@stellar/freighter-api'
+import { getAddress, getNetworkDetails, isConnected, requestAccess, signAuthEntry, signTransaction } from '@stellar/freighter-api'
 import { config } from '../config'
 
 export function useFreighter() {
@@ -52,7 +52,17 @@ export function useFreighter() {
     [address],
   )
 
+  const signAuth = useCallback(
+    async (entryXdr: string) => {
+      if (!address) throw new Error('Wallet not connected')
+      const res = await signAuthEntry(entryXdr, { networkPassphrase: config.networkPassphrase, address })
+      if (res.error || !res.signedAuthEntry) throw new Error(res.error?.message ?? 'Signing rejected')
+      return res.signedAuthEntry
+    },
+    [address],
+  )
+
   const wrongNetwork = networkPassphrase !== null && networkPassphrase !== config.networkPassphrase
 
-  return { address, wrongNetwork, error, connect, disconnect, sign }
+  return { address, wrongNetwork, error, connect, disconnect, sign, signAuthEntry: signAuth }
 }
