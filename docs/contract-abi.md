@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis (no signature changes).** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:40, see §10.** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -60,23 +60,28 @@ pub struct Config {
 
 #[contracterror] #[derive(Copy, Clone, Debug, Eq, PartialEq)] #[repr(u32)]
 pub enum Error {
-    NotFound = 1,               // unknown option id
-    InvalidArgs = 2,            // qty/strike_total/premium_total <= 0, or expiry <= now
-    AssetNotAllowed = 3,        // underlying not in the constructor allowlist
-    NotEligible = 4,            // writer/buyer not authorized on the underlying SAC (see §6)
-    ContractNotAuthorized = 5,  // the contract itself is not authorized to hold the underlying
-    WrongState = 6,             // action not valid in the option's current State
-    NotWriter = 7,              // caller is not the option's writer
-    NotHolder = 8,              // caller is not the option's holder
-    Expired = 9,                // buy/exercise after expiry
-    NotExpired = 10,            // reclaim before expiry
-    SelfTrade = 11,             // writer tried to buy their own offer
-    Overflow = 12,              // checked i128 math failed
-    InvalidConfig = 13,         // constructor: empty/duplicate/too many underlyings, or quote in underlyings
+    NotFound = 101,               // unknown option id
+    InvalidArgs = 102,            // qty/strike_total/premium_total <= 0, or expiry <= now
+    AssetNotAllowed = 103,        // underlying not in the constructor allowlist
+    NotEligible = 104,            // writer/buyer not authorized on the underlying SAC, or writer has no quote trustline (§6)
+    ContractNotAuthorized = 105,  // the contract itself is not authorized to hold the underlying (checked at create_offer AND buy)
+    WrongState = 106,             // action not valid in the option's current State
+    NotWriter = 107,              // caller is not the option's writer
+    NotHolder = 108,              // caller is not the option's holder
+    Expired = 109,                // buy/exercise after expiry
+    NotExpired = 110,             // reclaim before expiry
+    SelfTrade = 111,              // writer tried to buy their own offer
+    Overflow = 112,               // checked i128 math failed
+    InvalidConfig = 113,          // constructor: empty/duplicate/too many underlyings, or quote in underlyings
+    OpenListFull = 114,           // create_offer: MAX_OPEN (1000) offers are already in state Offered
+    CollateralShortfall = 115,    // create_offer/buy: SAC balance(contract) < open_collateral(token) for a token of this option
 }
 ```
 
-Error codes are public ABI: never renumber. New codes append at the end.
+Codes start at 101 so they can never be confused with Stellar Asset Contract errors (SAC #1–#13, e.g. #10 insufficient
+balance, #11 balance deauthorized, #13 trustline missing), which surface to clients through this contract unchanged.
+**v1 (deployed 2026-10-25 19:0x, `CDRS3BBF…L673`) used codes 1–13 with the same names and order; v1.1 renumbers once,
+before any production use, and adds 114/115.** Error codes are public ABI: never renumber. New codes append at the end.
 
 Derived values (clients compute, contract does not store):
 
@@ -123,8 +128,12 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
 - `writer.require_auth()`.
 - `AssetNotAllowed` unless `underlying` is in the allowlist.
 - `InvalidArgs` unless `qty > 0 && strike_total > 0 && premium_total > 0 && expiry > now`.
-- `NotEligible` unless `is_eligible(underlying, writer)`; `ContractNotAuthorized` unless
+- `NotEligible` unless `is_eligible(underlying, writer)` **and** `is_eligible(quote, writer)` (a writer with no quote
+  trustline could neither receive the premium nor claim CALL proceeds); `ContractNotAuthorized` unless
   `is_eligible(underlying, contract)` (an unauthorized contract could not receive the PUT delivery later).
+- `OpenListFull` if `list_open()` already holds `MAX_OPEN = 1000` ids.
+- `CollateralShortfall` if, for the option's quote or underlying token, `balance(contract) < open_collateral(token)`
+  (an earlier issuer clawback left a pooled deficit; no new exposure is accepted on that token, see §6).
 - Pulls collateral from the writer: PUT `quote.transfer(writer, contract, strike_total)`;
   CALL `underlying.transfer(writer, contract, qty)`.
 - Assigns `id = option_count()` (ids start at 0 and increase by 1), stores `OptionData { holder: None, state: Offered }`,
@@ -134,7 +143,11 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
 ### `buy(buyer, id)`
 - `buyer.require_auth()`.
 - `NotFound`, then `WrongState` unless `Offered`, then `Expired` unless `now < expiry`,
-  then `SelfTrade` if `buyer == writer`, then `NotEligible` unless `is_eligible(underlying, buyer)`.
+  then `SelfTrade` if `buyer == writer`, then `NotEligible` unless `is_eligible(underlying, buyer)`,
+  then `ContractNotAuthorized` unless `is_eligible(underlying, contract)` (the issuer may have de-authorized the
+  contract since the offer was created; the premium is non-refundable, so the buyer must not pay for an option that
+  cannot settle), then `CollateralShortfall` if `balance(contract) < open_collateral(token)` for the option's quote
+  or underlying token.
 - **PROVISIONAL premium policy (Dev 1 has not specified premium timing/refund):**
   `quote.transfer(buyer, writer, premium_total)` inside `buy`. The premium is earned by the writer at purchase
   and is never refunded by the contract, including if the option expires worthless or settlement later fails
@@ -239,8 +252,10 @@ pub struct DeliveryClaimed{ #[topic] pub id: u32 }
   runs out; the shortfall lands on whoever claims last, not on the option whose collateral was clawed. Nothing
   partial happens inside one call (a failing SAC transfer, #10, reverts the whole call). The deficit is visible as
   `open_collateral(token) > balance(contract)` and the UI must show it as a warning for **every** option on that
-  token. There is **no** `Impaired` state, refund or pro-rata logic (AGENTS.md). `USDx` is unflagged, so PUT strike
-  collateral is not exposed to clawback.
+  token. While a deficit exists on a token, `create_offer` and `buy` involving that token fail with
+  `CollateralShortfall`, so the hole cannot spread to new participants; existing positions keep settling
+  first-come-first-served. There is **no** `Impaired` state, refund or pro-rata logic (AGENTS.md). `USDx` is
+  unflagged, so PUT strike collateral is not exposed to clawback.
 - Issuer de-authorization of the **contract address** itself blocks every SAC transfer into or out of the contract
   for that asset: PUT `exercise` and PUT `claim_delivery`, CALL `exercise` and CALL `reclaim` all fail until the
   issuer re-authorizes the contract. Writers can still `reclaim` PUT collateral (quote token) after expiry.
@@ -270,6 +285,7 @@ enum Key {
     Reserved(Address),  // instance: i128 per token (see open_collateral)
     Opt(u32),           // persistent: OptionData
 }
+const MAX_OPEN: u32 = 1000;        // cap on ids in Key::Open (instance storage is one 64 KB entry)
 const DAY_LEDGERS: u32 = 17_280;
 const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
@@ -304,20 +320,23 @@ Demo asset plan (fictional, Testnet only): `USDx` (quote, unflagged issuer), `RW
 one regulated issuer with `AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED`). The deployed IDs live only
 in the **Deployed contracts** table of `AGENTS.md`.
 
-## 10. Known limitations of the deployed v1 and planned additive changes (not yet deployed)
+## 10. v1 → v1.1 hardening (decided 2026-10-25 19:40 by Dev 2 after the P0 audit; one redeploy)
 
-Found by the P0 static analysis and audit on 2026-10-25. Each change below is additive (new error codes are appended,
-no signature changes) and will ship together in one hardening redeploy; until then the deployed contract behaves as
-described in §3.
+The deployed v1 (`CDRS3BBFHUTB66OBP6Z3744QM7C7XDXLV5ZJ5URSFTAQMBJQCMZTL673`, codes 1–13) passed the P0/P0+ testnet
+smoke run and the 53-test suite. v1.1 changes, all reflected in §2, §3, §6 and §8 above:
 
-1. **Unbounded open-offer list.** `Key::Open` grows with every `Offered` option and is rewritten on every
-   state-changing call. An eligible account could create thousands of 1-unit offers to bloat the instance entry
-   (hard limit 64 KB, roughly 8,000 ids) and raise everyone's fees. Planned: `MAX_OPEN = 1000` enforced in
-   `create_offer` with `Error::OpenListFull = 14`. Mitigation today: only issuer-authorized accounts can create offers.
-2. **Writer eligibility on the quote token.** A writer with no `USDx` trustline can create an offer that nobody can
-   buy (every `buy` fails at the premium transfer), and could not `claim_delivery` on a CALL. Planned: `create_offer`
-   also requires `is_eligible(quote, writer)`, reusing `Error::NotEligible`. Clients should simulate `buy` before
-   presenting an offer as executable (RFQ truth rule).
-3. **Pooled clawback exposure** (§6): documented, no code change planned for the MVP. A fail-closed guard
-   (`balance(contract) >= open_collateral(token)` before any payout) is possible but freezes every option on the
-   token after any clawback, which is a product decision for Dev 1.
+1. **Error codes renumbered to 101–113** (same names/order) so SAC errors #10/#11/#13 can no longer be mistaken for
+   `NotExpired`/`SelfTrade`/`InvalidConfig` by clients. Two codes appended: `OpenListFull = 114`,
+   `CollateralShortfall = 115`.
+2. **`MAX_OPEN = 1000`** open offers; `create_offer` returns `OpenListFull` beyond that. Closes the instance-storage
+   bloat / fee-griefing path (audit finding, 64 KB entry limit at roughly 8,000 ids).
+3. **Writer must be eligible on the quote token** at `create_offer` (`NotEligible`), so no unbuyable offers appear in
+   `list_open` (RFQ truth rule).
+4. **`buy` re-checks `is_eligible(underlying, contract)`** (`ContractNotAuthorized`): no non-refundable premium for an
+   option the contract can no longer settle.
+5. **`CollateralShortfall` guard on new exposure**: `create_offer` and `buy` fail while `balance(contract) <
+   open_collateral(token)` for the option's quote or underlying token. Existing positions are unaffected (a full
+   fail-closed guard on every payout remains a product decision for Dev 1, §6).
+
+Not changed: function names, argument order, types, events, lifecycle. Frontend action: update the error-code map and
+the contract id after the v1.1 deploy; everything else is unchanged.
