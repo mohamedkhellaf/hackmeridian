@@ -1,0 +1,42 @@
+import { expect, type Page } from '@playwright/test'
+
+// Addresses of the test wallet (src/wallet/useFreighter.ts, VITE_E2E=1). A is the default.
+export const ADDR_B = 'GBPHYE7XMH6GWDVWVTB3V2N55I6GRFAEK6BPWVOH2RGKX3PMNA2VIEEM'
+
+export async function openApp(page: Page) {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: /FUND/ }).first()).toBeVisible()
+}
+
+export async function connect(page: Page) {
+  await page.getByRole('button', { name: 'Connect Freighter' }).click()
+  await expect(page.getByRole('button', { name: 'Disconnect' })).toBeVisible()
+}
+
+// The mock state lives in memory, so switching identity must not reload the page: the test wallet
+// reads `?as=` at connect time, so we rewrite the URL and reconnect.
+export async function switchTo(page: Page, address: string | null) {
+  await page.getByRole('button', { name: 'Disconnect' }).click()
+  await page.evaluate((a) => history.replaceState(null, '', a ? `/?as=${a}` : '/'), address)
+  await connect(page)
+}
+
+export async function goTo(page: Page, name: 'Market' | 'Write' | 'My positions') {
+  await page.locator('nav').getByRole('button', { name: new RegExp(`^${name}`) }).click()
+}
+
+// "Total held" cell of a token row in the collateral panel, as a number.
+export async function totalHeld(page: Page, code: string): Promise<number> {
+  const row = page
+    .locator('section', { has: page.getByRole('heading', { name: 'Collateral held by the contract' }) })
+    .getByRole('row')
+    .filter({ hasText: code })
+  const text = (await row.getByRole('cell').nth(5).innerText()).replace(/,/g, '')
+  return Number(text)
+}
+
+export async function openBuyDialogForSeed(page: Page) {
+  // Seeded best-priced FUND put (maker B, 1.8 USDx for 5 FUND).
+  await page.getByRole('button', { name: /^Buy put on 5 FUND from GMAK…BBBB/ }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+}
