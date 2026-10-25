@@ -8,7 +8,7 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
   const before = await totalHeld(page, 'USDx')
 
   await goTo(page, 'Write')
-  const submit = page.getByRole('button', { name: 'Lock collateral & publish offer' })
+  const submit = page.getByRole('button', { name: /^Lock .+ and publish$/ })
 
   // 0.0000001 FUND at 0.5 USDx is not an exact settlement amount.
   await page.getByLabel(/^Quantity/).fill('0.0000001')
@@ -35,7 +35,11 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
   const row = page.locator('tbody tr')
   await row.getByRole('button', { name: 'Cancel' }).click()
   await expect(toast(page)).toContainText('Cancel confirmed')
-  await expect(row.locator('.state')).toHaveText('cancelled')
+  // Cancelled positions are closed: hidden until "Show closed" is on.
+  await expect(row).toHaveCount(0)
+  await page.getByLabel('Show closed').check()
+  await expect(row).toContainText('Cancelled')
+  await expect(row.getByRole('button')).toHaveCount(0)
 
   await goTo(page, 'Reserves')
   await expect.poll(() => totalHeld(page, 'USDx')).toBe(before)

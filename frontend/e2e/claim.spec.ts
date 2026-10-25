@@ -7,7 +7,7 @@ test('writer claims delivery after a second account buys and exercises', async (
 
   // A writes a put.
   await goTo(page, 'Write')
-  await page.getByRole('button', { name: 'Lock collateral & publish offer' }).click()
+  await page.getByRole('button', { name: /^Lock .+ and publish$/ }).click()
   await expect(toast(page)).toContainText('Offer published')
 
   // B buys it and exercises (same page session: mock state is in memory).
@@ -24,7 +24,10 @@ test('writer claims delivery after a second account buys and exercises', async (
   await switchTo(page, null)
   await goTo(page, 'Portfolio')
   const row = page.locator('tbody tr')
-  await row.getByRole('button', { name: 'Claim delivery' }).click()
+  await expect(row).toContainText('Awaiting your claim')
+  await row.getByRole('button', { name: 'Claim 5.00 FUND' }).click()
   await expect(toast(page)).toContainText('Claim delivery confirmed')
-  await expect(row.locator('.state')).toHaveText('settled')
+  await expect(row).toHaveCount(0) // settled is closed
+  await page.getByLabel('Show closed').check()
+  await expect(row).toContainText('Settled')
 })
