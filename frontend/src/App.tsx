@@ -1,234 +1,68 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { config, explorerTx } from './config'
-import { CollateralPanel } from './maker/CollateralPanel'
-import { WriteOfferForm } from './maker/WriteOfferForm'
-import { MockOptionsClient } from './options/mockClient'
-import type { OptionsClient } from './options/client'
-import type { CollateralLine, NewOffer, OptionOffer, SupportedAssets } from './options/types'
-import { formatAmount, formatExpiry, shortAddress, strikePerUnit } from './options/format'
-import { useFreighter } from './wallet/useFreighter'
+import { PresentationMode } from './demo/PresentationMode'
+import { config } from './config'
+import { BuyDialog } from './market/BuyDialog'
+import { AppShell, WalletChip } from './layout/AppShell'
+import { useHashRoute } from './layout/routes'
+import { useStrata } from './state/useStrata'
+import { Banner, NoticeToast } from './ui'
+import { BalancesBar } from './wallet/BalancesBar'
+import { IssuerView } from './views/IssuerView'
+import { MarketsView } from './views/MarketsView'
+import { PortfolioView } from './views/PortfolioView'
+import { ReservesView } from './views/ReservesView'
+import { WriteView } from './views/WriteView'
 import './App.css'
 
-type Tab = 'market' | 'write' | 'positions'
-type Notice = { kind: 'ok'; text: string; hash: string; mock: boolean } | { kind: 'err'; text: string }
-
-function OptionRow({
-  o,
-  action,
-}: {
-  o: OptionOffer
-  action?: { label: string; onClick: () => void; disabled?: boolean }
-}) {
-  return (
-    <tr>
-      <td>
-        <span className={`kind kind-${o.kind}`}>{o.kind.toUpperCase()}</span>
-      </td>
-      <td>
-        {formatAmount(o.underlyingQty, o.underlying.decimals)} {o.underlying.code}
-      </td>
-      <td>
-        {strikePerUnit(o)} {o.quote.code}
-      </td>
-      <td>
-        {formatAmount(o.totalStrike, o.quote.decimals)} {o.quote.code}
-      </td>
-      <td>
-        {formatAmount(o.totalPremium, o.quote.decimals)} {o.quote.code}
-      </td>
-      <td>{formatExpiry(o.expiry)}</td>
-      <td className="mono">{shortAddress(o.writer)}</td>
-      <td>
-        <span className={`state state-${o.state}`}>{o.state}</span>
-      </td>
-      <td>
-        {action && (
-          <button type="button" onClick={action.onClick} disabled={action.disabled}>
-            {action.label}
-          </button>
-        )}
-      </td>
-    </tr>
-  )
-}
-
-function OptionsTable({ rows, actionFor }: { rows: OptionOffer[]; actionFor: (o: OptionOffer) => Parameters<typeof OptionRow>[0]['action'] }) {
-  if (rows.length === 0) return <p className="empty">Nothing here yet.</p>
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Underlying</th>
-            <th>Strike / unit</th>
-            <th>Total strike</th>
-            <th>Premium</th>
-            <th>Expiry</th>
-            <th>Writer</th>
-            <th>State</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((o) => (
-            <OptionRow key={o.id.toString()} o={o} action={actionFor(o)} />
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 function App() {
-  const wallet = useFreighter()
-  // Swap for the bindings-backed client once the contract is deployed.
-  const client: OptionsClient = useMemo(() => new MockOptionsClient(), [])
-  const [options, setOptions] = useState<OptionOffer[]>([])
-  const [assets, setAssets] = useState<SupportedAssets | null>(null)
-  const [collateral, setCollateral] = useState<CollateralLine[]>([])
-  const [tab, setTab] = useState<Tab>('market')
-  const [busyId, setBusyId] = useState<bigint | null>(null)
-  const [notice, setNotice] = useState<Notice | null>(null)
-
-  const refresh = useCallback(async () => {
-    const [opts, assets, lines] = await Promise.all([client.listOptions(), client.supportedAssets(), client.openCollateral()])
-    setOptions(opts)
-    setAssets(assets)
-    setCollateral(lines)
-  }, [client])
-
-  useEffect(() => {
-    void refresh()
-  }, [refresh])
-
-  // Returns whether the transaction went through.
-  const run = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>) => {
-    setBusyId(id)
-    setNotice(null)
-    try {
-      const { hash } = await fn()
-      setNotice({ kind: 'ok', text: `${label} confirmed`, hash, mock: client.isMock })
-      return true
-    } catch (e) {
-      setNotice({ kind: 'err', text: e instanceof Error ? e.message : String(e) })
-      return false
-    } finally {
-      setBusyId(null)
-      await refresh()
-    }
-  }
-
-  const writeOffer = (offer: NewOffer) => run(-1n, 'Offer published', () => client.createOffer(offer, me!))
-
-  const me = wallet.address
-  const market = options.filter((o) => o.state === 'offered')
-  const positions = options.filter((o) => me && (o.holder === me || o.writer === me))
-  const busy = busyId !== null
+  const s = useStrata()
+  const [route] = useHashRoute()
+  const { wallet, me } = s
 
   return (
-    <div className="app">
-      <header>
-        <div className="brand">
-          <strong>Strata</strong>
-          <span>Collateralized options on tokenized assets · Testnet</span>
-        </div>
-        {me ? (
-          <div className="wallet">
-            <span className="mono">{shortAddress(me)}</span>
-            <button type="button" className="secondary" onClick={wallet.disconnect}>
-              Disconnect
-            </button>
-          </div>
-        ) : (
-          <button type="button" onClick={() => void wallet.connect()}>
-            Connect Freighter
-          </button>
-        )}
-      </header>
+    <>
+      <PresentationMode />
+      <AppShell
+        route={route}
+        portfolioBadge={s.actionsWaiting}
+        mock={s.isMock}
+        contractId={config.optionsContractId}
+        balances={
+          me && s.assets ? (
+            <BalancesBar
+              tokens={s.balanceTokens.map((t) => ({ contractId: t.contractId, code: t.code, decimals: t.decimals }))}
+              balances={s.balances.balances}
+              loading={s.balances.loading}
+              onRefresh={() => void s.refreshBalances()}
+            />
+          ) : null
+        }
+        wallet={<WalletChip address={me} onConnect={() => void wallet.connect()} onDisconnect={wallet.disconnect} />}
+      >
+        {wallet.wrongNetwork && <Banner tone="danger">Freighter is not on Testnet. Switch network in the extension.</Banner>}
+        {wallet.error && <Banner tone="danger">{wallet.error}</Banner>}
 
-      {client.isMock && <div className="banner warn">Mock data: no contract connected. Assets, makers and transactions are fictional.</div>}
-      {wallet.wrongNetwork && <div className="banner err">Freighter is not on Testnet. Switch network in the extension.</div>}
-      {wallet.error && <div className="banner err">{wallet.error}</div>}
-      {notice?.kind === 'ok' && (
-        <div className="banner ok">
-          {notice.text} · tx{' '}
-          {notice.mock ? (
-            <span className="mono">{notice.hash.slice(0, 12)}… (mock)</span>
-          ) : (
-            <a className="mono" href={explorerTx(notice.hash)} target="_blank" rel="noreferrer">
-              {notice.hash.slice(0, 12)}…
-            </a>
-          )}
-        </div>
-      )}
-      {notice?.kind === 'err' && <div className="banner err">{notice.text}</div>}
-
-      <nav>
-        <button type="button" className={tab === 'market' ? 'tab active' : 'tab'} onClick={() => setTab('market')}>
-          Market ({market.length})
-        </button>
-        <button type="button" className={tab === 'write' ? 'tab active' : 'tab'} onClick={() => setTab('write')}>
-          Write
-        </button>
-        <button type="button" className={tab === 'positions' ? 'tab active' : 'tab'} onClick={() => setTab('positions')}>
-          My positions ({positions.length})
-        </button>
-      </nav>
-
-      <main>
-        {tab === 'market' && (
-          <OptionsTable
-            rows={market}
-            actionFor={(o) => ({
-              label: busyId === o.id ? 'Buying…' : 'Buy',
-              disabled: !me || busy || o.writer === me,
-              onClick: () => void run(o.id, 'Purchase', () => client.buy(o.id, me!)),
-            })}
+        {route === 'markets' && (
+          <MarketsView
+            offers={s.market}
+            me={me}
+            busy={s.busy}
+            busyId={s.busyId}
+            onBuy={s.setBuying}
+            collateral={s.collateral}
+            health={s.health}
+            mock={s.isMock}
           />
         )}
-        {tab === 'write' && (
-          <div className="write-grid">
-            {assets && <WriteOfferForm assets={assets} disabled={!me || busy} onSubmit={writeOffer} />}
-            <CollateralPanel lines={collateral} contractId={config.optionsContractId} />
-            {!me && <p className="empty">Connect Freighter to write an option.</p>}
-          </div>
-        )}
-        {tab === 'positions' &&
-          (me ? (
-            <OptionsTable
-              rows={positions}
-              actionFor={(o) => {
-                if (o.holder === me && o.state === 'active')
-                  return {
-                    label: busyId === o.id ? 'Exercising…' : 'Exercise',
-                    disabled: busy,
-                    onClick: () => void run(o.id, 'Exercise', () => client.exercise(o.id, me)),
-                  }
-                if (o.writer === me && o.state === 'expired')
-                  return {
-                    label: busyId === o.id ? 'Reclaiming…' : 'Reclaim collateral',
-                    disabled: busy,
-                    onClick: () => void run(o.id, 'Reclaim', () => client.reclaim(o.id, me)),
-                  }
-                if (o.writer === me && o.state === 'offered')
-                  return {
-                    label: busyId === o.id ? 'Cancelling…' : 'Cancel',
-                    disabled: busy,
-                    onClick: () => void run(o.id, 'Cancel', () => client.cancelOffer(o.id, me)),
-                  }
-                return undefined
-              }}
-            />
-          ) : (
-            <p className="empty">Connect Freighter to see your positions.</p>
-          ))}
-      </main>
+        {route === 'write' && <WriteView assets={s.assets} client={s.client} me={me} busy={s.busy} onSubmit={s.writeOffer} />}
+        {route === 'portfolio' && <PortfolioView me={me} rows={s.positions} actionFor={s.actionFor} />}
+        {route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
+        {route === 'issuer' && <IssuerView address={wallet.address} sign={wallet.sign} optionsContractId={config.optionsContractId} />}
+      </AppShell>
 
-      <footer>
-        Physically settled, fully collateralized. Issuer controls (freeze, clawback) on regulated assets can block settlement. This is not a guarantee against issuer action.
-      </footer>
-    </div>
+      {s.buying && me && <BuyDialog offer={s.buying} client={s.client} me={me} onCancel={() => s.setBuying(null)} onConfirm={s.confirmBuy} />}
+
+      <NoticeToast notice={s.notice} onDismiss={s.dismissNotice} />
+    </>
   )
 }
 

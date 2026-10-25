@@ -1,0 +1,35 @@
+/* Only active with ?present=1 (body.present is added by PresentationMode). */
+body.present {
+  font-size: 18px;
+}
+body.present .app {
+  padding-bottom: 72px;
+}
+body.present footer {
+  font-size: 0.8em;
+}
+
+.present-caption {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  max-width: calc(100vw - 32px);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(20, 20, 28, 0.82);
+  color: #fff;
+  font-size: 16px;
+  pointer-events: none;
+}
+.present-title {
+  font-weight: 600;
+}
+.present-meta {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}

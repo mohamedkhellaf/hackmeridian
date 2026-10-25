@@ -20,7 +20,8 @@ dist
 !.vscode/extensions.json
 .DS_Store
 
-# Testnet script output (public keys, ids, tx hashes) and anything key-shaped
+# Third-party UI screenshots used as design references (not ours to publish)
+design/inspiration/
 scripts/out/
 *.secret
 keys.json
