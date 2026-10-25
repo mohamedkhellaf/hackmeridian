@@ -19,7 +19,8 @@ TBD: how contracts, frontend and any backend talk to each other.
 
 ## How we work
 
-- `main` must always be demoable. Don't push directly to it; open a PR.
+- `main` must always be demoable. Changes to code (`contracts/`, `frontend/src`, build config like `Cargo.toml` / `package.json`, `.github/workflows`) go through a PR.
+- Small non-code changes (docs, `AGENTS.md`, README, `.mcp.json`, other config that can't break the build) can be pushed straight to `main`.
 - One short-lived branch per task: `feat/…`, `fix/…`, `chore/…`. Merge within a few hours, not days.
 - CI must be green before merging. Reviews are optional: tag a teammate if you want eyes, but don't wait on it.
 - Squash-merge, then delete the branch. Pull `main` often.
