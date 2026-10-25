@@ -43,10 +43,10 @@ test('buy review gates on the checkbox, then confirmed step, then exercise', asy
   // The new position shows as a waiting action on the Portfolio link.
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Portfolio 1' })).toBeVisible()
   const row = page.getByRole('row').filter({ hasText: 'GMAK…BBBB' })
-  await expect(row.locator('.state')).toHaveText('active')
+  await expect(row).toContainText('Active · exercisable')
   await row.getByRole('button', { name: 'Exercise' }).click()
   await expect(toast(page)).toContainText('Exercise confirmed')
-  await expect(row.locator('.state')).toHaveText('exercised')
+  await expect(row).toContainText('Exercised')
 })
 
 test('back to markets closes the confirmed step', async ({ page }) => {
