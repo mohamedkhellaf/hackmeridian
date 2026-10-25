@@ -48,6 +48,7 @@ const DAY: u32 = 17_280; // ledgers per day (ABI §8 DAY_LEDGERS)
 const SAC_BALANCE: u32 = 10; // insufficient / zero balance
 const SAC_DEAUTHORIZED: u32 = 11; // balance deauthorized (issuer freeze, not authorized)
 const SAC_OVERFLOW: u32 = 12; // i128 balance overflow
+const SAC_NO_TRUSTLINE: u32 = 13; // classic account has no trustline for the asset
 
 // ---------------------------------------------------------------------------
 // Fixture
@@ -2317,7 +2318,7 @@ fn open_list_cap_returns_open_list_full() {
 }
 
 #[test]
-fn create_offer_rejects_writer_without_quote_trustline() {
+fn create_offer_rejects_writer_deauthorized_on_quote() {
     let t = setup();
     // authorized and funded on RWA, nothing on USDx
     let w = Address::generate(&t.env);
@@ -2329,7 +2330,8 @@ fn create_offer_rejects_writer_without_quote_trustline() {
     // issuer: with AUTH_REVOCABLE the SAC admin writes an explicit deauthorized
     // USDx balance for `w`. (A classic G account without a USDx trustline reads
     // the same way, SAC #13 -> false, but this env cannot create the RWA
-    // trustline such an account would also need.)
+    // trustline such an account would also need; that SAC-error branch is
+    // covered by `is_eligible_false_for_g_account_without_trustline`.)
     assert!(t.c.is_eligible(&t.usdx, &w));
     t.usdx_flags.set_flag(IssuerFlags::RevocableFlag);
     t.sac(&t.usdx).set_authorized(&w, &false);
@@ -2376,6 +2378,29 @@ fn create_offer_rejects_writer_without_quote_trustline() {
     t.c.buy(&t.holder, &id);
     assert_eq!(t.bal(&t.usdx, &w), PREMIUM);
     assert_eq!(t.state(id), State::Active);
+}
+
+#[test]
+fn is_eligible_false_for_g_account_without_trustline() {
+    let t = setup();
+    // A classic G account with no trustline: the SAC's `authorized` fails with
+    // SAC #13. `is_eligible` must map that error to `false` (ABI §3) instead of
+    // trapping, so a writer like this gets `NotEligible` (#104) from
+    // `create_offer`, not a raw SAC error.
+    let g = Address::from_str(
+        &t.env,
+        "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    );
+    assert!(matches!(
+        t.sac(&t.usdx).try_authorized(&g),
+        Err(Ok(e)) if e == soroban_sdk::Error::from_contract_error(SAC_NO_TRUSTLINE)
+    ));
+    assert!(!t.c.is_eligible(&t.usdx, &g));
+    assert!(!t.c.is_eligible(&t.rwa, &g));
+    assert!(!t.c.is_eligible(&t.bond, &g));
+    // The asset's issuer account never holds a trustline, yet the SAC reports
+    // it as authorized (ABI §3).
+    assert!(t.c.is_eligible(&t.usdx, &t.usdx_flags.address()));
 }
 
 #[test]
