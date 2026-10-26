@@ -13,8 +13,8 @@ s.curve({ from: 50, to: 150, steps: 100 }) // [{ s, pnl }, ...] for the chart
 - `longCall`, `shortCall`, `longPut`, `shortPut` `(leg, spot)`: `{ perUnit, total }` P&L at expiry, premium included. `leg = { qty, strikeTotal, premiumTotal }` (totals, like the contract).
 - `coveredCall(holding, call)`, `cashSecuredPut(put)`, `protectivePut(holding, put)`, `collar(holding, put, call)`: return `{ pnl(s), breakevens, maxGain, maxLoss, capitalLocked, curve(range) }`. `holding = { qty, entryPrice }`; `qty` must match the option legs.
 - `maxGain`/`maxLoss` are `Infinity` when unbounded; `maxLoss` is a positive number. `capitalLocked` is gross (premiums received are not netted).
-- `proHolderPayout(qty, K, S_T, margin, vault)`: `{ due, paid, deficit }` with `paid = min(due, margin + vault)`; show the deficit, never hide it.
-- `guaranteedCoverPrice(qty, K, margin, vault)`: `K + (margin + vault) / qty`, the highest settlement price paid in full.
+- `proHolderPayout(qty, K, S_T, margin, vault)`: `{ due, paid, deficit }` with `paid = min(due, margin + vault)`; show the deficit, never hide it. Single-writer simplification: in the v0.1 model the vault is shared pro rata across a series' shortfalls, so with several writers in deficit the real payout is lower.
+- `fullCoverPrice(qty, K, margin, vault)`: `K + (margin + vault) / qty`, the highest settlement price paid in full under the same simplification. Label it "covered up to", never "guaranteed" (`guaranteedCoverPrice` is a deprecated alias).
 - Prices `s` are per unit of the underlying; no fees or slippage are modelled.
 
 Run: `npm install && npm test && npm run typecheck`.

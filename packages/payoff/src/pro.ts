@@ -10,7 +10,12 @@ export interface ProPayout {
   deficit: number
 }
 
-/** Cash payout of a Pro (cash-settled call) position when only margin and vault can pay it. */
+/**
+ * Cash payout of a Pro (cash-settled call) position at settlement when only margin and vault can pay it.
+ * Single-writer simplification: assumes the whole `vault` backs this one writer. In the v0.1 model
+ * (`packages/risk/pro_v0_model.py`) the vault covers all shortfalls of a series pro rata, so with
+ * several writers in deficit the holder's share of the vault is smaller than shown here.
+ */
 export function proHolderPayout(qty: number, K: number, S_T: number, writerMargin: number, vault: number): ProPayout {
   if (!(qty > 0) || !(K > 0)) throw new RangeError('qty and K must be > 0')
   if (writerMargin < 0 || vault < 0) throw new RangeError('writerMargin and vault must be >= 0')
@@ -19,8 +24,14 @@ export function proHolderPayout(qty: number, K: number, S_T: number, writerMargi
   return { label: 'hypothetical', due, paid, deficit: due - paid }
 }
 
-/** Highest settlement price the holder is still paid in full: K + (margin + vault) / qty. */
-export function guaranteedCoverPrice(qty: number, K: number, margin: number, vault: number): number {
+/**
+ * Highest settlement price at which the holder is still paid in full: K + (margin + vault) / qty.
+ * Same single-writer simplification as `proHolderPayout`. Not a guarantee: label it "covered up to".
+ */
+export function fullCoverPrice(qty: number, K: number, margin: number, vault: number): number {
   if (!(qty > 0)) throw new RangeError('qty must be > 0')
   return K + (margin + vault) / qty
 }
+
+/** @deprecated Renamed to `fullCoverPrice`: Pro payouts are never guaranteed. Kept as an alias. */
+export const guaranteedCoverPrice = fullCoverPrice
