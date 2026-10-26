@@ -13,6 +13,8 @@ import { MarketsView } from './views/MarketsView'
 import { PortfolioView } from './views/PortfolioView'
 import { ResaleMarket } from './resale/ResaleMarket'
 import { SellPanel } from './resale/SellPanel'
+import { MyRequests } from './requests/MyRequests'
+import { RequestsMarket } from './requests/RequestsMarket'
 import { ProtectView } from './views/ProtectView'
 import { ReservesView } from './views/ReservesView'
 import { WriteView } from './views/WriteView'
@@ -70,15 +72,30 @@ function App() {
             health={s.health}
             mock={s.isMock}
             resale={
-              <ResaleMarket
-                options={s.options}
-                asks={s.asks}
-                me={me}
-                busy={s.busy}
-                client={s.client}
-                onBuy={s.buyResale}
-                onOutcomeShown={s.dismissNotice}
-              />
+              <>
+                <RequestsMarket
+                  bids={s.bids}
+                  assets={s.assets}
+                  me={me}
+                  busy={s.busy}
+                  busyId={s.busyId}
+                  bidBusyId={s.bidBusyId}
+                  client={s.client}
+                  onCreate={s.createBid}
+                  onFill={s.fillBid}
+                  onCancel={s.cancelBid}
+                  onOutcomeShown={s.dismissNotice}
+                />
+                <ResaleMarket
+                  options={s.options}
+                  asks={s.asks}
+                  me={me}
+                  busy={s.busy}
+                  client={s.client}
+                  onBuy={s.buyResale}
+                  onOutcomeShown={s.dismissNotice}
+                />
+              </>
             }
           />
         )}
@@ -93,15 +110,18 @@ function App() {
             actionFor={s.actionFor}
             health={s.health}
             resale={
-              <SellPanel
-                me={me}
-                rows={s.positions}
-                asks={s.asks}
-                busy={s.busy}
-                busyId={s.busyId}
-                onList={s.listForSale}
-                onCancel={s.cancelSale}
-              />
+              <>
+                <MyRequests me={me} bids={s.bids} busy={s.busy} busyId={s.busyId} bidBusyId={s.bidBusyId} onCancel={s.cancelBid} />
+                <SellPanel
+                  me={me}
+                  rows={s.positions}
+                  asks={s.asks}
+                  busy={s.busy}
+                  busyId={s.busyId}
+                  onList={s.listForSale}
+                  onCancel={s.cancelSale}
+                />
+              </>
             }
           />
         )}
