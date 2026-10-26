@@ -37,7 +37,7 @@ export async function switchTo(page: Page, address: string | null) {
 
 export type NavName = 'Markets' | 'Protect' | 'Write' | 'Positions' | 'Collateral' | 'Issuer'
 
-// Sidebar label -> hash route. Labels changed in the fix round; routes did not.
+// Nav label -> hash route. Labels changed in the fix round; routes did not.
 export const ROUTE_OF: Record<NavName, string> = {
   Markets: 'markets',
   Protect: 'protect',
@@ -47,7 +47,7 @@ export const ROUTE_OF: Record<NavName, string> = {
   Issuer: 'issuer',
 }
 
-// Sidebar navigation (hash routes: #/markets, #/protect, #/write, #/portfolio, #/reserves, #/issuer).
+// Top bar navigation (hash routes: #/markets, #/protect, #/write, #/portfolio, #/reserves, #/issuer).
 // The Positions link may carry a count ("Positions 1"), so the name is matched as a prefix.
 export async function goTo(page: Page, name: NavName) {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: new RegExp(`^${name}`) }).click()

@@ -10,24 +10,25 @@ import './layout.css'
 export const DEMO_TEXT = 'Stellar Testnet. Fictional assets and makers. No real funds.'
 export const MOCK_TEXT = 'Mock data, not read from a chain.'
 
-function NavLinks({ current, badge, className }: { current: Route; badge?: number; className: string }) {
-  return NAV.map((item: NavItem) => {
-    const on = item.route === current
-    const count = item.route === 'portfolio' && badge ? badge : 0
-    return (
-      <a key={item.route} href={hrefFor(item.route)} className={on ? `${className} is-on` : className} aria-current={on ? 'page' : undefined}>
-        {item.label}
-        {count ? (
-          <>
-            {' '}
-            <span className="nav-count" title="Actions waiting">
-              {count}
-            </span>
-          </>
-        ) : null}
-      </a>
-    )
-  })
+/** Routes that get a tab on phones. The rest open from More. */
+const TAB_ROUTES: Route[] = ['markets', 'protect', 'portfolio', 'reserves']
+
+function NavLink({ item, current, badge, className, onClick }: { item: NavItem; current: Route; badge?: number; className: string; onClick?: () => void }) {
+  const on = item.route === current
+  const count = item.route === 'portfolio' && badge ? badge : 0
+  return (
+    <a href={hrefFor(item.route)} className={on ? `${className} is-on` : className} aria-current={on ? 'page' : undefined} onClick={onClick}>
+      {item.label}
+      {count ? (
+        <>
+          {' '}
+          <span className="nav-count" title="Actions waiting">
+            {count}
+          </span>
+        </>
+      ) : null}
+    </a>
+  )
 }
 
 /**
@@ -54,7 +55,7 @@ export function WalletChip({
   const [copied, setCopied] = useState(false)
   if (!address) {
     return (
-      <Button variant="primary" onClick={onConnect}>
+      <Button variant="primary" onClick={onConnect} title="Connect a Stellar wallet (Freighter)">
         Connect wallet
       </Button>
     )
@@ -133,35 +134,34 @@ export interface AppShellProps {
   children: ReactNode
 }
 
-/** Desktop: sidebar, top bar with the wallet control, content, footer. Phones (<= 768px): compact top bar and a bottom tab bar. */
+/** Desktop: top bar (wordmark, nav, wallet), content, footer. Phones (<= 768px): wordmark and wallet on top, four tabs and More at the bottom. */
 export function AppShell({ route, portfolioBadge, contractId, network, wallet, children }: AppShellProps) {
+  const [moreOpen, setMoreOpen] = useState(false)
   const tabbarRef = useRef<HTMLElement>(null)
-  // When the tab bar scrolls (narrow phones), keep the current tab in view.
   useEffect(() => {
-    tabbarRef.current?.querySelector<HTMLElement>('.tab.is-on')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    tabbarRef.current?.querySelector<HTMLElement>('.is-on')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
   }, [route])
+  const tabItems = NAV.filter((n) => TAB_ROUTES.includes(n.route))
+  const moreItems = NAV.filter((n) => !TAB_ROUTES.includes(n.route))
+  const moreOn = moreItems.some((n) => n.route === route)
   return (
     <div className="shell">
-      <aside className="sidebar">
-        <div className="sidebar-inner">
+      <header className="topbar">
+        <div className="topbar-inner">
           <a href={hrefFor('markets')} className="brand">
             Strata
           </a>
-          <nav className="sidebar-nav" aria-label="Main">
-            <NavLinks current={route} badge={portfolioBadge} className="nav-link" />
+          <nav className="topnav" aria-label="Main">
+            {NAV.map((item) => (
+              <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="nav-link" />
+            ))}
           </nav>
-        </div>
-      </aside>
-
-      <div className="shell-main">
-        <header className="topbar">
-          <a href={hrefFor('markets')} className="brand topbar-brand">
-            Strata
-          </a>
           <div className="topbar-wallet">{wallet}</div>
-        </header>
-        <main className="content">{children}</main>
-        <footer className="shell-footer">
+        </div>
+      </header>
+      <main className="content">{children}</main>
+      <footer className="shell-footer">
+        <div className="shell-footer-inner">
           <span>
             {DEMO_TEXT}{' '}
             {contractId ? (
@@ -177,12 +177,27 @@ export function AppShell({ route, portfolioBadge, contractId, network, wallet, c
             )}
           </span>
           {contractId && network?.ledger != null && <span className="ui-mono footer-ledger">Ledger {network.ledger.toLocaleString('en-US')}</span>}
-        </footer>
-      </div>
+        </div>
+      </footer>
 
       <nav className="tabbar" aria-label="Main" ref={tabbarRef}>
-        <NavLinks current={route} badge={portfolioBadge} className="tab" />
+        {tabItems.map((item) => (
+          <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="tab" />
+        ))}
+        <button type="button" className={moreOn ? 'tab is-on' : 'tab'} aria-haspopup="dialog" onClick={() => setMoreOpen(true)}>
+          More
+        </button>
       </nav>
+
+      {moreOpen && (
+        <Dialog title="More" width={360} onClose={() => setMoreOpen(false)}>
+          <nav className="more-nav" aria-label="More pages">
+            {moreItems.map((item) => (
+              <NavLink key={item.route} item={item} current={route} className="more-link" onClick={() => setMoreOpen(false)} />
+            ))}
+          </nav>
+        </Dialog>
+      )}
     </div>
   )
 }
