@@ -1,5 +1,5 @@
 import type { CollateralHealth, CollateralLine, TokenInfo } from '../options/types'
-import { AssetBadge, Banner, Card, Mono, StatusDot, Tag } from '../ui'
+import { AssetBadge, Banner, Card, Mono, StrataBar, Tag } from '../ui'
 import { backingFor, formatFixed, formatTenths, lineTotal, stellarExpertContract } from './reserves'
 import './reserves.css'
 
@@ -25,6 +25,8 @@ function TokenCard({ line, health, real }: { line: CollateralLine; health?: Coll
   const t = line.token
   const b = backingFor(line, health)
   const fmt = (v: bigint) => formatFixed(v, t.decimals)
+  const fmtN = (n: number | bigint) => fmt(BigInt(n))
+  const surplus = b.held !== null && b.held > b.owed ? b.held - b.owed : 0n
   return (
     <section className={b.status === 'short' ? 'rs-card rs-card--short' : 'rs-card'} aria-label={`${t.code} reserves`}>
       <div className="rs-head">
@@ -38,30 +40,34 @@ function TokenCard({ line, health, real }: { line: CollateralLine; health?: Coll
         {b.status === 'unknown' && <Tag tone="neutral">Balance unavailable</Tag>}
       </div>
 
-      <div className="rs-ratio">
-        <div className="rs-ratio-line">
-          <span>Held {b.held === null ? 'n/a' : fmt(b.held)}</span>
-          <span>
-            Owed <span data-testid="owed">{fmt(b.owed)}</span>
+      <div className="rs-figs">
+        <div className="rs-fig">
+          <span className="ui-num rs-fig-v" data-testid="owed">
+            {fmt(b.owed)}
           </span>
+          <span className="ui-label">Owed · open_collateral</span>
         </div>
-        <div className="rs-bar" role="img" aria-label={`${t.code} backing ${b.tenthsPct === null ? 'nothing owed' : formatTenths(b.tenthsPct)}`}>
-          <div className={`rs-bar-fill rs-bar-fill--${b.status === 'short' ? 'warn' : 'ok'}`} style={{ width: `${b.fill}%` }} />
+        <div className="rs-fig">
+          <span className="ui-num rs-fig-v">{b.held === null ? 'n/a' : fmt(b.held)}</span>
+          <span className="ui-label">Held · balance(contract)</span>
         </div>
-        {b.tenthsPct !== null ? (
-          <span className="rs-pct">{formatTenths(b.tenthsPct)}</span>
-        ) : (
-          <span className="rs-pct rs-pct--idle">
-            {b.status === 'unknown' ? (
-              'n/a'
-            ) : (
-              <>
-                <StatusDot tone="ok" /> Nothing owed
-              </>
-            )}
-          </span>
-        )}
+        <div className="rs-fig">
+          <span className="ui-num rs-fig-v">{b.status === 'short' ? `-${fmt(b.shortfall)}` : b.held === null ? 'n/a' : fmt(surplus)}</span>
+          <span className="ui-label">{b.status === 'short' ? 'Shortfall' : 'Surplus'}</span>
+        </div>
       </div>
+
+      {b.held !== null ? (
+        <StrataBar
+          owed={b.owed}
+          held={b.held}
+          unit={t.code}
+          format={fmtN}
+          layers={{ offered: line.offered, active: line.active, awaiting: line.unclaimed, reclaim: line.pendingReclaim }}
+        />
+      ) : (
+        <p className="rs-empty">The held balance could not be read, so the backing cannot be drawn.</p>
+      )}
 
       <div className="rs-rows">
         <Row label="Open offers" value={fmt(line.offered)} />
@@ -69,6 +75,7 @@ function TokenCard({ line, health, real }: { line: CollateralLine; health?: Coll
         <Row label="Unclaimed proceeds" value={fmt(line.unclaimed)} />
         <Row label="Expired, to reclaim" value={fmt(line.pendingReclaim)} />
         <Row label="Total owed" value={fmt(lineTotal(line))} strong />
+        {b.tenthsPct !== null && <Row label="Held / owed" value={formatTenths(b.tenthsPct)} />}
       </div>
 
       {b.status === 'short' && <ShortfallNote token={t} real={real} />}
