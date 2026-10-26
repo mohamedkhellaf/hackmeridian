@@ -1040,12 +1040,79 @@ prune_finish() {
 CAP_IDS=()
 CAP_CANCELLED=0
 CAP_CANCEL_FAILED=0
+DUST_TRIES=3 # attempts per bulk tx: testnet RPC sometimes answers "transaction submission timeout"
+# opt_state <id>: prints the option's state (Offered, Cancelled, ...) or nothing if unreadable.
+opt_state() {
+  view "$O" get_option --id "$1" |
+    jq -r '.state | if type == "string" then . elif type == "object" then (keys[0]) else tostring end' 2>/dev/null
+}
+# dust_create <label> <expiry>: one 1-unit dust PUT by maker2 on RWA; appends its id to CAP_IDS. After a failed
+# submission it waits, then reads writer_open_count(maker2): unchanged means the tx did not land and it is sent again
+# (a resend is built on the same account sequence while the first one is pending, so at most one of them can land);
+# one more means it landed late, and the new id is taken from RWA's open book. Returns non-zero when it gives up.
+dust_create() {
+  local label="$1" exp="$2" try before after book id cand
+  for ((try = 1; try <= DUST_TRIES; try++)); do
+    before="$(woc "$MAKER2")"
+    [[ "$before" =~ ^[0-9]+$ ]] || return 1
+    if submit_quiet "$label" "$ID_MAKER2" create_offer --writer "$MAKER2" --underlying "$RWA_SAC" --option_type Put \
+      --qty 1 --strike_total 1 --premium_total 1 --expiry "$exp"; then
+      [[ "$RESULT" =~ ^[0-9]+$ ]] || {
+        echo "   create_offer returned '$RESULT', not a u32 id"
+        return 1
+      }
+      CAP_IDS+=("$RESULT")
+      return 0
+    fi
+    sleep 10
+    after="$(woc "$MAKER2")"
+    if [[ "$after" == "$before" ]]; then
+      echo "   $label did not land (writer_open_count(maker2) still $after; attempt $try/$DUST_TRIES)"
+      continue
+    fi
+    if [[ "$after" == "$((before + 1))" ]]; then
+      book="$(open_book "$RWA_SAC")" || return 1
+      cand=""
+      for id in $(printf '%s\n' "${CAP_IDS[@]}" | jq -rs --argjson b "$book" '$b - . | .[]'); do
+        [[ "$(view "$O" get_option --id "$id" | jq -r '.writer' 2>/dev/null)" == "$MAKER2" ]] && cand+=" $id"
+      done
+      read -r -a cand <<<"$cand"
+      if ((${#cand[@]} == 1)); then
+        echo "   $label landed late as #${cand[0]} (writer_open_count(maker2) $before -> $after)"
+        CAP_IDS+=("${cand[0]}")
+        return 0
+      fi
+    fi
+    echo "   $label: writer_open_count(maker2) $before -> ${after:-unreadable}; cannot tell which offer is new, stopping"
+    return 1
+  done
+  return 1
+}
+# dust_cancel <id>: maker2 cancels one dust offer; a failed submission is checked with get_option and resent while
+# the offer is still Offered.
+dust_cancel() {
+  local id="$1" try st
+  for ((try = 1; try <= DUST_TRIES; try++)); do
+    submit_quiet "CAP_CANCEL_$id" "$ID_MAKER2" cancel_offer --writer "$MAKER2" --id "$id" && return 0
+    sleep 10
+    st="$(opt_state "$id")"
+    case "$st" in
+      Cancelled)
+        echo "   cancel of #$id landed late (state Cancelled)"
+        return 0
+        ;;
+      Offered) echo "   cancel of #$id did not land (attempt $try/$DUST_TRIES)" ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
 cap_cleanup() {
   local id
   ((${#CAP_IDS[@]} > 0)) || return 0
   echo "   cleanup: maker2 cancels ${#CAP_IDS[@]} dust offers"
   for id in "${CAP_IDS[@]}"; do
-    if submit_quiet "CAP_CANCEL_$id" "$ID_MAKER2" cancel_offer --writer "$MAKER2" --id "$id"; then
+    if dust_cancel "$id"; then
       CAP_CANCELLED=$((CAP_CANCELLED + 1))
     else
       CAP_CANCEL_FAILED=$((CAP_CANCEL_FAILED + 1))
@@ -1088,13 +1155,7 @@ v13_writer_cap() {
   echo "   maker2 has $w0 open offers; creating $need dust offers (PUT on RWA, qty = strike_total = premium_total = 1 unit)"
   trap cap_cleanup EXIT
   for ((i = 1; i <= need; i++)); do
-    submit_quiet "CAP_DUST_$i" "$ID_MAKER2" create_offer --writer "$MAKER2" --underlying "$RWA_SAC" --option_type Put \
-      --qty 1 --strike_total 1 --premium_total 1 --expiry "$exp" || break
-    [[ "$RESULT" =~ ^[0-9]+$ ]] || {
-      echo "   create_offer returned '$RESULT', not a u32 id"
-      break
-    }
-    CAP_IDS+=("$RESULT")
+    dust_create "CAP_DUST_$i" "$exp" || break
   done
   n="${#CAP_IDS[@]}"
   ((n == 0)) || range="ids ${CAP_IDS[0]}..${CAP_IDS[$((n - 1))]}"
