@@ -119,6 +119,10 @@
   padding: 3px 7px;
   border-radius: 4px;
   white-space: nowrap;
+  /* Do not stretch when placed in a stretching flex row (e.g. next to buttons). */
+  align-self: center;
+  flex: 0 0 auto;
+  height: fit-content;
 }
 .ui-tag--put {
   color: var(--put);
