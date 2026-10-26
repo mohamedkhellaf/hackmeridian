@@ -17,6 +17,18 @@ test('buy review gates on the checkbox, then confirmed step, then exercise', asy
   await expect(dialog).toContainText('authorized by the FUND issuer')
   await expect(dialog).toContainText('Collateral is fully locked in the contract')
 
+  // Payoff chart and risk lines (hypothetical, assumed price; seeded PUT: 5 FUND, strike 50 USDx => K = 10, premium 1.80).
+  await expect(dialog.getByTestId('payoff-chart')).toBeVisible()
+  await expect(dialog).toContainText('Hypothetical payoff at expiry')
+  await expect(dialog).toContainText('not a market price')
+  const assumed = dialog.getByLabel(/^Assumed price \(/)
+  await expect(assumed).toHaveValue('10')
+  await expect(dialog).toContainText('9.64')
+  await expect(dialog).toContainText('Premium (max loss)')
+  await expect(dialog.getByTestId('pnl-at-assumed')).toContainText('-1.80 USDx')
+  await assumed.fill('4')
+  await expect(dialog.getByTestId('pnl-at-assumed')).toContainText('+28.20 USDx')
+
   // Escape cancels without buying.
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
@@ -45,6 +57,11 @@ test('buy review gates on the checkbox, then confirmed step, then exercise', asy
   const row = page.getByRole('row').filter({ hasText: 'GMAK…BBBB' })
   await expect(row).toContainText('Active · exercisable')
   await row.getByRole('button', { name: 'Exercise' }).click()
+  // Exercise confirmation states the physical delivery before anything is signed.
+  const confirmDialog = page.getByRole('dialog', { name: /Exercise FUND put/ })
+  await expect(confirmDialog).toContainText('You deliver 5.00 FUND')
+  await expect(confirmDialog).toContainText('You receive 50.00 USDx')
+  await confirmDialog.getByRole('button', { name: 'Sign and exercise' }).click()
   await expect(toast(page)).toContainText('Exercise confirmed')
   await expect(row).toContainText('Exercised')
 })

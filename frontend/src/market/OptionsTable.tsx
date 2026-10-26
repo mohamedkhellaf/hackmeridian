@@ -1,4 +1,6 @@
-import type { OptionOffer } from '../options/types'
+import type { CollateralHealth, OptionOffer } from '../options/types'
+import { shortfallFor } from '../reserves/reserves'
+import { ShortfallNotice } from '../reserves/ShortfallWarning'
 import { formatExpiry, strikePerUnit } from '../options/format'
 import {
   actionKindOf,
@@ -66,7 +68,7 @@ function Title({ o }: { o: OptionOffer }) {
 const roleText = (r: Role) => (r === 'holder' ? 'Holder' : 'Writer')
 
 /** One desktop table row. `me` decides the role (holder or writer) and therefore the signs and labels. */
-export function OptionRow({ o, me, action }: { o: OptionOffer; me: string | null; action?: RowAction }) {
+export function OptionRow({ o, me, action, health = [] }: { o: OptionOffer; me: string | null; action?: RowAction; health?: CollateralHealth[] }) {
   const role = roleOf(o, me)
   if (!role) return null
   const prem = premiumOf(o, role)
@@ -77,6 +79,7 @@ export function OptionRow({ o, me, action }: { o: OptionOffer; me: string | null
         <span className="ui-bar" />
         <Title o={o} />
         <span className="ui-sub">{counterpartyLine(o, role)}</span>
+        <ShortfallNotice tokens={shortfallFor(o, health)} />
       </td>
       <td className="ui-left">{roleText(role)}</td>
       <td>{moneyWith(o.underlyingQty, o.underlying)}</td>
@@ -97,7 +100,7 @@ export function OptionRow({ o, me, action }: { o: OptionOffer; me: string | null
 }
 
 /** One mobile card (shown instead of the table at <= 768px). */
-export function OptionCard({ o, me, action }: { o: OptionOffer; me: string | null; action?: RowAction }) {
+export function OptionCard({ o, me, action, health = [] }: { o: OptionOffer; me: string | null; action?: RowAction; health?: CollateralHealth[] }) {
   const role = roleOf(o, me)
   if (!role) return null
   const prem = premiumOf(o, role)
@@ -120,6 +123,7 @@ export function OptionCard({ o, me, action }: { o: OptionOffer; me: string | nul
         <span>{formatExpiry(o.expiry)}</span>
       </div>
       <StatusText o={o} role={role} />
+      <ShortfallNotice tokens={shortfallFor(o, health)} />
       <ActionButton o={o} role={role} action={action} full />
     </article>
   )
@@ -129,11 +133,13 @@ export function OptionsTable({
   rows,
   me,
   actionFor,
+  health = [],
   empty,
 }: {
   rows: OptionOffer[]
   me: string | null
   actionFor: (o: OptionOffer) => RowAction | undefined
+  health?: CollateralHealth[]
   empty?: string
 }) {
   if (rows.length === 0) return <p className="pf-empty">{empty ?? 'Nothing here yet.'}</p>
@@ -157,14 +163,14 @@ export function OptionsTable({
           </thead>
           <tbody>
             {rows.map((o) => (
-              <OptionRow key={o.id.toString()} o={o} me={me} action={actionFor(o)} />
+              <OptionRow key={o.id.toString()} o={o} me={me} action={actionFor(o)} health={health} />
             ))}
           </tbody>
         </table>
       </div>
       <div className="pf-cards">
         {rows.map((o) => (
-          <OptionCard key={o.id.toString()} o={o} me={me} action={actionFor(o)} />
+          <OptionCard key={o.id.toString()} o={o} me={me} action={actionFor(o)} health={health} />
         ))}
       </div>
     </>
