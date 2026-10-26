@@ -35,12 +35,11 @@ export async function switchTo(page: Page, address: string | null) {
   await connect(page)
 }
 
-export type NavName = 'Markets' | 'Protect' | 'Positions' | 'Collateral' | 'Issuer'
+export type NavName = 'Markets' | 'Positions' | 'Collateral' | 'Issuer'
 
 // Nav label -> hash route. Labels changed in the fix round; routes did not.
 export const ROUTE_OF: Record<NavName, string> = {
   Markets: 'markets',
-  Protect: 'protect',
   Positions: 'portfolio',
   Collateral: 'reserves',
   Issuer: 'issuer',
@@ -53,7 +52,7 @@ export async function openTrade(page: Page, series: RegExp, side: 'Buy' | 'Sell'
   if (tab) await page.getByRole('radio', { name: tab }).click()
 }
 
-// Top bar navigation (hash routes: #/markets, #/protect, #/write, #/portfolio, #/reserves, #/issuer).
+// Top bar navigation (hash routes: #/markets, #/write, #/portfolio, #/reserves, #/issuer).
 // The Positions link may carry a count ("Positions 1"), so the name is matched as a prefix.
 export async function goTo(page: Page, name: NavName) {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: new RegExp(`^${name}`) }).click()

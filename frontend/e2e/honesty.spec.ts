@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { CHART_TEXT, DEMO_TEXT, ISSUER_TEXT, MOCK_TEXT, PREMIUM_TEXT, connect, countVisible, goTo, openApp, openBuyDialogForSeed } from './helpers.ts'
 import type { NavName } from './helpers.ts'
 
-const ROUTES: NavName[] = ['Markets', 'Protect', 'Positions', 'Collateral', 'Issuer']
+const ROUTES: NavName[] = ['Markets', 'Positions', 'Collateral', 'Issuer']
 
 // Old disclaimers that the de-slop pass removed; none may come back anywhere.
 const RETIRED = [

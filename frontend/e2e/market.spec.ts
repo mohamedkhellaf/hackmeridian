@@ -78,7 +78,6 @@ test('hash routes drive the sidebar and every view renders', async ({ page }) =>
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Collateral', exact: true })).toHaveAttribute('aria-current', 'page')
   for (const [link, title] of [
     ['Positions', 'Positions'],
-    ['Protect', 'Protect'],
     ['Issuer', 'Issuer'],
     ['Markets', 'Markets'],
   ] as const) {
