@@ -2,7 +2,7 @@
 
 **Draft for Dev 1 review.** Dev 1 owns the final narrative (AGENTS.md). Nothing here changes what the instrument promises. Every spoken line maps to evidence in the claims table (section 3). Amounts match `scripts/deploy/seed-demo-offers.sh`. Replace them if the recording uses different values.
 
-**Contract version caveat.** `main` and the live app (https://hackmeridian-psi.vercel.app/) run options **v1.2** (`CAJ2WJP4…GBAX`). Permissionless listing (`list_asset`) and the EQTY asset exist only on **v1.3 / v1.3.1** (`CBASUA3L…JUEE`, deployed and recorded on branch `feat/contract-v1-3-1`, not merged at the time of writing). Lines marked **[v1.3.1]** are true on that deployment. They need one of two things: the app is switched to v1.3.1 before recording, or that scene shows the recorded v1.3.1 transaction on stellar.expert and says so.
+**Contract version caveat.** `main` carries options **v1.3.1** (`CBASUA3L…JUEE`, PR #55; source builds byte-identical to the deployed wasm). At the time of writing the live app (https://hackmeridian-psi.vercel.app/) is still built against **v1.2** (`CAJ2WJP4…GBAX`); permissionless listing (`list_asset`) and the EQTY asset exist only on v1.3.1, so the app's `VITE_OPTIONS_CONTRACT_ID` must be switched before recording. Lines marked **[v1.3.1]** are true on that deployment. They need one of two things: the app is switched to v1.3.1 before recording, or that scene shows the recorded v1.3.1 transaction on stellar.expert and says so.
 
 ---
 
