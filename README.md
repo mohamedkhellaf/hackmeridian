@@ -152,16 +152,16 @@ Decisions a reader should know, each with its reasoning in [PRODUCT_SPEC.md](PRO
 
 ## Built during the event
 
-Everything in this repository was written between 11:00 on Saturday 25 October and the submission, starting from an empty scaffold: 61 commits and 30 merged pull requests, all in the public history.
+Everything in this repository was written between 11:00 on Sunday 25 October and the submission, starting from an empty scaffold: 61 commits and 30 merged pull requests, all in the public history.
 
 | When (Lisbon) | Milestone |
 |---|---|
-| Sat 14:00–17:00 | Idea committee: 12 proposals, debates, independent scoring, Testnet spikes. Decision record in [WINNING_IDEAS.md](WINNING_IDEAS.md) and [research/decision/](research/decision/). |
-| Sat 17:00 | Spike proves put exercise, issuer freeze and clawback against a contract balance on Testnet ([20_rwa_options_spike.md](research/decision/20_rwa_options_spike.md)). |
-| Sat 19:06 | **v1** deployed. Cash-secured put, covered call, two assets on one contract. |
-| Sat 19:38 · 20:32 | **v1.1** hardening; **v1.2** holder transfer, paged reads, issuer-action evidence, invariant and negative test suites. |
-| Sat 23:06 · Sun 00:50 | **v1.3** permissionless `list_asset`, per-writer cap, `prune_expired`, tenor cap; **v1.3.1** per-asset books and transfer guards after a five-reviewer gate. EQTY listed and traded on chain. |
-| Sun 01:00–06:00 | Frontend redesign, multi-wallet connect, Protect easy mode, Reserves attestation, payoff charts, product spec and payoff package. |
+| Sun 14:00–17:00 | Idea committee: 12 proposals, debates, independent scoring, Testnet spikes. Decision record in [WINNING_IDEAS.md](WINNING_IDEAS.md) and [research/decision/](research/decision/). |
+| Sun 17:00 | Spike proves put exercise, issuer freeze and clawback against a contract balance on Testnet ([20_rwa_options_spike.md](research/decision/20_rwa_options_spike.md)). |
+| Sun 19:06 | **v1** deployed. Cash-secured put, covered call, two assets on one contract. |
+| Sun 19:38 · 20:32 | **v1.1** hardening; **v1.2** holder transfer, paged reads, issuer-action evidence, invariant and negative test suites. |
+| Sun 23:06 · Mon 00:50 | **v1.3** permissionless `list_asset`, per-writer cap, `prune_expired`, tenor cap; **v1.3.1** per-asset books and transfer guards after a five-reviewer gate. EQTY listed and traded on chain. |
+| Mon 01:00–06:00 | Frontend redesign, multi-wallet connect, Protect easy mode, Reserves attestation, payoff charts, product spec and payoff package. |
 
 We used AI coding agents throughout, in bounded lanes with human owners for financial semantics, contract safety and UX, and every merged claim is backed by a test or a Testnet transaction. The process is documented in [AGENTS.md](AGENTS.md).
 
