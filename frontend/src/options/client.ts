@@ -12,6 +12,8 @@ export interface OptionsClient {
   // On-chain check: contract open_collateral(token) vs the contract's SAC balance.
   collateralHealth(): Promise<CollateralHealth[]>
   isEligible(token: string, who: string): Promise<boolean>
+  // Open (Offered) offers by this writer; null when the contract has no per-writer cap (before v1.3).
+  writerOpenCount(writer: string): Promise<number | null>
   createOffer(offer: NewOffer, writer: string): Promise<TxResult & { id: bigint }>
   buy(id: bigint, buyer: string): Promise<TxResult>
   exercise(id: bigint, holder: string): Promise<TxResult>

@@ -69,6 +69,11 @@ export interface CollateralHealth {
   held: bigint
 }
 
+// Contract limits (docs/contract-abi.md sections 7 and 12). The tenor cap and per-writer cap exist from v1.3;
+// the form enforces the tenor on every contract version since a longer offer is never sensible.
+export const MAX_TENOR_SECONDS = 63_072_000 // 2 years
+export const MAX_OPEN_PER_WRITER = 50
+
 // Puts lock the total strike in the quote token; covered calls lock the underlying.
 export function requiredCollateral(o: Pick<OptionOffer, 'kind' | 'underlying' | 'quote' | 'underlyingQty' | 'totalStrike'>) {
   return o.kind === 'put' ? { token: o.quote, amount: o.totalStrike } : { token: o.underlying, amount: o.underlyingQty }

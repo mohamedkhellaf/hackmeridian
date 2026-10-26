@@ -25,6 +25,10 @@ export const OPTIONS_ERRORS: Record<number, string> = {
   113: 'Invalid contract configuration.',
   114: 'The market is full: too many open offers. Try again once some are filled or cancelled.',
   115: 'Collateral shortfall: the issuer clawed back tokens held by the contract, so new offers and purchases on this token are paused.',
+  116: 'You already have the maximum of 50 open offers. Cancel or wait for some to be bought or expire.',
+  117: 'This asset is already listed.',
+  118: 'This asset has no Stellar Asset Contract deployed yet, so it cannot be listed.',
+  119: 'The expiry is too far out: offers can run for at most 2 years.',
 }
 
 // Options codes (101+) and SAC codes (1-13) are disjoint, so a code identifies its source on its own.

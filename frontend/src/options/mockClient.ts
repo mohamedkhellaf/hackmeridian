@@ -1,5 +1,7 @@
 import type { OptionsClient } from './client'
 import { collateralLines, reservedOf } from './abi'
+import { OPTIONS_ERRORS } from '../stellar/errors'
+import { MAX_OPEN_PER_WRITER, MAX_TENOR_SECONDS } from './types'
 import type { CollateralHealth, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
 
 // In-memory stand-in for the options contract. Fictional assets and accounts,
@@ -78,11 +80,18 @@ export class MockOptionsClient implements OptionsClient {
     return true
   }
 
+  async writerOpenCount(writer: string) {
+    return this.options.filter((o) => o.writer === writer && o.state === 'offered' && o.expiry > now()).length
+  }
+
   async createOffer(offer: NewOffer, writer: string) {
     let id = 0n
     const res = await this.tx(() => {
       if (offer.underlyingQty <= 0n || offer.totalStrike <= 0n || offer.totalPremium <= 0n) throw new Error('Amounts must be positive')
       if (offer.expiry <= now()) throw new Error('Expiry must be in the future')
+      if (offer.expiry > now() + MAX_TENOR_SECONDS) throw new Error(OPTIONS_ERRORS[119])
+      if (this.options.filter((o) => o.writer === writer && o.state === 'offered' && o.expiry > now()).length >= MAX_OPEN_PER_WRITER)
+        throw new Error(OPTIONS_ERRORS[116])
       id = BigInt(this.options.length)
       this.options.push({ ...offer, id, quote: USDX, writer, holder: null, state: 'offered' })
     })
