@@ -16,7 +16,7 @@
 
 | Owner | Role | Owns and decides | Primary code / artifacts |
 |---|---|---|---|
-| **Dev 1 — Founder / Product Architect / Quant Lead** | Financial logic, product and integration owner | Financial semantics, scope, payoff and risk formulas, strategy composition, RFQ requirements, maker economics, user story, financial acceptance criteria, trade-offs, final demo narrative | `PRODUCT_SPEC.md`, `packages/payoff/`, `packages/rfq/` (or frontend-side RFQ model), shared financial types, quantitative tests, `docs/demo-script.md` |
+| **Dev 1 — Founder / Product Architect / Quant Lead** | Financial logic, product and integration owner | Financial semantics, scope, payoff and risk formulas, strategy composition, RFQ requirements, maker economics, user story, financial acceptance criteria, trade-offs, final demo narrative | `PRODUCT_SPEC.md`, `packages/payoff/`, `packages/rfq/` (or frontend-side RFQ model), shared financial types, quantitative tests |
 | **Dev 2 — Blockchain / Contract Lead** | On-chain correctness and security owner | Soroban contract ABI, collateral accounting, auth, options lifecycle, atomic settlement, Stellar asset issuance/permissions, deployment, contract tests, security review | `contracts/`, `scripts/setup-testnet/`, `scripts/deploy/`, contract tests, deployed IDs |
 | **Dev 3 — Frontend / Stellar Integration Lead** | User experience and working dApp owner | React app, investor/maker/issuer journeys, payoff chart integration, Freighter/wallet UX, Stellar SDK transaction building, generated TS bindings consumption, hosting and end-to-end UI | `frontend/`, wallet/contract client integration, app deployment, UI/e2e tests, video capture support |
 

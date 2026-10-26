@@ -38,3 +38,7 @@ contracts/pro/test_snapshots/
 .metals/
 design/Our project/
 HANDOFF-*.md
+
+# Pitch and demo preparation stay local, not in the public repo
+docs/pitch-speech.md
+docs/demo-script.md

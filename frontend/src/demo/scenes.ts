@@ -1,4 +1,4 @@
-// Scene list for the demo video. Keep in sync with docs/demo-script.md (draft by Dev 3 for Dev 1 review).
+// Scene list for the demo video (presentation mode, `?present=1`). The shot list is kept locally by the team.
 export interface Scene {
   id: string
   title: string
