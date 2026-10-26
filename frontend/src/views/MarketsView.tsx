@@ -22,6 +22,7 @@ import { implausibleTerms } from '../options/feasibility'
 import type { CollateralHealth, CollateralLine, OptionOffer } from '../options/types'
 import { shortfallFor } from '../reserves/reserves'
 import { ShortfallNotice } from '../reserves/ShortfallWarning'
+import { AssetFactsDialog } from '../assetfacts/AssetFactsPanel'
 import { Button, Dialog, Mono, PageHeader, Segmented, Tag } from '../ui'
 
 export interface MarketsViewProps {
@@ -32,7 +33,7 @@ export interface MarketsViewProps {
   busyId: bigint | null
   /** Fills the buy ticket with this offer (the app renders it). */
   onBuy: (o: OptionOffer) => void
-  /** Opens the wallet connection. When absent, the shell's own Connect wallet button is used. */
+  /** Opens the wallet connection. */
   onConnect?: () => void
   collateral: CollateralLine[]
   health: CollateralHealth[]
@@ -43,14 +44,6 @@ export interface MarketsViewProps {
 }
 
 const CHECK_TITLE = 'Premium is at least the total strike. Check the terms before buying.'
-
-/** Falls back to the shell's Connect wallet button when the app passes no handler. */
-function connectViaShell() {
-  const btn = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
-    (b) => b.textContent?.trim() === 'Connect wallet' && !b.closest('.tk, .ui-dialog'),
-  )
-  btn?.click()
-}
 
 function ChainCell({
   side,
@@ -86,6 +79,7 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, onConnect, health
   const [day, setDay] = useState<string | null>(null)
   const [series, setSeries] = useState<string | null>(null)
   const [picked, setPicked] = useState<OptionOffer | null>(null)
+  const [factsOpen, setFactsOpen] = useState(false)
   const ticketOpen = useTicketOpen()
 
   const codes = assetCodes(offers)
@@ -105,7 +99,9 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, onConnect, health
   const [seriesKind, seriesStrike] = activeSeries ? activeSeries.split(':') : ['', '']
   const pickedLive = picked && offers.some((o) => o.id === picked.id) ? picked : null
   const selectedId = (me ? ticketOpen : !!pickedLive) && pickedLive ? pickedLive.id : null
-  const connect = onConnect ?? connectViaShell
+  const connect = onConnect ?? (() => {})
+
+  const factsToken = offers.find((o) => o.underlying.code === activeAsset)?.underlying ?? null
 
   const pickSeries = (key: string) => setSeries(key)
   const pickOffer = (o: OptionOffer) => {
@@ -140,6 +136,9 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, onConnect, health
                     </option>
                   ))}
                 </select>
+                <Button variant="ghost" size="sm" onClick={() => setFactsOpen(true)}>
+                  Asset facts
+                </Button>
                 <Segmented
                   label="Expiry"
                   options={days.map((d) => ({ value: d, label: dayLabel(d) }))}
@@ -227,7 +226,7 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, onConnect, health
                               )}
                             </td>
                             <td className="num">{formatDisplay(o.underlyingQty, o.underlying.decimals)}</td>
-                            <td className="num">
+                            <td className="num mk-prem">
                               {implausibleTerms(o) && (
                                 <Tag tone="warn" title={CHECK_TITLE} className="mk-check-terms">
                                   Check terms
@@ -274,6 +273,8 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, onConnect, health
       )}
 
       {resale}
+
+      {factsOpen && factsToken && <AssetFactsDialog token={factsToken} me={me} onClose={() => setFactsOpen(false)} />}
 
       {narrow && !me && pickedLive && (
         <Dialog title={`Buy ${pickedLive.underlying.code} ${pickedLive.kind}`} width={520} onClose={() => setPicked(null)}>
