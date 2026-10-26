@@ -50,12 +50,12 @@ test('buy is disabled until a wallet is connected', async ({ page }) => {
 
 test('hash routes drive the sidebar and every view renders', async ({ page }) => {
   await page.goto('/#/reserves')
-  await expect(page.getByRole('heading', { level: 1, name: 'Reserves' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /Owed equals held/ })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Reserves' })).toHaveAttribute('aria-current', 'page')
   for (const [link, title] of [
     ['Portfolio', 'Portfolio'],
     ['Write', 'Write an option'],
-    ['Issuer', 'Issuer console'],
+    ['Issuer', "The asset stays under its issuer's control."],
     ['Markets', 'Markets'],
   ] as const) {
     await goTo(page, link)
