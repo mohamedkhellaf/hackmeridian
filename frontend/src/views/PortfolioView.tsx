@@ -69,7 +69,7 @@ function ExerciseConfirm({ o, health, onConfirm, onCancel }: { o: OptionOffer; h
           <dd>{moneyWith(o.totalStrike, o.quote)}</dd>
         </div>
         <div>
-          <dt>Premium paid</dt>
+          <dt>Original premium (paid to the writer)</dt>
           <dd>{moneyWith(o.totalPremium, o.quote)}</dd>
         </div>
         <div>

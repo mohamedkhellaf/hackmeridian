@@ -73,7 +73,7 @@ test('buy review gates on the checkbox, then confirmed step, then exercise', asy
   await expect(confirmDialog).toContainText('You deliver 5.00 FUND and receive 50.00 USDx.')
   await expect(confirmDialog).toContainText('10.00 USDx per FUND')
   await expect(confirmDialog).toContainText(/Total strike\s*50\.00 USDx/)
-  await expect(confirmDialog).toContainText(/Premium paid\s*1\.80 USDx/)
+  await expect(confirmDialog).toContainText(/Original premium \(paid to the writer\)\s*1\.80 USDx/)
   await confirmDialog.getByRole('button', { name: 'Exercise', exact: true }).click()
   await expect(confirmDialog).toBeHidden()
   await expect(toast(page)).toContainText('Exercised')
