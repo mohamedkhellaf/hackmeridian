@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { connect, expectOpenOffers, goTo, offerRows, openApp, toast, totalHeld } from './helpers.ts'
+import { connect, expectOpenOffers, goTo, offerRows, openApp, openTrade, toast, totalHeld } from './helpers.ts'
 
 test('invalid input is rejected, a valid put locks collateral and can be cancelled', async ({ page }) => {
   await openApp(page)
@@ -7,8 +7,9 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
   await goTo(page, 'Collateral')
   const before = await totalHeld(page, 'USDx')
 
-  await goTo(page, 'Write')
-  await expect(page.getByRole('heading', { level: 1, name: 'Write' })).toBeVisible()
+  await goTo(page, 'Markets')
+  await openTrade(page, /^Put at 10\.00/, 'Sell', 'Post an offer at my price')
+  await expect(page.getByRole('dialog', { name: 'Sell FUND 10.00 put' })).toBeVisible()
   const submit = page.getByRole('button', { name: 'Write put' })
 
   // 0.0000001 FUND at 0.5 USDx is not an exact settlement amount.
@@ -32,7 +33,8 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
   await goTo(page, 'Markets')
   await expectOpenOffers(page, 5)
   await expect(offerRows(page)).toHaveCount(3) // the three makers of the FUND 10.00 put series
-  await expect(page.getByRole('button', { name: /^Buy put on 5.00 FUND from GBE6…3ZEG/ })).toBeDisabled() // own offer
+  await expect(page.getByRole('button', { name: /^Buy put on 5.00 FUND from GBE6…3ZEG/ })).toHaveCount(0) // own offer
+  await expect(offerRows(page).filter({ hasText: 'GBE6…3ZEG' }).getByRole('button', { name: /^Cancel offer/ })).toBeVisible()
 
   await goTo(page, 'Positions')
   const row = page.getByRole('table', { name: 'Written' }).locator('tbody tr')

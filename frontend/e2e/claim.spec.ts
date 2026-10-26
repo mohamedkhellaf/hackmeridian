@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test'
-import { ADDR_B, connect, goTo, openApp, switchTo, toast } from './helpers.ts'
+import { ADDR_B, connect, goTo, openApp, openTrade, switchTo, toast } from './helpers.ts'
 
 test('writer claims delivery after a second account buys and exercises', async ({ page }) => {
   await openApp(page)
   await connect(page) // account A (default)
 
-  // A writes a put (default form: 5 FUND at 10 USDx).
-  await goTo(page, 'Write')
+  // A posts an offer on the FUND 10.00 put series (prefilled: 5 FUND at 10 USDx).
+  await openTrade(page, /^Put at 10\.00/, 'Sell', 'Post an offer at my price')
+  await page.getByLabel(/^Quantity/).fill('5')
   await page.getByRole('button', { name: 'Write put' }).click()
   await expect(toast(page)).toContainText('Offer written')
 

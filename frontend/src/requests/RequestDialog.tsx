@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { buildOffer } from '../maker/buildOffer'
 import '../maker/write.css'
 import type { OptionsClient } from '../options/client'
@@ -34,7 +34,15 @@ export function RequestDialog({
   busy,
   onSubmit,
   onClose,
+  title = 'Request an option',
+  header,
+  initial,
 }: {
+  title?: string
+  /** Rendered above the form (the Buy dialog's tabs). */
+  header?: ReactNode
+  /** Prefill from a series. */
+  initial?: Partial<{ kind: OptionKind; underlyingId: string; qty: string; strike: string; premium: string; expiryMs: number }>
   assets: SupportedAssets
   client: OptionsClient
   me: string
@@ -42,12 +50,12 @@ export function RequestDialog({
   onSubmit: (bid: NewBid) => Promise<TxOutcome>
   onClose: () => void
 }) {
-  const [kind, setKind] = useState<OptionKind>('put')
-  const [underlyingId, setUnderlyingId] = useState(assets.underlyings[0]?.contractId ?? '')
-  const [qty, setQty] = useState('5')
-  const [strike, setStrike] = useState('10')
-  const [premium, setPremium] = useState('2')
-  const [expiry, setExpiry] = useState(() => toLocalInput(nowMs() + DEFAULT_TENOR_MS))
+  const [kind, setKind] = useState<OptionKind>(initial?.kind ?? 'put')
+  const [underlyingId, setUnderlyingId] = useState(initial?.underlyingId ?? assets.underlyings[0]?.contractId ?? '')
+  const [qty, setQty] = useState(initial?.qty ?? '5')
+  const [strike, setStrike] = useState(initial?.strike ?? '10')
+  const [premium, setPremium] = useState(initial?.premium ?? '2')
+  const [expiry, setExpiry] = useState(() => toLocalInput(initial?.expiryMs ?? nowMs() + DEFAULT_TENOR_MS))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -102,7 +110,7 @@ export function RequestDialog({
   const formId = 'request-form'
   return (
     <Dialog
-      title="Request an option"
+      title={title}
       width={520}
       onClose={() => !submitting && onClose()}
       footer={
@@ -111,13 +119,14 @@ export function RequestDialog({
             Cancel
           </Button>
           <Button type="submit" form={formId} variant="primary" loading={submitting} disabled={busy || !bid || short}>
-            {bid ? `Post request, escrow ${amt(bid.totalPremium, q)}` : 'Post request'}
+            {bid ? `Post bid, escrow ${amt(bid.totalPremium, q)}` : 'Post bid'}
           </Button>
         </>
       }
     >
+      {header}
       <form id={formId} className="wr" onSubmit={(e) => void submit(e)}>
-        <p className="rq-lead">You set the price. A maker who accepts your terms fills the request and becomes the writer.</p>
+        <p className="rq-lead">You set the price. A maker who accepts your terms fills the bid and becomes the writer.</p>
         <div className="wr-fields">
           <div className="wr-field">
             <span className="wr-label">Kind</span>
@@ -186,7 +195,7 @@ export function RequestDialog({
         )}
         {bid && (
           <p className="rq-escrow" data-testid="escrow-line">
-            You escrow {amt(bid.totalPremium, q)} now; refunded if you cancel or the request expires.
+            You escrow {amt(bid.totalPremium, q)} now; refunded if you cancel or it expires.
           </p>
         )}
         {'error' in draft && <p className="wr-error">{draft.error}</p>}

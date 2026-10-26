@@ -17,7 +17,7 @@ const nowSec = () => Math.floor(Date.now() / 1000)
 type Check = 'pending' | 'ok' | 'fail' | 'changed' | 'unknown'
 const amt = (units: bigint, t: { decimals: number; code: string }) => `${formatDisplay(units, t.decimals)} ${t.code}`
 
-function ResaleBuyDialog({
+export function ResaleBuyDialog({
   row,
   client,
   me,

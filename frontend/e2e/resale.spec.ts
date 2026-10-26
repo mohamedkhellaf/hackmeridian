@@ -13,10 +13,6 @@ test('holder lists an option for sale, another account buys it, the holder chang
   await expect(buy).toContainText('Bought. Position 1')
   await buy.getByRole('button', { name: 'Done' }).click()
 
-  // Markets shows an empty Resale section.
-  const resale = page.getByRole('region', { name: 'Resale' })
-  await expect(resale).toContainText('No options for sale.')
-
   // Positions: list it for 2.50 USDx.
   await goTo(page, 'Positions')
   const resell = page.getByRole('table', { name: 'Resell' })
@@ -33,7 +29,8 @@ test('holder lists an option for sale, another account buys it, the holder chang
 
   // The seller sees its own listing in Markets without a Buy button.
   await goTo(page, 'Markets')
-  const rows = page.getByRole('table', { name: 'Resale' }).locator('tbody tr')
+  await page.getByRole('button', { name: /^Put at 10\.00/ }).first().click()
+  const rows = page.getByRole('table', { name: 'Offers' }).locator('tbody tr').filter({ hasText: 'resale' })
   await expect(rows).toHaveCount(1)
   await expect(rows).toContainText('GBE6…3ZEG')
   await expect(rows).toContainText('2.50')
@@ -65,5 +62,6 @@ test('holder lists an option for sale, another account buys it, the holder chang
   await goTo(page, 'Positions')
   await expect(page.getByRole('table', { name: 'Held' })).toHaveCount(0)
   await goTo(page, 'Markets')
-  await expect(resale).toContainText('No options for sale.')
+  await page.getByRole('button', { name: /^Put at 10\.00/ }).first().click()
+  await expect(rows).toHaveCount(0)
 })

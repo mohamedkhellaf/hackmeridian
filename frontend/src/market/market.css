@@ -248,3 +248,19 @@
 .mk-table .ui-mono {
   font-weight: 400;
 }
+
+/* Two-sided book of one series: bids left, offers right; stacked on narrow screens. */
+.mk-book-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.mk-book-actions { display: flex; gap: 8px; }
+.mk-book-note { margin: 4px 0 12px; }
+.mk-book-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mk-book-cols.is-one { grid-template-columns: 1fr; }
+.mk-book-side { min-width: 0; }
+.mk-book-side h3 { margin: 0 0 8px; font-size: 14px; }
+@media (max-width: 900px) {
+  .mk-book-cols { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .mk-book-actions { width: 100%; }
+  .mk-book-actions > * { flex: 1; }
+}
