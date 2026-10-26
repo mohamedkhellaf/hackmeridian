@@ -515,6 +515,49 @@ Part B ran on a throwaway v1.3.1 instance, never the main id. Throwaway
 The v1.3.1 unit, invariant and negative suites were not run in this deployment step. Their results on the merged
 tree are under "Off-chain assurance" below.
 
+## v1.4 deployment (2026-10-26 07:56 UTC): on-chain resale market
+
+v1.3.1 plus the resale functions of `docs/contract-abi.md` §14: `list_for_sale(holder, id, ask_total)`,
+`cancel_sale(holder, id)`, `buy_resale(buyer, id, max_total)`, views `get_ask(id)` and `list_asks(from, limit)`,
+errors `NoAsk = 120` and `PriceMoved = 121`, events `ask_listed`, `ask_cancelled`, `resale_bought`. Nothing else in
+the interface changed.
+
+| Item | Value |
+|---|---|
+| Options contract v1.4 | `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK` |
+| Source | `feat/contract-v1-4-resale` at `bc873d2` (`lib.rs` is unchanged after it; later commits are tests, scripts and docs) |
+| Constructor | `quote` = USDx SAC, `underlyings` = [RWA SAC, BOND SAC]; EQTY listed afterwards with `list_asset` by the smoke run |
+| Wasm upload / deploy tx | `94f89539b36a00e8f37c08402718c645cfb77c7e6bfacede6980c9391ee81b5a` / `da27e9fd2afebaefc7385ce813406cebff3b7fa469f4a0fb2926c06743237fb8` |
+| Wasm sha256, 35,735 bytes (fetched back with `stellar contract fetch`; identical to the local build) | `437de9d56a05c84774bcb0811252c3b62980c1abe82b3a37fa2fd26566ef4e57` |
+| Issuer authorizes the contract on RWA / BOND (`deploy.sh`) | `db20d550933ca392e1ae9f77a2b47909fad86553fc9c3f8e4bec2a9132c2e0db` / `5ec517d189c7431f4387afe2cfc6491cb4d4f9b6b6f1c708ec6f5811cd484063` |
+| maker1 lists EQTY (`list_asset`, smoke `V13_LIST`) / issuer authorizes the contract on EQTY | `e754c2ba388155be30c8efeb8a81b92588df4a9122b9e4c2f294ec2ab4fe8626` / `45ea7dd59c425e1743b855272c801fd500fe51037e6777597541ca34e91bda06` |
+| Seeded demo book (`seed-demo-offers.sh --hours 72`, expiry 1793261137 = 2026-10-29 08:05:37 UTC) | ids 11, 12, 13, 14: `cc812ff80a70059ed61cc71a6b0d03a55b1d58f6e7b4e3219c96eb97e5db9edf`, `a25179d07f016c5414f1bfc92903b4f86bc1c01a2cb51beca2bd922024ff5224`, `ca257d50e2e764a60307911dd5a517a9ac64e06569886626cf07edc44296cb62`, `8d2a71113647f2b6bcb8304c87d45dc3aa6f5d6a2f6506078607fa265644a61f` |
+| `extend-ttl.sh` over ids 11–14 | `ce1d7a1523ba93471454f50e1165add801dd891403f04c94256b15e0c5a6b9f3` (instance live until ledger 5913963, ~29 days) |
+
+Built with `stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian`
+(stellar-cli 28.1.0); `stellar contract info meta` on the deployed id shows `source_repo: github:mohamedkhellaf/hackmeridian`.
+
+Smoke run against v1.4 (`scripts/deploy/smoke-testnet.sh`, log `smoke-20261026T075813Z`, git-ignored):
+**PRE 6/6, P0 36/36, P0+ 24/24, V1.2 26/26, V1.3 53/53 (1 skipped: `CAP_FILL`, `--full` not used), V1.3.1 15/15,
+V1.4 35/35, exit 0.**
+
+**Resale on chain (V1.4 section, option #10: maker1 PUT, 5 RWA, total strike 50 USDx, premium 1 USDx).**
+
+| Step | Effect | Tx |
+|---|---|---|
+| `create_offer` (maker1) | #10 `Offered`; `list_for_sale` on it simulates #106 `WrongState` | `301919c60b0c1df897602f7c41caecaa8b4ea7ac1e3307916a79d6b8bd5a9329` |
+| `buy` (investor) | `Active`, holder investor. Simulated: `buy_resale` before any ask #120 `NoAsk`, maker2 lists #108 `NotHolder`, ask 0 #102 `InvalidArgs` | `03ce25bef207c254cdcf6352541b79969803bd513ecc3500b6dfe75363545bae` |
+| `list_for_sale(investor, 10, 2 USDx)` | `ask_listed` event; `get_ask(10)` = 20000000; `list_asks(10, 1)` = `[{id 10, holder investor, ask_total 20000000}]`; no balance moves. Simulated: holder buys #111, writer buys #111 `SelfTrade`, outsider #104 `NotEligible`, maker2 with `max_total = ask − 1` #121 `PriceMoved` | `2f77d430d69dbfed1ca42b6bd735eb0e9487b8f1cf4c42edfa10f974b61204da` |
+| `buy_resale(maker2, 10, max_total = 2 USDx)` | `resale_bought` event; holder maker2, still `Active`; maker2 −2 USDx, investor +2 USDx, contract and `open_collateral` unchanged; `get_ask(10)` = none. Simulated: a second `buy_resale` #120 `NoAsk`; investor `exercise` #108 `NotHolder` | `a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949` |
+| `list_for_sale(maker2, 10, 4 USDx)` | maker2 relists. Simulated: investor `cancel_sale` #108 | `83dd56da6b3017d0c5d4c107b5f6e1ffedf196cfd439b2912b906aae55876c01` |
+| `cancel_sale(maker2, 10)` | `ask_cancelled` event; ask gone. Simulated: cancel again #120, investor `buy_resale` #120 | `c22cf911fa11e51629a05e2376c8bcb05ef34cab6a6112778af09cb791f53ae0` |
+| `exercise` (maker2, the resale buyer) | `Exercised`; maker2 −5 RWA, +50 USDx; ABI §2 deltas on contract and `open_collateral` | `35fe5b1ef63c37b83ded7eec0ca86cd3ab0617a78dfba406efda980cf9164804` |
+| `claim_delivery` (maker1) | `Settled`; maker1 +5 RWA | `cd4e2ea45734cbeed203f6684f23dcb19b5f457ee6e5f7908b455f9761ae74fa` |
+
+Off-chain on the same tree (`cargo test -p options`): 133 unit, 17 invariant (200 proptest cases including the new
+INV11 resale model, `buy_resale` Ok / `PriceMoved` / `NoAsk` / `CollateralShortfall` all reached and predicted
+exactly) and 76 negative tests pass; `cargo clippy -p options --all-targets` is clean.
+
 ## Off-chain assurance
 
 On the merged v1.3.1 tree (branch `feat/contract-v1-3-1`: `feat/v131-impl`, `feat/v131-tests`,
