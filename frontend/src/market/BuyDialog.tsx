@@ -6,7 +6,7 @@ import type { OptionOffer } from '../options/types'
 import { requiredCollateral } from '../options/types'
 import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
 import type { TxOutcome } from '../state/useStrata'
-import { AssetBadge, Button, Dialog, Icon, Mono, Tag } from '../ui'
+import { Button, Dialog, Icon, Mono, PayoffSketch, Sediment, Tag } from '../ui'
 import './market.css'
 
 type CheckState = 'pending' | 'ok' | 'fail' | 'unknown'
@@ -126,7 +126,7 @@ export function BuyDialog({
           <span className="mk-done-icon" aria-hidden="true">
             <Icon name="check" size={24} strokeWidth={2} />
           </span>
-          <h3 className="mk-done-title">
+          <h3 className="mk-done-title ui-display">
             You hold a {u.code} {offer.kind}
           </h3>
           <p className="mk-muted">
@@ -183,28 +183,30 @@ export function BuyDialog({
             loading={submitting}
             disabled={!agreed || blocked}
             onClick={() => void confirm()}
-            aria-label="Confirm in wallet: confirm purchase and sign transaction"
           >
-            {submitting ? 'Waiting for wallet…' : 'Confirm in wallet'}
+            {submitting ? 'Confirm in wallet…' : `Sign and buy for ${premium} ${q.code}`}
           </Button>
         </>
       }
     >
       <div className="mk-review-head">
-        <AssetBadge code={u.code} size={38} />
-        <div>
+        <div className="mk-thumb mk-thumb--sm">
+          <Sediment seed={u.code} size="thumb" tone={offer.kind === 'put' ? 'amber' : 'blue'} />
+        </div>
+        <div className="mk-review-main">
           <div className="mk-review-title">
-            Buy {u.code} <Tag tone={offer.kind}>{offer.kind.toUpperCase()}</Tag>
+            <span className="mk-code">{u.code}</span> <Tag tone={offer.kind}>{offer.kind.toUpperCase()}</Tag>
           </div>
           <div className="mk-muted-sm">
             Strike {strikePerUnit(offer)} {q.code} · Expires {formatExpiry(offer.expiry)}
           </div>
         </div>
+        <PayoffSketch kind={offer.kind} strikeLabel={strikePerUnit(offer)} asset={u.code} compact className="mk-payoff" />
       </div>
 
       <div className="mk-hero">
         <span className="mk-label">You pay now</span>
-        <span className="mk-hero-amount">
+        <span className="mk-hero-amount ui-num">
           {premium} <span className="mk-hero-unit">{q.code}</span>
         </span>
         <span className="mk-muted mk-hero-note">

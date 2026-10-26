@@ -15,7 +15,7 @@ test('writer claims delivery after a second account buys and exercises', async (
   await goTo(page, 'Markets')
   await page.getByRole('button', { name: /^Buy put on 5.00 FUND from GBE6…3ZEG/ }).click()
   await page.getByRole('dialog').getByRole('checkbox', { name: /I understand/ }).check()
-  await page.getByRole('dialog').getByRole('button', { name: /Confirm in wallet/ }).click()
+  await page.getByRole('dialog').getByRole('button', { name: /Sign and buy/ }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Back to markets' }).click()
   await expect(toast(page)).toContainText('Purchase confirmed')
   await goTo(page, 'Portfolio')
