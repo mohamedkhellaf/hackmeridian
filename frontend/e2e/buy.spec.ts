@@ -23,7 +23,7 @@ test('buy review gates on the checkbox, then confirmed step, then exercise', asy
   await expectOpenOffers(page, 4)
 
   await openBuyDialogForSeed(page)
-  const confirm = dialog.getByRole('button', { name: /Confirm in wallet/ })
+  const confirm = dialog.getByRole('button', { name: /Sign and buy/ })
   await expect(confirm).toBeDisabled()
   await dialog.getByRole('checkbox', { name: /I understand/ }).check()
   await expect(confirm).toBeEnabled()
@@ -55,7 +55,7 @@ test('back to markets closes the confirmed step', async ({ page }) => {
   await openBuyDialogForSeed(page)
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('checkbox', { name: /I understand/ }).check()
-  await dialog.getByRole('button', { name: /Confirm in wallet/ }).click()
+  await dialog.getByRole('button', { name: /Sign and buy/ }).click()
   await expect(dialog).toContainText('You hold a FUND put')
   await dialog.getByRole('button', { name: 'Back to markets' }).click()
   await expect(dialog).toBeHidden()

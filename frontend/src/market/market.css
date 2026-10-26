@@ -1,65 +1,104 @@
-/* Markets screen: layout, series cards, offer rows, buy dialog. Tokens only (see src/index.css). */
+/* Markets screen (visual v2): layout, series cards, offer rows, buy dialog. Tokens only (see src/index.css). */
 
+.mk-page {
+  display: flex;
+  flex-direction: column;
+}
 .mk-layout {
   display: flex;
-  gap: 28px;
+  gap: 40px;
   align-items: flex-start;
   flex-wrap: wrap;
+  padding-top: 32px;
   max-width: 1360px;
 }
 .mk-main {
-  flex: 999 1 640px;
+  flex: 999 1 560px;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 28px;
 }
 .mk-rail {
   flex: 1 1 300px;
+  max-width: 340px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 28px;
+}
+.mk-cap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.mk-rail-block {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mk-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.mk-rail-head a {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.mk-rail-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.mk-rail-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mk-rail-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
 }
 .mk-steps {
   margin: 0;
   padding: 0;
   list-style: none;
-  counter-reset: mk-step;
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 .mk-steps li {
-  counter-increment: mk-step;
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 1fr;
   gap: 12px;
-  font-size: 13px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--text-2);
 }
-.mk-steps li::before {
-  content: counter(mk-step);
-  flex: 0 0 22px;
-  height: 22px;
-  border-radius: 11px;
-  border: 1px solid var(--border-strong);
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  color: var(--text-2);
+.mk-steps .ui-mono {
+  color: var(--muted);
 }
 .mk-steps b {
   color: var(--text);
-  font-weight: 500;
+  font-weight: 600;
 }
 .mk-risk {
   margin: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-lg);
-  padding: 16px 20px;
+  padding: 14px 16px;
   font-size: 12.5px;
-  line-height: 1.55;
-  color: var(--muted);
+  line-height: 1.5;
+  color: var(--text-2);
 }
 
 /* Filters */
@@ -72,8 +111,8 @@
 .mk-filter-sep {
   width: 1px;
   height: 20px;
-  background: var(--border-2);
-  margin: 0 6px;
+  background: var(--border-strong);
+  margin: 0 8px;
 }
 .mk-sorted {
   margin-left: auto;
@@ -85,7 +124,7 @@
 .mk-series-list {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 32px;
 }
 .mk-empty {
   margin: 0;
@@ -95,36 +134,83 @@
 }
 .mk-series {
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border-radius: 10px;
   background: var(--surface);
   overflow: hidden;
 }
 .mk-series-head {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 20px;
+  gap: 20px;
+  padding: 20px 20px 18px;
   flex-wrap: wrap;
+}
+.mk-thumb {
+  position: relative;
+  width: 112px;
+  height: 72px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.mk-thumb--sm {
+  width: 84px;
+  height: 54px;
+}
+.mk-thumb > * {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.mk-series-title {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .mk-series-title h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  gap: 10px;
   flex-wrap: wrap;
+  margin: 0;
 }
-.mk-series-title p {
-  margin: 3px 0 0;
+.mk-code {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.mk-desc {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.mk-terms-line {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.mk-terms-line .ui-mono {
+  color: var(--text);
+}
+.mk-terms-line b {
+  color: var(--text);
+  font-weight: 600;
+}
+.mk-count {
+  margin: 0;
   font-size: 12.5px;
   color: var(--muted);
 }
-.mk-strike {
-  font-weight: 600;
-}
-.mk-series-count {
-  margin-left: auto;
-  font-size: 12.5px;
-  color: var(--text-2);
+.mk-payoff {
+  margin: 0;
+  align-items: flex-end;
 }
 .mk-table .ui-table th,
 .mk-table .ui-table td {
@@ -139,8 +225,12 @@
 .mk-table .ui-table td:last-child {
   padding-right: 20px;
 }
-.mk-backing {
-  color: var(--ok);
+.mk-maker {
+  display: flex;
+  align-items: center;
+}
+.mk-unit {
+  color: var(--muted);
 }
 .mk-sr {
   position: absolute;
@@ -178,6 +268,9 @@
   font-weight: 600;
 }
 .mk-offer-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -187,9 +280,15 @@
 }
 
 @media (max-width: 640px) {
-  .mk-layout,
+  .mk-layout {
+    padding-top: 20px;
+    gap: 28px;
+  }
   .mk-main {
     gap: 16px;
+  }
+  .mk-rail {
+    max-width: none;
   }
   .mk-table {
     display: none;
@@ -199,11 +298,23 @@
   }
   .mk-series-head {
     padding: 14px 16px;
-    gap: 10px;
+    gap: 12px;
   }
-  .mk-series-count {
-    margin-left: 0;
+  .mk-thumb {
+    width: 72px;
+    height: 56px;
+  }
+  .mk-series-title {
+    flex-basis: 0;
+  }
+  .mk-code {
+    font-size: 22px;
+  }
+  .mk-desc {
     flex-basis: 100%;
+  }
+  .mk-series-head > .mk-payoff {
+    display: none;
   }
   .mk-filters {
     flex-wrap: nowrap;
@@ -243,11 +354,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
   font-weight: 600;
 }
+.mk-review-title .mk-code {
+  font-size: 24px;
+}
 .mk-hero {
-  background: var(--surface-sunken);
+  background: var(--raised-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 18px 20px;
@@ -256,10 +369,15 @@
   gap: 4px;
 }
 .mk-hero-amount {
-  font-size: 32px;
-  font-weight: 600;
+  font-size: 52px;
+  line-height: 1;
   letter-spacing: -0.02em;
-  color: var(--text-strong);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.mk-review-main {
+  flex: 1;
+  min-width: 0;
 }
 .mk-hero-unit {
   font-size: 16px;

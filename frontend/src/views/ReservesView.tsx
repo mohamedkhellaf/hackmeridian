@@ -2,7 +2,8 @@ import { CollateralPanel } from '../reserves/CollateralPanel'
 import { useReadAt } from '../reserves/useReadAt'
 import { stellarExpertContract } from '../reserves/reserves'
 import type { CollateralHealth, CollateralLine } from '../options/types'
-import { Card, Mono, PageHeader, StatusDot } from '../ui'
+import { Card, Mono, PageHero, StatusDot } from '../ui'
+import { backingFor } from '../reserves/reserves'
 
 export interface ReservesViewProps {
   collateral: CollateralLine[]
@@ -13,26 +14,67 @@ export interface ReservesViewProps {
 export function ReservesView({ collateral, health, contractId }: ReservesViewProps) {
   const { readAt, ledger } = useReadAt(collateral, health, !!contractId)
   const tokens = collateral.map((l) => l.token)
+  const backings = collateral.map((l) => backingFor(l, health.find((h) => h.token.contractId === l.token.contractId)))
+  const shortCodes = collateral.filter((_, i) => backings[i].status === 'short').map((l) => l.token.code)
+  const unknown = backings.some((b) => b.status === 'unknown')
+  let title = 'Owed equals held, on every token.'
+  let tone: 'ok' | 'warn' | 'neutral' = 'ok'
+  let caption = 'Owed equals held'
+  if (collateral.length === 0) {
+    title = 'Nothing is owed yet.'
+    tone = 'neutral'
+    caption = 'No collateral locked'
+  } else if (shortCodes.length > 0) {
+    title = `Held is below owed on ${shortCodes.join(', ')}.`
+    tone = 'warn'
+    caption = 'Shortfall shown below'
+  } else if (unknown) {
+    title = 'Owed is known; held could not be read.'
+    tone = 'neutral'
+    caption = 'Held balance unavailable'
+  } else if (backings.some((b) => b.held !== null && b.held > b.owed)) {
+    title = 'Every token is held in full.'
+    caption = 'Held covers owed'
+  }
   return (
     <>
-      <PageHeader
-        title="Reserves"
-        subtitle="What the options contract owes, compared with what it actually holds. Both numbers are read from the chain."
-        actions={
-          contractId ? (
+      <PageHero
+        eyebrow="Proof of collateral"
+        title={title}
+        lede="“Owed” is what the contract has promised across all open positions. “Held” is its actual balance on each asset contract. Both are public reads, shown side by side."
+        sediment={{
+          seed: 'reserves',
+          captionLabel: contractId ? 'Testnet' : 'Mock data',
+          caption: (
             <span className="rs-fresh">
-              <StatusDot tone="ok" />
-              Read at {readAt.toLocaleTimeString('en-GB')}
-              {ledger !== null && ` · ledger ${ledger.toLocaleString('en-US')}`}
+              <StatusDot tone={tone} />
+              {caption}
             </span>
-          ) : (
-            <span className="rs-fresh">
-              <StatusDot tone="warn" />
-              Mock data, not read from a chain
-            </span>
-          )
-        }
+          ),
+        }}
+        stats={[{ label: 'Tokens', value: String(collateral.length) }]}
       />
+      <p className="rs-fresh rs-readline">
+        {contractId ? (
+          <>
+            <StatusDot tone="ok" />
+            <span>
+              Read at <Mono>{readAt.toLocaleTimeString('en-GB')}</Mono>
+              {ledger !== null && (
+                <>
+                  {' '}
+                  · ledger <Mono>{ledger.toLocaleString('en-US')}</Mono>
+                </>
+              )}
+            </span>
+          </>
+        ) : (
+          <>
+            <StatusDot tone="warn" />
+            Mock data, not read from a chain
+          </>
+        )}
+      </p>
       <div className="rs-page">
         <CollateralPanel lines={collateral} health={health} contractId={contractId} />
         <Card title="How to verify this yourself">
