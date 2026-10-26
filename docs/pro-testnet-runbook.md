@@ -106,6 +106,46 @@ Also update `docs/pro-testnet-evidence.md` by hand only to add commentary; the t
 - Do not publish the `strata-pro-*` or issuer secrets anywhere; `scripts/out/` is git-ignored and `env_set` refuses
   to write anything shaped like a secret seed.
 
+## 6. Keeping the demo live (UI recording)
+
+Deployed contract `CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN` (pro v0.3.2). The evidence run's series 0
+is expired and settled; the UI demo uses **series 1**, listed after that run:
+
+| item | value |
+|---|---|
+| series 1 | strike 110 USDx (`1100000000`), expiry `1793188800` = 2026-10-28T12:00:00Z, list tx `cbc4a798a11975ea2948b59762b2e3a624c96ef302bf2504f40c060b6025b963` |
+| offer 2 | writer strata-pro-maker, qty 2, premium 3 USDx, quote expiry = series expiry, tx `c2ebb4b03e1309d35b41ece7894e517ca486f7d2659b4854e47c072b0db06fe3` |
+| offer 3 | writer strata-pro-maker, qty 5, premium 7 USDx, quote expiry = series expiry, tx `67f282668cd5ef7027b8485a47b9b37d50b2bfd72aa9d2c1058c1e67e6de802a` |
+| maker margin | 323 USDx free cash after the evidence run; a `buy` of offer 3 simulates successfully (`--send=no`) |
+
+A risk snapshot is valid for `max_age` = 3600 s (buys and margin checks fail with `#207 StaleSnapshot` after that) and
+early exercise needs one at most `exercise_max_age` = 120 s old. **Every few minutes while recording**, and right before
+showing an exercise, run from the repo root (needs `strata-pro-publisher` in the CLI keystore and
+`scripts/out/testnet.env` with `PRO_ID`/`PRO_PUBLISHER`):
+
+```sh
+scripts/deploy/pro-refresh-risk.sh                 # series 1, strike 110, expiry 1793188800, spot 110 (ATM)
+scripts/deploy/pro-refresh-risk.sh --spot 125      # move the team-operated price (in the money)
+```
+
+Without the script, the same thing as one command (seq = Unix time, so it is always strictly increasing):
+
+```sh
+stellar contract invoke --id CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN --network testnet \
+  --source-account strata-pro-publisher -- publish_risk \
+  --publisher GDY257DGQREP4NLM2DF2YUS5M2VHRW3JNDK2YYHZP55SMW3FMAUHZUVN \
+  --snap "$(python3 scripts/deploy/pro-snapshot.py --series-id 1 --strike 110 --expiry 1793188800 --spot 110 \
+            --seq $(date +%s) --now $(( $(date +%s) - 10 )))"
+```
+
+Spot is whatever the operator types (team-operated publisher, not a market feed): say so on screen. A large jump
+(e.g. `--spot 200`) can make the maker liquidatable once positions exist; that is a feature to demo, not an accident
+to hide. After 2026-10-28T12:00Z series 1 is expired: `publish_settlement` must then be sent by the publisher within
+24 h, or list a new series (`list_series` from strata-pro-admin) and pass its id/strike/expiry to the script.
+
+TTL: every write extends the entries it touches to 30 days and `extend_ttl(series_ids, book_ids, pos_ids)` is
+permissionless; nothing needs extending before October 28.
+
 ## Known limits of this build (from the Dev 2 security pass, no action needed for judging)
 
 - Persistent entries (accounts, offers, LP shares) are extended on every write but are not covered by `extend_ttl`; they live 30 days after their last write, which covers judging (28 Oct). Series, snapshots, books, positions, the vault and the instance are covered by `extend_ttl`.
