@@ -1,12 +1,25 @@
-# Strata Pro v0.2 — build brief for Dev 2
+# Strata Pro v0.3 — build brief for Dev 2
 
 Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **experimental track, spec + integer model + simulator for the hackathon.** Dev 2's review of PR #30 recommended no-go for on-chain Pro before the 06:00 freeze; Dev 1 accepts. This brief is the build spec for when `contracts/pro/` is built. Dev 2 keeps the veto on unsafe behavior.
 
-**The executable spec is `packages/risk/pro_v0_model.py` (v0.2).** Every function below exists there with the same checks, in the same order, with the same errors. The brief and the model must agree. If Dev 2 finds that a behavior is unsafe or unbuildable on-chain, Dev 2 may deviate. Dev 1 then updates the model and the fixtures to match before the contract merges. The model never overrides on-chain safety. Background and calibration: `docs/pro-architecture.md`.
+**The executable spec is `packages/risk/pro_v0_model.py` (v0.3).** Every function below exists there with the same checks, in the same order, with the same errors. The brief and the model must agree. If Dev 2 finds that a behavior is unsafe or unbuildable on-chain, Dev 2 may deviate. Dev 1 then updates the model and the fixtures to match before the contract merges. The model never overrides on-chain safety. Background and calibration: `docs/pro-architecture.md`.
 
-**Done means:** `contracts/pro` replays every scenario in `packages/risk/fixtures/pro_v0.json` (10 scenarios, 219 steps) with identical results, error codes and state. The fixtures do **not** yet cover every bound or error: contract tests must add `NotFound`, `Overflow`, `TooManyPositions` and `TooManySeries` at their caps (§4). A Testnet run covers fill → early exercise → price move → vault liquidation → settlement → claim, with the transaction hashes recorded in `docs/contract-testnet-evidence.md`. Until then, every public claim says **specified and simulated**.
+**Done means:** `contracts/pro` replays every scenario in `packages/risk/fixtures/pro_v0.json` (14 scenarios, 335 steps) with identical results, error codes and state. **Replay is necessary, not sufficient**: the fixtures do not cover every bound or error, so contract tests must also include the negative tests listed in §7. A Testnet run covers fill → early exercise → price move → vault liquidation → settlement → claim, with the transaction hashes recorded in `docs/contract-testnet-evidence.md`. Until then, every public claim says **specified and simulated**.
 
 ## 0. What changed
+
+### v0.3 (fourth review of PR #30, head `09c6f26`)
+
+| Round-4 item | v0.3 resolution |
+|---|---|
+| A. A vault takeover pooled a solvent writer's payment with other shortfalls | The takeover payment is **reserved per moved book** (`Book.reserve`, split by takeover value, rounding dust to vault cash; `VaultAcct.reserved` counts it in the vault's NLV). At `settle(book)` a vault-owned book pays `min(due, reserve)` first; any excess returns to vault cash; only the rest joins the series' pooled shortfall. Dev 2's script: H1 paid 25,000/25,000 with or without the takeover and in both `settle_vault` orders. |
+| B. Surplus of the expired-debt bound returned to the defaulting writer | The takeover deficit `x − pay` becomes the writer's **debt to the vault** (`Acct.owed`, subtracted in its NLV). `withdraw` repays it first. Dev 2's script: the vault recovers 7,904.26 (what the exact debt would have given) and a self-triggered takeover gains nothing. |
+| C. First LP deposit skipped the value check | `lp_deposit` refuses with `VaultCapacity` whenever the vault's value is < 0, or ≤ 0 while it has shorts or shares, before the first-deposit branch. |
+| D. Replay was not a sufficient acceptance test | Header and §7 rewritten (replay is necessary, not sufficient). Four new scenarios (`negative_paths`, `takeover_debt`, `margin_boundaries`, `taker_oi_cap`) and one step in `settlement_pro_rata_deficit`. 18 of Dev 2's 19 single-line mutants now change the fixtures or fail the generator; the 19th ("settle total including live books") is equivalent in this model, since a live series never has a price. |
+| E. Overclaims | Architecture doc (snapshot rejection, takeover wording, calibration figures, labels), `packages/risk/README.md` status line (roadmap only), the RFQ carve-out now exists in AGENTS.md, USDx clawback wording. |
+| F. AGENTS.md lines 10, 41, 85, RFQ rule | Rewritten: spec-only status, exception names leverage and is not active in this hackathon, `contracts/pro/` marked planned and not built, RFQ funded-offer rule scoped to Covered. |
+
+The "conditions for any on-chain go" in that review remain open; §10 lists the ones that matter for users.
 
 ### v0.2 (second review of PR #30, head `e810657`)
 
@@ -43,7 +56,7 @@ Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **experimental track, spec +
 
 ## 1. Product in one paragraph
 
-Naked **American calls, cash-settled in USDx**, on one underlying market per deployment (demo: fictional `EQTY`). Makers deposit USDx margin and sell calls without holding the underlying. Margin is computed from risk snapshots posted by a publisher role run by the team. **The holder may exercise the whole position before expiry** at the spot of a snapshot at most `exercise_max_age` (120 s) old, and is paid `qty × max(spot − K, 0)` from the writer's margin. Exercise is refused when the book belongs to the vault (paid at expiry, pro rata), when the writer is below maintenance margin (taken over first), or while the writer has expired debt without a settlement price. An account with NLV < MM is taken over by a solvent maker or by the **backstop vault** (LP-funded, a pseudo-account inside the contract). Positions left at expiry are paid at the settlement price: first from the owner's margin (pro rata across that writer's expired series), then from the vault pro rata across the series' shortfalls; any remainder is a recorded **deficit** borne by the holders. Pro offers are **unfunded quotes**: the margin check happens at `buy`. The AGENTS.md "funded executable offer" rule applies to Covered only. Nothing is shared with `contracts/options`.
+Naked **American calls, cash-settled in USDx**, on one underlying market per deployment (demo: fictional `EQTY`). Makers deposit USDx margin and sell calls without holding the underlying. Margin is computed from risk snapshots posted by a publisher role run by the team. **The holder may exercise the whole position before expiry** at the spot of a snapshot at most `exercise_max_age` (120 s) old, and is paid `qty × max(spot − K, 0)` from the writer's margin. Exercise is refused when the book belongs to the vault (paid at expiry, pro rata), when the writer is below maintenance margin (taken over first), or while the writer has expired debt without a settlement price. An account with NLV < MM is taken over by a solvent maker or by the **backstop vault** (LP-funded, a pseudo-account inside the contract). Positions left at expiry are paid at the settlement price: first from the owner's margin (pro rata across that writer's expired series; for a book the vault took over, from the old writer's takeover payment reserved for it), then from the vault pro rata across the series' shortfalls; any remainder is a recorded **deficit** borne by the holders. Pro offers are **unfunded quotes**: the margin check happens at `buy`. The AGENTS.md "funded executable offer" rule applies to Covered only. Nothing is shared with `contracts/options`.
 
 ## 2. Crate and units
 
@@ -54,6 +67,7 @@ Naked **American calls, cash-settled in USDx**, on one underlying market per dep
   - takeover price per series `q * mark * (BPS + bonus_bps) / BPS` truncates (floor);
   - reserve fee `premium * reserve_fee_bps / BPS` truncates;
   - LP shares truncate;
+  - vault takeover reserve per book `floor(pay * value_b / Σ value)`, dust to vault cash;
   - writer cash per book at settlement `floor(due * cash / total_expired_due)` when cash is short;
   - vault share of a book `floor(book.shortfall * vault_paid / series.shortfall)`; position payout `floor(pos_due * book_paid / book.due)`. Rounding dust (< 1 unit per position) stays in the series pool.
 
@@ -92,9 +106,9 @@ Config and roles are immutable in v0.2. Scenario `limits_and_staleness` uses `ma
 | `Admin`, `Publisher`, `Quote`, `Cfg`, `NextSeries`, `NextOffer`, `NextPos`, `NextBook`, `TotalShares`, `LiveSeries` | instance | scalars |
 | `Series(u32)` | persistent | `{ strike, expiry, settlement_price: Option<i128>, oi, open_books: u32, shortfall, vault_paid, pool, claimed, closed }` |
 | `Snap(u32)` | persistent | `{ seq: u64, ts: u64, spot, mark, ra: Vec<i128> /*16*/, smin, liq }` |
-| `Acct(Address)` | persistent | `{ cash, shorts: Map<u32, i128> (≤ 8 series), books: Vec<u32> (≤ 16) }` |
-| `VaultAcct` | persistent | `{ cash, shorts: Map<u32, i128> (≤ MAX_LIVE_SERIES) }`, no book list |
-| `Book(u32)` | persistent | `{ series_id, owner: Writer, qty, settled, due, from_owner, shortfall }`, where `Writer = Account(Address) \| Vault` |
+| `Acct(Address)` | persistent | `{ cash, shorts: Map<u32, i128> (≤ 8 series), books: Vec<u32> (≤ 16), owed }` |
+| `VaultAcct` | persistent | `{ cash, shorts: Map<u32, i128> (≤ MAX_LIVE_SERIES), reserved }`, no book list |
+| `Book(u32)` | persistent | `{ series_id, owner: Writer, qty, settled, due, from_owner, shortfall, reserve }`, where `Writer = Account(Address) \| Vault` |
 | `Offer(u32)` | persistent | `{ writer, series_id, qty, premium, quote_expiry, open }` (no reservation) |
 | `Pos(u32)` | persistent | `{ series_id, holder, book: u32, qty, settled, exercised, paid, deficit }` |
 | `Lp(Address)` | persistent | shares (no withdrawal in v0) |
@@ -131,7 +145,7 @@ requirement(acct):
     expired:              expired += q·max(settlement_price − K, 0)        if published
                           expired += q·max(s_up(latest snap, any series) − K, 0)   otherwise (no freshness needed)
   scan = max(0, max_w pnl[w]);  mm = max(scan, smin) + liq;  im = ceil_div(mm·im_bps, BPS)
-  nlv  = cash − liability − expired
+  nlv  = cash + reserved (vault only) − owed − liability − expired
 ```
 
 `publish_risk` validates, in this order:
@@ -155,7 +169,8 @@ Names and order follow `pro_v0_model.py`. `require_auth` is on the first `Addres
 list_series(admin, strike: i128, expiry: u64) -> u32      // TooManySeries if MAX_LIVE_SERIES not closed
 publish_risk(publisher, series_id: u32, snap: Snapshot)
 deposit(who, amount)                     // RoleNotAllowed for admin/publisher; always allowed otherwise (top-up)
-withdraw(who, amount)                    // SeriesExpired if any expired unsettled short;
+withdraw(who, amount)                    // SeriesExpired if any expired unsettled short; then repays owed
+                                         // (min(cash, owed) → vault cash) before anything else;
                                          // shorts? -> requirement and nlv − amount ≥ im
 create_offer(writer, series_id, qty, premium_total, quote_expiry) -> u32   // no funds move; RoleNotAllowed
 cancel_offer(writer, offer_id)
@@ -178,6 +193,7 @@ liquidate(caller, writer, taker: Option<Address>)   // None = vault, anyone; Som
                                          // private taker: RoleNotAllowed, deficit > 0 -> InsolventTakeover,
                                          //   TooManySeries / OiCapExceeded / TooManyPositions (books)
                                          // move live shorts + live books (owner = taker); expired books stay
+                                         // vault: pay split into Book.reserve per moved book; owed += deficit
                                          // then private taker nlv ≥ im (InsufficientMargin); the vault always accepts
 publish_settlement(publisher, series_id, price)      // expiry ≤ now ≤ expiry + settle_window; once; team-set
 settle(book_id)                          // anyone. NotFound, NoSettlementPrice, WrongState if settled;
@@ -185,11 +201,13 @@ settle(book_id)                          // anyone. NotFound, NoSettlementPrice,
                                          // a price whose window is still open.
                                          // due = qty·max(price − K, 0); total = owner's expired priced debt;
                                          // from_owner = due if cash ≥ total else floor(due·cash/total)
-                                         // (0 for a vault-owned book); shortfall = due − from_owner
+                                         // vault-owned book: from_owner = min(due, reserve), excess → vault cash;
+                                         // shortfall = due − from_owner
 settle_vault(series_id)                  // anyone. needs price, all books settled (open_books == 0), once.
                                          // vault_paid = min(series.shortfall, vault cash); series closed
 claim(holder, pos_id) -> {due, paid, deficit}   // holder only; series closed; pays the caller only
-lp_deposit(lp, amount) -> shares         // RoleNotAllowed; SettlementPending; first deposit ≥ 100 USDx;
+lp_deposit(lp, amount) -> shares         // RoleNotAllowed; SettlementPending; VaultCapacity if value < 0, or ≤ 0
+                                         // with shorts or shares (first deposit included); first deposit ≥ 100 USDx;
                                          // shares = amount if total = 0 else amount·total/vault_value
 // no LP withdrawal in v0 (cut after the second review)
 extend_ttl(series_ids, book_ids, pos_ids)   // anyone; contract-only (not in the model or fixtures)
@@ -227,6 +245,8 @@ For each scenario:
    - `lp_shares` and `total_shares`.
 
 Snapshots in `publish_risk.args[1]` are already integers: pass them through unchanged. `liquidate` refers to the vault as the string `"VAULT"`; `settle` takes a book id.
+
+**Required negative tests beyond the fixtures** (each must fail with the stated error, at its cap where relevant): `NotFound` on every id-taking call; `Overflow` on a settlement price ≥ 2^120 and on the other `chk` products; `TooManyPositions` at 16 books (private account) and on a takeover that would exceed it; `TooManySeries` at 8 series per account and at 16 live series; a double `claim`; a takeover by the holder of the same book; footprint at every cap ≤ 400 keys and ≤ 200 writes.
 
 Regenerate the fixtures with `cd packages/risk && python gen_pro_fixtures.py`. The output is deterministic, and the script fails if the reference model breaks one of its own expectations or invariants (balance = accounts + pools; shorts = books = open longs = OI per series).
 
@@ -267,6 +287,7 @@ Never cut:
 - **The publisher is trusted.** Its spot and settlement price decide liquidations, early exercises and payouts. The §5 bounds only reject inconsistent snapshots. The demo feed and the settlement price are operated by the team.
 - **Early exercise is paid at the publisher's spot** (snapshot ≤ 120 s old), not at a live market price. It is refused when the vault owns the position (paid at expiry, pro rata), when the writer is unhealthy (taken over first) or while the writer has expired debt without a price.
 - The vault always takes over an account below MM, even when that pushes the vault below its own margin or below zero. Within a series the vault pays pro rata; across series it pays in `settle_vault` order.
+- **Vault takeovers ring-fence the writer's payment per book; the takeover shortfall is the writer's debt to the vault**, repaid before any withdrawal but not counted in the vault's value until repaid. The first LP takes any fee income earned before the first deposit.
 - **LP capital cannot be withdrawn in v0.** A deposit is priced at the vault's value, which does not include writers that are insolvent but not yet taken over: a deposit made in that window (before the keeper acts) buys into a hidden loss. New deposits are refused while the vault's value is ≤ 0.
 - The payoff is not guaranteed beyond writer margin plus vault cash. Holders can take a haircut, which is shown as `deficit`.
 - Settlement uses one price, not a TWAP. If the window closes with no price, the series never closes and keeps one of the 16 live-series slots; margin and claims stay locked. A price ≥ 2^120 would overflow and lock the series. v1 needs a bounded or two-step settlement price, an overflow guard, a fallback oracle, publisher key rotation and a permissionless close for expired zero-OI series. A stale snapshot on any series of a writer blocks early exercise against that writer (publisher liveness).

@@ -2,7 +2,7 @@
 
 Version du 25 octobre 2026. Conception pour Testnet. Les modèles et les tests sont dans `packages/risk/` (`strata_risk.py`, `test_strata_risk.py`).
 
-> **Périmètre v0 :** ce document décrit la cible. Ce qui est construit pour la soumission est défini par `docs/pro-v0-brief-dev2.md` et `packages/risk/pro_v0_model.py`. Pas en v0 : TWAP de règlement, enchère hollandaise, liquidation partielle, fonds de défaut des makers, tokens en couverture, MMP. Aucun paramètre n'est validé pour des fonds réels. **v0.1 (26 octobre)** intègre la revue de Dev 2 sur la PR #30 (voir le tableau §0 du brief) ; on-chain : no-go pour le hackathon, Pro est livré comme spec + modèle + simulateur. Sous-jacent démo : le label fictif `EQTY`, avec la calibration « action liquide » ; les RWA fins restent en Covered (§5).
+> **Périmètre v0 :** ce document décrit la cible. Ce qui est construit pour la soumission est défini par `docs/pro-v0-brief-dev2.md` et `packages/risk/pro_v0_model.py`. Pas en v0 : TWAP de règlement, enchère hollandaise, liquidation partielle, fonds de défaut des makers, tokens en couverture, MMP. Aucun paramètre n'est validé pour des fonds réels. **v0.3 (26 octobre)** intègre les revues 1 à 4 de Dev 2 sur la PR #30 (voir le §0 du brief) ; on-chain : no-go pour le hackathon, Pro est livré comme spec + modèle + simulateur. Sous-jacent démo : le label fictif `EQTY`, avec la calibration « action liquide » ; les RWA fins restent en Covered (§5).
 
 ## 0. Décision
 
@@ -133,10 +133,10 @@ Un call vendu à 10 % hors de la monnaie, sur 21 jours, 30 000 trajectoires. Deu
 
 Ce que cela tranche :
 
-1. **Sous-pondérer la queue est la pire option.** Le SPAN classique demande le moins de capital, mais présente 10 à 40 fois plus de risque de déficit. Pour un short call, la queue *est* le risque.
+1. **Sous-pondérer la queue est la pire option.** Le SPAN classique demande le moins de capital, mais présente 10 à 40 fois plus de risque de déficit sur l'action liquide (2 à 4 fois sur le RWA fin, mesure de Dev 2, revue 4). Pour un short call, la queue *est* le risque.
 2. **Action liquide** : environ 15 à 24 % du notionnel suffit à rendre le déficit négligeable dans ce modèle. Pro y est **4 à 6 fois plus efficace** qu'un covered call. Le marché est éligible.
 3. **RWA fin** : aucune marge sous environ 35 % du notionnel ne descend sous 1 % de probabilité de déficit. À 59 %, le gain sur un covered call n'est que de 1,7 fois, et il faut encore payer la réserve (§6.3). **Les RWA fins restent en Covered ou Defined Risk.** C'est la justification chiffrée de la séparation des régimes.
-4. Le maker passif (non montré ; `python strata_risk.py 30000`) fait *moins* de déficits, car il est liquidé dès les premières variations, dans la grande majorité des trajectoires (84,5 % mesuré par Dev 2 sur le simulateur actuel, revue 2 de la PR #30). Une marge qui « marche » parce qu'elle liquide tout le monde n'est pas viable pour un maker. L'hystérésis IM/MM et la liquidation partielle sont là pour ça.
+4. Le maker passif (non montré ; `python strata_risk.py 30000`) fait *moins* de déficits, car il est liquidé dès les premières variations, dans la grande majorité des trajectoires (98,9 à 99,4 % avec les marges Strata, 84,5 % avec la seule marge FINRA ; mesures de Dev 2, revue 4 de la PR #30). Une marge qui « marche » parce qu'elle liquide tout le monde n'est pas viable pour un maker. L'hystérésis IM/MM et la liquidation partielle sont là pour ça.
 
 Reproduire : `python strata_risk.py 30000` (environ 5 min).
 
@@ -193,9 +193,9 @@ Sources de financement : frais de réserve sur chaque fill Pro, bonus de liquida
 2. **Enchère hollandaise sur le bonus.** Le bonus monte de 0 à `max_bonus` (10 %) sur N minutes. Le premier repreneur qui dépose son IM prend la fraction minimale f qui ramène le compte à l'IM.
 3. **Backstop obligatoire.** Si personne n'a pris à `max_bonus`, le vault reprend, dans la limite de sa capacité. C'est l'engagement contractuel des LP, qui en sont rémunérés.
 4. **Aucune reprise possible** (vault saturé) : mode réduction seule sur ce sous-jacent. La position reste due et le compte est en défaut à l'échéance, avec application de la waterfall.
-5. **Anti-collusion** : X par lot = mark·(1+bonus). Le mark est borné on-chain et le bonus plafonné (`takeover_price`). Un snapshot gonflé est rejeté.
+5. **Anti-collusion** : X par lot = mark·(1+bonus). Le mark est borné on-chain et le bonus plafonné (`takeover_price`). Le contrat ne rejette un snapshot que s'il est incohérent avec le spot qu'il annonce : un spot gonflé mais cohérent passe (brief §5).
 
-Pour Alice, rien ne change pendant une reprise : même série, même quantité, même droit au règlement.
+Pour Alice, la position ne change pas pendant une reprise : même série, même quantité, même droit au règlement. Si le vault reprend, le paiement de son ancien vendeur reste réservé à son book (v0.3) ; seul le reste dû est mutualisé avec les autres insuffisances de la série.
 
 ## 8. Viabilité pour les market makers
 
@@ -205,14 +205,14 @@ Pour Alice, rien ne change pendant une reprise : même série, même quantité, 
 - **Aperçu de marge marginale** : la fonction de vue `what_if(account, fill)` renvoie MM et IM après le fill.
 - **Coûts explicites** : frais de réserve, bonus de liquidation et contribution au fonds de défaut sont publiés par marché.
 
-Tableau de comparaison pour un maker sur l'action liquide : un covered call immobilise 100 % du notionnel, alors qu'un livre Pro couvert en delta immobilise 12 à 24 %. C'est l'argument commercial, et il n'est vrai que sur les marchés admis.
+Tableau de comparaison pour un maker sur l'action liquide : un covered call immobilise 100 % du notionnel, alors qu'un livre Pro couvert en delta immobilise 12 à 24 % en marge, hors tokens de couverture (environ 25 % du notionnel en plus). C'est l'argument commercial, et il n'est vrai que sur les marchés admis.
 
 ## 9. Invariants (tests de propriétés côté contrat)
 
 1. Pour chaque token : balance du contrat ≥ libres + marges + compartiment backstop + fonds de défaut + claims dus.
 2. Aucune opération utilisateur ne laisse un compte avec NLV < IM, sauf top-up, réduction, claim et liquidation.
 3. Une liquidation réduit strictement l'exigence du compte ou ne s'exécute pas.
-4. Une reprise ne modifie aucune position longue.
+4. Une reprise ne modifie aucune position longue ; une reprise par le vault réserve le paiement du vendeur au book repris.
 5. Σ allocations du backstop ≤ capital du backstop. Le fonds de défaut n'est jamais compté dans la marge d'un maker.
 6. Un règlement s'exécute une seule fois par position. Le prix final est immuable.
 7. Les pertes Pro ne touchent jamais `contracts/options`.

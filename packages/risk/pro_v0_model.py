@@ -1,5 +1,5 @@
 """
-Strata Pro v0.1 — modèle de référence en entiers.
+Strata Pro v0.3 — modèle de référence en entiers.
 
 Spécification exécutable de `contracts/pro/`. Chaque fonction publique correspond à une fonction
 du contrat, avec les mêmes contrôles dans le même ordre et les mêmes erreurs. Aucun flottant :
@@ -21,6 +21,10 @@ v0.2 (2e revue) : pas d'exercice anticipé sur un book du vault ; snapshot d'exe
 dette échue non cotée bornée par le snapshot le plus récent du sous-jacent ; cash d'un vendeur réparti
 au prorata entre ses séries échues ; retraits LP coupés en v0 (dépôt seulement) ; reprise par le vault
 toujours possible quand NLV < MM, pour que la perte soit visible.
+
+v0.3 (4e revue) : le paiement d'une reprise par le vault reste réservé aux books repris (`reserve`), payé à leurs
+porteurs au règlement avant toute mutualisation ; le déficit de reprise devient une dette du vendeur envers le vault
+(`owed`), soldée avant tout retrait ; le premier dépôt LP est refusé si le vault vaut <= 0 avec des positions.
 
 Conventions de risque (publiées par le publieur, bornées par le contrat) :
 - `ra[w]`  : perte par lot COURT dans le scénario w (16 scénarios, ordre de strata_risk.ScanConfig),
@@ -137,6 +141,8 @@ class Account:
     cash: int = 0
     shorts: dict = field(default_factory=dict)     # series_id -> lots
     books: list = field(default_factory=list)      # ids des books ouverts (comptes privés seulement)
+    owed: int = 0                  # dette envers le vault (déficit de reprise), soldée avant tout retrait
+    reserved: int = 0              # vault seulement : somme des `reserve` de ses books ouverts
 
 
 @dataclass
@@ -150,6 +156,7 @@ class Book:
     due: int = 0                   # qty x max(S_T - K, 0) au règlement
     from_owner: int = 0            # payé par le compte propriétaire
     shortfall: int = 0             # due - from_owner, couvert ensuite au prorata par le vault
+    reserve: int = 0               # book repris par le vault : paiement de reprise réservé à ses porteurs
 
 
 @dataclass
@@ -286,7 +293,7 @@ class ProModel:
         scan = max(0, max(pnl))
         mm = max(scan, smin) + liq
         im = ceil_div(chk(mm * self.cfg.im_bps), BPS)
-        return {"nlv": a.cash - liability - expired, "liability": liability, "expired": expired, "scan": scan,
+        return {"nlv": a.cash + a.reserved - a.owed - liability - expired, "liability": liability, "expired": expired, "scan": scan,
                 "smin": smin, "liq": liq, "mm": mm, "im": im, "worst": pnl.index(max(pnl)) if any(pnl) else 0}
 
     # ------------------------------------------------------------------ admin / publieur
@@ -358,6 +365,14 @@ class ProModel:
             raise ProError("InvalidArgs")
         if any(q and not self._live(sid) for sid, q in a.shorts.items()):
             raise ProError("SeriesExpired")          # dette échue non réglée : aucun retrait avant settle
+        if a.owed:                                   # la dette de reprise passe avant tout retrait
+            paid = min(a.cash, a.owed)
+            a.cash -= paid
+            a.owed -= paid
+            self.accounts[VAULT].cash += paid
+            self.events.append(("DebtRepaid", who, paid))
+            if amount > a.cash:
+                raise ProError("InvalidArgs")
         if any(a.shorts.values()):
             r = self.requirement(who)
             if r["nlv"] - amount < r["im"]:
@@ -541,7 +556,20 @@ class ProModel:
             if len(t.books) + len(moved_books) > MAX_BOOKS_PER_ACCOUNT:
                 raise ProError("TooManyPositions")
         w.cash -= pay
-        t.cash += pay
+        if taker == VAULT:
+            # le paiement reste attaché aux books repris, au prorata de leur valeur de reprise ; la poussière
+            # d'arrondi va au cash du vault. Le déficit reste dû par le vendeur.
+            vals = {bid: chk(self.books[bid].qty * self.snaps[self.books[bid].series_id].mark
+                             * (BPS + self.cfg.bonus_bps)) // BPS for bid in moved_books}
+            total_v = sum(vals.values())
+            for bid, v in vals.items():
+                share = chk(pay * v) // total_v if total_v else 0
+                self.books[bid].reserve += share
+                t.reserved += share
+            t.cash += pay - sum(chk(pay * v) // total_v if total_v else 0 for v in vals.values())
+            w.owed += deficit
+        else:
+            t.cash += pay
         for sid, q in live.items():
             t.shorts[sid] = t.shorts.get(sid, 0) + q
             del w.shorts[sid]
@@ -597,7 +625,12 @@ class ProModel:
         a = self.acct(b.owner)
         due = chk(b.qty * max(ser.settlement_price - ser.strike, 0))
         if b.owner == VAULT:
-            from_owner = 0
+            # le book repris paie d'abord sa réserve (le paiement de son ancien vendeur) ; l'excédent revient
+            # au vault, le reste dû passe en insuffisance mutualisée à settle_vault
+            from_owner = min(due, b.reserve)
+            a.reserved -= b.reserve
+            a.cash += b.reserve - from_owner
+            b.reserve = 0
         else:
             # le cash du vendeur est partagé au prorata entre toutes ses séries échues : on attend que chacune
             # ait son prix (ou que sa fenêtre soit close), puis chaque book reçoit due x cash / dette totale
@@ -607,7 +640,8 @@ class ProModel:
             total = sum(self._book_due(x) for x in a.books if not self._live(self.books[x].series_id)
                         and self.series[self.books[x].series_id].settlement_price is not None)
             from_owner = due if a.cash >= total else (chk(due * a.cash) // total if total else 0)
-        a.cash -= from_owner
+        if b.owner != VAULT:
+            a.cash -= from_owner
         a.shorts[b.series_id] -= b.qty
         if a.shorts[b.series_id] == 0:
             del a.shorts[b.series_id]
@@ -689,13 +723,13 @@ class ProModel:
         if self._settlement_pending():
             raise ProError("SettlementPending")
         value = self.vault_value()
+        if value < 0 or (value <= 0 and (self.total_shares or any(self.accounts[VAULT].shorts.values()))):
+            raise ProError("VaultCapacity")           # vault en perte : aucune part émise, premier dépôt compris
         if self.total_shares == 0:
             if amount < MIN_FIRST_LP:
                 raise ProError("InvalidArgs")
             shares = amount
         else:
-            if value <= 0:
-                raise ProError("VaultCapacity")       # vault insolvable : pas de nouvelles parts
             shares = amount * self.total_shares // value
         if shares <= 0:
             raise ProError("InvalidArgs")
@@ -712,7 +746,7 @@ class ProModel:
     # ------------------------------------------------------------------ invariants
 
     def check_invariants(self):
-        cash = sum(a.cash for a in self.accounts.values())
+        cash = sum(a.cash + a.reserved for a in self.accounts.values())
         pools = sum(s.pool - s.claimed for s in self.series.values())
         assert self.contract_balance == cash + pools, ("balance != comptes + pools", self.contract_balance, cash, pools)
         assert all(a.cash >= 0 for a in self.accounts.values()), "cash négatif"
@@ -724,6 +758,10 @@ class ProModel:
                         if p.series_id == sid and not p.settled and not self.books[p.book].settled)
             assert shorts == books == longs == ser.oi, ("courts/books/longs/OI", sid, shorts, books, longs, ser.oi)
             assert ser.open_books == sum(1 for b in self.books.values() if b.series_id == sid and not b.settled)
+        v = self.accounts[VAULT]
+        assert v.reserved == sum(b.reserve for b in self.books.values() if b.owner == VAULT and not b.settled)
+        assert all(b.reserve == 0 for b in self.books.values() if b.settled or b.owner != VAULT)
+        assert all(a.owed >= 0 for a in self.accounts.values())
         for who, a in self.accounts.items():
             assert all(self.books[b].owner == who and not self.books[b].settled for b in a.books)
             assert len(a.books) <= MAX_BOOKS_PER_ACCOUNT

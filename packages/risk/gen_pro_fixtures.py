@@ -73,14 +73,15 @@ class Recorder:
             "now": m.now,
             "contract_balance": m.contract_balance,
             "accounts": {k: {"cash": a.cash, "shorts": {str(s): q for s, q in sorted(a.shorts.items()) if q},
-                             "books": list(a.books)}
+                             "books": list(a.books), "owed": a.owed, "reserved": a.reserved}
                          for k, a in sorted(m.accounts.items()) if a.cash or any(a.shorts.values()) or a.books},
             "wallets": dict(sorted(m.wallets.items())),
             "series": {str(s.id): {"oi": s.oi, "settlement_price": s.settlement_price, "open_books": s.open_books,
                                    "shortfall": s.shortfall, "vault_paid": s.vault_paid, "pool": s.pool,
                                    "claimed": s.claimed, "closed": s.closed} for s in m.series.values()},
             "books": {str(b.id): {"series_id": b.series_id, "owner": b.owner, "qty": b.qty, "settled": b.settled,
-                                  "due": b.due, "from_owner": b.from_owner, "shortfall": b.shortfall}
+                                  "due": b.due, "from_owner": b.from_owner, "shortfall": b.shortfall,
+                                  "reserve": b.reserve}
                       for b in m.books.values()},
             "positions": {str(p.id): {"holder": p.holder, "book": p.book, "qty": p.qty, "settled": p.settled,
                                       "exercised": p.exercised, "paid": p.paid, "deficit": p.deficit}
@@ -97,7 +98,8 @@ class Recorder:
             outcome = "ok"
         except ProError as e:
             result, outcome = None, e.name
-        assert outcome == expect, f"[{self.name}] {op}{tuple(rec_args)} : attendu {expect}, obtenu {outcome}"
+        if outcome != expect:                        # pas d'assert : `python -O` ne doit pas écrire de fixtures fausses
+            raise SystemExit(f"[{self.name}] {op}{tuple(rec_args)} : attendu {expect}, obtenu {outcome}")
         self.m.check_invariants()
         entry = {"op": op, "args": rec_args, "expect": outcome if outcome == "ok" else
                  {"error": outcome, "code": ERRORS[outcome]}}
@@ -132,7 +134,8 @@ class Recorder:
                 "config": asdict(self.m.cfg), "initial_wallets": self.initial_wallets, "steps": self.steps}
 
 
-def open_short_at_im(r: Recorder, writer: str, buyer: str, sid: int, qty: int, extra: int = 0) -> int:
+def open_short_at_im(r: Recorder, writer: str, buyer: str, sid: int, qty: int, extra: int = 0,
+                     expect: str = "ok") -> int:
     """Le vendeur dépose exactement ce qu'il faut pour être à l'IM après la vente (+ extra), puis vend."""
     m = r.m
     snap = m.snaps[sid]
@@ -147,7 +150,7 @@ def open_short_at_im(r: Recorder, writer: str, buyer: str, sid: int, qty: int, e
     if deposit > 0:
         r.step("deposit", writer, deposit, note="dépôt calculé pour être exactement à l'IM après la vente")
     oid = r.step("create_offer", writer, sid, qty, premium, m.series[sid].expiry)
-    return r.step("buy", buyer, oid)
+    return r.step("buy", buyer, oid, expect=expect)
 
 
 def settle_all(r: Recorder, sid: int, note: str = "") -> dict:
@@ -296,6 +299,8 @@ def s_settlement_deficit():
     r.step("publish_settlement", "PUBLISHER", sid, 160 * SCALE)
     r.step("settle", bid, note="dû 50/lot ; marge du vendeur d'abord")
     r.step("settle", bid, expect="WrongState", note="un seul règlement par book")
+    r.step("lp_deposit", "LP1", 1_000 * SCALE, expect="SettlementPending",
+           note="books réglés mais insuffisance pas encore couverte : la série n'est pas close")
     out = r.step("settle_vault", sid, note="vault ensuite ; reste = déficit")
     assert out["deficit"] > 0
     a = r.step("claim", "ALICE", 0)
@@ -450,13 +455,157 @@ def s_writer_cash_pro_rata():
     return r
 
 
+def s_negative_paths():
+    r = Recorder("negative_paths",
+                 "Chemins négatifs que le simple rejeu des autres scénarios ne distingue pas (revue 4, point D) : "
+                 "IM et non MM à l'achat, double fill, annulation par un tiers, cotation expirée, horodatage qui recule, "
+                 "contrôle d'IM du repreneur privé, dette échue cotée non réglée, double settle_vault, claim avant clôture, "
+                 "réserve de reprise payée aux porteurs du book repris.")
+    r.fund(MAKER_A=200_000, MAKER_B=100_000, MAKER_C=5_000, ALICE=50_000, BOB=50_000, LP1=100_000)
+    r.step("lp_deposit", "LP1", 50_000 * SCALE)
+    sid = r.step("list_series", "ADMIN", K, EXPIRY)
+    r.publish(sid, 100.0)
+    open_short_at_im(r, "MAKER_B", "BOB", sid, 1_000, extra=-1, expect="InsufficientMargin")
+    p_alice = open_short_at_im(r, "MAKER_A", "ALICE", sid, 500)
+    filled = max(r.m.offers)
+    r.step("buy", "BOB", filled, expect="WrongState", note="offre déjà exécutée : pas de double fill")
+    prem = 10 * r.m.snaps[sid].mark * 11 // 10
+    o2 = r.step("create_offer", "MAKER_A", sid, 10, prem, EXPIRY)
+    r.step("cancel_offer", "BOB", o2, expect="Unauthorized", note="seul le vendeur annule")
+    r.step("cancel_offer", "MAKER_A", o2)
+    o3 = r.step("create_offer", "MAKER_A", sid, 10, prem, r.m.now + 60)
+    r.advance(61)
+    r.step("buy", "BOB", o3, expect="SeriesExpired", note="cotation expirée")
+    r.publish(sid, 100.0)
+    r.advance(30)
+    r.publish(sid, 101.0, expect="BadSnapshot", ts=r.m.now - 60)
+    spot = 100.0
+    while True:
+        spot += 0.5
+        r.advance(3_600)
+        r.publish(sid, spot)
+        req = r.m.requirement("MAKER_A")
+        if req["nlv"] < req["mm"]:
+            break
+    r.view("MAKER_A", f"à S={spot} : liquidable, encore solvable")
+    r.step("deposit", "MAKER_C", 5_000 * SCALE)
+    r.step("liquidate", "MAKER_C", "MAKER_A", "MAKER_C", expect="InsufficientMargin",
+           note="repreneur privé sous son IM après reprise")
+    out = r.step("liquidate", "KEEPER", "MAKER_A", VAULT, note="paiement de reprise réservé au book repris")
+    assert out["deficit"] == 0 and r.m.books[r.m.positions[p_alice].book].reserve == out["paid"]
+    r.advance(EXPIRY - r.m.now)
+    r.step("publish_settlement", "PUBLISHER", sid, 130 * SCALE)
+    req = r.view(VAULT, "dette échue cotée, pas encore réglée : comptée à qté x (130 - 110)")
+    assert req["expired"] == 500 * 20 * SCALE
+    bid = r.m.positions[p_alice].book
+    r.step("settle", bid, note="le book repris paie d'abord sa réserve ; l'excédent revient au vault")
+    r.step("claim", "ALICE", p_alice, expect="WrongState", note="pas de claim avant settle_vault")
+    r.step("settle_vault", sid)
+    r.step("settle_vault", sid, expect="WrongState", note="une seule clôture")
+    out = r.step("claim", "ALICE", p_alice, note="porteur du book repris payé en entier par la réserve")
+    assert out["deficit"] == 0
+    r.step("claim", "ALICE", p_alice, expect="WrongState")
+    return r
+
+
+def s_takeover_debt():
+    r = Recorder("takeover_debt",
+                 "Reprise par le vault avec déficit (borne prudente d'une dette échue non cotée) : le déficit devient une "
+                 "dette du vendeur, soldée avant tout retrait (revue 4, point B).")
+    r.fund(MAKER_A=100_000, ALICE=50_000, BOB=50_000, LP1=60_000)
+    r.step("lp_deposit", "LP1", 50_000 * SCALE)
+    s1 = r.step("list_series", "ADMIN", K, EXPIRY)
+    s2 = r.step("list_series", "ADMIN", K, EXPIRY + 30 * DAY)
+    r.publish(s1, 100.0)
+    r.publish(s2, 100.0)
+    open_short_at_im(r, "MAKER_A", "ALICE", s1, 500)
+    open_short_at_im(r, "MAKER_A", "BOB", s2, 300)
+    r.advance(EXPIRY - r.m.now)
+    r.publish(s2, 135.0)
+    out = r.step("liquidate", "MAKER_A", "MAKER_A", VAULT, note="le vendeur déclenche sa propre reprise : sans gain")
+    assert out["deficit"] > 0 and r.m.acct("MAKER_A").owed == out["deficit"]
+    r.step("publish_settlement", "PUBLISHER", s1, 112 * SCALE)
+    settle_all(r, s1)
+    owed = r.m.acct("MAKER_A").owed
+    r.step("withdraw", "MAKER_A", 1 * SCALE, note="solde d'abord la dette de reprise envers le vault")
+    assert r.m.acct("MAKER_A").owed == 0 and owed > 0
+    r.step("withdraw", "MAKER_A", r.m.acct("MAKER_A").cash)
+    r.step("lp_deposit", "LP1", 1_000 * SCALE, note="vault reconstitué par le remboursement")
+    return r
+
+
+def s_margin_boundaries():
+    r = Recorder("margin_boundaries",
+                 "Bornes exactes (revue 4, point D) : arrondi de l'IM vers le haut, frais vers le bas, compte entre MM et IM "
+                 "ni liquidable ni bloqué à l'exercice, premier dépôt LP refusé sur un vault déjà en perte.")
+    r.fund(MAKER_A=100_000, MAKER_B=100_000, ALICE=20_000, BOB=20_000, CAROL=20_000, LP1=10_000)
+    s0 = r.step("list_series", "ADMIN", 95 * SCALE, EXPIRY)
+    r.publish(s0, 100.0)
+    # IM arrondi vers le haut : un mm non multiple de 4 rend im = ceil(1,25 x mm) fractionnaire
+    for qty in (1, 3, 7, 11, 13):
+        probe = ProModel("ADMIN", "PUBLISHER", r.m.cfg)
+        probe.now, probe.series, probe.snaps = r.m.now, r.m.series, r.m.snaps
+        probe.acct("X").shorts = {s0: qty}
+        if probe.requirement("X")["mm"] * r.m.cfg.im_bps % BPS:
+            break
+    r.step("deposit", "MAKER_B", 5_000 * SCALE)
+    prem = qty * r.m.snaps[s0].mark * 11 // 10
+    prem += 3 if prem * r.m.cfg.reserve_fee_bps % BPS == 0 else 0      # frais fractionnaire : arrondi vers le bas
+    o = r.step("create_offer", "MAKER_B", s0, qty, prem, EXPIRY)
+    r.step("buy", "CAROL", o, note="frais = floor(prime x 10 %)")
+    req = r.view("MAKER_B", "im = ceil(mm x 1,25), mm non multiple de 4")
+    assert req["mm"] * r.m.cfg.im_bps % BPS
+    # compte entre MM et IM : pas liquidable, exercice permis
+    p_alice = open_short_at_im(r, "MAKER_A", "ALICE", s0, 200)
+    spot = 100.0
+    while True:
+        spot = round(spot + 0.1, 1)
+        r.advance(60)
+        r.publish(s0, spot)
+        req = r.m.requirement("MAKER_A")
+        if req["nlv"] < req["im"]:
+            break
+    assert req["nlv"] >= req["mm"], "le pas de prix a sauté la zone MM..IM"
+    r.view("MAKER_A", f"à S={spot} : MM <= NLV < IM")
+    r.step("liquidate", "KEEPER", "MAKER_A", VAULT, expect="NotLiquidable", note="sous l'IM mais au-dessus du MM")
+    r.step("exercise", "ALICE", p_alice, note="vendeur au-dessus du MM : l'exercice anticipé est payé")
+    # premier dépôt LP refusé quand le vault porte déjà une perte (aucune part émise à perte)
+    p_bob = open_short_at_im(r, "MAKER_A", "BOB", s0, 2_000)
+    r.advance(DAY)
+    r.publish(s0, 160.0)
+    r.step("liquidate", "KEEPER", "MAKER_A", VAULT)
+    assert r.m.vault_value() < 0 and r.m.total_shares == 0
+    r.step("lp_deposit", "LP1", 1_000 * SCALE, expect="VaultCapacity", note="premier dépôt : le vault vaut déjà < 0")
+    return r
+
+
+def s_taker_oi_cap():
+    cfg = MarketConfig(max_writer_oi=600)
+    r = Recorder("taker_oi_cap", "Le repreneur privé reste soumis au plafond d'OI par vendeur.", cfg)
+    r.fund(MAKER_A=100_000, MAKER_B=300_000, ALICE=20_000, BOB=20_000)
+    sid = r.step("list_series", "ADMIN", K, EXPIRY)
+    r.publish(sid, 100.0)
+    open_short_at_im(r, "MAKER_A", "ALICE", sid, 500)
+    open_short_at_im(r, "MAKER_B", "BOB", sid, 200, extra=200_000 * SCALE)
+    spot = 100.0
+    while True:
+        spot += 0.5
+        r.advance(3_600)
+        r.publish(sid, spot)
+        req = r.m.requirement("MAKER_A")
+        if req["nlv"] < req["mm"]:
+            break
+    r.step("liquidate", "MAKER_B", "MAKER_A", "MAKER_B", expect="OiCapExceeded", note="200 + 500 > plafond de 600")
+    return r
+
+
 SCENARIOS = [s_happy_path, s_insufficient_margin, s_snapshot_bounds, s_liquidation_private, s_gap_to_vault,
              s_settlement_deficit, s_limits_and_staleness, s_american_exercise, s_review_regressions,
-             s_writer_cash_pro_rata]
+             s_writer_cash_pro_rata, s_negative_paths, s_takeover_debt, s_margin_boundaries, s_taker_oi_cap]
 
 
 if __name__ == "__main__":
-    out = {"version": "pro-v0.2", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
+    out = {"version": "pro-v0.3", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
                                           "time": "secondes Unix"},
            "scenario_order": "index 0..13 : prix {0,+1/3,-1/3,+2/3,-2/3,+1,-1} x U, vol {x1.25, x0.75} ; 14 : +ext ; 15 : -ext",
            "errors": ERRORS, "scenarios": [f().dump() for f in SCENARIOS]}
