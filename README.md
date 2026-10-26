@@ -8,6 +8,7 @@ HackMeridian 2026, Lisbon · Genesis path · Stellar Unlocked track · Testnet o
 |---|---|
 | App | https://hackmeridian-psi.vercel.app |
 | Contract (options v1.4) | [`CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`](https://stellar.expert/explorer/testnet/contract/CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK) |
+| Contract (Strata Pro v0.3.2, experimental) | [`CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) · [evidence](docs/pro-testnet-evidence.md) |
 | Spec · ABI · evidence | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) · [docs/contract-abi.md](docs/contract-abi.md) · [docs/contract-testnet-evidence.md](docs/contract-testnet-evidence.md) |
 | Demo video · deck | added at submission |
 
@@ -50,6 +51,7 @@ Every transaction we claim is listed in [docs/contract-testnet-evidence.md](docs
 | Third party prunes an expired unsold offer, collateral returns to the writer | [`da477e8c…`](https://stellar.expert/explorer/testnet/tx/da477e8cc5d490bdfb8f88f90c65e3ae0121073668a9ce53908a31fc7622ac7d) |
 | Holder transfers an active option | [`c4a60668…`](https://stellar.expert/explorer/testnet/tx/c4a60668b296e7c643d9aca1cee7e54d1b3e864de2604caef9a880ccd73c0c67) |
 | Holder lists an option for resale, another eligible account buys it; holder changes, collateral untouched | [`a5c5a3d2…`](https://stellar.expert/explorer/testnet/tx/a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949) |
+| Strata Pro on Testnet: deposit margin, two covered-by-margin calls bought, early exercise, price move, liquidation to the vault, settlement, claim; every amount equal to the model's fixtures | [`3af75122…`](https://stellar.expert/explorer/testnet/tx/3af75122179bb76f427c975f2a3331146e03cf9f777004fe1f19685c5a897725), [`83d65527…`](https://stellar.expert/explorer/testnet/tx/83d65527ba83c7f34bc3a110e1ccf603ed04d57c01906a7ad64c28dfbaebd77e), [`a4cbd965…`](https://stellar.expert/explorer/testnet/tx/a4cbd965c7b062050029a9922579bf505df2e1ee692011e05032c7255905c33c) |
 
 Tests: 133 unit, 17 property-based invariants (collateral conservation, no double use, per-token reserves), 76 negative (replay, double exercise, unauthorized cancel, withdrawn collateral, caps, tenor). Frontend: Vitest unit tests and a Playwright suite with a test-only wallet. All run in CI.
 
@@ -58,6 +60,7 @@ Tests: 133 unit, 17 property-based invariants (collateral conservation, no doubl
 | | ID |
 |---|---|
 | options v1.4 | `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK` |
+| pro v0.3.2 (experimental, separate contract and identities) | `CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN` |
 | RWA SAC | `CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U` |
 | BOND SAC | `CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP` |
 | EQTY SAC (listed with `list_asset`) | `CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU` |
@@ -141,7 +144,7 @@ Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after
 ## Next
 
 - Position tokens. Resale exists on-chain; a token would make options tradable on the Stellar DEX and usable as collateral elsewhere.
-- Strata Pro: cash-settled calls with partial margin. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, passes its negative suite), previewed on fixtures behind a build flag. Not deployed: it needs an oracle and a liquidation design we would not put on chain unreviewed. It shares nothing with the options contract.
+- Strata Pro: cash-settled calls with partial margin, a separate experimental contract. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, 24 negative tests), deployed on Testnet and run end to end with every amount matching the model ([docs/pro-testnet-evidence.md](docs/pro-testnet-evidence.md)). In the app at `#/pro` behind a build flag, against the live contract, with the disclosure that payouts can be reduced and any deficit is shown. The price feed and settlement price are published by the team; it is a demo oracle, not a market. It shares no storage or balance with the options contract. Next: real oracle, liquidation incentives, audit.
 - Issuer onboarding for real tokenized assets. The contract already respects their rules; the rest is legal and operational.
 - An RFQ layer for makers; the on-chain funded offer stays the only executable quote.
 
