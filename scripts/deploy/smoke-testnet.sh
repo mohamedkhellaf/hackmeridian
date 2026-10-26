@@ -54,7 +54,8 @@ O="$OPTIONS_ID"
 
 mkdir -p "$OUT_DIR"
 SMOKE_LOG="$OUT_DIR/smoke-$(date -u +%Y%m%dT%H%M%SZ).log"
-exec > >(tee -a "$SMOKE_LOG") 2>&1
+# tee -i: Ctrl-C signals the whole process group; tee must survive it or the --full EXIT cleanup dies of SIGPIPE.
+exec > >(tee -ia "$SMOKE_LOG") 2>&1
 
 # Amounts are 7-decimal integer units (1 token = 10_000_000).
 PUT_QTY=50000000      # 5 RWA
