@@ -1,6 +1,7 @@
 //! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`; v1.4
-//! adds the resale market of ABI §14: `list_for_sale`, `cancel_sale`, `buy_resale`, `get_ask`,
-//! `list_asks`, error `NoAsk`, modelled with check order, events, auth and INV11 below. v1.3.1:
+//! adds the resale market of ABI §14: `list_for_sale`, `cancel_sale`, `buy_resale` with its
+//! `max_total` cap, `get_ask`, `list_asks`, errors `NoAsk` and `PriceMoved`, modelled with
+//! check order, events, auth and INV11 below. v1.3.1:
 //! error codes 101–119, `CollateralShortfall`, contract re-authorization check in `buy` (ABI §10),
 //! holder `transfer` and paged `get_options` (ABI §11), permissionless `list_asset` registry,
 //! per-writer open cap, tenor cap, `prune_expired` and the contract-address backstop (ABI §12),
@@ -311,10 +312,11 @@ enum Act {
         id: u32,
         who: usize,
     },
-    /// v1.4 `buy_resale(who, id)`.
+    /// v1.4 `buy_resale(who, id, max)`.
     BuyResale {
         id: u32,
         who: usize,
+        max: i128,
     },
 }
 
@@ -450,7 +452,11 @@ impl fmt::Display for Act {
                 )
             }
             Act::CancelSale { id, who } => write!(f, "cancel_sale({}, id={})", NAMES[who], id),
-            Act::BuyResale { id, who } => write!(f, "buy_resale({}, id={})", NAMES[who], id),
+            Act::BuyResale { id, who, max } => write!(
+                f,
+                "buy_resale({}, id={}, max_total={})",
+                NAMES[who], id, max
+            ),
         }
     }
 }
@@ -486,6 +492,15 @@ enum To {
 enum Stress {
     DeauthContract,
     ClawbackRwa,
+}
+
+/// v1.4 `buy_resale` price cap, resolved against the model's ask: no cap (`i128::MAX`), exactly
+/// the ask (Ok), or one unit below it (`PriceMoved`).
+#[derive(Clone, Copy, Debug)]
+enum Cap {
+    Max,
+    Exact,
+    Below,
 }
 
 /// `u8` id selector value that resolves to the first unknown id (`option_count`).
@@ -535,7 +550,7 @@ enum Op {
     /// v1.4 `cancel_sale`: ask selector (prefers ids with an ask), caller.
     CancelSale(u8, Who),
     /// v1.4 `buy_resale`: ask selector (prefers ids with an ask), buyer.
-    BuyResale(u8, Who),
+    BuyResale(u8, Who, Cap),
     /// v1.4 composite (`World::step`): the holder of an `Active` option lists it at the ask, an
     /// eligible taker buys it, then the previous holder's `exercise` must fail with `NotHolder`.
     Resale(u8, i128),
@@ -993,7 +1008,7 @@ impl Model {
             // `buy_resale`: InvalidArgs (contract) -> NoAsk -> NotFound -> WrongState -> Expired ->
             // SelfTrade (holder or writer) -> NotEligible -> ContractNotAuthorized ->
             // CollateralShortfall; then the buyer pays the ask to the holder.
-            Act::BuyResale { id, who } => {
+            Act::BuyResale { id, who, max } => {
                 if who == CONTRACT {
                     return Err(Error::InvalidArgs);
                 }
@@ -1017,6 +1032,9 @@ impl Model {
                 }
                 if self.shortfall(o.underlying) {
                     return Err(Error::CollateralShortfall);
+                }
+                if ask > max {
+                    return Err(Error::PriceMoved);
                 }
                 Ok(vec![(USDX, who, seller, ask)])
             }
@@ -1153,7 +1171,7 @@ impl Model {
             Act::CancelSale { id, .. } => {
                 self.asks.remove(&id);
             }
-            Act::BuyResale { id, who } => {
+            Act::BuyResale { id, who, .. } => {
                 self.opts[id as usize].holder = Some(who);
                 self.asks.remove(&id);
             }
@@ -1278,7 +1296,7 @@ fn outcome_matches(expect: Expect, outcome: Outcome, direct_sac: bool) -> bool {
 // ---------------------------------------------------------------------------------------------
 
 /// Every options `Error`, to name an observed code.
-const ALL_ERRORS: [Error; 20] = [
+const ALL_ERRORS: [Error; 21] = [
     Error::NotFound,
     Error::InvalidArgs,
     Error::AssetNotAllowed,
@@ -1299,6 +1317,7 @@ const ALL_ERRORS: [Error; 20] = [
     Error::AssetNotDeployed,
     Error::TenorOutOfRange,
     Error::NoAsk,
+    Error::PriceMoved,
 ];
 
 /// Pseudo-call under which `prune_expired` tallies the number of ids it pruned.
@@ -1759,11 +1778,17 @@ impl World {
                 }
             }
             Op::Resale(s, ask) => self.resolve(&Op::ListSale(s, Who::Holder, ask)),
-            Op::BuyResale(s, w) => {
+            Op::BuyResale(s, w, cap) => {
                 let id = pick_ask(s);
+                let ask = m.asks.get(&id).copied().unwrap_or(1);
                 Act::BuyResale {
                     id,
                     who: who_of(id, w),
+                    max: match cap {
+                        Cap::Max => i128::MAX,
+                        Cap::Exact => ask,
+                        Cap::Below => ask - 1,
+                    },
                 }
             }
             Op::Backstop(kind, s) => match kind % 7 {
@@ -1855,7 +1880,18 @@ impl World {
                 return listed;
             }
             let buyer = recipient_for(&self.model, id, To::Eligible);
-            let bought = self.run(Act::BuyResale { id, who: buyer });
+            // a cap one unit below the ask first (`PriceMoved` once every earlier check passes,
+            // nothing moves), then exactly the ask
+            self.run(Act::BuyResale {
+                id,
+                who: buyer,
+                max: ask - 1,
+            });
+            let bought = self.run(Act::BuyResale {
+                id,
+                who: buyer,
+                max: ask,
+            });
             if bought == Outcome::Ok {
                 let probe = Act::Exercise { id, who: seller };
                 let probed = self.run(probe);
@@ -2185,7 +2221,7 @@ impl World {
             Act::Claim { id, who } => classify(c.try_claim_delivery(&h[who], &id)),
             Act::ListSale { id, who, ask } => classify(c.try_list_for_sale(&h[who], &id, &ask)),
             Act::CancelSale { id, who } => classify(c.try_cancel_sale(&h[who], &id)),
-            Act::BuyResale { id, who } => classify(c.try_buy_resale(&h[who], &id)),
+            Act::BuyResale { id, who, max } => classify(c.try_buy_resale(&h[who], &id, &max)),
             Act::SetTime { t } => {
                 self.env.ledger().set_timestamp(t);
                 (Outcome::Ok, String::new())
@@ -2295,7 +2331,7 @@ impl World {
             }
             .to_xdr(env, me)],
             Act::CancelSale { id, .. } => vec![AskCancelled { id }.to_xdr(env, me)],
-            Act::BuyResale { id, who } => {
+            Act::BuyResale { id, who, .. } => {
                 let seller = opt(id).holder.ok_or_else(|| {
                     format!("EVENTS: `{act}` succeeded on an option without holder")
                 })?;
@@ -2968,7 +3004,7 @@ fn check_transition(
                 && (matches!(*act, Act::Transfer { id, from, to }
                     if id == a.id && from == x && y == Some(to) && to != x)
                     // v1.4: or a successful resale of this option to another actor
-                    || matches!(*act, Act::BuyResale { id, who }
+                    || matches!(*act, Act::BuyResale { id, who, .. }
                     if id == a.id && y == Some(who) && who != x))
         };
         match (b.holder, a.holder) {
@@ -3235,7 +3271,7 @@ fn check_transition(
         (true, Act::CancelSale { id, .. }) => {
             others_same(id) && ask_of(before, id).is_some() && ask_of(after, id).is_none()
         }
-        (true, Act::BuyResale { id, who }) => {
+        (true, Act::BuyResale { id, who, .. }) => {
             others_same(id)
                 && ask_of(before, id).is_some()
                 && ask_of(after, id).is_none()
@@ -3403,9 +3439,10 @@ fn op() -> impl Strategy<Value = Op> {
         2 => (0u8..128, ask_amount()).prop_map(|(i, a)| Op::Resale(i, a)),
         3 => (
             id_sel(),
-            prop_oneof![4 => Just(Who::Taker), 1 => Just(Who::Holder), 1 => any_actor()]
+            prop_oneof![4 => Just(Who::Taker), 1 => Just(Who::Holder), 1 => any_actor()],
+            prop_oneof![3 => Just(Cap::Max), 2 => Just(Cap::Exact), 1 => Just(Cap::Below)],
         )
-            .prop_map(|(i, w)| Op::BuyResale(i, w)),
+            .prop_map(|(i, w, c)| Op::BuyResale(i, w, c)),
     ]
 }
 
@@ -3426,7 +3463,7 @@ fn config() -> ProptestConfig {
 /// (call, outcome) rows every run of at least `MIN_CASES_FOR_COVERAGE` cases must observe, so
 /// that a generator change cannot silently stop exercising the v1.3 / v1.3.1 paths (each row
 /// occurs dozens of times per 200 cases).
-const REQUIRED_COVERAGE: [(&str, &str); 18] = [
+const REQUIRED_COVERAGE: [(&str, &str); 19] = [
     ("list_asset", "Ok"),
     ("list_asset", "AlreadyListed"),
     ("list_asset", "AssetNotDeployed"),
@@ -3445,6 +3482,7 @@ const REQUIRED_COVERAGE: [(&str, &str); 18] = [
     ("cancel_sale", "Ok"),
     ("buy_resale", "Ok"),
     ("buy_resale", "NoAsk"),
+    ("buy_resale", "PriceMoved"),
 ];
 const MIN_CASES_FOR_COVERAGE: u32 = 100;
 

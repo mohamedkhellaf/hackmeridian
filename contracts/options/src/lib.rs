@@ -33,7 +33,8 @@
 //!   buyer pays `ask_total` quote straight to the current holder and becomes the holder, in one
 //!   invocation. Collateral, reserved totals and open books never change. An ask is removed
 //!   whenever the option leaves `Active` or changes hands (`exercise`, `transfer`, `reclaim`,
-//!   `buy_resale`). The writer cannot buy back its own option (`SelfTrade`). Views `get_ask`,
+//!   `buy_resale`). `buy_resale(buyer, id, max_total)` fails with `PriceMoved` if the ask is
+//!   above the buyer's cap. The writer cannot buy back its own option (`SelfTrade`). Views `get_ask`,
 //!   `list_asks` (scan of option ids, at most `MAX_PAGE` per call).
 //! - No admin, no upgrade, no delisting; the quote token is fixed by the constructor.
 //! - Check order in every state-changing function:
@@ -206,6 +207,9 @@ pub enum Error {
     /// v1.4 cancel_sale/buy_resale: the option has no ask (never listed, cancelled, already
     /// bought, or cleared by exercise/transfer/reclaim).
     NoAsk = 120,
+    /// v1.4 buy_resale: the current ask is above the buyer's `max_total` (the seller re-listed at
+    /// a higher price after the buyer saw the ask).
+    PriceMoved = 121,
 }
 
 /// v1.4 `list_asks` row: an `Active` option `id` offered for resale by its current `holder` for
@@ -1423,12 +1427,15 @@ impl OptionsContract {
     /// holder (the seller) and becomes the holder; the ask is removed. The state stays `Active`;
     /// collateral, reserved totals and open books are untouched. All in one invocation: if the
     /// payment fails (for example the buyer lacks quote) nothing changes. The writer cannot buy
-    /// back its own option (`SelfTrade`; writer buy-back is out of scope for v1.4).
+    /// back its own option (`SelfTrade`; writer buy-back is out of scope for v1.4). `max_total` is
+    /// the most the buyer agrees to pay: if the ask is above it (the seller re-listed higher after
+    /// the buyer read it) the call fails with `PriceMoved` and nothing moves. The buyer pays the
+    /// current `ask_total` (never more than `max_total`).
     /// Check order: auth -> InvalidArgs (buyer is the contract) -> NoAsk -> NotFound -> WrongState
     /// -> Expired -> SelfTrade (buyer is the holder or the writer) -> NotEligible (buyer on the
-    /// underlying) -> ContractNotAuthorized -> CollateralShortfall (as `transfer`) -> payment ->
-    /// storage -> event.
-    pub fn buy_resale(env: Env, buyer: Address, id: u32) -> Result<(), Error> {
+    /// underlying) -> ContractNotAuthorized -> CollateralShortfall (as `transfer`) -> PriceMoved
+    /// (`ask_total > max_total`) -> payment -> storage -> event.
+    pub fn buy_resale(env: Env, buyer: Address, id: u32, max_total: i128) -> Result<(), Error> {
         // auth
         buyer.require_auth();
         // backstop: the contract is never a party
@@ -1458,6 +1465,10 @@ impl OptionsContract {
             return Err(Error::ContractNotAuthorized);
         }
         check_collateral(&env, &opt.quote, &opt.underlying)?;
+        // price cap: the buyer never pays more than it signed for
+        if ask_total > max_total {
+            return Err(Error::PriceMoved);
+        }
 
         // transfers: the buyer pays the seller directly; the contract never holds the price
         TokenClient::new(&env, &opt.quote).transfer(&buyer, &seller, &ask_total);

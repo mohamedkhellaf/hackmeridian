@@ -6,7 +6,7 @@
 //! list, every per-asset open book, `option_count`, every stored `OptionData`, every tracked
 //! party's `writer_open_count` and the asset registry) and that no contract event was emitted.
 //!
-//! Contract errors are `options::Error`, codes 101–120 (120 `NoAsk` appended in v1.4) (renumbered in v1.1, 116–119 appended in
+//! Contract errors are `options::Error`, codes 101–121 (120 `NoAsk`, 121 `PriceMoved` appended in v1.4) (renumbered in v1.1, 116–119 appended in
 //! v1.3), and are matched by variant name, never by number. v1.2 adds `transfer(holder, to, id)`,
 //! `get_options(from, limit)` and the `OptionTransferred` event: sections 16 and 17 cover them,
 //! and sections 1, 2, 3, 12 and 15 include `transfer` in their existing checks.
@@ -32,10 +32,10 @@
 //! order (§13.4: `AlreadyListed` without probing the SAC).
 //!
 //! v1.4 (ABI §14) adds the on-chain secondary market: `list_for_sale(holder, id, ask_total)`,
-//! `cancel_sale(holder, id)`, `buy_resale(buyer, id)`, views `get_ask`/`list_asks`, events
-//! `AskListed`/`AskCancelled`/`ResaleBought` and error `NoAsk` (120). Every snapshot also holds
-//! every open ask and checks that an ask exists only on an `Active` option and names its current
-//! holder; section 25 covers the misuse paths.
+//! `cancel_sale(holder, id)`, `buy_resale(buyer, id, max_total)`, views `get_ask`/`list_asks`,
+//! events `AskListed`/`AskCancelled`/`ResaleBought` and errors `NoAsk` (120), `PriceMoved`
+//! (121). Every snapshot also holds every open ask and checks that an ask exists only on an
+//! `Active` option and names its current holder; section 25 covers the misuse paths.
 //! Every snapshot also checks the open-book invariant: each asset's book is exactly its
 //! `Offered` ids in id order, and `list_open()` is the registry-order concatenation, truncated.
 //!
@@ -6762,7 +6762,7 @@ fn listed_put(t: &T) -> u32 {
     id
 }
 
-/// Auth tree of `buy_resale(buyer, id)`: the root plus the buyer's quote payment to the seller.
+/// Auth tree of `buy_resale(buyer, id, ASK)`: the root plus the buyer's quote payment to the seller.
 fn resale_tree<'a>(
     t: &'a T,
     buyer: &Address,
@@ -6772,7 +6772,7 @@ fn resale_tree<'a>(
     MockAuthInvoke {
         contract: &t.contract,
         fn_name: "buy_resale",
-        args: (buyer, id).into_val(&t.env),
+        args: (buyer, id, ASK).into_val(&t.env),
         sub_invokes: pay,
     }
 }
@@ -6889,7 +6889,7 @@ fn resale25_unauthorized_list_cancel_and_buy_are_auth_failures() {
     assert_auth_cases(
         &t,
         "buy_resale",
-        &(m, id).into_val(env),
+        &(m, id, ASK).into_val(env),
         &[
             (
                 "seller signs the buyer's tree",
@@ -6913,6 +6913,18 @@ fn resale25_unauthorized_list_cancel_and_buy_are_auth_failures() {
                 }],
             ),
             (
+                "buyer's tree with a different cap",
+                std::vec![MockAuth {
+                    address: m,
+                    invoke: &MockAuthInvoke {
+                        contract: &t.contract,
+                        fn_name: "buy_resale",
+                        args: (m, id, ASK + 1).into_val(env),
+                        sub_invokes: &pay,
+                    }
+                }],
+            ),
+            (
                 "buyer signs the root without the payment",
                 std::vec![MockAuth {
                     address: m,
@@ -6929,7 +6941,7 @@ fn resale25_unauthorized_list_cancel_and_buy_are_auth_failures() {
         invoke: &buy,
     }]);
     let mut want = t.snap();
-    t.c.buy_resale(m, &id);
+    t.c.buy_resale(m, &id, &ASK);
     env.mock_all_auths();
     want.add(m, 0, -ASK);
     want.add(h, 0, ASK);
@@ -7055,20 +7067,35 @@ fn resale25_buy_resale_rejections() {
     let bare = t.put(w);
     t.c.buy(h, &bare);
     let before = t.snap();
-    rejected(&t, t.c.try_buy_resale(m, &99), Error::NoAsk, &before);
-    rejected(&t, t.c.try_buy_resale(m, &bare), Error::NoAsk, &before);
-    rejected(&t, t.c.try_buy_resale(h, &id), Error::SelfTrade, &before);
-    // writer buy-back is out of scope for v1.4
-    rejected(&t, t.c.try_buy_resale(w, &id), Error::SelfTrade, &before);
+    rejected(&t, t.c.try_buy_resale(m, &99, &ASK), Error::NoAsk, &before);
     rejected(
         &t,
-        t.c.try_buy_resale(&t.outsider, &id),
+        t.c.try_buy_resale(m, &bare, &ASK),
+        Error::NoAsk,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_buy_resale(h, &id, &ASK),
+        Error::SelfTrade,
+        &before,
+    );
+    // writer buy-back is out of scope for v1.4
+    rejected(
+        &t,
+        t.c.try_buy_resale(w, &id, &ASK),
+        Error::SelfTrade,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_buy_resale(&t.outsider, &id, &ASK),
         Error::NotEligible,
         &before,
     );
     rejected(
         &t,
-        t.c.try_buy_resale(&t.contract, &id),
+        t.c.try_buy_resale(&t.contract, &id, &ASK),
         Error::InvalidArgs,
         &before,
     );
@@ -7078,7 +7105,7 @@ fn resale25_buy_resale_rejections() {
     let deauth = t.snap();
     rejected(
         &t,
-        t.c.try_buy_resale(m, &id),
+        t.c.try_buy_resale(m, &id, &ASK),
         Error::ContractNotAuthorized,
         &deauth,
     );
@@ -7088,10 +7115,15 @@ fn resale25_buy_resale_rejections() {
     t.at(EXPIRY);
     let expired = t.snap();
     for buyer in [m, h, w, &t.outsider] {
-        rejected(&t, t.c.try_buy_resale(buyer, &id), Error::Expired, &expired);
+        rejected(
+            &t,
+            t.c.try_buy_resale(buyer, &id, &ASK),
+            Error::Expired,
+            &expired,
+        );
     }
     t.at(EXPIRY - 1);
-    t.c.buy_resale(m, &id);
+    t.c.buy_resale(m, &id, &ASK);
     t.assert_one_event("resale_bought", id);
 }
 
@@ -7110,14 +7142,14 @@ fn resale25_buy_resale_blocked_by_collateral_shortfall() {
     for x in [id, call] {
         rejected(
             &t,
-            t.c.try_buy_resale(&t.holder2, &x),
+            t.c.try_buy_resale(&t.holder2, &x, &ASK),
             Error::CollateralShortfall,
             &before,
         );
     }
     // the issuer repairs the escrow: resale works again
     t.sac(&t.rwa).mint(&t.contract, &1);
-    t.c.buy_resale(&t.holder2, &id);
+    t.c.buy_resale(&t.holder2, &id, &ASK);
     assert_eq!(t.c.get_option(&id).holder, Some(t.holder2.clone()));
 }
 
@@ -7126,17 +7158,17 @@ fn resale25_buy_resale_blocked_by_collateral_shortfall() {
 fn resale25_double_buy_resale_second_is_no_ask() {
     let t = setup();
     let id = listed_put(&t);
-    t.c.buy_resale(&t.maker2, &id);
+    t.c.buy_resale(&t.maker2, &id, &ASK);
     let before = t.snap();
     rejected(
         &t,
-        t.c.try_buy_resale(&t.holder2, &id),
+        t.c.try_buy_resale(&t.holder2, &id, &ASK),
         Error::NoAsk,
         &before,
     );
     rejected(
         &t,
-        t.c.try_buy_resale(&t.maker2, &id),
+        t.c.try_buy_resale(&t.maker2, &id, &ASK),
         Error::NoAsk,
         &before,
     );
@@ -7172,11 +7204,21 @@ fn resale25_buyer_without_quote_fails_in_the_sac_atomically() {
     t.sac(&t.rwa).set_authorized(&poor, &true);
     t.extra.borrow_mut().push(poor.clone());
     let before = t.snap();
-    sac_rejected(&t, t.c.try_buy_resale(&poor, &id), SAC_BALANCE, &before);
+    sac_rejected(
+        &t,
+        t.c.try_buy_resale(&poor, &id, &ASK),
+        SAC_BALANCE,
+        &before,
+    );
     // some USDx, but less than the ask
     t.sac(&t.usdx).mint(&poor, &(ASK - 1));
     let before = t.snap();
-    sac_rejected(&t, t.c.try_buy_resale(&poor, &id), SAC_BALANCE, &before);
+    sac_rejected(
+        &t,
+        t.c.try_buy_resale(&poor, &id, &ASK),
+        SAC_BALANCE,
+        &before,
+    );
     assert_eq!(t.c.get_ask(&id), Some(ASK));
     assert_eq!(t.c.get_option(&id).holder, Some(t.holder.clone()));
 }
@@ -7200,7 +7242,12 @@ fn resale25_ask_never_survives_exercise_transfer_or_reclaim() {
     }
     t.at(EXPIRY - 1);
     let s = t.snap();
-    rejected(&t, t.c.try_buy_resale(&t.holder2, &b), Error::NoAsk, &s);
+    rejected(
+        &t,
+        t.c.try_buy_resale(&t.holder2, &b, &ASK),
+        Error::NoAsk,
+        &s,
+    );
     rejected(&t, t.c.try_list_for_sale(h, &b, &ASK), Error::NotHolder, &s);
     rejected(
         &t,
@@ -7208,4 +7255,95 @@ fn resale25_ask_never_survives_exercise_transfer_or_reclaim() {
         Error::WrongState,
         &s,
     );
+}
+
+/// v1.4 price cap: the seller raises the ask after the buyer read it; the buyer's capped call
+/// fails with `PriceMoved` after every other check, moves nothing and emits nothing. A cap equal
+/// to the ask succeeds and moves exactly the ask.
+#[test]
+fn resale25_price_moved_when_ask_raised_and_cap_equal_to_ask_succeeds() {
+    let t = setup();
+    let (h, m) = (&t.holder, &t.maker2);
+    let id = listed_put(&t);
+    // an RWA CALL so that the escrow holds RWA the issuer can claw back below
+    t.call(&t.writer);
+    let seen = t.c.get_ask(&id).unwrap();
+    t.c.list_for_sale(h, &id, &(seen * 2));
+    let before = t.snap();
+    rejected(
+        &t,
+        t.c.try_buy_resale(m, &id, &seen),
+        Error::PriceMoved,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_buy_resale(m, &id, &0),
+        Error::PriceMoved,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_buy_resale(m, &id, &-1),
+        Error::PriceMoved,
+        &before,
+    );
+    // every earlier check keeps its precedence over PriceMoved
+    rejected(
+        &t,
+        t.c.try_buy_resale(h, &id, &0),
+        Error::SelfTrade,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_buy_resale(&t.outsider, &id, &0),
+        Error::NotEligible,
+        &before,
+    );
+    rejected(&t, t.c.try_buy_resale(m, &99, &0), Error::NoAsk, &before);
+    t.sac(&t.rwa).clawback(&t.contract, &1);
+    let short = t.snap();
+    rejected(
+        &t,
+        t.c.try_buy_resale(m, &id, &0),
+        Error::CollateralShortfall,
+        &short,
+    );
+    t.sac(&t.rwa).mint(&t.contract, &1);
+    t.at(EXPIRY);
+    let expired = t.snap();
+    rejected(&t, t.c.try_buy_resale(m, &id, &0), Error::Expired, &expired);
+    t.at(EXPIRY - 1);
+    // max_total == ask_total succeeds
+    let mut want = t.snap();
+    t.c.buy_resale(m, &id, &(seen * 2));
+    t.assert_one_event("resale_bought", id);
+    want.add(m, 0, -(seen * 2));
+    want.add(h, 0, seen * 2);
+    want.options.iter_mut().find(|o| o.id == id).unwrap().holder = Some(m.clone());
+    want.asks.retain(|a| a.0 != id);
+    assert_eq!(t.snap(), want);
+}
+
+/// v1.4 edge semantics after expiry: `buy_resale` on an expired, unreclaimed option is `Expired`
+/// (not `NoAsk`); the holder may still `cancel_sale` (holder + ask only, no time check).
+#[test]
+fn resale25_after_expiry_buy_is_expired_and_cancel_still_works() {
+    let t = setup();
+    let (h, m) = (&t.holder, &t.maker2);
+    let id = listed_put(&t);
+    t.at(EXPIRY);
+    let before = t.snap();
+    rejected(
+        &t,
+        t.c.try_buy_resale(m, &id, &ASK),
+        Error::Expired,
+        &before,
+    );
+    t.c.cancel_sale(h, &id);
+    t.assert_one_event("ask_cancelled", id);
+    let after = t.snap();
+    assert!(after.asks.is_empty());
+    rejected(&t, t.c.try_buy_resale(m, &id, &ASK), Error::NoAsk, &after);
 }
