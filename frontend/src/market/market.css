@@ -264,3 +264,15 @@
   .mk-book-actions { width: 100%; }
   .mk-book-actions > * { flex: 1; }
 }
+
+/* Plain-language line under the Markets header. */
+.mk-intro {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 13px;
+  color: var(--muted);
+}
+.mk-intro b {
+  color: var(--text);
+  font-weight: 600;
+}

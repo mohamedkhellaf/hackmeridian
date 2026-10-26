@@ -222,6 +222,11 @@ export function MarketsView(props: MarketsViewProps) {
           </>
         }
       />
+      <p className="mk-intro">
+        Each price is an option a market maker is selling, with the maker's reserves already locked in the contract. Calls on the left give
+        you the right to <b>buy</b> the asset at that strike before expiry; puts on the right give you the right to <b>sell</b> it. Pick a price
+        to see every maker and the premium you pay once, up front.
+      </p>
       <ShortfallNotice tokens={shortTokens} className="mk-short-note" />
 
       {nAll === 0 ? (

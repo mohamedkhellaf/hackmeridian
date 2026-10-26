@@ -4,7 +4,7 @@ import { connect, expectOpenOffers, goTo, offerRows, openApp, openTrade, toast, 
 test('invalid input is rejected, a valid put locks collateral and can be cancelled', async ({ page }) => {
   await openApp(page)
   await connect(page)
-  await goTo(page, 'Collateral')
+  await goTo(page, 'Locked reserves')
   const before = await totalHeld(page, 'USDx')
 
   await goTo(page, 'Markets')
@@ -22,12 +22,12 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
   await page.getByLabel(/^Quantity/).fill('5')
   await page.getByLabel(/^Strike per/).fill('10')
   await expect(page.getByText(/not an exact amount/)).toBeHidden()
-  await expect(page.getByRole('group', { name: 'Order summary' })).toContainText(/Collateral to lock\s*50\.00 USDx/)
+  await expect(page.getByRole('group', { name: 'Order summary' })).toContainText(/Reserves to lock\s*50\.00 USDx/)
   await expect(submit).toBeEnabled()
   await submit.click()
   await expect(toast(page)).toContainText('Offer written')
 
-  await goTo(page, 'Collateral')
+  await goTo(page, 'Locked reserves')
   await expect.poll(() => totalHeld(page, 'USDx')).toBe(before + 50)
 
   await goTo(page, 'Markets')
@@ -48,7 +48,7 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
   await expect(row).toContainText('Cancelled')
   await expect(row.getByRole('button')).toHaveCount(0)
 
-  await goTo(page, 'Collateral')
+  await goTo(page, 'Locked reserves')
   await expect.poll(() => totalHeld(page, 'USDx')).toBe(before)
   await goTo(page, 'Markets')
   await expectOpenOffers(page, 4)

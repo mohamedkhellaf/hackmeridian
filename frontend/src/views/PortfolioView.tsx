@@ -132,7 +132,7 @@ export function PortfolioView({ me, rows, actionFor, health = [], resale }: Port
           {kpis.premium && (
             <StatGrid columns={2}>
               <Stat label="Premium earned">{moneyWith(kpis.premium.amount, kpis.premium.token)}</Stat>
-              <Stat label="Collateral locked">
+              <Stat label="Reserves locked">
                 {kpis.locked.length === 0 ? '0' : kpis.locked.map((l) => moneyWith(l.amount, l.token)).join(', ')}
               </Stat>
             </StatGrid>

@@ -88,8 +88,8 @@ test('the ticket starts empty; without a wallet it shows terms and Connect walle
 
 test('hash routes drive the sidebar and every view renders', async ({ page }) => {
   await page.goto('/#/reserves')
-  await expect(page.getByRole('heading', { level: 1, name: 'Collateral' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Collateral', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { level: 1, name: 'Locked reserves' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Locked reserves', exact: true })).toHaveAttribute('aria-current', 'page')
   for (const [link, title] of [
     ['Positions', 'Positions'],
     ['Issuer', 'Issuer'],

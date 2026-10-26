@@ -24,7 +24,7 @@ export function ReservesView({ collateral, health, contractId, onRefresh }: Rese
   return (
     <div className="rs">
       <PageHeader
-        title="Collateral"
+        title="Locked reserves"
         actions={
           contractId ? (
             <>
@@ -44,15 +44,19 @@ export function ReservesView({ collateral, health, contractId, onRefresh }: Rese
         ))}
 
       {rows.length === 0 ? (
-        <p className="rs-empty">No collateral locked.</p>
+        <p className="rs-empty">No reserves locked.</p>
       ) : (
         <div className="ui-table-wrap rs-table">
-          <table className="ui-table" aria-label="Collateral by token">
+          <table className="ui-table" aria-label="Locked reserves by token">
             <thead>
               <tr>
                 <th>Token</th>
-                <th className="num">Owed</th>
-                <th className="num">Held</th>
+                <th className="num" title="Reserves the contract must hold for open options">
+                  Locked
+                </th>
+                <th className="num" title="Balance the contract actually holds">
+                  Held
+                </th>
                 <th className="num">Difference</th>
               </tr>
             </thead>
