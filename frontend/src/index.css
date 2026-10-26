@@ -1,27 +1,33 @@
 /* StellSec tokens and base styles. Dark only. Rules: frontend/STYLE.md. */
 :root {
-  /* Neutral dark. Contrast on --bg: text 15:1, text-2 6.9:1, muted 5.2:1, accent 6.2:1. */
-  --bg: #18181a;
-  --surface: #1f1f22;
-  --surface-hover: #262629;
-  --border: #2c2c30;
-  --border-strong: #3a3a40;
-  --row-line: #2c2c30;
-  --text: #ededed;
-  --text-2: #a1a1a6;
-  --muted: #8a8a92;
-  --accent: #7c93f0;
-  --accent-fg: #111114;
-  --danger: #e5736a;
-  --warn: #d9a85b;
+  /* Dark navy-graphite. Contrast on --bg: text 16:1, text-2 7.6:1, muted 6.3:1, accent 6.5:1. On --raised muted is 5.4:1. */
+  --bg: #0c0e14;
+  --surface: #141722;
+  --raised: #1b1f2d;
+  --surface-hover: #222739;
+  --border: #262b3b;
+  --border-strong: #343a4f;
+  --row-line: #262b3b;
+  --text: #eef0f6;
+  --text-2: #a5abbd;
+  --muted: #8d93a8;
+  --accent: #7f8cff;
+  /* Dark ink on the brand gradient: 6.2:1 at the blue end, 5.4:1 at the violet end. White would be 3.1:1. */
+  --accent-fg: #0c0e14;
+  --grad-brand: linear-gradient(135deg, #6e8bff 0%, #9b6bff 100%);
+  --danger: #f07178;
+  --warn: #f2b55b;
   /* Chart fills only. */
   --profit: #5fb87a;
-  --loss: #e5736a;
+  --loss: #f07178;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
 
   --font-sans: 'Public Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --r: 6px;
+  --r: 10px;
+  --r-lg: 12px;
+  --r-pill: 999px;
   --gutter: 24px;
   --control-h: 36px;
 
@@ -44,7 +50,11 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* Ambient glow, fixed and faint. The only large gradient on the ground. */
+  background:
+    radial-gradient(1200px 500px at 20% -10%, rgba(110, 139, 255, 0.12), transparent),
+    radial-gradient(900px 420px at 90% -15%, rgba(155, 107, 255, 0.07), transparent), var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
 }

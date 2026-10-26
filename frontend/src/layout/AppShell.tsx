@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Dialog, Mono } from '../ui'
+import { Button, Dialog, Icon, Mono } from '../ui'
+import type { IconName } from '../ui'
 import { shortAddress } from '../options/format'
 import { hrefFor, NAV } from './routes'
 import type { NavItem, Route } from './routes'
@@ -13,19 +14,31 @@ export const MOCK_TEXT = 'Mock data, not read from a chain.'
 /** Routes that get a tab on phones. The rest open from More. */
 const TAB_ROUTES: Route[] = ['markets', 'protect', 'portfolio', 'reserves']
 
+const ICONS: Record<Route, IconName> = {
+  markets: 'markets',
+  protect: 'protect',
+  write: 'write',
+  portfolio: 'portfolio',
+  reserves: 'reserves',
+  issuer: 'issuer',
+  pro: 'pro',
+}
+
+function countLabel(n: number) {
+  return n === 1 ? '1 position needs action' : `${n} positions need action`
+}
+
 function NavLink({ item, current, badge, className, onClick }: { item: NavItem; current: Route; badge?: number; className: string; onClick?: () => void }) {
   const on = item.route === current
   const count = item.route === 'portfolio' && badge ? badge : 0
   return (
-    <a href={hrefFor(item.route)} className={on ? `${className} is-on` : className} aria-current={on ? 'page' : undefined} onClick={onClick}>
-      {item.label}
+    <a href={hrefFor(item.route)} className={on ? `${className} is-on` : className} aria-current={on ? 'page' : undefined} onClick={onClick} data-tip={item.label}>
+      <Icon name={ICONS[item.route]} size={18} className="nav-icon" />
+      <span className="nav-label">{item.label}</span>
       {count ? (
-        <>
-          {' '}
-          <span className="nav-count" title="Actions waiting">
-            {count}
-          </span>
-        </>
+        <span className="nav-count" aria-label={countLabel(count)}>
+          {count}
+        </span>
       ) : null}
     </a>
   )
@@ -134,7 +147,7 @@ export interface AppShellProps {
   children: ReactNode
 }
 
-/** Desktop: top bar (wordmark, nav, wallet), content, footer. Phones (<= 768px): wordmark and wallet on top, four tabs and More at the bottom. */
+/** Desktop (>= 1024px): 240px left sidebar (wordmark, nav, wallet), content, footer. 769-1023px: 72px icon rail. Phones (<= 768px): wordmark and wallet on top, four tabs and More at the bottom. */
 export function AppShell({ route, portfolioBadge, contractId, network, wallet, children }: AppShellProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const tabbarRef = useRef<HTMLElement>(null)
@@ -146,46 +159,48 @@ export function AppShell({ route, portfolioBadge, contractId, network, wallet, c
   const moreOn = moreItems.some((n) => n.route === route)
   return (
     <div className="shell">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <a href={hrefFor('markets')} className="brand">
-            StellSec
-          </a>
-          <nav className="topnav" aria-label="Main">
-            {NAV.map((item) => (
-              <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="nav-link" />
-            ))}
-          </nav>
-          <div className="topbar-wallet">{wallet}</div>
-        </div>
-      </header>
-      <main className="content">{children}</main>
-      <footer className="shell-footer">
-        <div className="shell-footer-inner">
-          <span>
-            {DEMO_TEXT}{' '}
-            {contractId ? (
-              <>
-                Contract{' '}
-                <a className="ui-mono" href={`https://stellar.expert/explorer/testnet/contract/${contractId}`} target="_blank" rel="noreferrer" title={contractId}>
-                  {shortAddress(contractId)}
-                </a>
-                {network?.rpc === 'degraded' && <span className="footer-warn"> RPC not responding.</span>}
-              </>
-            ) : (
-              MOCK_TEXT
-            )}
-          </span>
-          {contractId && network?.ledger != null && <span className="ui-mono footer-ledger">Ledger {network.ledger.toLocaleString('en-US')}</span>}
-        </div>
-      </footer>
+      <aside className="sidebar">
+        <a href={hrefFor('markets')} className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <span className="brand-name">StellSec</span>
+        </a>
+        <nav className="topnav" aria-label="Main">
+          {NAV.map((item) => (
+            <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="nav-link" />
+          ))}
+        </nav>
+        <div className="sidebar-wallet">{wallet}</div>
+      </aside>
+      <div className="main-col">
+        <main className="content">{children}</main>
+        <footer className="shell-footer">
+          <div className="shell-footer-inner">
+            <span>
+              {DEMO_TEXT}{' '}
+              {contractId ? (
+                <>
+                  Contract{' '}
+                  <a className="ui-mono" href={`https://stellar.expert/explorer/testnet/contract/${contractId}`} target="_blank" rel="noreferrer" title={contractId}>
+                    {shortAddress(contractId)}
+                  </a>
+                  {network?.rpc === 'degraded' && <span className="footer-warn"> RPC not responding.</span>}
+                </>
+              ) : (
+                MOCK_TEXT
+              )}
+            </span>
+            {contractId && network?.ledger != null && <span className="ui-mono footer-ledger">Ledger {network.ledger.toLocaleString('en-US')}</span>}
+          </div>
+        </footer>
+      </div>
 
       <nav className="tabbar" aria-label="Main" ref={tabbarRef}>
         {tabItems.map((item) => (
           <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="tab" />
         ))}
         <button type="button" className={moreOn ? 'tab is-on' : 'tab'} aria-haspopup="dialog" onClick={() => setMoreOpen(true)}>
-          More
+          <Icon name="more" size={18} className="nav-icon" />
+          <span className="nav-label">More</span>
         </button>
       </nav>
 

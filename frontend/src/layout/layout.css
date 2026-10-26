@@ -1,12 +1,18 @@
-/* App shell: top bar, content, footer, phone tab bar. Tokens in src/index.css. */
+/* App shell: left sidebar (rail, then top bar on phones), content, footer, phone tab bar. Tokens in src/index.css. */
 .shell {
   min-height: 100vh;
+}
+.main-col {
+  min-height: 100vh;
+  margin-left: 240px;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 17px;
   font-weight: 700;
   color: var(--text);
@@ -14,60 +20,135 @@
 .brand:hover {
   text-decoration: none;
 }
-
-/* Top bar */
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
+/* Logo mark: gradient tile with two stacked bars. */
+.brand-mark {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--grad-brand);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset;
 }
-.topbar-inner {
+.brand-mark::before,
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent-fg);
+}
+.brand-mark::before {
+  top: 8px;
+}
+.brand-mark::after {
+  top: 15px;
+  opacity: 0.6;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  width: 240px;
   display: flex;
-  align-items: center;
-  gap: 32px;
-  max-width: 1280px;
-  height: 52px;
-  margin: 0 auto;
-  padding: 0 var(--gutter);
+  flex-direction: column;
+  gap: 20px;
+  padding: 18px 12px 16px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.sidebar .brand {
+  padding: 0 8px;
+  height: 32px;
 }
 .topnav {
   display: flex;
-  align-self: stretch;
-  gap: 4px;
+  flex-direction: column;
+  gap: 2px;
 }
 .nav-link {
+  position: relative;
   display: flex;
   align-items: center;
+  gap: 12px;
+  height: 40px;
   padding: 0 10px;
+  border-radius: var(--r);
   color: var(--text-2);
   font-size: 14px;
   font-weight: 500;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 .nav-link:hover {
   color: var(--text);
+  background: var(--surface-hover);
   text-decoration: none;
 }
 .nav-link.is-on {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  background: linear-gradient(90deg, rgba(110, 139, 255, 0.18), rgba(155, 107, 255, 0.06));
 }
+.nav-link.is-on::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--grad-brand);
+}
+.nav-icon {
+  flex: none;
+}
+.nav-link.is-on .nav-icon {
+  color: var(--accent);
+}
+.nav-label {
+  min-width: 0;
+}
+
+/* Notification counter: gradient pill, right aligned in the row. */
 .nav-count {
-  color: var(--warn);
-  font-variant-numeric: tabular-nums;
-}
-.topbar-wallet {
   margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  background: var(--grad-brand);
+  color: var(--accent-fg);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 3px rgba(110, 139, 255, 0.15);
+}
+
+.sidebar-wallet {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-wallet > * {
+  width: 100%;
 }
 .wallet-btn {
   height: var(--control-h);
   padding: 0 12px;
   border: 1px solid var(--border-strong);
   border-radius: var(--r);
-  background: transparent;
+  background: var(--raised);
   cursor: pointer;
 }
 .wallet-btn:hover {
@@ -83,7 +164,7 @@
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 24px var(--gutter);
+  padding: 28px var(--gutter);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -151,6 +232,7 @@
 .more-link {
   display: flex;
   align-items: center;
+  gap: 12px;
   min-height: 48px;
   color: var(--text);
   font-size: 15px;
@@ -163,50 +245,166 @@
 .more-link:hover {
   text-decoration: none;
 }
+.more-link .nav-icon {
+  color: var(--muted);
+}
 .more-link.is-on {
   color: var(--accent);
 }
+.more-link.is-on .nav-icon {
+  color: var(--accent);
+}
+
+/* Icon rail, 769px to 1023px: icons only, label as tooltip. */
+@media (min-width: 769px) and (max-width: 1023px) {
+  .main-col {
+    margin-left: 72px;
+  }
+  .sidebar {
+    width: 72px;
+    padding: 18px 10px 16px;
+    align-items: center;
+  }
+  .sidebar .brand {
+    padding: 0;
+  }
+  .brand-name,
+  .sidebar .nav-link .nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .topnav {
+    width: 100%;
+    align-items: center;
+  }
+  .nav-link {
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+  .nav-link.is-on::before {
+    left: -10px;
+  }
+  .nav-link .nav-count {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    margin: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+  .nav-link::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 4px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r);
+    background: var(--raised);
+    color: var(--text);
+    font-size: 12.5px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s;
+    z-index: 40;
+  }
+  .nav-link:hover::after,
+  .nav-link:focus-visible::after {
+    opacity: 1;
+  }
+  .sidebar-wallet .ui-btn,
+  .sidebar-wallet .wallet-btn {
+    height: auto;
+    min-height: 40px;
+    padding: 6px 4px;
+    font-size: 11.5px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .sidebar-wallet .ui-mono {
+    font-size: 11px;
+  }
+}
 
 @media (max-width: 768px) {
+  .main-col {
+    margin-left: 0;
+    min-height: 0;
+  }
+  /* The sidebar becomes a sticky top bar: wordmark and wallet. */
+  .sidebar {
+    position: sticky;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    width: auto;
+    height: 52px;
+    padding: 0 var(--gutter);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar .brand {
+    padding: 0;
+  }
   .topnav {
     display: none;
   }
-  .topbar-inner {
-    height: 48px;
+  .sidebar-wallet {
+    margin: 0 0 0 auto;
+    width: auto;
   }
-  /* Keep the footer above the fixed tab bar (56px + border). */
+  .sidebar-wallet > * {
+    width: auto;
+  }
+  /* Keep the footer above the floating tab bar (64px + margins). */
   .shell {
-    padding-bottom: calc(57px + env(safe-area-inset-bottom));
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
   }
   .content {
     padding-top: 16px;
   }
   .tabbar {
     display: flex;
+    gap: 2px;
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
     z-index: 30;
-    background: var(--bg);
-    border-top: 1px solid var(--border);
-    padding-bottom: env(safe-area-inset-bottom);
+    padding: 6px;
+    background: var(--raised);
+    border: 1px solid var(--border-strong);
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
   .tab {
+    position: relative;
     flex: 1 1 0;
     min-width: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    min-height: 56px;
-    padding: 0 4px;
+    gap: 2px;
+    min-height: 48px;
+    padding: 0 2px;
     border: 0;
-    border-top: 2px solid transparent;
-    margin-top: -1px;
+    border-radius: 13px;
     background: transparent;
     font: inherit;
-    font-size: 12.5px;
+    font-size: 11.5px;
     font-weight: 500;
     white-space: nowrap;
     color: var(--text-2);
@@ -217,6 +415,20 @@
   }
   .tab.is-on {
     color: var(--text);
-    border-top-color: var(--accent);
+    background: linear-gradient(180deg, rgba(110, 139, 255, 0.2), rgba(155, 107, 255, 0.08));
+  }
+  .tab.is-on .nav-icon {
+    color: var(--accent);
+  }
+  .tab .nav-count {
+    position: absolute;
+    top: 2px;
+    left: calc(50% + 4px);
+    margin: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    box-shadow: 0 0 0 2px var(--raised);
   }
 }
