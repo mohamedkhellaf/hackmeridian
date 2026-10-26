@@ -9,6 +9,8 @@
 #
 # Constructor (contract-abi.md §3, §9): __constructor(quote: Address, underlyings: Vec<Address>)
 #   quote = USDx SAC, underlyings = [RWA SAC, BOND SAC]  (read from scripts/out/testnet.env)
+#   EQTY is deliberately NOT in the constructor and NOT authorized here: on contract v1.3 the smoke run lists it with
+#   list_asset and authorizes the escrow on it afterwards (contract-abi.md §12.4; smoke-testnet.sh section V1.3).
 # Every deploy creates a NEW contract id (fresh state, empty option book). The build stamps SEP-55 metadata
 # source_repo=github:mohamedkhellaf/hackmeridian into the wasm (check: stellar contract info meta --wasm <wasm>).
 # --throwaway never touches the `options` alias, OPTIONS_ID or DEPLOY_TX: it saves alias `options-throwaway` and
@@ -86,6 +88,7 @@ else
 fi
 
 # ---------- deploy ----------
+# Constructor underlyings stay [RWA, BOND]. Never add EQTY_SAC here (the v1.3 listing demo depends on it).
 UNDERLYINGS="$(jq -cn --arg a "$RWA_SAC" --arg b "$BOND_SAC" '[$a, $b]')"
 run_tx "$DEPLOY_LABEL" stellar contract deploy --wasm "$WASM" --source-account "$ID_DEPLOYER" --network "$NETWORK" \
   --alias "$ALIAS" -- --quote "$USDX_SAC" --underlyings "$UNDERLYINGS"
@@ -120,8 +123,8 @@ else
   fi
 fi
 
-# ---------- authorize the contract on every underlying SAC ----------
-DRY_RUN="$DRY" "$SCRIPTS_DIR/setup-testnet/03-authorize-contract.sh" "$NEW_ID" "$AUTH_LABEL"
+# ---------- authorize the contract on the constructor underlyings (RWA, BOND; never EQTY, see above) ----------
+DRY_RUN="$DRY" "$SCRIPTS_DIR/setup-testnet/03-authorize-contract.sh" "$NEW_ID" "$AUTH_LABEL" RWA BOND
 
 if [[ $THROWAWAY == 1 ]]; then
   cat <<EOF
@@ -137,6 +140,10 @@ fi
 
 # ---------- AGENTS.md rows ----------
 short() { printf '%s…%s' "${1:0:4}" "${1: -4}"; }
+EQTY_ROW=""
+if [[ -n "${EQTY_SAC:-}" ]]; then
+  EQTY_ROW="| EQTY SAC (fictional tokenized-equity label; \`EQTY:$(short "$RWA_ISSUER")\`, auth required/revocable/clawback; not in the constructor, listed with \`list_asset\` on v1.3) | — | \`$EQTY_SAC\` | strata-rwa-issuer \`$RWA_ISSUER\` |"$'\n'
+fi
 cat <<EOF
 
 Paste into AGENTS.md "Deployed contracts (TESTNET ONLY)" (replace the previous options row):
@@ -146,7 +153,7 @@ Paste into AGENTS.md "Deployed contracts (TESTNET ONLY)" (replace the previous o
 | options (deploy tx \`$DEPLOY_TX\`, wasm sha256 \`${WASM_SHA256:0:16}…\`) | options | \`$OPTIONS_ID\` | strata-deployer \`$DEPLOYER\` |
 | RWA SAC (fictional; \`RWA:$(short "$RWA_ISSUER")\`, auth required/revocable/clawback) | — | \`$RWA_SAC\` | strata-rwa-issuer \`$RWA_ISSUER\` |
 | BOND SAC (fictional; \`BOND:$(short "$RWA_ISSUER")\`, auth required/revocable/clawback) | — | \`$BOND_SAC\` | strata-rwa-issuer \`$RWA_ISSUER\` |
-| USDx SAC (fictional quote token; \`USDx:$(short "$USDX_ISSUER")\`, no flags) | — | \`$USDX_SAC\` | strata-usdx-issuer \`$USDX_ISSUER\` |
+${EQTY_ROW}| USDx SAC (fictional quote token; \`USDx:$(short "$USDX_ISSUER")\`, no flags) | — | \`$USDX_SAC\` | strata-usdx-issuer \`$USDX_ISSUER\` |
 
 Next: update AGENTS.md in the same PR, then scripts/deploy/bindings.sh to regenerate the TypeScript client.
 EOF
