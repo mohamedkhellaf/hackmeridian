@@ -21,7 +21,7 @@ Setup (assets, trustlines, funding, authorizing the options contract on the FUND
 
 Pre-staged state needed before recording (ask Dev 2 to produce it, or do it off camera):
 - Maker A's and Maker B's offers (scenes 2 and 3) are created on camera. One extra option, bought by the Investor and still `active`, must exist off camera for scene 7 (the freeze scene), because scene 5 consumes the first one. Simplest: a third funded offer from Maker B, bought by the Investor before recording.
-- Scene 4b (resale, contract v1.4 `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`) needs one more option, bought by the Investor off camera and still `active`, with no ask on it. Do not resell the option bought in scene 4: scene 5 exercises it.
+- Scene 4b (resale, contract v1.5 `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6` (resale since v1.4)) needs one more option, bought by the Investor off camera and still `active`, with no ask on it. Do not resell the option bought in scene 4: scene 5 exercises it.
 - Short expiry is risky: use an expiry at least 2 hours after the recording time.
 
 ## Pre-recording checklist
