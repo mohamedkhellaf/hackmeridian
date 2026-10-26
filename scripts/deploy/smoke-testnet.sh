@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Smoke-test the deployed options contract on Stellar TESTNET with real transactions (test XLM fees only).
 #
-#   scripts/deploy/smoke-testnet.sh             # P0 (PUT lifecycle, expected failures, expiry, competition), then P0+
+#   scripts/deploy/smoke-testnet.sh             # P0 (PUT lifecycle, expected failures, expiry, competition), then P0+,
+#                                               # then V1.2 (holder transfer, paged reads; needs contract v1.2+)
 #   scripts/deploy/smoke-testnet.sh --p0-only   # stop after P0
 #
 # Reads OPTIONS_ID (written by deploy.sh), the SAC ids and the role public keys from scripts/out/testnet.env.
@@ -21,7 +22,7 @@ case "${1:-}" in
   "") ;;
   --p0-only) RUN_P0PLUS=0 ;;
   -h | --help)
-    sed -n '2,12p' "$0"
+    sed -n '2,13p' "$0"
     exit 0
     ;;
   *) die "unknown argument: $1 (usage: $0 [--p0-only])" ;;
@@ -48,7 +49,7 @@ COMP_PREM=8000000     # maker2's competing premium, 0.8 USDx
 EXP_SECS=45           # tenor of the offer used for the expiry path
 
 # ---------- results ----------
-declare -A NPASS=([P0]=0 [P0+]=0 [PRE]=0) NFAIL=([P0]=0 [P0+]=0 [PRE]=0)
+declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [PRE]=0) NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [PRE]=0)
 GROUP=PRE
 SUMMARY=()
 pass() {
@@ -180,8 +181,9 @@ expect_option() {
 }
 
 # ---------- balances and open_collateral ----------
-# Keys: m1/inv/ctr = maker1/investor/contract SAC balance, oc = open_collateral; Q = USDx quote, U = underlying.
-SNAP_KEYS=(m1Q invQ ctrQ ocQ m1U invU ctrU ocU)
+# Keys: m1/m2/inv/ctr = maker1/maker2/investor/contract SAC balance, oc = open_collateral; Q = USDx quote,
+# U = underlying.
+SNAP_KEYS=(m1Q m2Q invQ ctrQ ocQ m1U m2U invU ctrU ocU)
 declare -A CUR=() PREV=()
 snap_reset() {
   CUR=()
@@ -195,6 +197,8 @@ snapshot() {
   for k in "${!CUR[@]}"; do PREV[$k]="${CUR[$k]}"; done
   (view "$USDX_SAC" balance --id "$MAKER1" | num >"$d/m1Q") &
   pids+=($!)
+  (view "$USDX_SAC" balance --id "$MAKER2" | num >"$d/m2Q") &
+  pids+=($!)
   (view "$USDX_SAC" balance --id "$INVESTOR" | num >"$d/invQ") &
   pids+=($!)
   (view "$USDX_SAC" balance --id "$O" | num >"$d/ctrQ") &
@@ -202,6 +206,8 @@ snapshot() {
   (view "$O" open_collateral --token "$USDX_SAC" | num >"$d/ocQ") &
   pids+=($!)
   (view "$u" balance --id "$MAKER1" | num >"$d/m1U") &
+  pids+=($!)
+  (view "$u" balance --id "$MAKER2" | num >"$d/m2U") &
   pids+=($!)
   (view "$u" balance --id "$INVESTOR" | num >"$d/invU") &
   pids+=($!)
@@ -215,7 +221,7 @@ snapshot() {
   echo "   [$title]"
   printf '   %-30s %26s %26s\n' "" "USDx" "$sym"
   local row
-  for row in "maker1 balance:m1" "investor balance:inv" "contract balance:ctr" "open_collateral:oc"; do
+  for row in "maker1 balance:m1" "maker2 balance:m2" "investor balance:inv" "contract balance:ctr" "open_collateral:oc"; do
     printf '   %-30s %26s %26s\n' "${row%%:*}" "$(fmt_cell "${row#*:}Q")" "$(fmt_cell "${row#*:}U")"
   done
 }
@@ -431,6 +437,98 @@ competition() {
   fi
 }
 
+# transfer_path (v1.2): maker1 PUT on RWA -> investor buy -> investor transfer to maker2 -> maker2 exercise ->
+# maker1 claim_delivery. transfer moves no tokens and leaves open_collateral alone (contract-abi.md §3); the old
+# holder can no longer exercise. The transfer preconditions are simulated on the same option.
+transfer_path() {
+  local q="$PUT_QTY" k="$PUT_STRIKE" p="$PUT_PREM" id exp
+  snap_reset
+  snapshot "XFER before" "$RWA_SAC" RWA
+  exp=$(($(date +%s) + 3600))
+  send XFER_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" --option_type Put \
+    --qty "$q" --strike_total "$k" --premium_total "$p" --expiry "$exp" || return 1
+  id="$RESULT"
+  [[ "$id" =~ ^[0-9]+$ ]] || {
+    fail XFER_CREATE_ID "create_offer returned '$id', not a u32 id"
+    return 1
+  }
+  echo "   transfer-path option id $id (Put, RWA, qty $q, strike_total $k, premium_total $p, expiry $exp)"
+  expect_option XFER_CREATE_STATE "$id" Offered || return 1
+  snapshot "XFER after create_offer #$id" "$RWA_SAC" RWA
+  check_deltas XFER_CREATE_BAL "m1Q=-$k ctrQ=$k ocQ=$k" || return 1
+  expect_fail FAIL_XFER_OFFERED 108 NotHolder "$ID_INVESTOR" transfer --holder "$INVESTOR" --to "$MAKER2" --id "$id"
+
+  send XFER_BUY "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$id" || return 1
+  expect_option XFER_BUY_STATE "$id" Active "$INVESTOR" || return 1
+  snapshot "XFER after buy #$id" "$RWA_SAC" RWA
+  check_deltas XFER_BUY_BAL "invQ=-$p m1Q=$p" || return 1
+
+  expect_fail FAIL_XFER_NOT_HOLDER 108 NotHolder "$ID_MAKER1" transfer --holder "$MAKER1" --to "$MAKER2" --id "$id"
+  expect_fail FAIL_XFER_SELF 102 InvalidArgs "$ID_INVESTOR" transfer --holder "$INVESTOR" --to "$INVESTOR" --id "$id"
+  expect_fail FAIL_XFER_TO_WRITER 111 SelfTrade "$ID_INVESTOR" transfer --holder "$INVESTOR" --to "$MAKER1" --id "$id"
+  expect_fail FAIL_XFER_NOT_ELIGIBLE 104 NotEligible "$ID_INVESTOR" transfer --holder "$INVESTOR" --to "$OUTSIDER" \
+    --id "$id"
+
+  send XFER_TRANSFER "$ID_INVESTOR" transfer --holder "$INVESTOR" --to "$MAKER2" --id "$id" || return 1
+  if grep -qi 'option_transferred' <<<"$ERR"; then
+    pass XFER_EVENT "option_transferred event in tx $HASH"
+  else
+    fail XFER_EVENT "no option_transferred event in the CLI output of tx $HASH"
+  fi
+  expect_option XFER_TRANSFER_STATE "$id" Active "$MAKER2" || return 1
+  snapshot "XFER after transfer #$id to maker2" "$RWA_SAC" RWA
+  check_deltas XFER_TRANSFER_BAL "" || return 1
+  expect_fail FAIL_XFER_OLD_HOLDER 108 NotHolder "$ID_INVESTOR" exercise --holder "$INVESTOR" --id "$id"
+
+  send XFER_EXERCISE "$ID_MAKER2" exercise --holder "$MAKER2" --id "$id" || return 1
+  expect_option XFER_EXERCISE_STATE "$id" Exercised "$MAKER2" || return 1
+  snapshot "XFER after maker2 exercise #$id" "$RWA_SAC" RWA
+  check_deltas XFER_EXERCISE_BAL "m2U=-$q m2Q=$k ctrU=$q ctrQ=-$k ocQ=-$k ocU=$q" || return 1
+  expect_fail FAIL_XFER_AFTER_EXERCISE 106 WrongState "$ID_MAKER2" transfer --holder "$MAKER2" --to "$INVESTOR" \
+    --id "$id"
+
+  send XFER_CLAIM "$ID_MAKER1" claim_delivery --writer "$MAKER1" --id "$id" || return 1
+  expect_option XFER_CLAIM_STATE "$id" Settled "$MAKER2" || return 1
+  snapshot "XFER after claim_delivery #$id" "$RWA_SAC" RWA
+  check_deltas XFER_CLAIM_BAL "ctrU=-$q m1U=$q ocU=-$q"
+}
+
+# paging (v1.2): get_options(from, limit) returns ids from, from+1, ... capped at option_count and MAX_PAGE = 50.
+# Needs at least 3 options on the contract (the P0 sections create them).
+paging() {
+  local count page ids len want
+  count="$(view "$O" option_count | num)"
+  [[ "$count" =~ ^[0-9]+$ ]] || {
+    fail PAGE_COUNT "option_count unreadable: '$count'"
+    return 1
+  }
+  echo "   option_count = $count"
+  page="$(view "$O" get_options --from 0 --limit 3)"
+  ids="$(jq -c '[.[].id]' <<<"$page" 2>/dev/null)"
+  echo "   get_options(0, 3) ids = ${ids:-unreadable}"
+  if [[ "$ids" == "[0,1,2]" ]]; then
+    pass PAGE_FIRST3 "get_options(0, 3) returned 3 entries, ids $ids"
+  else
+    fail PAGE_FIRST3 "get_options(0, 3) ids ${ids:-unreadable}; wanted [0,1,2] (page: $page)"
+  fi
+  page="$(view "$O" get_options --from "$count" --limit 5)"
+  echo "   get_options($count, 5) = $page"
+  if [[ "$(jq -c . <<<"$page" 2>/dev/null)" == "[]" ]]; then
+    pass PAGE_PAST_END "get_options(option_count=$count, 5) returned []"
+  else
+    fail PAGE_PAST_END "get_options($count, 5) returned '$page'; wanted []"
+  fi
+  page="$(view "$O" get_options --from 0 --limit 1000)"
+  len="$(jq length <<<"$page" 2>/dev/null)"
+  want=$((count < 50 ? count : 50))
+  echo "   get_options(0, 1000) length = ${len:-unreadable} (option_count $count, MAX_PAGE 50)"
+  if [[ "$len" =~ ^[0-9]+$ ]] && ((len <= 50 && len == want)); then
+    pass PAGE_CAP "get_options(0, 1000) returned $len entries (<= 50, = min(option_count, 50))"
+  else
+    fail PAGE_CAP "get_options(0, 1000) returned ${len:-unreadable} entries; wanted $want (<= 50)"
+  fi
+}
+
 # ---------- run ----------
 section "Strata options smoke run on Stellar TESTNET ($(date -u +%FT%TZ))"
 echo "options contract  $O"
@@ -482,6 +580,12 @@ if [[ $RUN_P0PLUS == 1 ]]; then
   lifecycle P0P_CALL Call "$RWA_SAC" RWA "$CALL_QTY" "$CALL_STRIKE" "$CALL_PREM" || echo "   CALL path stopped"
   section "P0+-2 PUT happy path on BOND (second underlying, same contract)"
   lifecycle P0P_BOND_PUT Put "$BOND_SAC" BOND "$PUT_QTY" "$PUT_STRIKE" "$PUT_PREM" || echo "   BOND path stopped"
+
+  GROUP=V1.2
+  section "V1.2-1 holder transfer on RWA PUT (buy -> transfer to maker2 -> maker2 exercises)"
+  transfer_path || echo "   transfer path stopped"
+  section "V1.2-2 paged reads (get_options)"
+  paging || echo "   paging checks stopped"
 fi
 
 # Every required check must have run (a stopped path leaves its later checks unreached).
@@ -498,6 +602,10 @@ require_ran P0 P0_PUT_CREATE P0_PUT_BUY P0_PUT_EXERCISE P0_PUT_CLAIM P0_PUT_CLAI
   FAIL_BUY_EXPIRED EXP_RECLAIM EXP_RECLAIM_BAL COMP_LIST_BOTH COMP_LIST_SHRINKS
 [[ $RUN_P0PLUS != 1 ]] || require_ran P0+ P0P_CALL_CREATE P0P_CALL_BUY P0P_CALL_EXERCISE P0P_CALL_CLAIM \
   P0P_CALL_CLAIM_BAL P0P_BOND_PUT_CREATE P0P_BOND_PUT_BUY P0P_BOND_PUT_EXERCISE P0P_BOND_PUT_CLAIM P0P_BOND_PUT_CLAIM_BAL
+[[ $RUN_P0PLUS != 1 ]] || require_ran V1.2 XFER_CREATE FAIL_XFER_OFFERED XFER_BUY FAIL_XFER_NOT_HOLDER FAIL_XFER_SELF \
+  FAIL_XFER_TO_WRITER FAIL_XFER_NOT_ELIGIBLE XFER_TRANSFER XFER_EVENT XFER_TRANSFER_STATE XFER_TRANSFER_BAL \
+  FAIL_XFER_OLD_HOLDER XFER_EXERCISE XFER_EXERCISE_BAL FAIL_XFER_AFTER_EXERCISE XFER_CLAIM XFER_CLAIM_BAL PAGE_FIRST3 \
+  PAGE_PAST_END PAGE_CAP
 
 section "SUMMARY"
 printf '%-5s %-30s %-5s %s\n' GROUP CHECK RESULT DETAIL
@@ -510,6 +618,7 @@ verdict() { if ((NFAIL[$1] == 0)); then echo PASS; else echo FAIL; fi; }
 echo "PRE: $(verdict PRE) (${NPASS[PRE]} passed, ${NFAIL[PRE]} failed)"
 echo "P0:  $(verdict P0) (${NPASS[P0]} passed, ${NFAIL[P0]} failed)"
 if [[ $RUN_P0PLUS == 1 ]]; then echo "P0+: $(verdict P0+) (${NPASS[P0+]} passed, ${NFAIL[P0+]} failed)"; else echo "P0+: not run (--p0-only)"; fi
+if [[ $RUN_P0PLUS == 1 ]]; then echo "V1.2: $(verdict V1.2) (${NPASS[V1.2]} passed, ${NFAIL[V1.2]} failed)"; else echo "V1.2: not run (--p0-only)"; fi
 echo "log: $SMOKE_LOG"
-total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+]))
+total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2]))
 exit $((total_fail > 0 ? 1 : 0))

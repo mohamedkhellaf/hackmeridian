@@ -2563,3 +2563,651 @@ fn shortfall_on_quote_blocks_every_underlying() {
     );
     assert_eq!(t.snap(), before);
 }
+
+// ---------------------------------------------------------------------------
+// v1.2: holder transfer and paged reads (ABI §3, §11)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn transfer_active_option_changes_holder_and_emits_event() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    // an unrelated open offer, to show list_open is untouched
+    let open = t.call(&t.writer);
+    let before = t.snap();
+    assert_eq!(before.open, [open]);
+
+    t.c.transfer(&t.holder, &t.maker2, &id);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [OptionTransferred {
+            id,
+            from: t.holder.clone(),
+            to: t.maker2.clone(),
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+
+    // only the holder changed: no balance, reserved total, open list or count moved
+    let mut expected = before.clone();
+    expected.options[id as usize].holder = Some(t.maker2.clone());
+    assert_eq!(t.snap(), expected);
+    assert_eq!(t.state(id), State::Active);
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+    assert_eq!(t.c.open_collateral(&t.usdx), before.open_usdx);
+    assert_eq!(t.c.open_collateral(&t.rwa), before.open_rwa);
+    assert_eq!(t.open(), before.open);
+
+    // the previous holder can no longer exercise or transfer
+    assert_err(t.c.try_exercise(&t.holder, &id), Error::NotHolder);
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.maker2, &id),
+        Error::NotHolder,
+    );
+    assert_eq!(t.snap(), expected);
+
+    // the new holder exercises and receives the payout
+    t.c.exercise(&t.maker2, &id);
+    assert_eq!(t.state(id), State::Exercised);
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+    assert_eq!(t.bal(&t.rwa, &t.maker2), UNDERLYING_START - QTY);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), USDX_START + STRIKE);
+    // the original buyer paid the premium and nothing else
+    assert_eq!(t.bals(&t.holder), before.holder);
+    assert_eq!(t.bal(&t.usdx, &t.holder), USDX_START - PREMIUM);
+    // the delivered RWA waits in the contract for the writer, next to the open CALL's collateral
+    assert_eq!(t.bal(&t.rwa, &t.contract), QTY + QTY);
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY + QTY);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    t.c.claim_delivery(&t.writer, &id);
+    assert_eq!(t.state(id), State::Settled);
+    // writer: -QTY RWA locked in the open CALL, +QTY RWA delivered by the new holder
+    assert_eq!(t.bal(&t.rwa, &t.writer), UNDERLYING_START);
+}
+
+#[test]
+fn transfer_rejects_non_holder() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    let before = t.snap();
+
+    // the writer cannot take or redirect the position
+    assert_err(
+        t.c.try_transfer(&t.writer, &t.maker2, &id),
+        Error::NotHolder,
+    );
+    // nor can a third party, to anyone (including itself)
+    assert_err(
+        t.c.try_transfer(&t.maker2, &t.outsider, &id),
+        Error::NotHolder,
+    );
+    assert_err(
+        t.c.try_transfer(&t.maker2, &t.maker2, &id),
+        Error::NotHolder,
+    );
+    assert_err(
+        t.c.try_transfer(&t.outsider, &t.maker2, &id),
+        Error::NotHolder,
+    );
+    // an unknown id comes first
+    assert_err(t.c.try_transfer(&t.holder, &t.maker2, &9), Error::NotFound);
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+}
+
+#[test]
+fn transfer_rejects_offered_and_terminal_states() {
+    let t = setup();
+
+    // Offered: holder is None, so the ownership check fails first
+    let offered = t.put(&t.writer);
+    let before = t.snap();
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.maker2, &offered),
+        Error::NotHolder,
+    );
+    assert_err(
+        t.c.try_transfer(&t.writer, &t.maker2, &offered),
+        Error::NotHolder,
+    );
+    assert_eq!(t.snap(), before);
+
+    // Cancelled: holder is None as well
+    t.c.cancel_offer(&t.writer, &offered);
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.maker2, &offered),
+        Error::NotHolder,
+    );
+
+    // Exercised and Settled: the holder is still recorded, the state check fails
+    let exercised = t.put(&t.writer);
+    t.c.buy(&t.holder, &exercised);
+    t.c.exercise(&t.holder, &exercised);
+    let before = t.snap();
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.maker2, &exercised),
+        Error::WrongState,
+    );
+    assert_eq!(t.snap(), before);
+    t.c.claim_delivery(&t.writer, &exercised);
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.maker2, &exercised),
+        Error::WrongState,
+    );
+
+    // Expired after reclaim: state is checked before time, so WrongState (not Expired)
+    let reclaimed = t.call(&t.writer);
+    t.c.buy(&t.holder, &reclaimed);
+    t.at(EXPIRY);
+    t.c.reclaim(&t.writer, &reclaimed);
+    let before = t.snap();
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.maker2, &reclaimed),
+        Error::WrongState,
+    );
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.holder_of(reclaimed), Some(t.holder.clone()));
+}
+
+#[test]
+fn transfer_rejects_after_expiry() {
+    let t = setup();
+    let id = t.call(&t.writer);
+    t.c.buy(&t.holder, &id);
+
+    // one second before expiry (now < expiry) the transfer works
+    t.at(EXPIRY - 1);
+    t.c.transfer(&t.holder, &t.maker2, &id);
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+
+    // at and after expiry it does not; time comes before the recipient checks
+    for ts in [EXPIRY, EXPIRY + 86_400] {
+        t.at(ts);
+        let before = t.snap();
+        assert_err(t.c.try_transfer(&t.maker2, &t.holder, &id), Error::Expired);
+        assert_err(t.c.try_transfer(&t.maker2, &t.maker2, &id), Error::Expired);
+        assert_err(t.c.try_transfer(&t.maker2, &t.writer, &id), Error::Expired);
+        assert_err(
+            t.c.try_transfer(&t.maker2, &t.outsider, &id),
+            Error::Expired,
+        );
+        assert_eq!(t.snap(), before);
+    }
+    assert_eq!(t.state(id), State::Active);
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+
+    // the writer reclaims as usual
+    t.c.reclaim(&t.writer, &id);
+    assert_eq!(t.state(id), State::Expired);
+    assert_eq!(t.bal(&t.rwa, &t.writer), UNDERLYING_START);
+}
+
+#[test]
+fn transfer_rejects_to_self() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    let before = t.snap();
+
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.holder, &id),
+        Error::InvalidArgs,
+    );
+    assert!(t.env.events().all().events().is_empty());
+    // checked before eligibility: a frozen holder still gets InvalidArgs
+    t.sac(&t.rwa).set_authorized(&t.holder, &false);
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.holder, &id),
+        Error::InvalidArgs,
+    );
+    t.sac(&t.rwa).set_authorized(&t.holder, &true);
+    assert_eq!(t.snap(), before);
+}
+
+#[test]
+fn transfer_rejects_to_writer() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    let before = t.snap();
+
+    // the writer may not hold its own option (same rule as buy)
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.writer, &id),
+        Error::SelfTrade,
+    );
+    // checked before eligibility: a frozen writer still gets SelfTrade
+    t.sac(&t.rwa).set_authorized(&t.writer, &false);
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.writer, &id),
+        Error::SelfTrade,
+    );
+    t.sac(&t.rwa).set_authorized(&t.writer, &true);
+    assert_eq!(t.snap(), before);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+}
+
+#[test]
+fn transfer_rejects_ineligible_recipient() {
+    let t = setup();
+    let put = t.put(&t.writer);
+    let bond_call = t.offer(&t.writer, &t.bond, OptionType::Call);
+    t.c.buy(&t.holder, &put);
+    t.c.buy(&t.holder, &bond_call);
+    let before = t.snap();
+
+    // outsider holds USDx but is not authorized on RWA or BOND
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.outsider, &put),
+        Error::NotEligible,
+    );
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.outsider, &bond_call),
+        Error::NotEligible,
+    );
+    // an unknown account (no balance entry at all) is not eligible either
+    let nobody = Address::generate(&t.env);
+    assert_err(
+        t.c.try_transfer(&t.holder, &nobody, &put),
+        Error::NotEligible,
+    );
+    assert_eq!(t.snap(), before);
+
+    // eligibility is per underlying and follows the issuer: a recipient frozen on RWA is
+    // rejected for the RWA option but accepted for the BOND option
+    t.sac(&t.rwa).set_authorized(&t.maker2, &false);
+    assert_err(
+        t.c.try_transfer(&t.holder, &t.maker2, &put),
+        Error::NotEligible,
+    );
+    t.c.transfer(&t.holder, &t.maker2, &bond_call);
+    assert_eq!(t.holder_of(bond_call), Some(t.maker2.clone()));
+    // once the issuer authorizes the recipient again the RWA transfer goes through
+    t.sac(&t.rwa).set_authorized(&t.maker2, &true);
+    t.c.transfer(&t.holder, &t.maker2, &put);
+    assert_eq!(t.holder_of(put), Some(t.maker2.clone()));
+}
+
+#[test]
+fn transfer_requires_holder_auth() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    let transfer = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "transfer",
+        args: (&t.holder, &t.maker2, id).into_val(&t.env),
+        sub_invokes: &[],
+    };
+    let before = t.snap();
+
+    // neither the recipient, the writer nor a third party can sign for the holder
+    for signer in [&t.maker2, &t.writer, &t.outsider] {
+        t.env.mock_auths(&[MockAuth {
+            address: signer,
+            invoke: &transfer,
+        }]);
+        assert_host_abort(t.c.try_transfer(&t.holder, &t.maker2, &id));
+        assert_eq!(t.snap(), before);
+    }
+
+    // the holder's signature over (holder, to, id) is sufficient; no token sub-invocation
+    t.env.mock_auths(&[MockAuth {
+        address: &t.holder,
+        invoke: &transfer,
+    }]);
+    t.c.transfer(&t.holder, &t.maker2, &id);
+    assert_eq!(
+        t.env.auths(),
+        std::vec![(
+            t.holder.clone(),
+            leaf(contract_fn(
+                &t,
+                &t.contract,
+                "transfer",
+                (t.holder.clone(), t.maker2.clone(), id).into_val(&t.env)
+            ))
+        )]
+    );
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+
+    // the signature binds the recipient: maker2's signature for a transfer to the holder does
+    // not authorize a transfer to the writer
+    let back = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "transfer",
+        args: (&t.maker2, &t.holder, id).into_val(&t.env),
+        sub_invokes: &[],
+    };
+    t.env.mock_auths(&[MockAuth {
+        address: &t.maker2,
+        invoke: &back,
+    }]);
+    let before = t.snap();
+    assert_host_abort(t.c.try_transfer(&t.maker2, &t.writer, &id));
+    assert_eq!(t.snap(), before);
+}
+
+#[test]
+fn transfer_then_frozen_old_holder_does_not_matter() {
+    let t = setup();
+    let put = t.put(&t.writer);
+    let call = t.call(&t.writer);
+    t.c.buy(&t.holder, &put);
+    t.c.buy(&t.holder, &call);
+    t.c.transfer(&t.holder, &t.maker2, &put);
+    t.c.transfer(&t.holder, &t.maker2, &call);
+
+    // the issuer freezes the previous holder on RWA after the transfers
+    t.sac(&t.rwa).set_authorized(&t.holder, &false);
+    assert!(!t.c.is_eligible(&t.rwa, &t.holder));
+    let holder_before = t.bals(&t.holder);
+
+    // the old holder is out either way (ownership is checked before any token movement)
+    assert_err(t.c.try_exercise(&t.holder, &put), Error::NotHolder);
+    assert_err(t.c.try_exercise(&t.holder, &call), Error::NotHolder);
+
+    // the new holder exercises the PUT: delivers RWA, receives the strike
+    t.c.exercise(&t.maker2, &put);
+    assert_eq!(t.state(put), State::Exercised);
+    assert_eq!(t.bal(&t.rwa, &t.maker2), UNDERLYING_START - QTY);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), USDX_START + STRIKE);
+
+    // and the CALL: pays the strike, receives RWA
+    t.c.exercise(&t.maker2, &call);
+    assert_eq!(t.state(call), State::Exercised);
+    assert_eq!(t.bal(&t.rwa, &t.maker2), UNDERLYING_START);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), USDX_START);
+
+    // the frozen old holder was never touched
+    assert_eq!(t.bals(&t.holder), holder_before);
+    assert_eq!(t.bal(&t.usdx, &t.holder), USDX_START - 2 * PREMIUM);
+    // the writer's proceeds wait in the contract: RWA from the PUT, USDx from the CALL
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY);
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE);
+    assert_eq!(t.bal(&t.rwa, &t.contract), QTY);
+    assert_eq!(t.bal(&t.usdx, &t.contract), STRIKE);
+}
+
+#[test]
+fn get_options_pages_in_order() {
+    let t = setup();
+    let page_ids = |from: u32, limit: u32| -> std::vec::Vec<u32> {
+        t.c.get_options(&from, &limit)
+            .iter()
+            .map(|o| o.id)
+            .collect()
+    };
+    assert!(t.c.get_options(&0, &10).is_empty());
+
+    // 7 options across writers, underlyings and types
+    t.put(&t.writer);
+    t.call(&t.writer);
+    t.offer(&t.maker2, &t.bond, OptionType::Put);
+    t.offer(&t.maker2, &t.bond, OptionType::Call);
+    t.put(&t.maker2);
+    t.call(&t.maker2);
+    t.offer(&t.writer, &t.bond, OptionType::Put);
+    assert_eq!(t.c.option_count(), 7);
+
+    assert_eq!(page_ids(0, 3), [0, 1, 2]);
+    assert_eq!(page_ids(3, 50), [3, 4, 5, 6]);
+    assert!(page_ids(7, 10).is_empty());
+    assert!(page_ids(2, 0).is_empty());
+    assert!(page_ids(u32::MAX, 50).is_empty());
+    assert_eq!(page_ids(6, u32::MAX), [6]);
+    // pages hold exactly what get_option returns
+    let all = t.c.get_options(&0, &50);
+    assert_eq!(all.len(), 7);
+    for (i, o) in all.iter().enumerate() {
+        assert_eq!(o, t.c.get_option(&(i as u32)));
+    }
+
+    // 60 options: one call returns at most MAX_PAGE = 50
+    for _ in 7..60 {
+        t.c.create_offer(&t.writer, &t.rwa, &OptionType::Put, &1, &1, &1, &EXPIRY);
+    }
+    assert_eq!(t.c.option_count(), 60);
+    assert_eq!(MAX_PAGE, 50);
+    assert_eq!(page_ids(0, 1000), (0..50).collect::<std::vec::Vec<u32>>());
+    assert_eq!(page_ids(50, 1000), (50..60).collect::<std::vec::Vec<u32>>());
+    assert_eq!(page_ids(55, 50), [55, 56, 57, 58, 59]);
+    assert!(page_ids(60, 1000).is_empty());
+
+    // paging with from += len visits every id exactly once
+    let mut seen = std::vec::Vec::new();
+    let mut from = 0;
+    loop {
+        let page = t.c.get_options(&from, &7);
+        if page.is_empty() {
+            break;
+        }
+        from += page.len();
+        seen.extend(page.iter().map(|o| o.id));
+    }
+    assert_eq!(seen, (0..60).collect::<std::vec::Vec<u32>>());
+}
+
+#[test]
+fn get_options_reflects_state_changes() {
+    let t = setup();
+    let a = t.put(&t.writer);
+    let b = t.call(&t.maker2);
+    let c = t.offer(&t.writer, &t.bond, OptionType::Put);
+    let page = |from: u32| t.c.get_options(&from, &MAX_PAGE);
+
+    assert_eq!(
+        page(0),
+        vec![
+            &t.env,
+            expected_option(&t, a, &t.rwa, OptionType::Put, &t.writer),
+            expected_option(&t, b, &t.rwa, OptionType::Call, &t.maker2),
+            expected_option(&t, c, &t.bond, OptionType::Put, &t.writer),
+        ]
+    );
+
+    t.c.buy(&t.holder, &a);
+    let p = page(0);
+    assert_eq!(p.get_unchecked(0).state, State::Active);
+    assert_eq!(p.get_unchecked(0).holder, Some(t.holder.clone()));
+    assert_eq!(p.get_unchecked(1).state, State::Offered);
+
+    t.c.transfer(&t.holder, &t.maker2, &a);
+    assert_eq!(page(0).get_unchecked(0).holder, Some(t.maker2.clone()));
+
+    t.c.exercise(&t.maker2, &a);
+    t.c.cancel_offer(&t.maker2, &b);
+    let p = page(0);
+    assert_eq!(p.get_unchecked(0).state, State::Exercised);
+    assert_eq!(p.get_unchecked(0).holder, Some(t.maker2.clone()));
+    assert_eq!(p.get_unchecked(1).state, State::Cancelled);
+    assert_eq!(p.get_unchecked(1).holder, None);
+    assert_eq!(p.get_unchecked(2).state, State::Offered);
+    // every paged copy equals get_option
+    for (i, o) in p.iter().enumerate() {
+        assert_eq!(o, t.c.get_option(&(i as u32)));
+    }
+    assert_eq!(page(1).get_unchecked(0), t.c.get_option(&b));
+
+    // a pure read: no TTL is extended even when entries are below the threshold
+    let seq = t.env.ledger().sequence();
+    t.env.ledger().set_sequence_number(seq + 25 * DAY);
+    let ttls = |ids: [u32; 3]| ids.map(|id| t.option_ttl(id));
+    let before = ttls([a, b, c]);
+    let instance = t.instance_ttl();
+    assert!(before.iter().all(|&ttl| ttl < 7 * DAY), "{before:?}");
+    assert_eq!(page(0).len(), 3);
+    assert_eq!(ttls([a, b, c]), before);
+    assert_eq!(t.instance_ttl(), instance);
+}
+
+// ---------------------------------------------------------------------------
+// Per-call TTL extension and exercise transfer order (found by mutation testing)
+// ---------------------------------------------------------------------------
+
+/// Ages the ledger 25 days so every entry written at setup is below the 7-day
+/// extension threshold (ABI §8), and checks that precondition on the instance.
+fn age_below_ttl_threshold(t: &T) {
+    let seq = t.env.ledger().sequence();
+    t.env.ledger().set_sequence_number(seq + 25 * DAY);
+    assert!(
+        t.instance_ttl() < 7 * DAY,
+        "precondition: instance TTL {}",
+        t.instance_ttl()
+    );
+}
+
+/// The call under test extended the instance, the contract code and option `id`
+/// back to about TTL_EXTEND_TO = 30 days (ABI §8).
+#[track_caller]
+fn assert_ttls_extended(t: &T, id: u32) {
+    assert!(
+        t.instance_ttl() >= 29 * DAY,
+        "instance TTL {}",
+        t.instance_ttl()
+    );
+    assert!(
+        t.env.deployer().get_contract_code_ttl(&t.contract) >= 29 * DAY,
+        "code TTL {}",
+        t.env.deployer().get_contract_code_ttl(&t.contract)
+    );
+    assert!(
+        t.option_ttl(id) >= 29 * DAY,
+        "option TTL {}",
+        t.option_ttl(id)
+    );
+}
+
+#[test]
+fn constructor_extends_instance_and_code_ttl() {
+    let t = setup();
+    assert!(
+        t.instance_ttl() >= 29 * DAY,
+        "instance TTL {}",
+        t.instance_ttl()
+    );
+    assert!(
+        t.env.deployer().get_contract_code_ttl(&t.contract) >= 29 * DAY,
+        "code TTL {}",
+        t.env.deployer().get_contract_code_ttl(&t.contract)
+    );
+}
+
+#[test]
+fn create_offer_extends_ttls() {
+    let t = setup();
+    age_below_ttl_threshold(&t);
+    let id = t.put(&t.writer);
+    assert_ttls_extended(&t, id);
+}
+
+#[test]
+fn buy_extends_ttls() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    age_below_ttl_threshold(&t);
+    t.c.buy(&t.holder, &id);
+    assert_ttls_extended(&t, id);
+}
+
+#[test]
+fn exercise_extends_ttls() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    age_below_ttl_threshold(&t);
+    t.c.exercise(&t.holder, &id);
+    assert_ttls_extended(&t, id);
+}
+
+#[test]
+fn cancel_offer_extends_ttls() {
+    let t = setup();
+    let id = t.call(&t.writer);
+    age_below_ttl_threshold(&t);
+    t.c.cancel_offer(&t.writer, &id);
+    assert_ttls_extended(&t, id);
+}
+
+#[test]
+fn reclaim_extends_ttls() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.at(EXPIRY);
+    age_below_ttl_threshold(&t);
+    t.c.reclaim(&t.writer, &id);
+    assert_ttls_extended(&t, id);
+}
+
+#[test]
+fn claim_delivery_extends_ttls() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    t.c.exercise(&t.holder, &id);
+    age_below_ttl_threshold(&t);
+    t.c.claim_delivery(&t.writer, &id);
+    assert_ttls_extended(&t, id);
+}
+
+#[test]
+fn transfer_extends_ttls() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    // ageing moves the ledger sequence only, so the option is still before expiry
+    age_below_ttl_threshold(&t);
+    t.c.transfer(&t.holder, &t.maker2, &id);
+    assert_ttls_extended(&t, id);
+}
+
+/// Index, within the most recent invocation's events, of the single event the
+/// SAC `sac` emitted.
+fn sac_event_pos(t: &T, sac: &Address) -> usize {
+    let all = t.env.events().all();
+    let mine = all.filter_by_contract(sac);
+    assert_eq!(
+        mine.events().len(),
+        1,
+        "expected exactly one transfer event from the SAC"
+    );
+    let target = mine.events()[0].clone();
+    all.events().iter().position(|e| *e == target).unwrap()
+}
+
+/// ABI §3 `exercise`: the holder pays into the contract first, then the
+/// contract pays the holder.
+#[test]
+fn exercise_transfer_order_matches_abi() {
+    let t = setup();
+    let put = t.put(&t.writer);
+    t.c.buy(&t.holder, &put);
+    t.c.exercise(&t.holder, &put);
+    // PUT: underlying holder -> contract, then quote contract -> holder
+    assert!(sac_event_pos(&t, &t.rwa) < sac_event_pos(&t, &t.usdx));
+
+    let call = t.call(&t.writer);
+    t.c.buy(&t.holder, &call);
+    t.c.exercise(&t.holder, &call);
+    // CALL: quote holder -> contract, then underlying contract -> holder
+    assert!(sac_event_pos(&t, &t.usdx) < sac_event_pos(&t, &t.rwa));
+}
+
+/// White-box: the defensive `next < 0` guard in `sub_reserved` (unreachable
+/// through the ABI). A corrupted reserve makes the release fail atomically.
+#[test]
+fn sub_reserved_rejects_negative_result_on_corrupted_reserve() {
+    let t = setup();
+    let id = t.put(&t.writer);
+    t.env.as_contract(&t.contract, || {
+        t.env
+            .storage()
+            .instance()
+            .set(&Key::Reserved(t.usdx.clone()), &0i128)
+    });
+    let before = t.snap();
+    assert_err(t.c.try_cancel_offer(&t.writer, &id), Error::Overflow);
+    assert_eq!(t.snap(), before);
+}
