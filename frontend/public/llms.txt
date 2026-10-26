@@ -1,4 +1,4 @@
-# Strata
+# StellSec
 
 > Options on tokenized Stellar assets. A maker writes a put or a call on an eligible asset and locks the full collateral in a Soroban contract; an investor buys it; the holder can exercise any time before expiry, and the contract swaps tokens for payment in one transaction. Built at HackMeridian 2026 (Lisbon, Stellar Unlocked track). Stellar Testnet only, fictional assets, unaudited.
 
@@ -15,9 +15,9 @@ The app at https://hackmeridian-psi.vercel.app reads live Testnet state without 
 
 ## Contracts (Stellar Testnet)
 
-- [Options contract v1.4](https://stellar.expert/explorer/testnet/contract/CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK): `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`
+- [Options contract v1.5](https://stellar.expert/explorer/testnet/contract/CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6): `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`
 - [RWA SAC](https://stellar.expert/explorer/testnet/contract/CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U), [BOND SAC](https://stellar.expert/explorer/testnet/contract/CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP), [EQTY SAC](https://stellar.expert/explorer/testnet/contract/CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU) (listed at runtime), [USDx SAC](https://stellar.expert/explorer/testnet/contract/CAKXMQVKSW2AEKF5DSMDPHJAYGNVOQANHXLI64QJS2H3GOCXRW2GCICU) (quote token). RWA, BOND and EQTY have auth required, revocable and clawback enabled.
-- [Strata Pro v0.3.2](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) (experimental, separate contract): uncovered calls on partial margin, cash-settled in USDx, with a liquidity-provider vault. Prices are published by the team. Payouts can be reduced and any deficit is shown. Shares no storage or balance with the options contract.
+- [StellSec Margin (contract crate pro) v0.3.2](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) (experimental, separate contract): uncovered calls on partial margin, cash-settled in USDx, with a liquidity-provider vault. Prices are published by the team. Payouts can be reduced and any deficit is shown. Shares no storage or balance with the options contract.
 
 ## Evidence (Testnet transactions)
 
@@ -28,7 +28,7 @@ The app at https://hackmeridian-psi.vercel.app reads live Testnet state without 
 - [Third party prunes an expired unsold offer](https://stellar.expert/explorer/testnet/tx/da477e8cc5d490bdfb8f88f90c65e3ae0121073668a9ce53908a31fc7622ac7d)
 - [Holder transfers an active option](https://stellar.expert/explorer/testnet/tx/c4a60668b296e7c643d9aca1cee7e54d1b3e864de2604caef9a880ccd73c0c67)
 - [Option resold to another eligible account](https://stellar.expert/explorer/testnet/tx/a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949)
-- Strata Pro end to end: [margin and buys](https://stellar.expert/explorer/testnet/tx/3af75122179bb76f427c975f2a3331146e03cf9f777004fe1f19685c5a897725), [liquidation to the vault](https://stellar.expert/explorer/testnet/tx/83d65527ba83c7f34bc3a110e1ccf603ed04d57c01906a7ad64c28dfbaebd77e), [settlement and claim](https://stellar.expert/explorer/testnet/tx/a4cbd965c7b062050029a9922579bf505df2e1ee692011e05032c7255905c33c)
+- StellSec Margin (contract crate pro) end to end: [margin and buys](https://stellar.expert/explorer/testnet/tx/3af75122179bb76f427c975f2a3331146e03cf9f777004fe1f19685c5a897725), [liquidation to the vault](https://stellar.expert/explorer/testnet/tx/83d65527ba83c7f34bc3a110e1ccf603ed04d57c01906a7ad64c28dfbaebd77e), [settlement and claim](https://stellar.expert/explorer/testnet/tx/a4cbd965c7b062050029a9922579bf505df2e1ee692011e05032c7255905c33c)
 
 ## Limits
 
