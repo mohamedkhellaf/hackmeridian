@@ -15,7 +15,7 @@ export default defineConfig({
     command: `npx vite --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     // Empty contract id keeps the app on the in-memory mock client.
-    env: { VITE_E2E: '1', VITE_OPTIONS_CONTRACT_ID: '' },
+    env: { VITE_E2E: '1', VITE_OPTIONS_CONTRACT_ID: '', VITE_ENABLE_PRO: '1' },
     reuseExistingServer: !process.env.CI,
   },
 })

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { IconName } from '../ui'
 
-export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer'
+export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
+
+/** Strata Pro (experimental) is mounted only when the build sets VITE_ENABLE_PRO=1. */
+export const PRO_ENABLED = import.meta.env.VITE_ENABLE_PRO === '1'
 
 export interface NavItem {
   route: Route
@@ -22,7 +25,7 @@ export const NAV_TRANSPARENCY: NavItem[] = [
 /** Bottom tab bar on phones. Issuer is reached from the top bar. */
 export const NAV_TABS: NavItem[] = [...NAV_TRADE, NAV_TRANSPARENCY[0]]
 
-const ROUTES: Route[] = ['markets', 'protect', 'write', 'portfolio', 'reserves', 'issuer']
+const ROUTES: Route[] = ['markets', 'protect', 'write', 'portfolio', 'reserves', 'issuer', ...(PRO_ENABLED ? (['pro'] as const) : [])]
 
 export const hrefFor = (r: Route) => `#/${r}`
 

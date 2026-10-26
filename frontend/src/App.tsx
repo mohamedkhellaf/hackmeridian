@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { PresentationMode } from './demo/PresentationMode'
 import { config } from './config'
 import { BuyDialog } from './market/BuyDialog'
@@ -15,6 +16,9 @@ import { ProtectView } from './views/ProtectView'
 import { ReservesView } from './views/ReservesView'
 import { WriteView } from './views/WriteView'
 import './App.css'
+
+// Strata Pro (experimental): a lazy chunk that exists only when the build sets VITE_ENABLE_PRO=1.
+const ProApp = import.meta.env.VITE_ENABLE_PRO === '1' ? lazy(() => import('./pro/ProApp')) : null
 
 function App() {
   const s = useStrata()
@@ -87,6 +91,11 @@ function App() {
         {route === 'write' && <WriteView assets={s.assets} client={s.client} me={me} busy={s.busy} onSubmit={s.writeOffer} />}
         {route === 'portfolio' && <PortfolioView me={me} rows={s.positions} actionFor={s.actionFor} health={s.health} />}
         {route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
+        {route === 'pro' && ProApp && (
+          <Suspense fallback={null}>
+            <ProApp />
+          </Suspense>
+        )}
         {route === 'issuer' && <IssuerView address={wallet.address} sign={wallet.sign} optionsContractId={config.optionsContractId} />}
       </AppShell>
 
