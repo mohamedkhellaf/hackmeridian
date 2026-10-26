@@ -5751,3 +5751,19 @@ fn resale_edge_semantics_after_expiry() {
     t.c.reclaim(&t.writer, &b);
     assert_eq!(t.c.get_ask(&b), None);
 }
+
+#[test]
+fn resale_ask_does_not_survive_a_round_trip_transfer() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    // A -> B -> A: the option is back with A, but A's old ask is gone
+    t.c.transfer(&t.holder, &t.maker2, &id);
+    t.c.transfer(&t.maker2, &t.holder, &id);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+    assert_eq!(t.c.get_ask(&id), None);
+    let buyer0 = t.bal(&t.usdx, &t.maker2);
+    assert_err(t.c.try_buy_resale(&t.maker2, &id, &ASK), Error::NoAsk);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+}

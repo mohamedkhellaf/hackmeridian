@@ -7347,3 +7347,32 @@ fn resale25_after_expiry_buy_is_expired_and_cancel_still_works() {
     assert!(after.asks.is_empty());
     rejected(&t, t.c.try_buy_resale(m, &id, &ASK), Error::NoAsk, &after);
 }
+
+/// A seller with no trustline for the quote token cannot be paid: `buy_resale` fails inside the
+/// quote SAC (#13) and reverts atomically (holder, ask, balances and events unchanged). The G
+/// seller got the option through `transfer` (no tokens move), so it never needed a USDx trustline.
+#[test]
+fn resale25_seller_without_quote_trustline_reverts_atomically() {
+    let t = setup();
+    let (h, m) = (&t.holder, &t.maker2);
+    let id = t.put(&t.writer);
+    t.c.buy(h, &id);
+    // G account: authorized RWA trustline, no USDx trustline
+    let g = t.g_actor([false, true, false], true, [0, 0, 0]);
+    t.c.transfer(h, &g, &id);
+    t.c.list_for_sale(&g, &id, &ASK);
+    let before = t.snap();
+    sac_rejected(
+        &t,
+        t.c.try_buy_resale(m, &id, &ASK),
+        SAC_NO_TRUSTLINE,
+        &before,
+    );
+    assert_eq!(t.c.get_ask(&id), Some(ASK));
+    assert_eq!(t.c.get_option(&id).holder, Some(g.clone()));
+    // once the seller adds the trustline, the same purchase settles
+    t.sac(&t.usdx).trust(&g);
+    t.c.buy_resale(m, &id, &ASK);
+    assert_eq!(t.bal(&t.usdx, &g), ASK);
+    assert_eq!(t.c.get_option(&id).holder, Some(m.clone()));
+}
