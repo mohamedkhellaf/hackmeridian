@@ -31,7 +31,7 @@ test('invalid input is rejected, a valid put locks collateral and can be cancell
 
   await goTo(page, 'Markets')
   await expectOpenOffers(page, 5)
-  await expect(offerRows(page)).toHaveCount(5)
+  await expect(offerRows(page)).toHaveCount(3) // the three makers of the FUND 10.00 put series
   await expect(page.getByRole('button', { name: /^Buy put on 5.00 FUND from GBE6…3ZEG/ })).toBeDisabled() // own offer
 
   await goTo(page, 'Positions')

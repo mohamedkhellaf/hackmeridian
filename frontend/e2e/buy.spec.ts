@@ -83,7 +83,7 @@ test('buy review gates on the checkbox, then confirmed step, then exercise', asy
   await expect(row.getByRole('button')).toHaveCount(0)
 })
 
-test('back to markets closes the confirmed step', async ({ page }) => {
+test('done closes the confirmed contract note', async ({ page }) => {
   await openApp(page)
   await connect(page)
   await openBuyDialogForSeed(page)
@@ -91,7 +91,7 @@ test('back to markets closes the confirmed step', async ({ page }) => {
   await dialog.getByRole('checkbox', { name: 'I understand the terms above.' }).check()
   await dialog.getByRole('button', { name: 'Buy for 1.80 USDx' }).click()
   await expect(dialog).toContainText('Bought. Position 1')
-  await dialog.getByRole('button', { name: 'Back to markets' }).click()
+  await dialog.getByRole('button', { name: 'Done' }).click()
   await expect(dialog).toBeHidden()
   await expect(page).toHaveURL(/\/(#\/markets)?$/)
   await expectOpenOffers(page, 3)
