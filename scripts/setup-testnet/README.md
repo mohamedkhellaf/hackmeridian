@@ -22,7 +22,7 @@ asset and the network passphrase, so it stays the same as long as the issuer key
 
 `EQTY` (label: tokenized equity, fictional; no ownership claim) is the contract v1.3 listing demo asset
 (`docs/contract-abi.md` §12). It is regulated like RWA and BOND but is deliberately **not** in the options
-constructor and is **not** authorized on the contract by `deploy.sh`. On a v1.3 contract the smoke run lists it with
+constructor and is **not** authorized on the contract by `deploy.sh`. On contract v1.3.1 the smoke run lists it with
 `list_asset`, shows that `create_offer` on it fails with `ContractNotAuthorized` (#105), then has the issuer authorize
 the escrow (`03-authorize-contract.sh <id> EQTY`) and settles a PUT on it. Its SAC must be deployed beforehand
 (`list_asset` returns `AssetNotDeployed` #118 otherwise); `02-assets.sh` does that.
