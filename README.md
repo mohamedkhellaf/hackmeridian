@@ -1,14 +1,14 @@
 # Strata
 
-Fully collateralized, physically settled options on tokenized Stellar assets. Soroban contract plus a React app.
+Options on tokenized Stellar assets: one place to write, buy and resell puts and calls. Fully collateralized by default; uncovered calls on margin are allowed, marked, and carry a warning.
 
 HackMeridian 2026, Lisbon · Genesis path · Stellar Unlocked track · Testnet only, fictional assets, unaudited.
 
 | | |
 |---|---|
 | App | https://hackmeridian-psi.vercel.app |
-| Contract (options v1.4) | [`CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`](https://stellar.expert/explorer/testnet/contract/CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK) |
-| Contract (Strata Pro v0.3.2, experimental) | [`CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) · [evidence](docs/pro-testnet-evidence.md) |
+| Covered options contract (v1.4) | [`CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`](https://stellar.expert/explorer/testnet/contract/CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK) |
+| Uncovered calls contract (Pro v0.3.2, experimental) | [`CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) · [evidence](docs/pro-testnet-evidence.md) |
 | Spec · ABI · evidence | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) · [docs/contract-abi.md](docs/contract-abi.md) · [docs/contract-testnet-evidence.md](docs/contract-testnet-evidence.md) |
 | Demo video · deck | added at submission |
 
@@ -19,6 +19,8 @@ Tokenized funds, bonds and equities exist on Stellar. Many are regulated: the is
 ## What Strata does
 
 A market maker writes a put or a call on an eligible asset and locks the full collateral in the contract: the total strike for a put, the total underlying for a call. An investor buys it, paying the premium to the writer. The holder may exercise any time before expiry; the contract swaps tokens for payment in one transaction. If any leg fails, nothing moves.
+
+Two ways to back a call live in the same product. **Covered** (default): the writer locks the full strike or the full underlying before the sale; the holder's only risk is issuer action. **Uncovered** (experimental, separate contract): the writer posts partial margin in USDx, the option settles in cash at a published price, and a vault funded by liquidity providers backstops liquidations. Uncovered offers are marked as such and every screen carries the warning that payouts can be reduced and any deficit is shown. The two contracts share no storage or balance, so a margin loss can never touch covered collateral.
 
 - Eligibility is the asset's own `AUTH_REQUIRED` trustline authorization, read from the Stellar Asset Contract. The issuer keeps every power; the contract checks them, it does not replace them.
 - Anyone can list a classic asset by `(code, issuer)`. The contract derives the canonical SAC. The issuer still decides who may hold it, including the escrow.
@@ -144,7 +146,7 @@ Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after
 ## Next
 
 - Position tokens. Resale exists on-chain; a token would make options tradable on the Stellar DEX and usable as collateral elsewhere.
-- Strata Pro: cash-settled calls with partial margin, a separate experimental contract. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, 24 negative tests), deployed on Testnet and run end to end with every amount matching the model ([docs/pro-testnet-evidence.md](docs/pro-testnet-evidence.md)). In the app at `#/pro` behind a build flag, against the live contract, with the disclosure that payouts can be reduced and any deficit is shown. The price feed and settlement price are published by the team; it is a demo oracle, not a market. It shares no storage or balance with the options contract. Next: real oracle, liquidation incentives, audit.
+- Uncovered calls (Strata Pro): the margined mode, experimental. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, 24 negative tests), deployed on Testnet and run end to end with every amount matching the model ([docs/pro-testnet-evidence.md](docs/pro-testnet-evidence.md)). In the app at `#/pro` behind a build flag, against the live contract, with the warning that payouts can be reduced and any deficit is shown. The price feed and settlement price are published by the team; it is a demo oracle, not a market. It shares no storage or balance with the options contract. Next: show covered and uncovered offers in one Markets list with the badge and warning in the buy dialog, a real oracle, liquidation incentives, audit.
 - Issuer onboarding for real tokenized assets. The contract already respects their rules; the rest is legal and operational.
 - An RFQ layer for makers; the on-chain funded offer stays the only executable quote.
 
