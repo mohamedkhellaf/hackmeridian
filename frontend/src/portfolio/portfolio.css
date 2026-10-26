@@ -12,7 +12,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 18px;
+  font-size: 0.6em;
+  line-height: 1.15;
 }
 .pf-pos {
   color: var(--ok);
@@ -60,6 +61,7 @@
   background: var(--surface);
 }
 .pf-title {
+  font-family: var(--font-sans);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -121,6 +123,11 @@
   flex-direction: column;
   gap: 10px;
   font-variant-numeric: tabular-nums;
+}
+.pf-card.is-act {
+  background: var(--raised);
+  border-color: var(--border-2);
+  box-shadow: inset 3px 0 0 var(--warn);
 }
 .pf-card-head {
   display: flex;
@@ -187,3 +194,20 @@
 .pf-toolbar .ui-seg-item {
   white-space: nowrap;
 }
+
+.pf-table td:first-child .pf-title {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.pf-table td:first-child .ui-sub {
+  margin-left: 13px;
+}
+.pf-table td:nth-child(n + 3):nth-child(-n + 6),
+.pf-card-line {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.pf-table td:nth-child(n + 3):nth-child(-n + 6) .ui-sub {
+  font-family: var(--font-sans);
+}
+.pf-multi, .pf-hero-multi { font-family: var(--font-display); }

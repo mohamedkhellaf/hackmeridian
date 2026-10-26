@@ -72,8 +72,9 @@ export function OptionRow({ o, me, action }: { o: OptionOffer; me: string | null
   const prem = premiumOf(o, role)
   const now = nowMs()
   return (
-    <tr>
+    <tr className={action ? 'is-best' : undefined}>
       <td>
+        <span className="ui-bar" />
         <Title o={o} />
         <span className="ui-sub">{counterpartyLine(o, role)}</span>
       </td>
@@ -101,7 +102,7 @@ export function OptionCard({ o, me, action }: { o: OptionOffer; me: string | nul
   if (!role) return null
   const prem = premiumOf(o, role)
   return (
-    <article className="pf-card">
+    <article className={action ? 'pf-card is-act' : 'pf-card'}>
       <div className="pf-card-head">
         <Title o={o} />
         <span className="pf-card-role">{roleText(role)}</span>
