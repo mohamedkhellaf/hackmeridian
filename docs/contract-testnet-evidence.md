@@ -521,26 +521,33 @@ On the merged v1.3.1 tree (branch `feat/contract-v1-3-1`: `feat/v131-impl`, `fea
 `feat/v131-invariants`, `feat/v131-negative` and `feat/v131-verify` merged in that order, no conflicts). Its `lib.rs`
 is the `3d386eb` file. `stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian`
 on this tree gives sha256 `acecb2f2…354b`, 29,957 bytes, byte-identical to the v1.3.1 wasm fetched back from chain
-with `stellar contract fetch` (section above). `cargo test -p options`: **199 passed, 0 failed, 2 ignored** (unit
-118 + 1 ignored, invariants 16 + 1 ignored, negative 65). The merged v1.3 tree had 171 passed, 1 ignored.
+with `stellar contract fetch` (section above). `cargo test -p options`: **202 passed, 0 failed, 0 ignored** (unit
+120, invariants 17, negative 65), after the gate-review test fixes below; `lib.rs` is unchanged by them, so the wasm and
+the deployed contract are the same. The merged tree before those fixes had 199 passed, 2 ignored; the merged v1.3 tree
+had 171 passed, 1 ignored.
 
-- 119 unit tests in `contracts/options/src/test.rs`: 118 run and 1 is `#[ignore]`d (below). They are the 105 v1.3
-  tests, minus 2 that v1.3.1 retires, plus 16 new ones.
+- 120 unit tests in `contracts/options/src/test.rs`, all run, none ignored. They are the 105 v1.3 tests, minus 2 that
+  v1.3.1 retires, plus 17 new ones.
   - Retired: `open_list_cap_returns_open_list_full` (the single `MAX_OPEN` list is gone; see `per_asset_open_cap`)
     and `prune_expired_needs_no_auth` (see `prune_requires_pruner_auth`).
   - New tests for §13.1, `prune_expired(pruner, ids)`: `prune_requires_pruner_auth` and `prune_event_carries_pruner`.
   - §13.2, the `transfer` guards: `transfer_rejects_when_contract_deauthorized`, `transfer_rejects_during_shortfall`,
     `transfer_rejects_during_quote_shortfall` and `frozen_holder_can_still_transfer`.
-  - §13.3, per-asset books: `per_asset_open_cap`, `list_open_for_pages` and
-    `list_open_concatenates_registry_order_and_truncates_at_200`.
+  - §13.3, per-asset books: `per_asset_open_cap`, `list_open_for_pages`,
+    `list_open_concatenates_registry_order_and_truncates_at_200` and
+    `list_open_visits_only_the_first_max_page_registry_assets` (offers on registry indexes 49, 50 and 51: `list_open()`
+    shows only index 49, `list_open_for` shows each).
   - §13.4: `list_asset_already_listed_before_undeployed_probe`.
   - §13.5, keeper coverage: `extend_ttl_extends_registry_writer_and_book_entries` and
     `extend_ttl_registry_coverage_is_the_first_max_page_assets`.
   - §13.8, persistent `Reserved`: `reserved_is_persistent_and_extended_on_touch`,
     `reserved_and_open_book_ttls_extended_on_every_touching_path` and
     `instance_storage_stays_four_keys_as_assets_and_tokens_grow`.
-  - The ignored `list_open_includes_books_past_the_first_max_page_assets`.
-- 17 tests in `contracts/options/tests/invariants.rs`: 16 run and 1 is `#[ignore]`d (below).
+  - §8, found by v1.3.1 mutation testing (dropping the `AssetAt` TTL extension in `registry_push` survived):
+    `registry_entries_get_full_ttl_on_creation`. The `open_book` test helper also bounds a book at
+    `MAX_OPEN_PER_ASSET` ids, so a `list_open_for` regression that never returns an empty page fails instead of
+    hanging.
+- 17 tests in `contracts/options/tests/invariants.rs`, all run, none ignored.
   - 1 property test, `invariants_hold_for_random_operation_sequences`. Its reference model now includes
     `prune_expired(pruner, ids)` with pruner auth and the backstop, and the `transfer` guards. A composite stress
     operation de-authorizes the escrow, or claws RWA back from it, right before a holder transfer that would otherwise
@@ -555,7 +562,8 @@ with `stellar contract fetch` (section above). `cargo test -p options`: **199 pa
     also out of reach. The deterministic `open_book_cap_is_per_asset_at_five_hundred` covers both.
   - 16 deterministic regression tests: the 11 from v1.3 plus `open_books_concatenate_in_registry_order`,
     `open_book_cap_is_per_asset_at_five_hundred`, `transfer_refuses_new_holders_while_the_escrow_cannot_settle`,
-    `list_asset_checks_already_listed_before_deployment` and the ignored `list_open_spans_the_whole_registry`.
+    `list_asset_checks_already_listed_before_deployment` and `list_open_window_is_the_first_max_page_registry_assets`
+    (52 assets: `list_open()` holds the offers on indexes 0 and 49, not those on 50 and 51).
 - 65 negative security tests in `contracts/options/tests/negative.rs`, all run, none ignored. They are the 55 v1.3
   tests, minus 2 retired, plus 12 new ones.
   - Retired: `griefing8_open_list_cap_and_full_list_operations_fit_limits` (the single list is gone) and the
@@ -569,7 +577,10 @@ with `stellar contract fetch` (section above). `cargo test -p options`: **199 pa
     `griefing8_f1r_sybil_dust_on_a_self_listed_asset_fills_only_its_own_book`,
     `books24_per_asset_cap_cannot_be_bypassed_by_alternating_assets`,
     `books24_list_open_truncation_never_hides_the_first_registry_assets` and
-    `books24_list_open_stays_within_limits_whatever_the_registry_size` (250 listings after the constructor assets).
+    `books24_list_open_stays_within_limits_whatever_the_registry_size` (250 listings after the constructor assets;
+    an offer on registry index 251 is in its own book and outside the `list_open()` window).
+  - The suite's open-book oracle requires `list_open()` to be the concatenation of the first `MAX_PAGE` registry
+    assets' books (ABI §3/§13.3), checked on every snapshot.
   - Listing order: `listing18_relisting_is_rejected_before_the_deployment_probe`.
   - Footprint and storage griefing: `griefing8_extend_ttl_spanning_many_assets_and_writers_fits_footprint_limit`,
     `griefing8_listing_and_collateral_spam_never_grows_the_instance_entry` and
@@ -577,25 +588,14 @@ with `stellar contract fetch` (section above). `cargo test -p options`: **199 pa
 - `cargo clippy -p options --all-targets -- -D warnings`: 0 warnings. `cargo fmt --all -- --check`: clean.
   `bash -n` on every `*.sh` in the repository: clean.
 
-Ignored tests (2). Both are about the same question:
-
-- Unit test `list_open_includes_books_past_the_first_max_page_assets`. Reason: `ABI deviation: list_open() visits
-  only the first MAX_PAGE (50) registry assets; ABI §3/§13.3 specify the concatenation of every per-asset book,
-  truncated only at 200 ids`.
-- Invariant test `list_open_spans_the_whole_registry`. Reason: `ABI deviation: list_open() visits only the first
-  MAX_PAGE (50) registry assets; ABI §3/§13.3 cap ids (200), not assets (observed [1], expected [1, 0])`.
-- Both tests assert the first wording of §3 and §13.3, in which `list_open()` joins the books of every registry
-  asset. The implementation stops after the first `MAX_PAGE` (50) registry assets. This keeps the view within the
-  per-transaction limits however many assets are listed (`books24_list_open_stays_within_limits_whatever_the_registry_size`
-  checks it over 250 listings).
-- Commit `438195d` ("Specify list_open's bounded registry window in v1.3.1") now specifies exactly that window in
-  §3 and §13.3. The implementation therefore matches the ABI, and the two tests encode the superseded wording. Their
-  reason strings are out of date.
-- Run with `--ignored` on this tree, the unit test fails with `left: []`, `right: [0]`: the only open offer is on
-  registry index 51. The invariant test fails with `left: [1]`, `right: [1, 0]`: the offers are on registry indexes
-  0 and 51. Both failures show the bounded window the ABI now specifies.
-- No passing test pins that bound exactly: the negative suite's `list_open()` oracle accepts either wording. Turning
-  the two tests into passing checks of the window is a test change for Dev 2.
+Formerly ignored tests (resolved). The merged tree had two `#[ignore]`d tests, the unit test
+`list_open_includes_books_past_the_first_max_page_assets` and the invariant test `list_open_spans_the_whole_registry`.
+Both asserted the first wording of ABI §3 and §13.3, in which `list_open()` joins the books of every registry asset.
+Commit `438195d` specifies the implemented window instead: the first `MAX_PAGE` (50) registry assets, which keeps the
+view within the per-transaction limits however many assets are listed. Both tests are now active checks of that window
+(`list_open_visits_only_the_first_max_page_registry_assets` and
+`list_open_window_is_the_first_max_page_registry_assets`), and the negative suite's oracle accepts only it. In a scratch
+copy, each of three `lib.rs` mutants of the window (unbounded, 49 assets, 51 assets) fails both new tests.
 
 Earlier assurance, not re-run on the v1.3 or v1.3.1 `lib.rs`:
 
