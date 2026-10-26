@@ -26,7 +26,7 @@ Two ways to back a call live in the same product. **Covered** (default): the wri
 - Anyone can list a classic asset by `(code, issuer)`. The contract derives the canonical SAC. The issuer still decides who may hold it, including the escrow.
 - A holder can list an active option for resale at a price they set. An eligible buyer pays that price to the holder and becomes the holder in one transaction. Strike, expiry, quantity and the writer's collateral do not change.
 - Buyers can post too. A request names the terms and the premium offered, with that premium escrowed in the contract; any eligible maker fills it in one transaction and the option is created with the buyer as holder. Offers and requests sit side by side on Markets; nothing matches automatically.
-- No admin, no oracle, no margin, no upgrade path.
+- The covered contract has no admin, no oracle, no margin and no upgrade path. Margin lives only in the separate contract above.
 
 This works for any Stellar asset whose issuer permits it, not for every token. Freeze and clawback remain the issuer's powers and can block settlement (see [Limits](#limits)).
 
@@ -70,11 +70,11 @@ Tests: 146 unit, 18 property-based invariants (collateral conservation, no doubl
 | EQTY SAC (listed with `list_asset`) | `CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU` |
 | USDx SAC | `CAKXMQVKSW2AEKF5DSMDPHJAYGNVOQANHXLI64QJS2H3GOCXRW2GCICU` |
 
-Earlier versions v1 to v1.3.1: [AGENTS.md](AGENTS.md#deployed-contracts-testnet-only).
+Earlier versions v1 to v1.4: [AGENTS.md](AGENTS.md#deployed-contracts-testnet-only).
 
 ## Try it
 
-Without a wallet: Markets, Reserves and option history in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
+Without a wallet: Markets, Collateral and option history in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
 
 With a wallet: Freighter on Testnet, funded by Friendbot. The underlyings require issuer authorization, so open an issue with your Testnet `G…` address and we run `scripts/setup-testnet/onboard-account.sh`: trustlines, authorization on the three assets, `USDx` and underlying balances. With `USDx` alone you can buy and exercise a call.
 
@@ -94,7 +94,7 @@ Full Testnet reproduction: `scripts/setup-testnet/` (issuers, flags, trustlines)
 
 ## App
 
-Markets: one book per series. Bids from buyers on the left, offers from makers and resale asks on the right, best price on top; prices are limits set by users. Two actions per series: **Buy** (take the best offer, or post a bid at your price with the premium escrowed) and **Sell** (fill the best bid, or post an offer at your price with the collateral locked). Posting an offer asks for the collateral mode, Full collateral by default or Margin, and Margin opens a risk warning that must be acknowledged. Portfolio: exercise, claim, reclaim, cancel, list for resale, cancel sale, open requests, with countdowns. Reserves: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Margin section: the uncovered-call book on its own contract. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
+Markets: one book per series. Bids from buyers on the left, offers from makers and resale asks on the right, best price on top; prices are limits set by users. Two actions per series: **Buy** (take the best offer, or post a bid at your price with the premium escrowed) and **Sell** (fill the best bid, or post an offer at your price with the collateral locked). Posting an offer asks for the collateral mode, Full collateral by default or Margin, and Margin opens a risk warning that must be acknowledged. Positions: exercise, claim, reclaim, cancel, list for resale, cancel sale, open requests, with countdowns. Collateral: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Margin section: the uncovered-call book on its own contract. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
 
 ## Contract
 
@@ -138,7 +138,7 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 ## Limits
 
 - Issuer action is not insured. A freeze, de-authorization of the escrow or clawback after a sale can make an option unexercisable. The premium is not refunded.
-- After a clawback the escrow is short. It holds one balance per token, so remaining payouts are first come, first served. While a token is short, new offers, purchases and transfers on it fail with `CollateralShortfall`; other tokens continue. Reserves shows the shortfall.
+- After a clawback the escrow is short. It holds one balance per token, so remaining payouts are first come, first served. While a token is short, new offers, purchases and transfers on it fail with `CollateralShortfall`; other tokens continue. The Collateral page shows the shortfall.
 - Quotes are indicative until an on-chain funded offer is confirmed. The demo makers are our own Testnet accounts. There is no order book depth and no pricing model.
 - Resale prices are set by holders: one ask per option, no matching, no writer buy-back.
 - Soroban storage expires; `extend_ttl` is public and a keeper script runs it.
@@ -146,7 +146,7 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 
 ## Built at the event
 
-Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale), v1.5 (buyer requests). Six app screens on the live contract, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 89 commits, 74 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
+Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale), v1.5 (buyer requests). Five app screens (Markets, Positions, Collateral, Issuer, Margin) on the live contracts, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 94 commits, 79 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
 
 ## Next
 

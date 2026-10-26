@@ -1,101 +1,95 @@
 # StellSec demo script (3 minutes)
 
-**Draft by Dev 3 for Dev 1 review.** Dev 1 owns the final narrative; Dev 3 owns capture. Nothing here changes the product promise. All amounts below are placeholders: replace them with the values Dev 2's setup script actually creates.
+Owner: Dev 1 (narrative), Dev 3 (capture). Current as of options v1.5 (`CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`) and the hosted app. The voice-over text, timings and claims table in `docs/pitch-speech.md` §2–§3 are the reference; this file is the shot list. Amounts match `scripts/deploy/seed-demo-offers.sh` (PUT on 5 RWA, total strike 50 USDx, premiums 1.0 and 0.8 USDx).
 
-Presentation mode: open the app with `?present=1` (for example `http://localhost:5173/?present=1`). It enlarges type slightly and shows a caption bar with the scene title. Keys: Right / Left arrow = next / previous scene, `h` = hide or show the bar. Hide it (`h`) for the final cut if you add titles in editing. It never hides the mock-data banner. Scene titles live in `frontend/src/demo/scenes.ts` and must match the table below.
+Presentation mode: open the app with `?present=1`. It enlarges type slightly and shows a caption bar with the scene title. Keys: Right / Left arrow = next / previous scene, `h` = hide or show the bar. Scene titles and start times live in `frontend/src/demo/scenes.ts` (nine scenes; the optional resale scene 4b has no caption, hide the bar for it). The bar never hides the mock-data banner.
 
 ## Roles and accounts
 
-All accounts are disposable Testnet-only accounts, imported into Freighter. Assets are fictional.
+All accounts are disposable Testnet-only accounts, imported into Freighter. Assets are fictional: `RWA`, `BOND`, `EQTY` (auth required, revocable, clawback enabled) and the quote token `USDx` (no flags).
 
 | Role | Account | Used in scenes |
 |---|---|---|
-| Issuer FUND | Issuer of fictional `FUND` (flags AUTH_REQUIRED, AUTH_REVOCABLE, AUTH_CLAWBACK_ENABLED) | 7 |
-| Issuer USDx | Separate issuer of the quote token `USDx` (no flags) | none on camera |
-| Maker A | Writer with USDx funded | 2, 6, 8 |
-| Maker B | Second writer with USDx funded | 3 |
-| Investor | Holds FUND (authorized by the FUND issuer) and USDx for the premium | 4, 4b, 5, 7 |
-| Investor 2 | Second buyer: authorized on FUND, holds USDx for the resale price. Must not be the writer of the resold option | 4b |
+| RWA issuer | `strata-rwa-issuer` (also issues BOND and EQTY) | 7 |
+| USDx issuer | `strata-usdx-issuer` | none on camera |
+| Maker A | writer, USDx funded | 2 |
+| Maker B | writer, USDx funded; writes the cheaper offer, so it is Maker B who claims in scene 6 | 3, 6 |
+| Investor | authorized on RWA, holds RWA and USDx | 4, 4b, 5, 7 |
+| Investor 2 | authorized on RWA, holds USDx for the resale price; not the writer of the resold option | 4b |
 
-Setup (assets, trustlines, funding, authorizing the options contract on the FUND SAC, deployment) belongs to Dev 2 in `scripts/setup-testnet/`. This document does not define it.
+Setup (issuers, flags, trustlines, authorizing the contract on each SAC, deployment, seeding) is `scripts/setup-testnet/` then `scripts/deploy/` (`deploy.sh`, `seed-demo-offers.sh`, `seed-demo-bids.sh`). Public keys are in `docs/contract-testnet-evidence.md`, "Roles".
 
-Pre-staged state needed before recording (ask Dev 2 to produce it, or do it off camera):
-- Maker A's and Maker B's offers (scenes 2 and 3) are created on camera. One extra option, bought by the Investor and still `active`, must exist off camera for scene 7 (the freeze scene), because scene 5 consumes the first one. Simplest: a third funded offer from Maker B, bought by the Investor before recording.
-- Scene 4b (resale, contract v1.5 `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6` (resale since v1.4)) needs one more option, bought by the Investor off camera and still `active`, with no ask on it. Do not resell the option bought in scene 4: scene 5 exercises it.
-- Short expiry is risky: use an expiry at least 2 hours after the recording time.
+Pre-staged state before recording:
+- Maker A's and Maker B's offers (scenes 2 and 3) are created on camera.
+- One extra option bought by the Investor and still `Active` for scene 7 (the freeze scene), because scene 5 exercises the one bought in scene 4.
+- For the optional scene 4b, one more `Active` option held by the Investor with no ask on it. Do not resell the scene 4 option.
+- Expiry at least 2 hours after the recording time. The seeded book uses 72 hours.
 
 ## Pre-recording checklist
 
-- [ ] Freighter: Maker A, Maker B, Investor, Investor 2, FUND issuer imported; network set to Testnet (the app shows a red banner otherwise).
-- [ ] `VITE_OPTIONS_CONTRACT_ID` set to the deployed contract (see Deployed contracts in AGENTS.md). Confirm there is NO "Mock data" banner on screen.
-- [ ] Balances funded: Makers have enough USDx for strike collateral; Investor has USDx for premiums and FUND for the put delivery; all have XLM for fees.
-- [ ] FUND issuer has authorized the options contract on the FUND SAC (otherwise `create_offer` fails with ContractNotAuthorized). Investor and makers are authorized on FUND.
-- [ ] Investor 2 is authorized on FUND and holds enough USDx for the ask in scene 4b.
-- [ ] Investor is NOT frozen at the start; the FUND issuer is ready to freeze them in scene 7.
-- [ ] Browser zoom 110 to 125 percent, window 1920x1080, one clean browser profile, all other tabs closed, notifications off, bookmarks bar hidden.
-- [ ] Open tabs: app with `?present=1`; stellar.expert Testnet page ready for a transaction link.
-- [ ] Do one full dry run on a throwaway option; note the tx hashes of the real run (see fallback).
-- [ ] Record screen at 1080p with a separate voice-over take if live narration is shaky.
+- [ ] Freighter: Maker A, Maker B, Investor, Investor 2, RWA issuer imported; network Testnet (the app shows a red banner otherwise).
+- [ ] The app points at v1.5 (`VITE_OPTIONS_CONTRACT_ID`); no "Mock data" banner; Markets shows offers, requests and resale.
+- [ ] Balances: makers hold USDx for the strike; the Investor holds USDx for premiums and RWA for the put delivery; all hold XLM for fees.
+- [ ] The issuer has authorized the contract on RWA (otherwise `create_offer` fails with `ContractNotAuthorized` 105); Investor, Investor 2 and both makers are authorized on RWA.
+- [ ] The Investor is not frozen at the start; the issuer wallet is ready to freeze them in scene 7.
+- [ ] Browser zoom 110 to 125 percent, 1920x1080, clean profile, other tabs closed, notifications off.
+- [ ] Open tabs: app with `?present=1`; stellar.expert Testnet ready for a transaction link.
+- [ ] One full dry run on throwaway options; note the tx hashes of the real run (see fallback).
+- [ ] Record at 1080p; voice-over as a separate take if live narration is shaky.
 
 ## Scene list
 
-Timestamps are targets. Voice-over lines are English, calm, one claim per sentence.
+Timings are targets; the spoken lines are in `docs/pitch-speech.md` §2. One claim per sentence.
 
-| # | Time | Screen and exact actions | Voice-over |
+| # | Time | Screen and exact actions | Beat |
 |---|---|---|---|
-| 1 | 0:00-0:20 | Title card or the app, Market tab, "How it works" strip expanded (click "How it works"). Freighter not yet needed. | "Stellar already has tokenized funds, bonds and stocks. What they lack is risk management: a holder cannot hedge, and nobody can earn a premium on what they hold. StellSec is a fully collateralized options layer for eligible tokenized assets on Stellar, running on Testnet." |
-| 2 | 0:20-0:45 | Freighter: Maker A. Click Connect Freighter. Open **Markets**, press **Sell**, choose **Post an offer**. Choose underlying FUND, type PUT, fill quantity, total strike, premium, expiry. Click the publish button, approve in Freighter. Wait for the green banner "Offer published". | "A market maker writes a cash-secured put on a fictional fund token. The strike is locked in the contract right now. No margin, no leverage, no promise without collateral." |
-| 2b | (in 2) | Stay on Sell dialog on Markets: show the collateral panel line for USDx. | "The contract holds exactly the strike amount. Anyone can verify it." |
-| 3 | 0:45-1:00 | Freighter: switch to Maker B (reconnect in the app). **Markets → Sell → Post an offer**, same underlying and strike, lower premium. Publish and approve. | "A second maker competes with a cheaper funded offer. These are on-chain offers, not an order book we invented." |
-| 4 | 1:00-1:20 | Freighter: Investor. **Market** tab: both offers visible, compare premium. Click buy on the cheaper one, review the BuyDialog (eligibility hint, premium), confirm and approve. Open **My positions**: option is `active`. | "The investor holds FUND and wants downside protection. They buy the cheaper put. The premium goes to the maker at purchase. The investor now owns the right to sell FUND at the strike until expiry." |
-| 4b | 1:20-1:40 | Freighter: Investor. **Portfolio**: on the pre-staged second put (not the one just bought), click **Sell**, enter the ask total (for example 2 USDx), approve. Freighter: Investor 2. **Markets**, Resale section: the ask is listed; click **Buy**, approve. **Portfolio** (Investor 2): the option is `active` with Investor 2 as holder. On-screen text: "Resale: the holder sets the price. Strike, expiry and collateral unchanged." | "Holders are not locked in. The investor lists a second put for resale at a price they set. Another eligible account buys it: the price goes to the investor, and the buyer becomes the holder. Strike, expiry and the maker's collateral do not change." |
-| 5 | 1:40-2:05 | **My positions**, click Exercise on the active option, approve. Banner shows the tx hash: click it to open stellar.expert, show the transfers: FUND from investor into the contract, USDx from the contract to the investor, one transaction. Return to the app. | "Exercising is atomic delivery-versus-payment. The investor's FUND and the maker's locked USDx move in the same transaction. If any part fails, nothing moves." |
-| 6 | 2:05-2:15 | Freighter: Maker A (writer of that option). **My positions**: state `exercised`. Click Claim delivery, approve. State becomes `settled`. | "The maker then claims the delivered FUND. Settlement is complete." |
-| 7 | 2:15-2:40 | Freighter: FUND issuer. **Issuer** tab: asset code FUND, target = Investor's G address, click **Revoke / freeze**, approve. Switch to Investor, **My positions**, click Exercise on the pre-staged active option. Show the failure banner. | "Now the part we want to be honest about. The issuer of a regulated asset keeps its powers. If the issuer freezes the holder, exercise fails, with a clear message, and nothing moves. StellSec does not override issuer control and it is not a guarantee against issuer action." |
-| 8 | 2:40-2:50 | **Reserves** page (owed vs held): contract holds collateral for every open position. If a clawback warning is visible (only if the issuer used Clawback against the contract in rehearsal), point to it; otherwise do not stage one on the final take. | "The collateral panel compares what the contract must hold with what it actually holds. Full backing is visible." (Cut the clawback sentence to fit 10 seconds.) |
-| 9 | 2:50-3:00 | Back to Market tab or closing card; the footer disclaimer visible. | "Everything you saw is Testnet with fictional assets. Real tokenized funds need issuer cooperation. StellSec supports any eligible Stellar asset the issuer allows, not every token automatically." |
+| 1 | 0:00-0:20 | App, **Markets**. No wallet yet. | Tokenized assets on Stellar have no risk tools. StellSec: fully collateralized options for eligible assets, Testnet. |
+| 2 | 0:20-0:45 | Wallet: Maker A. Connect. **Markets → Sell → Post an offer**: RWA, PUT, qty 5, total strike 50 USDx, premium 1 USDx, expiry. Keep **Full collateral**. Sign. Then **Collateral**: Held rises by 50 USDx. | The full strike is locked now. No margin, no leverage. |
+| 3 | 0:45-1:00 | Wallet: Maker B. Same series, premium 0.8 USDx. Sign. **Markets**: two funded offers on one series, best on top. | A second maker undercuts with a funded on-chain offer. Not an order book we invented. |
+| 4 | 1:00-1:20 | Wallet: Investor. **Markets → Buy** on the 0.8 offer. Buy dialog: premium, eligibility, hypothetical payoff. Sign. **Positions**: `Active`. | Premium to the maker at purchase. The investor may sell 5 RWA for 50 USDx any time before expiry. |
+| 4b | optional, 1:20-1:30 | Wallet: Investor. **Positions → Sell** on the pre-staged second put, ask 2 USDx, sign. Wallet: Investor 2. **Markets**, resale ask → **Buy**, sign. **Positions** (Investor 2): holder. | Holders are not locked in. The price goes to the holder; strike, expiry and collateral do not change. |
+| 5 | 1:30-1:53 | Wallet: Investor. **Positions → Exercise**, sign. Click the tx link: on stellar.expert, RWA investor → contract and USDx contract → investor in one transaction. | Atomic delivery-versus-payment. If any leg fails, nothing moves. |
+| 6 | 1:53-2:02 | Wallet: **Maker B**. **Positions**: `Exercised` → **Claim delivery**, sign → `Settled`. | The writer claims the delivered RWA. Settled. |
+| 7 | 2:02-2:33 | **Collateral** page first: Owed vs Held per token, read at a ledger. Then wallet: RWA issuer. **Issuer**: RWA, target = Investor, **Revoke / freeze**, sign. Wallet: Investor. **Positions → Exercise** on the pre-staged option: failure banner (SAC error 11, balance deauthorized). | Anyone can check the backing. The issuer keeps its powers; a frozen holder cannot exercise and nothing moves. Not a guarantee against issuer action. |
+| 8 | 2:33-2:43 | stellar.expert: EQTY `list_asset` tx `9e83e587…bf69`, then the EQTY exercise `f2ad8d0e…10a5`. | Anyone can list a classic asset with one call; the issuer still decides who may hold it. |
+| 9 | 2:43-3:00 | Closing card: app URL, repo URL, the disclosure line. If Margin is mentioned, show its warning banner. | Testnet, fictional assets, unaudited. Real assets need their issuer. Protection for any eligible Stellar asset. |
 
-After the take: unfreeze the Investor (Issuer tab, Authorize) so the demo account stays usable.
+After the take: unfreeze the Investor (Issuer → Authorize) so the demo account stays usable.
 
 ## Fallback plan
 
-- **Testnet or RPC slow, transaction pending more than about 15 seconds:** cut the recording, wait, retry. Do not narrate over a long spinner. Edit out waits but never alter the content of results.
-- **Recording must happen without live chain:** use hashes recorded during the dry run. Show each real tx on stellar.expert Testnet (the pages remain available) and say so: "This is the transaction from our earlier run."
-- **Mock mode** (no `VITE_OPTIONS_CONTRACT_ID`): the app shows an orange "Mock data" banner and "(mock)" next to hashes. Use it only for a clearly labelled walkthrough of the UI, with a spoken and on-screen label "mock mode, no blockchain". Never present mock data or mock hashes as on-chain. Do not mix mock and live in one scene.
-- Keep a list of the real tx hashes for: create_offer A, create_offer B, buy, list_for_sale, buy_resale, exercise, claim_delivery, freeze. Put it in the submission notes.
+- **Testnet or RPC slow (a transaction pending more than about 15 seconds):** cut, wait, retry. Do not narrate over a spinner. Edit out waits; never alter what a result shows.
+- **No live chain during recording:** use the hashes from the dry run on stellar.expert and say so: "This is the transaction from our earlier run."
+- **Mock mode** (no `VITE_OPTIONS_CONTRACT_ID`): the app shows an orange "Mock data" banner and "(mock)" next to hashes. Use it only for a labelled UI walkthrough, spoken and on screen: "mock mode, no blockchain". Never mix mock and live in one scene.
+- Keep the real tx hashes of create A, create B, buy, (list_for_sale, buy_resale,) exercise, claim_delivery, freeze for the submission notes.
 
 ## Claims checklist
 
-Fill the evidence column before recording. "Test" = automated test name, "tx" = Testnet hash on stellar.expert, "code" = path in repo.
+Hashes are from `docs/contract-testnet-evidence.md`; a version tag means the hash was recorded on that earlier deployment of the same code path, which is on v1.5 unchanged. Replace with the recording's own hashes once captured.
 
 | Spoken claim | Evidence | Status |
 |---|---|---|
-| Collateral is locked in the contract when an offer is created | Contract: `create_offer` pulls collateral (ABI section 3); tx of scene 2; `open_collateral` shown in the collateral panel (`frontend/src/maker/CollateralPanel.tsx`) | TODO tx hash, Dev 2 contract test name |
-| Fully collateralized, no leverage or margin | ABI section 2 derived values table; AGENTS.md "Never in this hackathon" | contract tests TBD by Dev 2 |
-| Two makers compete with on-chain funded offers | txs of scenes 2 and 3; Market tab reads `list_open` | TODO tx hashes |
-| Investor buys, premium goes to the maker at purchase | `buy` transfers premium buyer to writer (ABI section 3). Policy is PROVISIONAL (ABI section 7): Dev 1 must confirm or change before we say more than this | needs Dev 1 decision |
-| A holder resells at a price they set; the buyer pays the holder and becomes holder; strike, expiry and collateral unchanged | `list_for_sale` and `buy_resale` (v1.4, `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`); PRODUCT_SPEC D8; tx `a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949`; `open_collateral` the same before and after | TODO scene 4b recording |
-| Exercise is atomic delivery-versus-payment | `exercise` in one transaction (ABI section 3); spike on-chain revert proof tx `a005ab41...` (`research/decision/20_rwa_options_spike.md`); tx of scene 5 | TODO scene 5 tx hash |
-| Writer claims delivery after exercise | `claim_delivery` (ABI section 3); scene 6 tx | TODO tx hash |
-| Frozen holder cannot exercise, clear message, nothing moves | ABI section 6; spike results (e) and (d+); error text for SAC #11 in `frontend/src/stellar/errors.ts` ("Token balance is deauthorized...") | TODO scene 7 recording; Dev 2 contract test |
-| Collateral page shows owed vs held per token and flags a clawback shortfall | `open_collateral` vs SAC balance, ABI section 3 and 6; `frontend/src/views/ReservesView.tsx` | warning only if staged; say so |
-| Works on any eligible asset the issuer allows | Constructor allowlist (AGENTS.md architecture); claim must stay "eligible, supported" | wording check by Dev 1 |
-| Testnet, fictional assets | Deployed contracts table; asset labels | true by construction |
+| Collateral is locked when an offer is created | `create_offer` pulls the full strike or quantity before the offer exists (ABI §3); seeded offer tx `5dc15250…2531` (v1.5); `open_collateral` on the Collateral page | Verified on chain |
+| Covered options carry no margin or leverage | no margin path in `contracts/options/src/lib.rs`; ABI §2 derived values | True by construction |
+| Two makers compete with funded on-chain offers | `seed-demo-offers.sh` creates the 1.0 / 0.8 USDx pair; competition txs `2275ee06…0404` / `9f7dce74…bd97` (v1.2) | Verified; recording tx to add |
+| Premium goes to the maker at purchase, never refunded | `buy` (ABI §3), PRODUCT_SPEC D1; buy tx `03ce25be…` (v1.4) | Verified; policy decided |
+| Resale: holder-set price, buyer pays the holder, option unchanged | `list_for_sale` / `buy_resale`, PRODUCT_SPEC D8; tx `a5c5a3d2…6949` (v1.4) | Verified on chain |
+| Buyer requests: funded bid filled by a maker into an Active option | `create_bid` / `fill_bid`, PRODUCT_SPEC D9; tx `ce841e7e…5cb3`, exercise `088f1066…276c`, claim `80196949…506e` (v1.5) | Verified on chain |
+| Exercise is atomic delivery-versus-payment | `exercise` in one invocation (ABI §3); forced failure left balances identical, tx `a005ab41…` (`research/decision/20_rwa_options_spike.md`); EQTY exercise `f2ad8d0e…10a5` | Verified on chain |
+| Writer claims after exercise | `claim_delivery`; `80196949…506e` (v1.5) | Verified on chain |
+| Frozen holder cannot exercise; nothing moves | freeze `3f0d711d…f462` then exercise rejected with SAC error 11 (v1.3.1 run); the rejection happens in simulation, so no fee is spent | Verified on chain |
+| Collateral page shows owed vs held and a clawback shortfall | `open_collateral` vs SAC balance; clawback run `f45330be…` / `c6ef0692…` (RWA short, BOND unaffected, issuer repays) | Verified on chain |
+| Anyone can list a classic asset; the issuer decides eligibility | `list_asset` derives the canonical SAC on chain; `9e83e587…bf69` (v1.5) | Verified on chain |
+| Testnet, fictional assets, unaudited | Deployed contracts table; asset labels | True by construction |
 
-## Do NOT say
+## Do not say
 
 - Mainnet, production, "live", or any launch date.
-- "Real" RWAs, real funds, or implying the FUND token represents a real fund. It is fictional.
+- "Real" RWAs or funds, or that RWA, BOND or EQTY represent anything. They are fictional.
 - "Works with every token." Say "any supported, eligible Stellar asset".
-- That options are a guarantee against issuer action, or that settlement is unconditional. Freeze and clawback can block settlement.
+- That an option is a guarantee against issuer action, or that settlement is unconditional.
 - That the contract is audited, secure for production, or "trustless" without qualification.
-- That premium handling is final (it is PROVISIONAL until Dev 1 decides), or that premiums are refundable.
-- That there is an `Impaired` state, refunds, a position token, multi-leg or strategy products, an RFQ service, an oracle, or pricing models: none exist in the MVP. Do not show payoff charts as market quotes.
-- "Market price", "liquidity" or "order book" for resale. A resale price is an ask set by one holder, not a market quote; there is one ask per option and no matching.
-- Any statement about liquidity, volume, or users. Demo makers are our own funded Testnet accounts.
-
-## Open questions
-
-For Dev 1: is the provisional premium policy acceptable to state aloud? Is the clawback warning in scene 8 part of the take, or only mentioned? Final wording of the closing line?
-For Dev 3: add scene 4b to `frontend/src/demo/scenes.ts` and shift the later start times to match the table.
-For Dev 2: exact account names, asset codes, amounts, and the pre-staged third and fourth options (scene 7, scene 4b), the Investor 2 account; contract test names for the claims table; will setup scripts print the tx hashes?
+- That premiums are refundable, or that an `Impaired` state, a position token, multi-leg products, an RFQ service, an oracle or a pricing model exist for covered options. Payoff charts are hypothetical, not quotes.
+- "Market price", "liquidity" or "order book" for resale: one ask per option, set by its holder, no matching.
+- For Margin: "guaranteed", "insured", "safe", "fully backed" or "fully collateralized". Say partial margin, payouts can be reduced, any deficit is shown, prices come from the team's publisher.
+- Any statement about liquidity, volume or users. Demo makers are our own funded Testnet accounts.

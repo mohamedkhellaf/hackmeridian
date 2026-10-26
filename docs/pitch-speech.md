@@ -1,6 +1,6 @@
 # StellSec pitch and speech
 
-**Draft for Dev 1 review.** Dev 1 owns the final narrative (AGENTS.md). Nothing here changes what the instrument promises. Every spoken line maps to evidence in the claims table (section 3). Amounts match `scripts/deploy/seed-demo-offers.sh`. Replace them if the recording uses different values.
+**Owner: Dev 1** (final narrative, AGENTS.md). Current as of options v1.5 and the Margin contract on Testnet, 26 October. Nothing here changes what the instrument promises. Every spoken line maps to evidence in the claims table (section 3). Amounts match `scripts/deploy/seed-demo-offers.sh`. Replace them if the recording uses different values.
 
 **Contract version caveat.** `main` carries options **v1.5** (`CAIKMS2B…GKY6`, PR #74; source builds byte-identical to the deployed wasm). v1.5 includes resale (v1.4) and funded buyer requests (v1.5). The live app must point `VITE_OPTIONS_CONTRACT_ID` at `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`; check the Markets page shows Requests and Resale before recording. Earlier ids: v1.4 `CC6AI7AK…PWNK`, v1.3.1 `CBASUA3L…JUEE`.
 
@@ -16,7 +16,7 @@
 
 > StellSec is a fully collateralized options layer for eligible tokenized assets on Stellar: makers lock the full strike or underlying in a Soroban contract, investors buy puts or calls, and exercise swaps the tokens in one atomic transaction. It runs on Testnet with fictional assets and keeps each issuer's authorization, freeze and clawback rules in force.
 
-If v1.3.1 is live in the app, a third sentence can be added where the form allows: "Anyone can list a new Stellar asset; its issuer still decides who may hold it."
+A third sentence where the form allows: "Anyone can list a new Stellar asset; its issuer still decides who may hold it."
 
 ---
 
@@ -28,30 +28,26 @@ Pace: about 140 words per minute, with room for pauses and transaction waits. **
 |---|---|---|---|
 | 1 | 0:00–0:16 | Markets page, the offers table. No wallet yet. | "Stellar already carries tokenized funds, bonds and stocks. / But most of them come with **no risk tools**. If you hold one, you can't easily buy **protection** against it falling, / or earn a premium on what you hold." |
 | 2 | 0:16–0:30 | Stay on Markets; open "How settlement works". | "This is **StellSec**: fully collateralized options for eligible tokenized assets on Stellar. / Puts and calls, **physically settled**, and every one is backed **in full** before anyone can buy it. Everything you'll see runs on **Testnet**, with fictional assets." |
-| 3 | 0:30–0:50 | Wallet: Maker A. **Markets → Sell → Post an offer**: PUT on RWA, qty 5, total strike 50 USDx, premium 1 USDx. Sign. StrataBar shows the locked layer. | "A market maker writes a put on **RWA**, a fictional fund token: / five RWA, fifty USDx total strike. When they sign, the **full fifty USDx** moves into the contract. / No margin. No leverage." |
+| 3 | 0:30–0:50 | Wallet: Maker A. **Markets → Sell → Post an offer**: PUT on RWA, qty 5, total strike 50 USDx, premium 1 USDx. Sign. Open **Collateral**: Held rises by 50 USDx. | "A market maker writes a put on **RWA**, a fictional fund token: / five RWA, fifty USDx total strike. When they sign, the **full fifty USDx** moves into the contract. / No margin. No leverage." |
 | 4 | 0:50–1:02 | Wallet: Maker B. Same put, premium 0.8 USDx. Sign. Back to Markets: two quotes on one series. | "A second maker posts the same put for **less**: zero point eight USDx instead of one. / Both offers are funded on-chain. These are real offers, not a mock order book." |
 | 5 | 1:02–1:20 | Wallet: Investor. Markets → buy the 0.8 offer. Buy dialog: premium, eligibility, payoff sketch. Sign. Portfolio: `active`. | "Our investor holds RWA and wants protection. / They buy the **cheaper** put. The premium goes straight to the maker. / The investor now has the right to sell five RWA for fifty USDx, **any time before expiry**." |
 | 5b | (optional, in 5) | Only if the buy dialog shows the "Assumed price" payoff chart (PR #37). | "The chart uses a price **you** type in. It's hypothetical; there's no oracle." |
-| 5c | (optional) 1:20–1:30 | **[v1.4]** Wallet: Investor. Portfolio → **Sell** on a second, pre-staged put, ask 2 USDx → sign. Wallet: Investor 2. Markets → Resale → **Buy** → sign. Portfolio: Investor 2 is the holder. Cut the waits. | "Holders aren't locked in. / Here the investor sells a second put at a price **they** set. The buyer pays them; the collateral doesn't move." |
+| 5c | (optional) 1:20–1:30 | Wallet: Investor. Portfolio → **Sell** on a second, pre-staged put, ask 2 USDx → sign. Wallet: Investor 2. Markets → Resale → **Buy** → sign. Portfolio: Investor 2 is the holder. Cut the waits. | "Holders aren't locked in. / Here the investor sells a second put at a price **they** set. The buyer pays them; the collateral doesn't move." |
 | 6 | 1:30–1:53 | Portfolio → Exercise → sign. Click the tx link → stellar.expert: RWA investor → contract, USDx contract → investor, one transaction. | "Say RWA falls. The investor exercises. / In **one transaction**, five RWA go into the contract and fifty USDx come back to the investor. Here it is on stellar.expert. / If any leg fails, **the whole thing reverts**. That's delivery-versus-payment, enforced by the contract." |
 | 7 | 1:53–2:02 | Wallet: **Maker B** (writer of the bought offer). Portfolio → Claim delivery → sign → `settled`. | "The writer then claims the five RWA from the contract, / and the option is **settled**." |
 | 8 | 2:02–2:13 | **Reserves** page: Owed vs Held per token, "Read at … ledger …", contract links. | "Anyone can check the backing. / The Reserves page reads two numbers straight from the chain: what the contract **owes**, and what it **actually holds**." |
 | 9 | 2:13–2:33 | Wallet: RWA issuer. **Issuer console** → freeze the investor on RWA. Wallet: Investor → Exercise on the pre-staged active option → error banner. | "Now the **honest** part. RWA is a regulated asset, and its issuer keeps its powers. / When the issuer **freezes** this holder, exercise fails, and **nothing moves**. / StellSec respects issuer rules. It doesn't override them, and it's **not** a guarantee against issuer action." |
-| 10 | 2:33–2:43 | **[v1.3.1]** EQTY listing: app if switched, otherwise stellar.expert tx `94f1f28c…75b4` then the EQTY exercise `f2ad8d0e…10a5`. | "New assets don't need our permission. / Anyone can list a Stellar asset with **one call**. Here's EQTY, a fictional equity token: listed, authorized by its issuer, and a put on it **settled**." |
+| 10 | 2:33–2:43 | EQTY listing on stellar.expert: `list_asset` tx `9e83e587…bf69` (maker1, v1.5), then the EQTY exercise `f2ad8d0e…10a5`. | "New assets don't need our permission. / Anyone can list a Stellar asset with **one call**. Here's EQTY, a fictional equity token: listed, authorized by its issuer, and a put on it **settled**." |
 | 11 | 2:43–2:52 | Simple card: three icons (asset + issuer flags, atomic tx, fee). | "Why Stellar? Assets are native, with **issuer controls built in**. / Soroban gives us atomic settlement. / And an exercise costs **less than a hundredth of an XLM** in fees." |
 | 12 | 2:52–3:00 | Closing card: StellSec, live URL, repo URL, footer disclaimer. | "Testnet, fictional assets, unaudited code. Real assets need their issuer on board. / **StellSec**: protection for any **eligible** Stellar asset." |
 
-**If scene 10 cannot be shown** (app on v1.2 and no time to cut in the stellar.expert clip), replace it with: "Each asset is listed once, and its issuer decides who may hold it." That line is true on v1.2 (constructor allowlist plus issuer authorization). Give the freed seconds to scene 6.
-
 **If scene 5c is dropped**, scene 6 starts at 1:20 and the 10 seconds go back to scenes 6 to 11 (their pre-5c lengths: 25, 10, 13, 22, 12, 10 s).
-
-**Scene 7 correction for `docs/demo-script.md`:** the investor buys Maker B's cheaper offer, so the writer who claims is **Maker B**, not Maker A. The current demo script says Maker A in scene 6. Either switch to Maker B there, or have the investor buy Maker A's offer and change the scene 4 line to "they buy one". Buying the cheaper one is the stronger story.
 
 ---
 
 ## 3. Claims → evidence
 
-Contract IDs: v1.2 `CAJ2WJP4CUM2GGRB2A5P2M2H5GI45CTZSECV7SL3RTQMGYEKZ7ZDGBAX` (AGENTS.md table, live app); v1.3.1 `CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE` (branch `feat/contract-v1-3-1`). Hashes are from `docs/contract-testnet-evidence.md` (v1.2 on `main`; v1.3.1 on that branch). Replace them with the recording's own hashes once captured.
+Contract: options v1.5 `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6` (live app). Hashes are from `docs/contract-testnet-evidence.md`; a version tag means the hash was recorded on that earlier deployment of the same code path. Replace them with the recording's own hashes once captured.
 
 | Spoken claim | Evidence | Status |
 |---|---|---|
@@ -67,10 +63,10 @@ Contract IDs: v1.2 `CAJ2WJP4CUM2GGRB2A5P2M2H5GI45CTZSECV7SL3RTQMGYEKZ7ZDGBAX` (A
 | Writer claims the delivered RWA; option settled | `claim_delivery`, v1.2 tx `e487b120…22bf` | Verified; recording tx TODO |
 | Reserves page reads owed vs held from the chain | `open_collateral(token)` vs SAC `balance(contract)` (ABI §3 views); `frontend/src/views/ReservesView.tsx` ("Both are public reads") | Verified in code |
 | Issuer freeze → exercise fails, nothing moves | ABI §6; PRODUCT_SPEC §8. v1.1 run (A1): freeze `b102fb5c…f109`, then exercise rejected with SAC #11. v1.3.1 A1: freeze `3f0d711d…f462`. A rejected exercise fails in simulation, so no fee is spent and nothing is sent | Verified on chain (v1.1 and v1.3.1); recording TODO |
-| A holder sells at a price they set; the buyer pays them; the collateral doesn't move **[v1.4]** | `list_for_sale` / `buy_resale` on `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`; PRODUCT_SPEC D8 (the option, its strike, expiry and the writer's collateral are unchanged). Resale tx `a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949` | Verified on v1.4 once the hash is filled |
+| A holder sells at a price they set; the buyer pays them; the collateral doesn't move | `list_for_sale` / `buy_resale` on `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`; PRODUCT_SPEC D8 (the option, its strike, expiry and the writer's collateral are unchanged). Resale tx `a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949` | Verified on chain (v1.4 run) |
 | Not a guarantee against issuer action | PRODUCT_SPEC §8 (required wording) | Required disclosure |
-| Anyone can list a Stellar asset with one call **[v1.3.1]** | `list_asset` (ABI §12 on the v1.3.1 branch); the SAC address is derived on chain, so custom tokens can't be listed. v1.3.1 tx `94f1f28cbef1ec1e6318782976b58605d0b41f6ff74396753b294906148675b4`, sent by maker1 (not an admin) | Verified on v1.3.1 only |
-| EQTY: listed, authorized by its issuer, a put settled **[v1.3.1]** | Issuer authorizes `891473865d…0512`; EQTY PUT #8 create / buy / exercise / claim `26158344…4147` / `ac3ce920…d718` / `f2ad8d0e…10a5` / `d7f84cdf…d1fe` | Verified on v1.3.1 only |
+| Anyone can list a Stellar asset with one call | `list_asset` (ABI §12); the SAC address is derived on chain, so custom tokens can't be listed. v1.3.1 tx `94f1f28cbef1ec1e6318782976b58605d0b41f6ff74396753b294906148675b4`, sent by maker1 (not an admin); on v1.5 maker1 listed EQTY again, `9e83e587…bf69` | Verified on chain |
+| EQTY: listed, authorized by its issuer, a put settled | Issuer authorizes `891473865d…0512`; EQTY PUT #8 create / buy / exercise / claim `26158344…4147` / `ac3ce920…d718` / `f2ad8d0e…10a5` / `d7f84cdf…d1fe` | Verified on chain (v1.3.1 run) |
 | Issuer controls are built into Stellar assets | Classic asset flags AUTH_REQUIRED / AUTH_REVOCABLE / AUTH_CLAWBACK_ENABLED, exposed through the SAC; `is_eligible` reads the SAC's own authorization (ABI §3, §6) | True |
 | Exercise costs less than a hundredth of an XLM in fees | Horizon `fee_charged`: v1.2 exercise `df44d1ef…ed2e` = 53,561 stroops (0.0054 XLM); v1.3.1 EQTY exercise `f2ad8d0e…10a5` = 79,873 stroops (0.0080 XLM). These are Testnet figures | Verified (Testnet) |
 | Testnet, fictional assets | AGENTS.md Deployed contracts table; asset labels in PRODUCT_SPEC §1 | True by construction |
@@ -97,8 +93,6 @@ For a short video or a live pitch. Same claims, nothing new.
 >
 > Testnet, fictional assets, unaudited. StellSec: protection for any eligible Stellar asset.
 
-If the app is not on v1.3.1, cut the EQTY paragraph (about 18 words) or say "We've also shown permissionless listing on a newer deployment" only if the v1.3.1 tx is in the deck.
-
 ---
 
 ## 5. Pitch deck outline (10 slides)
@@ -109,13 +103,13 @@ Use the frontend style in `frontend/STYLE.md` throughout (IBM Plex Sans, Plex Mo
 |---|---|---|---|
 | 1 | **StellSec** | Fully collateralized options for eligible tokenized assets on Stellar. Testnet MVP, HackMeridian 2026, Genesis / Stellar Unlocked. | Wordmark on the dark ground; live URL and repo URL in Plex Mono |
 | 2 | **Tokenized, but unhedgeable** | Funds, bonds and stocks are being issued on Stellar. Holders have few ways to buy downside protection or earn yield by writing options. Risk tools that ignore issuer rules can't touch regulated assets. | One token icon with an empty "protection" slot beside it |
-| 3 | **What StellSec does** | Makers lock the full worst-case obligation up front. Investors buy puts (protection) or calls. Exercise swaps tokens at the strike, atomically. | Three-step strip: Lock → Buy → Exercise, StrataBar under "Lock" |
+| 3 | **What StellSec does** | Makers lock the full worst-case obligation up front. Investors buy puts (protection) or calls. Exercise swaps tokens at the strike, atomically. | Three-step strip: Lock → Buy → Exercise, collateral bar under "Lock" |
 | 4 | **Demo: a protective put on RWA** | Two funded quotes: 1.0 vs 0.8 USDx. Investor buys the cheaper one. Exercise: 5 RWA in, 50 USDx out, one tx. | Screenshots: Markets with two quotes; Portfolio `active`; stellar.expert tx page |
 | 5 | **Proof of backing** | Reserves page: owed (`open_collateral`) vs held (SAC balance), both read from the chain. While a token is short after a clawback, new offers and buys on it are refused (#115). | Reserves screenshot with Owed and Held highlighted |
 | 6 | **How it works** | One Soroban escrow contract, no admin, no upgrade. Assets are SACs over classic assets; eligibility = the issuer's own trustline authorization. Lifecycle: Offered → Active → Exercised → Settled (or Cancelled / Expired). | Diagram: Maker and Investor wallets ↔ options contract ↔ RWA / BOND / EQTY SACs and USDx SAC; issuer above the RWA SAC with an "authorize / freeze / clawback" arrow |
-| 7 | **Why Stellar** | Issuer flags (auth required, revocable, clawback) are native and respected end to end. Soroban gives atomic delivery-versus-payment. Exercise fee on Testnet: about 0.005–0.008 XLM. [v1.3.1] Any classic asset can be listed by deriving its SAC address on chain. | Three tiles; a stellar.expert fee line in Plex Mono |
-| 8 | **What's real, what isn't** | Real: deployed Testnet contract, signed txs, 171 contract tests on the v1.3 tree (unit, property-based, negative), smoke and issuer-demo scripts. Fictional: RWA, BOND, EQTY, USDx; demo makers are our own accounts. Not audited; Testnet only. | Two columns, "Real" and "Fictional", with tx hashes under "Real" |
-| 9 | **Limits and roadmap** | Issuer action can block settlement; the premium is not refunded; a clawback is absorbed first come, first served. Next: position token (holder-priced resale is on chain in v1.4), per-offer quote tokens, keeper service, issuer pilots (with permission). StellSec Pro (cash-settled, margined) is specified but not on chain. | Limitation table (freeze holder / freeze writer / de-authorize escrow / clawback) beside a roadmap line |
+| 7 | **Why Stellar** | Issuer flags (auth required, revocable, clawback) are native and respected end to end. Soroban gives atomic delivery-versus-payment. Exercise fee on Testnet: about 0.005–0.008 XLM. Any classic asset can be listed by deriving its SAC address on chain. | Three tiles; a stellar.expert fee line in Plex Mono |
+| 8 | **What's real, what isn't** | Real: deployed Testnet contract, signed txs, 250 contract tests (146 unit, 18 property-based and invariant, 86 negative), smoke and issuer-demo scripts. Fictional: RWA, BOND, EQTY, USDx; demo makers are our own accounts. Not audited; Testnet only. | Two columns, "Real" and "Fictional", with tx hashes under "Real" |
+| 9 | **Limits and roadmap** | Issuer action can block settlement; the premium is not refunded; a clawback is absorbed first come, first served. Resale (v1.4) and funded buyer requests (v1.5) are on chain. Next: position token, per-offer quote tokens, keeper service, issuer pilots (with permission). Margin (the `pro` contract: cash-settled, partially margined uncovered calls) is a separate experimental contract on Testnet; payouts can be reduced and any deficit is shown. | Limitation table (freeze holder / freeze writer / de-authorize escrow / clawback) beside a roadmap line |
 | 10 | **Team and ask** | Dev 1: product and quant. Dev 2: contracts. Dev 3: frontend and Stellar integration. Ask: an introduction to a Stellar asset issuer willing to pilot on Testnet, and feedback from market makers. | Three name cards (names TBD); live URL and QR code |
 
 ---
@@ -138,18 +132,18 @@ In the demo, our own funded Testnet accounts. We claim no liquidity. Natural wri
 Correct, which is why this is Testnet with fictional assets. StellSec doesn't run its own KYC list: eligibility is the issuer's own authorization on the asset, so the issuer controls who may write, buy or receive the asset. A real deployment needs the issuer's cooperation, legal permission and a licensed party where the law requires one. We don't claim compliance.
 
 **6. Why physical delivery instead of cash settlement?**
-It needs no oracle and so has no price-manipulation surface, and delivery runs through the asset's own transfer rules. The trade-off: a put holder must hold the asset to exercise. We have a cash-settled, margined design (StellSec Pro), but it's only specified and simulated. It isn't on chain, and its guarantees are weaker.
+It needs no oracle and so has no price-manipulation surface, and delivery runs through the asset's own transfer rules. The trade-off: a put holder must hold the asset to exercise. We also built a cash-settled, partially margined design (Margin, the `pro` contract): a separate experimental contract on Testnet with a team-run price publisher. Its guarantees are weaker, and every Margin screen says so.
 
 **7. Soroban storage expires. What happens to an option after its TTL runs out?**
-Every state-changing call extends the contract and the touched option by 30 days. Anyone can call `extend_ttl`, and a keeper script does it for every live option. Expiry is stored in the option itself, so TTL is never a security mechanism. Unsold expired offers can be pruned by anyone [v1.3.1], and the collateral always goes back to the writer. Caveat: Testnet resets quarterly.
+Every state-changing call extends the contract and the touched option by 30 days. Anyone can call `extend_ttl`, and a keeper script does it for every live option. Expiry is stored in the option itself, so TTL is never a security mechanism. Unsold expired offers can be pruned by anyone, and the collateral always goes back to the writer. Caveat: Testnet resets quarterly.
 
 **8. Can a maker post a "trap" offer, for example one that can't settle, or pull it while I'm buying?**
-An open offer isn't treated as executable until the client simulates `buy` against the chain right before signing. `buy` itself checks that you're eligible, that the contract is authorized on the asset and that the asset isn't short. Terms can't change after creation. A writer can cancel only while the offer is unsold. If they cancel first, your buy fails and you pay nothing. Expiry is capped at two years [v1.3+], and all amounts must be positive. Odd terms (a far-out strike, a tiny quantity) are shown in full, but the user still has to read them.
+An open offer isn't treated as executable until the client simulates `buy` against the chain right before signing. `buy` itself checks that you're eligible, that the contract is authorized on the asset and that the asset isn't short. Terms can't change after creation. A writer can cancel only while the offer is unsold. If they cancel first, your buy fails and you pay nothing. Expiry is capped at two years, and all amounts must be positive. Odd terms (a far-out strike, a tiny quantity) are shown in full, but the user still has to read them.
 
 **Backup questions:**
-- *Is it secure? Audited?* Not audited, and we don't claim production security. On the v1.3 tree: 171 contract tests passing (105 unit, 12 property-based and invariant, 54 negative), clippy clean, and mutation testing on v1.2 with 0 surviving mutants. An internal review of v1 (including CoinFabrik Scout) confirmed two findings, pooled clawback exposure and an unbounded offer list. Both are handled: the first is disclosed and guarded, the second is capped.
+- *Is it secure? Audited?* Not audited, and we don't claim production security. On v1.5: 250 contract tests passing (146 unit, 18 property-based and invariant, 86 negative), clippy clean, and mutation testing on v1.2 with 0 surviving mutants. An internal review of v1 (including CoinFabrik Scout) confirmed two findings, pooled clawback exposure and an unbounded offer list. Both are handled: the first is disclosed and guarded, the second is capped.
 - *How is this different from Lusty?* As we understand it, Lusty settles through a server. StellSec's collateral and settlement live in the contract, with physical delivery of permissioned assets and the issuer's rules enforced at every step.
-- *Why not every token?* Listing derives the canonical SAC address of a classic asset on chain, so arbitrary token contracts can never be listed [v1.3.1]. Eligibility then depends on the issuer.
+- *Why not every token?* Listing derives the canonical SAC address of a classic asset on chain, so arbitrary token contracts can never be listed. Eligibility then depends on the issuer.
 
 ---
 
@@ -159,19 +153,14 @@ An open offer isn't treated as executable until the client simulates `buy` again
 - **Pace:** about 140 words per minute. Pause at each `/`. Read the numbers slowly: "five RWA", "fifty USDx", "zero point eight".
 - **Stress:** *in full*, *no margin, no leverage*, *cheaper*, *one transaction*, *the whole thing reverts*, *owes / actually holds*, *honest*, *nothing moves*, *not a guarantee*, *eligible*.
 - **Show while saying:**
-  - Scene 3: zoom on the StrataBar locked layer as "fifty USDx moves into the contract" lands.
+  - Scene 3: zoom on the Collateral page's Held figure as "fifty USDx moves into the contract" lands.
   - Scene 4: hold on the two quotes side by side.
   - Scene 6: on stellar.expert, highlight both transfers in one tx (a cursor circle or an editing callout).
   - Scene 8: hover Owed, then Held.
   - Scene 9: hold the error banner for about two seconds before speaking the "StellSec respects issuer rules" line.
 - **Keep the "Testnet / fictional" label visible:** the footer disclaimer in scenes 1 and 12. The mock-data banner must never appear in a live take.
 - **If over time, cut in this order:** 5c (resale) → 5b (chart) → scene 11 fee line → scene 2's last sentence (scene 12 repeats it) → scene 10 (use the one-line fallback). **Never cut** scene 9 (the honesty beat) or the scene 12 disclaimer.
-- **Suggested edits to `docs/demo-script.md`** (Dev 3 / Dev 1 to apply):
-  1. Rename FUND to **RWA**. The deployed assets are RWA, BOND, EQTY and USDx, and `frontend/src/issuer/IssuerConsole.tsx` still defaults the asset code to `FUND`. Change it or retype it on camera.
-  2. Claim delivery by **Maker B** (the writer of the cheaper offer), not Maker A.
-  3. Move the collateral beat from the Sell dialog on Markets to the **Reserves** page.
-  4. Add the EQTY listing scene (2:30–2:42), conditional on v1.3.1.
-  5. Update `frontend/src/demo/scenes.ts` titles and start times to match section 2.
+- `docs/demo-script.md` follows this section: RWA, Maker B claims, the Collateral page, the EQTY scene.
 
 ---
 
@@ -183,8 +172,5 @@ An open offer isn't treated as executable until the client simulates `buy` again
 - PRODUCT_SPEC open question 1: the first-come-first-served clawback disclosure is not yet in the UI or README. The deck states it on slide 9. Is that enough for the video, or should scene 8 say it?
 
 **For Dev 2 and Dev 3:**
-- Which contract will the recording use, v1.2 (live app today) or v1.3.1? This decides whether scene 10 is shown in the app, as a stellar.expert cut, or dropped.
-- Is the buy-dialog payoff chart with "Assumed price" (PR #37) live before recording? If not, drop 5b.
 - Is a pre-staged active option for the freeze scene ready (`seed-demo-offers.sh` creates offers, not bought positions)?
-- Test counts for the v1.3.1 tree. Slide 8 quotes the v1.3 tree (171 passing, 1 ignored) and should be updated if v1.3.1 differs.
 - Recording tx hashes for create A, create B, buy, exercise, claim and freeze, to replace the smoke-run hashes in section 3.
