@@ -1,9 +1,11 @@
-import type { CollateralHealth, OptionOffer } from '../options/types'
+import { useState } from 'react'
+import type { CollateralHealth, OptionOffer, TokenInfo } from '../options/types'
+import { AssetFactsDialog } from '../assetfacts/AssetFactsPanel'
 import { shortfallFor } from '../reserves/reserves'
 import { ShortfallNotice } from '../reserves/ShortfallWarning'
 import { requiredCollateral } from '../options/types'
 import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
-import { Button, Mono, PayoffSketch, Sediment, Tag } from '../ui'
+import { Button, Icon, Mono, PayoffSketch, Sediment, Tag } from '../ui'
 import { implausibleTerms } from '../options/feasibility'
 import { formatCountdown, groupSeries } from './series'
 import './market.css'
@@ -46,6 +48,7 @@ export function MarketSeries({
   busyId: bigint | null
   onBuy: (o: OptionOffer) => void
 }) {
+  const [factsFor, setFactsFor] = useState<TokenInfo | null>(null)
   const series = groupSeries(offers)
   if (series.length === 0) return <p className="mk-empty">No open offers match.</p>
 
@@ -57,6 +60,7 @@ export function MarketSeries({
 
   return (
     <div className="mk-series-list">
+      {factsFor && <AssetFactsDialog token={factsFor} me={me} onClose={() => setFactsFor(null)} />}
       {series.map((s) => {
         const first = s.offers[0]
         const n = s.offers.length
@@ -86,7 +90,13 @@ export function MarketSeries({
                     Right to <b>{first.kind === 'put' ? 'sell' : 'buy'}</b> {first.underlying.code} at strike
                   </span>
                 </p>
-                <p className="mk-count">{n > 1 ? `${n} makers competing` : '1 maker'}</p>
+                <p className="mk-count">
+                  {n > 1 ? `${n} makers competing` : '1 maker'}
+                  <button type="button" className="mk-facts-btn" onClick={() => setFactsFor(first.underlying)}>
+                    <Icon name="issuer" size={14} />
+                    Asset facts<span className="mk-sr"> for {first.underlying.code}</span>
+                  </button>
+                </p>
                 <ShortfallNotice tokens={shortfallFor(first, health)} />
               </div>
               <PayoffSketch kind={first.kind} strikeLabel={strike} asset={first.underlying.code} className="mk-payoff" />
