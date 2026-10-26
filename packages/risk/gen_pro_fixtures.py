@@ -72,12 +72,18 @@ class Recorder:
         return {
             "now": m.now,
             "contract_balance": m.contract_balance,
-            "accounts": {k: {"cash": a.cash, "shorts": {str(s): q for s, q in sorted(a.shorts.items()) if q}}
-                         for k, a in sorted(m.accounts.items()) if a.cash or any(a.shorts.values())},
+            "accounts": {k: {"cash": a.cash, "shorts": {str(s): q for s, q in sorted(a.shorts.items()) if q},
+                             "books": list(a.books)}
+                         for k, a in sorted(m.accounts.items()) if a.cash or any(a.shorts.values()) or a.books},
             "wallets": dict(sorted(m.wallets.items())),
-            "series": {str(s.id): {"oi": s.oi, "settlement_price": s.settlement_price} for s in m.series.values()},
-            "positions": {str(p.id): {"holder": p.holder, "writer": p.writer, "qty": p.qty,
-                                      "settled": p.settled, "paid": p.paid, "deficit": p.deficit}
+            "series": {str(s.id): {"oi": s.oi, "settlement_price": s.settlement_price, "open_books": s.open_books,
+                                   "shortfall": s.shortfall, "vault_paid": s.vault_paid, "pool": s.pool,
+                                   "claimed": s.claimed, "closed": s.closed} for s in m.series.values()},
+            "books": {str(b.id): {"series_id": b.series_id, "owner": b.owner, "qty": b.qty, "settled": b.settled,
+                                  "due": b.due, "from_owner": b.from_owner, "shortfall": b.shortfall}
+                      for b in m.books.values()},
+            "positions": {str(p.id): {"holder": p.holder, "book": p.book, "qty": p.qty, "settled": p.settled,
+                                      "exercised": p.exercised, "paid": p.paid, "deficit": p.deficit}
                           for p in m.positions.values()},
             "lp_shares": dict(sorted((k, v) for k, v in m.lp_shares.items() if v)),
             "total_shares": m.total_shares,
@@ -144,6 +150,17 @@ def open_short_at_im(r: Recorder, writer: str, buyer: str, sid: int, qty: int, e
     return r.step("buy", buyer, oid)
 
 
+def settle_all(r: Recorder, sid: int, note: str = "") -> dict:
+    """Règlement complet d'une série : settle de chaque book ouvert, settle_vault, puis claim de chaque porteur."""
+    m = r.m
+    for bid in sorted(b.id for b in m.books.values() if b.series_id == sid and not b.settled):
+        r.step("settle", bid, note=f"book {bid} ({m.books[bid].owner})")
+    out = r.step("settle_vault", sid, note=note or "prorata des insuffisances de la série")
+    for pid in sorted(p.id for p in m.positions.values() if p.series_id == sid and not p.settled):
+        r.step("claim", m.positions[pid].holder, pid)
+    return out
+
+
 # ------------------------------------------------------------------------------------------------ scénarios
 
 def s_happy_path():
@@ -159,9 +176,10 @@ def s_happy_path():
     r.step("withdraw", "MAKER_A", room, note="retrait exact de l'excédent au-dessus de l'IM")
     r.advance(21 * DAY)
     r.publish(sid, 95.0, expect="SeriesExpired")
-    r.step("liquidate", "KEEPER", "MAKER_A", VAULT, expect="SeriesExpired")
+    r.step("liquidate", "KEEPER", "MAKER_A", VAULT, expect="NotLiquidable", note="seules les séries vivantes se reprennent")
+    r.step("withdraw", "MAKER_A", 1 * SCALE, expect="SeriesExpired", note="dette échue non réglée : retrait gelé")
     r.step("publish_settlement", "PUBLISHER", sid, 95 * SCALE)
-    r.step("settle", "MAKER_A", sid, note="hors de la monnaie : dû 0")
+    settle_all(r, sid, note="hors de la monnaie : dû 0")
     cash = r.m.acct("MAKER_A").cash
     r.step("withdraw", "MAKER_A", cash, note="plus de position : tout le cash est retirable")
     return r
@@ -259,9 +277,10 @@ def s_gap_to_vault():
     r.step("lp_deposit", "LP2", 50_000 * SCALE, note="parts émises à la valeur nette du vault, pertes comprises")
     r.advance(12 * DAY)
     r.step("publish_settlement", "PUBLISHER", sid, 150 * SCALE)
-    out = r.step("settle", VAULT, sid, note="le vault paie Alice intégralement")
+    r.step("lp_withdraw", "LP1", expect="SettlementPending", note="pas de sortie LP entre l'échéance et la clôture")
+    out = settle_all(r, sid, note="book repris par le vault : sa dette passe par settle_vault")
     assert out["deficit"] == 0
-    r.step("lp_withdraw", "LP1", note="après règlement, le capital est libéré à la valeur nette")
+    r.step("lp_withdraw", "LP1", note="après clôture : min(valeur à la demande, valeur actuelle)")
     return r
 
 
@@ -275,11 +294,17 @@ def s_settlement_deficit():
     open_short_at_im(r, "MAKER_A", "ALICE", sid, 600)
     open_short_at_im(r, "MAKER_A", "DAVE", sid, 400)
     r.advance(21 * DAY)
-    r.step("settle", "MAKER_A", sid, expect="NoSettlementPrice")
+    bid = r.m.positions[0].book
+    r.step("settle", bid, expect="NoSettlementPrice")
     r.step("publish_settlement", "PUBLISHER", sid, 160 * SCALE)
-    out = r.step("settle", "MAKER_A", sid, note="dû 50/lot ; marge puis vault ; reste = déficit")
-    assert out["deficit"] > 0 and out["alloc"][0] * 400 // 600 in (out["alloc"][1] - 1, out["alloc"][1], out["alloc"][1] + 1)
-    r.step("settle", "MAKER_A", sid, expect="WrongState", note="un seul règlement")
+    r.step("settle", bid, note="dû 50/lot ; marge du vendeur d'abord")
+    r.step("settle", bid, expect="WrongState", note="un seul règlement par book")
+    out = r.step("settle_vault", sid, note="vault ensuite ; reste = déficit")
+    assert out["deficit"] > 0
+    a = r.step("claim", "ALICE", 0)
+    d = r.step("claim", "DAVE", 1)
+    assert a["deficit"] > 0 and abs(a["paid"] * 400 - d["paid"] * 600) <= 600, (a, d)
+    r.step("claim", "ALICE", 0, expect="WrongState", note="un seul claim")
     r.step("publish_settlement", "PUBLISHER", sid, 100 * SCALE, expect="WrongState", note="prix final immuable")
     return r
 
@@ -308,12 +333,101 @@ def s_limits_and_staleness():
     return r
 
 
+def s_american_exercise():
+    r = Recorder("american_exercise",
+                 "Exercice américain : à tout moment avant l'échéance, au spot du snapshot frais, payé par le vendeur ; "
+                 "un vendeur liquidable est d'abord repris ; après l'échéance, règlement puis claim.")
+    r.fund(MAKER_A=200_000, ALICE=10_000, BOB=20_000, LP1=300_000)
+    r.step("lp_deposit", "LP1", 250_000 * SCALE)
+    sid = r.step("list_series", "ADMIN", K, EXPIRY)
+    r.publish(sid, 100.0)
+    p_alice = open_short_at_im(r, "MAKER_A", "ALICE", sid, 200, extra=30_000 * SCALE)
+    r.step("exercise", "ALICE", p_alice, expect="OutOfTheMoney", note="S=100 < K=110")
+    r.step("exercise", "BOB", p_alice, expect="Unauthorized", note="seul le porteur exerce")
+    r.advance(DAY)
+    r.publish(sid, 118.0)
+    req = r.view("MAKER_A", "vendeur sain : NLV >= MM")
+    assert req["nlv"] >= req["mm"]
+    out = r.step("exercise", "ALICE", p_alice, note="exercice anticipé : 200 x (118 - 110) payé depuis la marge de A")
+    assert out["due"] == 200 * 8 * SCALE
+    r.step("exercise", "ALICE", p_alice, expect="WrongState", note="une seule fois, toute la position")
+    p_bob = open_short_at_im(r, "MAKER_A", "BOB", sid, 1_000)
+    r.advance(DAY)
+    r.publish(sid, 140.0)                                    # gap : A devient liquidable
+    req = r.view("MAKER_A", "après le gap : NLV < MM")
+    assert req["nlv"] < req["mm"]
+    r.step("exercise", "BOB", p_bob, expect="LiquidateFirst", note="pas de course à la marge d'un vendeur en défaut")
+    r.step("liquidate", "KEEPER", "MAKER_A", VAULT)
+    req = r.m.requirement(VAULT)
+    r.step("exercise", "BOB", p_bob, expect="ok" if req["nlv"] >= req["mm"] else "VaultCapacity",
+           note="le vault paie l'exercice s'il reste au-dessus de son MM ; sinon le porteur attend l'échéance")
+    if not r.m.positions[p_bob].settled:
+        r.advance(EXPIRY - r.m.now)
+        r.step("exercise", "BOB", p_bob, expect="SeriesExpired", note="l'exercice s'arrête à l'échéance")
+        r.step("publish_settlement", "PUBLISHER", sid, 140 * SCALE)
+        settle_all(r, sid)
+    return r
+
+
+def s_review_regressions():
+    r = Recorder("review_regressions",
+                 "Régressions de la revue PR #30 : rôles hors marché, prime >= mark, retrait gelé après l'échéance, "
+                 "reprise d'une série vivante malgré une série échue, flux LP gelés, vault au prorata entre vendeurs.")
+    E1 = EXPIRY
+    r.fund(MAKER_A=200_000, MAKER_B=200_000, MAKER_C=500_000, ALICE=50_000, BOB=50_000, LP1=10_000,
+           PUBLISHER=100_000, ADMIN=100_000)
+    r.step("lp_deposit", "PUBLISHER", 1_000 * SCALE, expect="RoleNotAllowed")
+    r.step("lp_deposit", "LP1", 50 * SCALE, expect="InvalidArgs", note="premier dépôt LP minimal : 100 USDx")
+    r.step("lp_deposit", "LP1", 2_000 * SCALE, note="vault volontairement petit")
+    r.step("lp_request_withdraw", "LP1", r.m.lp_shares["LP1"], note="demande déposée tôt")
+    s1 = r.step("list_series", "ADMIN", K, E1)
+    s2 = r.step("list_series", "ADMIN", K, E1 + 30 * DAY)
+    r.publish(s1, 100.0)
+    r.publish(s2, 100.0)
+    r.step("deposit", "PUBLISHER", 1_000 * SCALE, expect="RoleNotAllowed")
+    r.step("create_offer", "ADMIN", s1, 10, 10 * SCALE, E1, expect="RoleNotAllowed")
+    r.step("deposit", "MAKER_A", 20_000 * SCALE)
+    cheap = r.step("create_offer", "MAKER_A", s1, 100, 1, E1)
+    r.step("buy", "BOB", cheap, expect="PremiumBelowMark", note="la part du vault ne peut pas être contournée")
+    r.step("buy", "PUBLISHER", cheap, expect="RoleNotAllowed")
+    r.step("cancel_offer", "MAKER_A", cheap)
+    open_short_at_im(r, "MAKER_A", "ALICE", s1, 500)
+    open_short_at_im(r, "MAKER_B", "BOB", s1, 500)
+    open_short_at_im(r, "MAKER_A", "ALICE", s2, 300)
+    r.advance(E1 - r.m.now)
+    r.step("withdraw", "MAKER_A", 1 * SCALE, expect="SeriesExpired", note="série s1 échue non réglée")
+    r.publish(s2, 135.0)
+    req = r.view("MAKER_A", "s1 échue comptée à sa borne prudente, s2 vivante au snapshot frais")
+    assert req["nlv"] < req["mm"] and req["expired"] > 0
+    r.step("deposit", "MAKER_C", 400_000 * SCALE)
+    r.step("liquidate", "PUBLISHER", "MAKER_A", "PUBLISHER", expect="RoleNotAllowed")
+    r.step("liquidate", "MAKER_C", "MAKER_A", "MAKER_C",
+           note="reprise de la série vivante s2 seulement ; la dette échue s1 reste à A")
+    r.step("publish_settlement", "PUBLISHER", s1, 200 * SCALE)
+    r.step("lp_withdraw", "LP1", expect="SettlementPending", note="LP ne sort pas devant une perte connue")
+    r.step("lp_deposit", "LP1", 1_000 * SCALE, expect="SettlementPending")
+    books = sorted(b.id for b in r.m.books.values() if b.series_id == s1 and not b.settled)
+    r.step("settle", books[0])
+    r.step("settle_vault", s1, expect="WrongState", note="tous les books d'abord : pas de premier arrivé")
+    r.step("settle", books[1])
+    r.step("claim", "BOB", 0, expect="Unauthorized", note="seul le porteur réclame")
+    out = r.step("settle_vault", s1, note="le vault couvre les insuffisances de A et B au prorata")
+    assert out["deficit"] > 0
+    ba, bb = (r.m.books[b] for b in books)
+    pa = r.step("claim", "ALICE", 0)
+    pb = r.step("claim", "BOB", 1)
+    vault_a, vault_b = pa["paid"] - ba.from_owner, pb["paid"] - bb.from_owner
+    assert abs(vault_a * bb.shortfall - vault_b * ba.shortfall) <= ba.shortfall + bb.shortfall, (vault_a, vault_b)
+    r.step("lp_withdraw", "LP1", note="série close : retrait au min(valeur à la demande, valeur actuelle)")
+    return r
+
+
 SCENARIOS = [s_happy_path, s_insufficient_margin, s_snapshot_bounds, s_liquidation_private, s_gap_to_vault,
-             s_settlement_deficit, s_limits_and_staleness]
+             s_settlement_deficit, s_limits_and_staleness, s_american_exercise, s_review_regressions]
 
 
 if __name__ == "__main__":
-    out = {"version": "pro-v0", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
+    out = {"version": "pro-v0.1", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
                                           "time": "secondes Unix"},
            "scenario_order": "index 0..13 : prix {0,+1/3,-1/3,+2/3,-2/3,+1,-1} x U, vol {x1.25, x0.75} ; 14 : +ext ; 15 : -ext",
            "errors": ERRORS, "scenarios": [f().dump() for f in SCENARIOS]}
