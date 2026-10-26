@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { IconName } from '../ui'
 
-export type Route = 'markets' | 'write' | 'portfolio' | 'reserves' | 'issuer'
+export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer'
 
 export interface NavItem {
   route: Route
@@ -11,6 +11,7 @@ export interface NavItem {
 
 export const NAV_TRADE: NavItem[] = [
   { route: 'markets', label: 'Markets', icon: 'markets' },
+  { route: 'protect', label: 'Protect', icon: 'reserves' },
   { route: 'write', label: 'Write', icon: 'write' },
   { route: 'portfolio', label: 'Portfolio', icon: 'portfolio' },
 ]
@@ -21,7 +22,7 @@ export const NAV_TRANSPARENCY: NavItem[] = [
 /** Bottom tab bar on phones. Issuer is reached from the top bar. */
 export const NAV_TABS: NavItem[] = [...NAV_TRADE, NAV_TRANSPARENCY[0]]
 
-const ROUTES: Route[] = ['markets', 'write', 'portfolio', 'reserves', 'issuer']
+const ROUTES: Route[] = ['markets', 'protect', 'write', 'portfolio', 'reserves', 'issuer']
 
 export const hrefFor = (r: Route) => `#/${r}`
 
