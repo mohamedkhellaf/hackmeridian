@@ -365,7 +365,7 @@ enum Key {
     Quote,              // instance: Address
     Underlyings,        // instance: Vec<Address>
     Next,               // instance: u32 (next id)
-    Reserved(Address),  // instance: i128 per token (see open_collateral)
+    Reserved(Address),  // persistent: i128 per token, v1.3.1 (was instance until v1.3); TTL extended on every state-changing path that touches it and by extend_ttl
     Opt(u32),           // persistent: OptionData
     OpenFor(Address),   // persistent: Vec<u32>, v1.3.1 per-asset open book (replaces instance Key::Open)
     Listed(Address),    // persistent: bool, v1.3 asset registry membership (seeded by the constructor)
@@ -382,7 +382,9 @@ const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
 ```
 
-Registry and per-writer entries are persistent and get their TTL extended whenever they are read on a state-changing path (v1.3).
+Instance storage holds only `Quote`, `Underlyings`, `Next` and `AssetCount` (v1.3.1); every other key is persistent.
+Registry and per-writer entries get their TTL extended whenever they are read on a state-changing path (v1.3), and
+`Reserved` entries whenever a state-changing path touches them (v1.3.1).
 Every state-changing function extends the contract instance **and code** TTL (`instance().extend_ttl` does both
 in soroban-sdk 28) and the touched option's persistent TTL with `(TTL_THRESHOLD, TTL_EXTEND_TO)`. `extend_ttl(ids)`
 does the same for the instance/code and for every listed option, so a keeper can keep idle options alive.
@@ -491,6 +493,9 @@ position token, impairment/refund, margin.
 6. **`list_assets` order**: constructor underlyings in constructor order, then listings in `list_asset` order.
 7. Doc corrections applied in the same change: §2 `AssetNotAllowed` comment, §3 constructor sentence, §6 regulated-only
    wording and F-1/F-1R status, §7.4 tenor bounds, §12 frontend wording.
+8. **`Reserved(token)` moves to persistent storage** (one entry per token, TTL extended on touch and by `extend_ttl` for
+   the option's quote and underlying). Found by the v1.3 gate: with permissionless listing, per-token instance keys let
+   anyone grow the single instance entry without bound.
 
 No new error codes. Signature changes: `prune_expired` (new first argument), `list_open_for` added. Everything else is
 unchanged. Deployment of v1.3.1 replaces the v1.3 id in the Deployed contracts table.
