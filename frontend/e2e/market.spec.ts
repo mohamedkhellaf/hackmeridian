@@ -5,6 +5,11 @@ const chain = (page: Page) => page.getByRole('table', { name: 'Option chain' })
 const chainRows = (page: Page) => chain(page).locator('tbody tr')
 
 test('a loading skeleton precedes the data and no count or empty state shows meanwhile', async ({ page }) => {
+  // Slow the mock's 150 ms read so the loading state is observable.
+  await page.addInitScript(() => {
+    const st = window.setTimeout
+    window.setTimeout = ((f: TimerHandler, d?: number, ...a: unknown[]) => st(f, d === 150 ? 1500 : d, ...a)) as typeof window.setTimeout
+  })
   await page.goto('/')
   const loading = page.getByRole('status', { name: 'Loading Markets' })
   await expect(loading).toBeVisible()
