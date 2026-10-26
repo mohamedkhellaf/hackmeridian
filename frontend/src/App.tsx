@@ -20,7 +20,7 @@ import './App.css'
 // StellSec Pro (experimental): a lazy chunk that exists only when the build sets VITE_ENABLE_PRO=1.
 const ProApp = import.meta.env.VITE_ENABLE_PRO === '1' ? lazy(() => import('./pro/ProApp')) : null
 
-const ROUTE_TITLES: Partial<Record<Route, string>> = { markets: 'Markets', protect: 'Protect', portfolio: 'Positions', reserves: 'Collateral', issuer: 'Issuer' }
+const ROUTE_TITLES: Partial<Record<Route, string>> = { markets: 'Markets', portfolio: 'Positions', reserves: 'Collateral', issuer: 'Issuer' }
 
 /** One skeleton per view, shaped like its real content, until the first data round completes. */
 function LoadingView({ route, error, onRetry }: { route: Route; error: string | null; onRetry: () => void }) {
