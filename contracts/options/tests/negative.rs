@@ -26,7 +26,10 @@
 //! registry order truncated to 200 ids; `extend_ttl` also extends the registry, writer and book
 //! entries. The former F-1R finding (20 sybil writers on a self-listed unflagged asset fill the
 //! global list) is now the passing regression `griefing8_f1r_*`; section 24 covers the rest,
-//! including the cost of the `list_open()` window with a large registry.
+//! including the cost of the `list_open()` window with a large registry. Section 8 also pins
+//! the persistent `Reserved(token)` entries (§13.8: the instance entry never grows with listings,
+//! and every path that touches a reserve keeps it alive) and section 18 the `list_asset` check
+//! order (§13.4: `AlreadyListed` without probing the SAC).
 //! Every snapshot also checks the open-book invariant: each asset's book is exactly its
 //! `Offered` ids in id order, and `list_open()` is the registry-order concatenation, truncated.
 //!
@@ -598,6 +601,64 @@ impl T {
     fn instance_ttl(&self) -> u32 {
         self.env
             .as_contract(&self.contract, || self.env.storage().instance().get_ttl())
+    }
+
+    /// Names of the `Key` variants stored in the contract's instance entry, sorted.
+    fn instance_keys(&self) -> std::vec::Vec<std::string::String> {
+        let all = self
+            .env
+            .as_contract(&self.contract, || self.env.storage().instance().all());
+        let mut names: std::vec::Vec<std::string::String> = all
+            .keys()
+            .iter()
+            .map(|k| match xdr::ScVal::try_from_val(&self.env, &k).unwrap() {
+                xdr::ScVal::Vec(Some(v)) => match v.first() {
+                    Some(xdr::ScVal::Symbol(s)) => s.0.to_utf8_string_lossy(),
+                    other => panic!("unexpected instance key head {other:?}"),
+                },
+                other => panic!("unexpected instance key {other:?}"),
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// The persistent `Key::Reserved(token)` entry (ABI §8, v1.3.1), `None` if absent.
+    fn reserved_entry(&self, token: &Address) -> Option<i128> {
+        let key: Vec<Val> = vec![
+            &self.env,
+            Symbol::new(&self.env, "Reserved").into_val(&self.env),
+            token.into_val(&self.env),
+        ];
+        self.env
+            .as_contract(&self.contract, || self.env.storage().persistent().get(&key))
+    }
+
+    /// (contract, function) of every contract call the last top-level invocation made, the
+    /// invocation itself first (read from the host's `fn_call` diagnostic events).
+    fn calls(&self) -> std::vec::Vec<(Address, std::string::String)> {
+        let evs = self.env.host().get_diagnostic_events().unwrap();
+        evs.0
+            .iter()
+            .filter_map(|he| {
+                let xdr::ContractEventBody::V0(v0) = &he.event.body;
+                match (v0.topics.first(), v0.topics.get(1), v0.topics.get(2)) {
+                    (
+                        Some(xdr::ScVal::Symbol(s)),
+                        Some(xdr::ScVal::Bytes(id)),
+                        Some(xdr::ScVal::Symbol(f)),
+                    ) if s.0.to_utf8_string_lossy() == "fn_call" => {
+                        let hash: [u8; 32] = id.0.as_slice().try_into().unwrap();
+                        let a = xdr::ScAddress::Contract(xdr::ContractId(xdr::Hash(hash)));
+                        Some((
+                            Address::try_from_val(&self.env, &a).unwrap(),
+                            f.0.to_utf8_string_lossy(),
+                        ))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
     }
 
     /// ABI §2 derived reserve per token [USDx, RWA, BOND], summed over every stored option.
@@ -2475,9 +2536,10 @@ fn griefing8_extend_ttl_unknown_id_extends_nothing() {
     let b = t.call(&t.maker2);
     let seq = t.env.ledger().sequence();
     t.env.ledger().set_sequence_number(seq + 24 * DAY);
-    // v1.3.1 keeper coverage (ABI §13.5): besides the options and the instance, `extend_ttl`
-    // extends each id's Listed / WriterOpen / OpenFor entries and the first MAX_PAGE registry
-    // slots (AssetAt and their Listed entries: here RWA and BOND, although no id is on BOND).
+    // v1.3.1 keeper coverage (ABI §13.5, §13.8): besides the options and the instance,
+    // `extend_ttl` extends each id's Listed / WriterOpen / OpenFor / Reserved(quote) /
+    // Reserved(underlying) entries and the first MAX_PAGE registry slots (AssetAt and their
+    // Listed entries: here RWA and BOND, although no id is on BOND).
     let ttls = |t: &T| {
         std::vec![
             t.option_ttl(a),
@@ -2490,6 +2552,8 @@ fn griefing8_extend_ttl_unknown_id_extends_nothing() {
             t.entry_ttl("WriterOpen", t.writer.into_val(env)),
             t.entry_ttl("WriterOpen", t.maker2.into_val(env)),
             t.entry_ttl("OpenFor", t.rwa.into_val(env)),
+            t.entry_ttl("Reserved", t.usdx.into_val(env)),
+            t.entry_ttl("Reserved", t.rwa.into_val(env)),
         ]
     };
     let aged = ttls(&t);
@@ -2552,11 +2616,11 @@ fn griefing8_extend_ttl_batch_size_fits_footprint_limit() {
     fits(fit + 1);
     assert_eq!(t.exceeded_ledger(), ["footprint entries"]);
     assert_eq!(fp(&t), FOOTPRINT_LIMIT + 1);
-    // ABI §13.5: one more id on an asset and writer already in the batch costs exactly one entry
-    // (its Opt); the rest is per call: instance + code, the SEEDED registry slots (AssetAt and
-    // Listed each), one WriterOpen per writer, and at most three entries for the asset and the
-    // quote token (OpenFor(RWA), plus the Reserved entries an implementation that keeps them in
-    // persistent storage also extends).
+    // ABI §13.5, §13.8: one more id on an asset and writer already in the batch costs exactly one
+    // entry (its Opt); the rest is per call: instance + code, the SEEDED registry slots (AssetAt
+    // and Listed each), one WriterOpen per writer, and three entries for the asset and the quote
+    // token: OpenFor(RWA), Reserved(USDx) and Reserved(RWA) (in the footprint even while absent:
+    // these PUTs lock no RWA).
     t.c.extend_ttl(&Vec::from_iter(env, 0..10));
     let fp10 = fp(&t);
     t.c.extend_ttl(&Vec::from_iter(env, 0..11));
@@ -2566,9 +2630,10 @@ fn griefing8_extend_ttl_batch_size_fits_footprint_limit() {
         "marginal footprint of an id on a shared asset and writer"
     );
     let overhead = FOOTPRINT_LIMIT - fit;
-    assert!(
-        overhead <= 2 + 2 * SEEDED + writers.len() as u32 + 3,
-        "per-call extend_ttl footprint {overhead} on a single asset"
+    assert_eq!(
+        overhead,
+        2 + 2 * SEEDED + writers.len() as u32 + 3,
+        "per-call extend_ttl footprint on a single asset"
     );
     // the mainnet limits, enforced again, accept exactly that batch
     env.cost_estimate()
@@ -2582,11 +2647,11 @@ fn griefing8_extend_ttl_batch_size_fits_footprint_limit() {
 
 #[test]
 fn griefing8_extend_ttl_spanning_many_assets_and_writers_fits_footprint_limit() {
-    // Worst case for a keeper (ABI §13.5): every id on its own listed asset beyond the first
-    // MAX_PAGE registry slots and written by its own writer, so each id adds four entries
-    // (Opt, Listed(asset), OpenFor(asset), WriterOpen(writer)) on top of the per-call part
-    // (instance, code, AssetAt(0..MAX_PAGE) and their Listed entries), which must stay bounded
-    // however many assets are listed.
+    // Worst case for a keeper (ABI §13.5, §13.8): every id on its own listed asset beyond the
+    // first MAX_PAGE registry slots and written by its own writer, so each id adds five entries
+    // (Opt, Listed(asset), OpenFor(asset), WriterOpen(writer), Reserved(asset)) on top of the
+    // per-call part (instance, code, AssetAt(0..MAX_PAGE) and their Listed entries, plus the
+    // shared Reserved(USDx)), which must stay bounded however many assets are listed.
     let t = setup();
     let env = &t.env;
     env.cost_estimate().budget().reset_unlimited();
@@ -2656,9 +2721,10 @@ fn griefing8_extend_ttl_spanning_many_assets_and_writers_fits_footprint_limit() 
     let max_spread = lo as u32;
     fits(lo + 1);
     assert_eq!(t.exceeded_ledger(), ["footprint entries"]);
-    // the cost is linear in the ids: ABI §13.5 needs Opt, Listed(asset), OpenFor(asset) and
-    // WriterOpen(writer) for each such id, and an implementation keeping Reserved(asset) in
-    // persistent storage extends it as well (5); the measured line predicts the maximum exactly
+    // the cost is linear in the ids: ABI §13.5 and §13.8 need Opt, Listed(asset), OpenFor(asset),
+    // WriterOpen(writer) and Reserved(asset) for each such id (5), and once per call the quote's
+    // Reserved(USDx) (in the footprint even while absent: these CALLs lock no USDx); the measured
+    // line predicts the maximum exactly
     t.c.extend_ttl(&batch(1));
     let fp1 = fp(&t);
     t.c.extend_ttl(&batch(2));
@@ -2669,14 +2735,11 @@ fn griefing8_extend_ttl_spanning_many_assets_and_writers_fits_footprint_limit() 
         2 * per_id,
         "extend_ttl footprint is not linear"
     );
-    assert!(
-        (4..=5).contains(&per_id),
-        "footprint per id on its own asset and writer: {per_id}"
-    );
-    assert!(
-        fp1 - per_id <= per_call + 1,
-        "per-call footprint beyond the registry part: {} vs {per_call}",
-        fp1 - per_id
+    assert_eq!(per_id, 5, "footprint per id on its own asset and writer");
+    assert_eq!(
+        fp1 - per_id,
+        per_call + 1,
+        "per-call footprint: the registry part plus Reserved(USDx)"
     );
     assert_eq!(
         max_spread,
@@ -2704,6 +2767,207 @@ fn griefing8_extend_ttl_spanning_many_assets_and_writers_fits_footprint_limit() 
     assert_eq!(t.c.writer_open_count(&w1), 0);
     t.c.extend_ttl(&vec![env, ids[0], ids[1], ids[2]]);
     assert!(t.opt_events().is_empty());
+}
+
+/// v1.3.1 (ABI §8, §13.8): permissionless listing lets anyone create per-token state, so none of
+/// it may live in the single instance entry that every call loads (v1.3 kept `Reserved(token)`
+/// there, so listing assets and locking one unit on each grew it without bound). However many
+/// assets are listed and carry collateral, and whatever lifecycle paths run, instance storage
+/// holds exactly `Quote`, `Underlyings`, `Next` and `AssetCount`, and each token's reserved total
+/// is its own persistent `Reserved(token)` entry, equal to `open_collateral(token)`.
+#[test]
+fn griefing8_listing_and_collateral_spam_never_grows_the_instance_entry() {
+    let t = setup();
+    let env = &t.env;
+    env.cost_estimate().budget().reset_unlimited();
+    let only = ["AssetCount", "Next", "Quote", "Underlyings"];
+    assert_eq!(t.instance_keys(), only, "after the constructor");
+    assert_eq!(t.reserved_entry(&t.usdx), None);
+
+    // every lifecycle path on the fixture tokens
+    let (w, m, h, h2) = (&t.writer, &t.maker2, &t.holder, &t.holder2);
+    let p = t.put(w);
+    t.c.buy(h, &p);
+    t.c.exercise(h, &p);
+    t.c.claim_delivery(w, &p);
+    let c = t.call(m);
+    t.c.buy(h, &c);
+    t.c.transfer(h, h2, &c);
+    let x = t.offer(w, &t.bond, OptionType::Call);
+    t.c.cancel_offer(w, &x);
+    let y = t.offer_x(
+        w,
+        &t.bond,
+        OptionType::Put,
+        QTY,
+        STRIKE,
+        PREMIUM,
+        START + 10,
+    );
+    let z = t.offer_x(m, &t.rwa, OptionType::Put, QTY, STRIKE, PREMIUM, START + 10);
+    t.at(START + 10);
+    t.c.reclaim(w, &y);
+    assert_eq!(t.prune(&Address::generate(env), &vec![env, z]), 1);
+    t.at(START);
+    assert_eq!(t.instance_keys(), only, "after every lifecycle path");
+
+    // a spammer lists MAX_PAGE + 10 unflagged assets and locks collateral on each
+    let lister = Address::generate(env);
+    let n = MAX_PAGE + 10;
+    let mut junk = std::vec::Vec::new();
+    for i in 0..n {
+        let (iss, iss_id) = t.issuer(0);
+        let code = std::format!("S{i}");
+        let sac = t.deploy_sac(&classic_asset(code.as_bytes(), &iss_id));
+        assert_eq!(t.c.list_asset(&lister, &t.s(&code), &iss), sac);
+        let sybil = Address::generate(env);
+        let amt = i as i128 + 1;
+        t.sac(&sac).mint(&sybil, &amt);
+        t.c.create_offer(&sybil, &sac, &OptionType::Call, &amt, &1, &1, &EXPIRY);
+        junk.push(sac);
+    }
+    assert_eq!(t.c.asset_count(), SEEDED + n);
+    assert_eq!(
+        t.instance_keys(),
+        only,
+        "after {n} listings with collateral"
+    );
+
+    // each token's reserve is its own persistent entry, the one `open_collateral` reports
+    for (i, sac) in junk.iter().enumerate() {
+        assert_eq!(
+            t.reserved_entry(sac),
+            Some(i as i128 + 1),
+            "Reserved(junk {i})"
+        );
+        assert_eq!(t.c.open_collateral(sac), i as i128 + 1);
+    }
+    for (label, tok) in [("USDx", &t.usdx), ("RWA", &t.rwa), ("BOND", &t.bond)] {
+        let held = t.c.open_collateral(tok);
+        assert_eq!(t.reserved_entry(tok), Some(held), "Reserved({label})");
+    }
+    assert_eq!(
+        t.c.open_collateral(&t.usdx),
+        0,
+        "every PUT exercised and claimed, reclaimed or pruned"
+    );
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY, "the transferred CALL");
+    assert_eq!(t.c.open_collateral(&t.bond), 0);
+}
+
+/// v1.3.1 (ABI §8, §13.8): a persistent `Reserved(token)` entry must not archive under live
+/// positions (every later path on that token would then fail until someone restores it), so each
+/// state-changing path extends the TTL of the reserves it touches: the legs it moves and, for
+/// `create_offer`, `buy` and `transfer`, both of the option's tokens, which the
+/// `CollateralShortfall` guard reads. Each case starts from aged entries (6 days left).
+#[test]
+fn griefing8_reserved_entries_are_kept_alive_by_every_path_that_touches_them() {
+    type Step = fn(&T, u32, u32);
+    let none: Step = |_, _, _| {};
+    let cases: [(&str, Step, Step, [bool; 2]); 11] = [
+        (
+            "create_offer PUT",
+            none,
+            |t, _, _| {
+                t.put(&t.writer);
+            },
+            [true, true],
+        ),
+        (
+            "create_offer CALL",
+            none,
+            |t, _, _| {
+                t.call(&t.writer);
+            },
+            [true, true],
+        ),
+        (
+            "buy PUT",
+            none,
+            |t, p, _| t.c.buy(&t.holder, &p),
+            [true, true],
+        ),
+        (
+            "buy CALL",
+            none,
+            |t, _, c| t.c.buy(&t.holder, &c),
+            [true, true],
+        ),
+        (
+            "transfer",
+            |t, _, c| t.c.buy(&t.holder, &c),
+            |t, _, c| t.c.transfer(&t.holder, &t.holder2, &c),
+            [true, true],
+        ),
+        (
+            "exercise PUT",
+            |t, p, _| t.c.buy(&t.holder, &p),
+            |t, p, _| t.c.exercise(&t.holder, &p),
+            [true, true],
+        ),
+        (
+            "exercise CALL",
+            |t, _, c| t.c.buy(&t.holder, &c),
+            |t, _, c| t.c.exercise(&t.holder, &c),
+            [true, true],
+        ),
+        (
+            "claim_delivery PUT",
+            |t, p, _| {
+                t.c.buy(&t.holder, &p);
+                t.c.exercise(&t.holder, &p);
+            },
+            |t, p, _| t.c.claim_delivery(&t.writer, &p),
+            [false, true],
+        ),
+        (
+            "cancel_offer CALL",
+            none,
+            |t, _, c| t.c.cancel_offer(&t.maker2, &c),
+            [false, true],
+        ),
+        (
+            "reclaim PUT",
+            |t, p, _| t.c.buy(&t.holder, &p),
+            |t, p, _| {
+                t.at(EXPIRY);
+                t.c.reclaim(&t.writer, &p);
+            },
+            [true, false],
+        ),
+        (
+            "prune_expired PUT",
+            none,
+            |t, p, _| {
+                t.at(EXPIRY);
+                assert_eq!(t.prune(&Address::generate(&t.env), &vec![&t.env, p]), 1);
+            },
+            [true, false],
+        ),
+    ];
+    for (label, pre, act, touched) in cases {
+        let t = setup();
+        let p = t.put(&t.writer); // Reserved(USDx)
+        let c = t.call(&t.maker2); // Reserved(RWA)
+        pre(&t, p, c);
+        let ttls = |t: &T| {
+            [
+                t.entry_ttl("Reserved", t.usdx.into_val(&t.env)),
+                t.entry_ttl("Reserved", t.rwa.into_val(&t.env)),
+            ]
+        };
+        let seq = t.env.ledger().sequence();
+        t.env.ledger().set_sequence_number(seq + 24 * DAY);
+        let aged = ttls(&t);
+        assert!(aged.iter().all(|&ttl| ttl < 7 * DAY), "{label}: {aged:?}");
+        act(&t, p, c);
+        let after = ttls(&t);
+        for (i, tok) in ["Reserved(USDx)", "Reserved(RWA)"].iter().enumerate() {
+            if touched[i] {
+                assert_eq!(after[i], 30 * DAY, "{label}: {tok} not extended");
+            }
+        }
+    }
 }
 
 #[test]
@@ -4638,6 +4902,48 @@ fn listing18_lookalike_codes_never_alias_a_listed_asset() {
     assert_eq!(t.bal(&real, &t.contract), QTY);
 }
 
+/// v1.3.1 (ABI §3 `list_asset`, §13.4): `AlreadyListed` is decided from the contract's own
+/// storage before the deployment probe. A re-listing of a self-listed asset, of a
+/// constructor-seeded asset or of the quote token makes no call into that asset's SAC, so its
+/// answer can never depend on the SAC (v1.3 probed first), while a first listing probes the SAC
+/// exactly once (`decimals`) and calls nothing else.
+#[test]
+fn listing18_relisting_is_rejected_before_the_deployment_probe() {
+    let t = setup();
+    let env = &t.env;
+    let root = (t.contract.clone(), std::string::String::from("list_asset"));
+    let (iss, iss_id) = t.issuer(REGULATED);
+    let eqty = t.deploy_sac(&classic_asset(b"EQTY", &iss_id));
+    assert_eq!(t.c.list_asset(&t.writer, &t.s("EQTY"), &iss), eqty);
+    assert_eq!(
+        t.calls(),
+        [root.clone(), (eqty.clone(), "decimals".into())],
+        "a first listing probes the SAC once"
+    );
+    let g = |id: &xdr::AccountId| {
+        Address::try_from_val(env, &xdr::ScAddress::Account(id.clone())).unwrap()
+    };
+    let before = t.snap();
+    for (label, code, issuer) in [
+        ("the self-listed EQTY", "EQTY", iss.clone()),
+        ("the seeded RWA (code aaa)", "aaa", g(&t.rwa_issuer)),
+        ("the quote token (code aaa)", "aaa", g(&t.usdx_issuer)),
+    ] {
+        let r = t.c.try_list_asset(&t.maker2, &t.s(code), &issuer);
+        let calls = t.calls();
+        rejected_as(&t, label, r, Error::AlreadyListed, &before);
+        assert_eq!(
+            calls,
+            std::slice::from_ref(&root),
+            "{label}: probed the SAC before AlreadyListed"
+        );
+    }
+    // the same code under another issuer is a different, undeployed asset: the probe decides
+    let (other, _) = t.issuer(REGULATED);
+    let r = t.c.try_list_asset(&t.maker2, &t.s("EQTY"), &other);
+    rejected_as(&t, "undeployed", r, Error::AssetNotDeployed, &before);
+}
+
 #[test]
 fn listing18_issuer_must_be_a_classic_account() {
     let t = setup();
@@ -5315,10 +5621,7 @@ fn prune19_huge_id_lists_fit_the_footprint_or_fail_as_a_whole() {
         assert_eq!(u.state(id), State::Expired);
     }
     assert_eq!(u.open_book(&u.rwa).len() as u32, pool - cursor);
-    assert_eq!(
-        u.c.list_open().len() as u32,
-        (pool - cursor).min(LIST_OPEN_MAX)
-    );
+    assert_eq!(u.c.list_open().len(), (pool - cursor).min(LIST_OPEN_MAX));
     assert_eq!(u.c.open_collateral(&u.usdx), (pool - cursor) as i128);
 }
 
