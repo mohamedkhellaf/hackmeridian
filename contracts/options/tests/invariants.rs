@@ -1,23 +1,34 @@
-//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`, v1.3:
+//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`, v1.3.1:
 //! error codes 101–119, `CollateralShortfall`, contract re-authorization check in `buy` (ABI §10),
 //! holder `transfer` and paged `get_options` (ABI §11), permissionless `list_asset` registry,
-//! per-writer open cap, tenor cap, `prune_expired` and the contract-address backstop (ABI §12)).
+//! per-writer open cap, tenor cap, `prune_expired` and the contract-address backstop (ABI §12),
+//! and the v1.3.1 corrections (ABI §13): `prune_expired(pruner, ids)` with `pruner` auth and the
+//! backstop, the incoming-participant guards `ContractNotAuthorized` / `CollateralShortfall` in
+//! `transfer`, per-asset open books (`list_open_for`, `OpenListFull` per asset at
+//! `MAX_OPEN_PER_ASSET = 500`, `list_open()` as the books concatenated in registry order and
+//! truncated to 200 ids) and `AlreadyListed` before `AssetNotDeployed` in `list_asset`).
 //! See "Coverage limits" below for the checks the random model cannot reach.
 //!
 //! A random sequence of operations (offers, buys, exercises, holder transfers, cancellations,
 //! reclaims, delivery claims, time warps, issuer freeze/unfreeze of accounts and of the contract
-//! address, clawback from the contract on RWA, v1.3 `list_asset` requests, `prune_expired` with
-//! random id lists, the EQTY issuer (de)authorizing the escrow, and calls that pass the contract's
-//! own address as a party) is applied through the `try_` client methods; failures are allowed and
-//! expected. After every successful `transfer` the previous holder's `exercise` is run as a probe
-//! and must fail with `NotHolder` (model and chain). After EVERY operation the on-chain state is
-//! read back and checked against:
+//! address, clawback from the contract on RWA, v1.3 `list_asset` requests, `prune_expired` by a
+//! random pruner with random id lists, the EQTY issuer (de)authorizing the escrow, and calls that
+//! pass the contract's own address as a party) is applied through the `try_` client methods;
+//! failures are allowed and expected. A composite stress operation (`World::stress_transfer`:
+//! the issuer de-authorizes the escrow, or claws RWA back from it, right before a holder transfer
+//! that would otherwise succeed; after a re-authorization the same transfer is retried) drives
+//! transfers into the v1.3.1 `ContractNotAuthorized` / `CollateralShortfall` guards dozens of
+//! times per run. After every successful `transfer` the previous holder's `exercise` is run as a
+//! probe and must fail with `NotHolder` (model and chain). After EVERY operation the on-chain
+//! state is read back and checked against:
 //!
 //! * an executable reference model of the ABI (`Model`) that predicts the outcome of each call
 //!   (Ok / options `Error` by name / SAC error), its return value (`create_offer` id, `list_asset`
-//!   SAC, `prune_expired` count), its exact events (ABI §5; a failed call emits none) and, for
-//!   `list_asset`/`prune_expired`, its auth (lister only / none), from the check order in ABI §3
-//!   and the SAC semantics of soroban-env-host, and the exact state afterwards;
+//!   SAC, `prune_expired` count), its exact events (ABI §5, every byte, including the
+//!   authenticated `OfferPruned.pruner`; a failed call emits none) and, for
+//!   `list_asset`/`prune_expired`, its auth (exactly the lister / exactly the pruner), from the
+//!   check order in ABI §3 and the SAC semantics of soroban-env-host, and the exact state
+//!   afterwards;
 //! * the invariants in `World::check_state` and `check_transition`:
 //!   1. `open_collateral(T)` equals the sum of the ABI §2 derived reserves of every option;
 //!   2. SAC `balance(contract, T) == open_collateral(T)`, except RWA where the deficit equals the
@@ -26,7 +37,13 @@
 //!   4. lifecycle: only ABI §4 edges, terminal states frozen, holder rules (set by `buy`, changed
 //!      only by a successful `transfer` of that `Active` option), immutable terms; `prune_expired`
 //!      moves exactly the predicted ids, each `Offered` -> `Expired` with `now >= expiry`;
-//!   5. `list_open()` == ids in `Offered`, creation order; `option_count()` == successful creates;
+//!   5. per-asset open books (v1.3.1): for every fixture token `t`, `list_open_for(t, ..)` read in
+//!      pages of 4 (every page before the last full, the page at the end and every `limit == 0`
+//!      page empty, `list_open_for(t, 0, u32::MAX)` the head of the book) == the ids of the
+//!      options on underlying `t` in `Offered`, creation order (empty for the quote token and
+//!      unlisted assets, and for the contract address); every `Offered` option's underlying is
+//!      listed; `list_open()` == those books concatenated in registry order, truncated to 200
+//!      ids; `option_count()` == successful creates;
 //!   6. a successful `exercise` moves the holder's pay-leg and receive-leg by exactly the ABI
 //!      amounts (and every balance delta of every call equals the ABI transfers; `transfer` moves
 //!      no tokens);
@@ -47,7 +64,7 @@
 //!      read on chain (independent of the model);
 //!
 //!   plus atomicity: a failed call changes nothing observable (options, balances, reserves, open
-//!   list, per-writer counts, registry).
+//!   list and per-asset books, per-writer counts, registry).
 //!
 //! Any violation panics with the full, readable operation history (after proptest shrinking).
 //!
@@ -70,29 +87,48 @@
 //!   start authorized) so the deterministic regression
 //!   `writer_deauthorized_on_quote_cannot_create_offer` can revoke a writer; `src/test.rs`
 //!   `create_offer_rejects_writer_deauthorized_on_quote` covers it too.
-//! * `OpenListFull` (ABI §10.2) is unreachable here: a case has at most 40 operations and
-//!   `MAX_OPEN` is 1000. Covered by `src/test.rs` `open_list_cap_returns_open_list_full`.
+//! * `OpenListFull` (v1.3.1, ABI §13.3: per underlying, `MAX_OPEN_PER_ASSET = 500`) is predicted
+//!   by the model but unreachable here: a case has at most 40 operations, and 500 offers on one
+//!   asset need at least 10 writers (`MAX_OPEN_PER_WRITER = 50`) while the fixture has 5 actors.
+//!   The regression `open_book_cap_is_per_asset_at_five_hundred` (own fixture, 11 writers) fills
+//!   one book with 10 writers x 50 offers, pins the check order around `OpenListFull`, shows a
+//!   successful offer on another asset while the first book is full, the `list_open()`
+//!   truncation at 200 ids and every way a slot is freed (buy, cancel, reclaim, prune).
+//! * `list_open()` truncation (200 ids) is likewise unreachable at random; the same regression
+//!   pins it, `open_books_concatenate_in_registry_order` pins the registry-order concatenation
+//!   with the full oracle, and `list_open_spans_the_whole_registry` (own fixture, 52 assets) that
+//!   the concatenation covers more than `MAX_PAGE` listed assets (the ABI caps ids, not assets).
+//!   That regression is `#[ignore]`d as an ABI deviation: the v1.3.1 implementation visits only
+//!   the first `MAX_PAGE` registry assets, a bound ABI §3/§13.3 do not state.
 //! * `WriterOpenLimit` (ABI §12.2, `MAX_OPEN_PER_WRITER = 50`) is predicted by the model but 40
 //!   random operations cannot reach it; the regression
 //!   `writer_open_limit_is_exactly_fifty_offers_per_writer` drives one writer to the cap and pins
 //!   the check order around it and every way a slot is freed (buy, cancel, reclaim, prune).
+//! * `list_asset` check order `AlreadyListed` before `AssetNotDeployed` (v1.3.1, ABI §13.4) is
+//!   encoded in the model but cannot be observed with this fixture: `AlreadyListed` needs the
+//!   derived SAC to be the quote token or in the registry, and every such address here is a
+//!   deployed SAC. The regression `list_asset_checks_already_listed_before_deployment` deploys
+//!   contracts whose quote token / constructor underlying is the derived address of an
+//!   undeployed SAC.
 //! * Settlement of existing positions under a pooled RWA deficit (ABI §6, §10.5: unaffected while
 //!   the pool covers them, SAC #10 once it is drained) needs large clawbacks that random runs
 //!   rarely produce; the regression `clawback_deficit_falls_on_the_last_rwa_settlement` pins
 //!   `exercise`, `claim_delivery`, `reclaim` and `cancel_offer` under a deficit, and
 //!   `prune_expired_skips_live_bought_frozen_and_underfunded_offers` pins `prune_expired`.
-//! * The `OfferPruned.pruner` value is not predicted: `prune_expired(ids)` takes no address and
-//!   requires no auth (ABI §3), so the ABI does not say which address it reports. The oracle
-//!   checks every other byte of the event and that `pruner` decodes as an `Address`.
+//!   The small deficits of the stress operation reach the v1.3.1 `transfer`
+//!   `CollateralShortfall` guard at random; the regression
+//!   `transfer_refuses_new_holders_while_the_escrow_cannot_settle` pins it and
+//!   `ContractNotAuthorized` with their check order.
 //!
-//! Running: `cargo test -p options --test invariants` (default 200 cases, about a minute).
+//! Running: `cargo test -p options --test invariants` (default 200 cases, about 105 s here).
 //! `PROPTEST_CASES=<n>` changes the number of cases. `PROPTEST_RNG_SEED=<u64>` fixes the RNG so a
 //! run, and any failure it finds, is reproducible; without it every run draws a fresh seed (no
 //! regression files are written). `INVARIANTS_TRACE=1 ... -- --nocapture` prints every passing
 //! sequence. At the end the property test prints a predicted / observed tally of every
 //! (call, outcome) pair (`-- --nocapture` shows it for a passing run), and a run of at least 100
 //! cases fails if one of the `REQUIRED_COVERAGE` pairs (the v1.3 `list_asset`, `prune_expired`
-//! and `TenorOutOfRange` paths among them) never happened.
+//! and `TenorOutOfRange` paths and the v1.3.1 `transfer` guards and pruner backstop among them)
+//! never happened.
 
 // Token/holder indices address several parallel tables (balances, names, reserves) at once.
 #![allow(clippy::needless_range_loop)]
@@ -150,9 +186,17 @@ const NAMES: [&str; N_HOLDERS] = [
 /// (`Op::ContractAuth`).
 const FREEZE_TARGETS: [usize; 4] = [WRITER1, WRITER2, HOLDER1, HOLDER2];
 
-/// ABI §10 `MAX_OPEN`: `create_offer` fails with `OpenListFull` at this many `Offered` ids.
+/// ABI §13.3 `MAX_OPEN_PER_ASSET` (v1.3.1): `create_offer` fails with `OpenListFull` once the
+/// underlying's open book holds this many ids (v1.3 and before: one global list of 1000).
 /// Mirrored in the model but unreachable with at most 40 operations per case (see the header).
-const MAX_OPEN: usize = 1000;
+const MAX_OPEN_PER_ASSET: usize = 500;
+
+/// ABI §3 `list_open()` (v1.3.1): the per-asset books concatenated in registry order, truncated
+/// to this many ids.
+const LIST_OPEN_CAP: usize = 200;
+
+/// ABI §3/§8 `MAX_PAGE`: page cap of `get_options`, `list_assets` and `list_open_for`.
+const MAX_PAGE: u32 = 50;
 
 /// ABI §12 `MAX_OPEN_PER_WRITER`: `create_offer` fails with `WriterOpenLimit` once the writer has
 /// this many `Offered` options (checked right after `OpenListFull`).
@@ -235,8 +279,9 @@ enum Act {
         code: &'static str,
         issuer: Issuer,
     },
-    /// v1.3 `prune_expired(ids[..len])` (fixed array so that `Act` stays `Copy`).
+    /// v1.3.1 `prune_expired(pruner, ids[..len])` (fixed array so that `Act` stays `Copy`).
     Prune {
+        pruner: usize,
         ids: [u32; MAX_PRUNE],
         len: u8,
     },
@@ -351,7 +396,12 @@ impl fmt::Display for Act {
                 "list_asset({}, code={code:?}, issuer={issuer})",
                 NAMES[lister]
             ),
-            Act::Prune { ids, len } => write!(f, "prune_expired({:?})", &ids[..len as usize]),
+            Act::Prune { pruner, ids, len } => write!(
+                f,
+                "prune_expired({}, {:?})",
+                NAMES[pruner],
+                &ids[..len as usize]
+            ),
             Act::SetAuthEqty {
                 target: CONTRACT,
                 authorized,
@@ -372,12 +422,15 @@ impl fmt::Display for Act {
 }
 
 /// Actor selector for id-based operations, resolved against the current state so that a useful
-/// fraction of random calls come from the option's own writer/holder.
+/// fraction of random calls come from the option's own writer/holder (or, for `buy`, from an
+/// actor that may buy it: not its writer, authorized on its underlying, so that enough options
+/// become `Active` for the exercise / claim / transfer paths).
 #[derive(Clone, Copy, Debug)]
 enum Who {
     Actor(usize),
     Writer,
     Holder,
+    Buyer,
 }
 
 /// Recipient selector for `transfer`: a fixed actor, or (resolved against the model) an actor that
@@ -387,6 +440,16 @@ enum Who {
 enum To {
     Actor(usize),
     Eligible,
+}
+
+/// What `Op::StressTransfer` does to the escrow right before the transfer (v1.3.1
+/// incoming-participant guards, ABI §13.2): de-authorize the contract on the option's underlying
+/// (RWA or EQTY, the assets with random issuer actions), transfer, then re-authorize it; or claw
+/// 1 RWA unit back from the contract (an RWA deficit, if the contract holds RWA), then transfer.
+#[derive(Clone, Copy, Debug)]
+enum Stress {
+    DeauthContract,
+    ClawbackRwa,
 }
 
 /// `u8` id selector value that resolves to the first unknown id (`option_count`).
@@ -409,6 +472,9 @@ enum Op {
     Exercise(u8, Who),
     /// id selector, caller (`from`), recipient (`to`).
     Transfer(u8, Who, To),
+    /// v1.3.1 transfer guards: a holder transfer right after an issuer action on the escrow (see
+    /// `World::stress_transfer`); option selector, recipient, issuer action.
+    StressTransfer(u8, To, Stress),
     Cancel(u8, Who),
     Reclaim(u8, Who),
     Claim(u8, Who),
@@ -421,15 +487,16 @@ enum Op {
     Clawback(i128),
     /// v1.3 `list_asset` by an actor; the `u8` indexes `LIST_CANDIDATES`.
     List(usize, u8),
-    /// v1.3 `prune_expired`: id selectors (first `len` used). A selector < 128 resolves to a
-    /// prunable id (`Offered`, `now >= expiry`) if any, `UNKNOWN_ID` to the first unknown id.
-    /// `Some(sel)`: first warp to the expiry of an option (`WarpToExpiry(sel, 0)`), so that
-    /// prunable offers exist more often.
-    Prune([u8; MAX_PRUNE], u8, Option<u8>),
+    /// v1.3.1 `prune_expired`: pruner (a holder index: any actor, rarely the contract address),
+    /// id selectors (first `len` used). A selector < 128 resolves to a prunable id (`Offered`,
+    /// `now >= expiry`) if any, `UNKNOWN_ID` to the first unknown id. `Some(sel)`: first warp to
+    /// the expiry of an option (`WarpToExpiry(sel, 0)`), so that prunable offers exist more often.
+    Prune(usize, [u8; MAX_PRUNE], u8, Option<u8>),
     /// EQTY issuer `set_authorized(contract, bool)`.
     EqtyContractAuth(bool),
     /// v1.3 backstop: the contract's own address as writer / buyer / holder / transfer recipient
-    /// / `list_asset` lister (kind, id or `LIST_CANDIDATES` selector).
+    /// / `list_asset` lister / (v1.3.1) `prune_expired` pruner (kind, id or `LIST_CANDIDATES`
+    /// selector).
     Backstop(u8, u8),
 }
 
@@ -572,10 +639,21 @@ impl Model {
             .count()
     }
 
+    /// v1.3.1 `list_open_for(asset)` (ABI §13.3): the ids of the options on `asset` in `Offered`,
+    /// oldest first (empty for the quote token and unlisted assets).
+    fn open_for(&self, asset: usize) -> Vec<u32> {
+        self.opts
+            .iter()
+            .filter(|o| o.underlying == asset && o.state == State::Offered)
+            .map(|o| o.id)
+            .collect()
+    }
+
     /// ABI §3 `list_asset`: `InvalidArgs` unless the code is 1–12 chars of `[A-Za-z0-9]` and the
     /// issuer is a `G…` account; the SAC is derived from `(code, issuer)` (only `"aaa"` of a
-    /// fixture issuer is deployed), `AssetNotDeployed` otherwise; `AlreadyListed` for a listed SAC
-    /// or the quote token. Returns the fixture token the request lists.
+    /// fixture issuer is deployed); `AlreadyListed` for a listed SAC or the quote token, checked
+    /// before the deployment probe (v1.3.1, ABI §13.4); `AssetNotDeployed` otherwise. Returns the
+    /// fixture token the request lists.
     fn list_target(&self, code: &str, issuer: Issuer) -> Result<usize, Error> {
         let code_ok =
             (1..=12).contains(&code.len()) && code.bytes().all(|b| b.is_ascii_alphanumeric());
@@ -583,22 +661,33 @@ impl Model {
         if !code_ok || !account {
             return Err(Error::InvalidArgs);
         }
-        let t = match issuer {
-            Issuer::Of(t) if code == SAC_CODE => t,
-            _ => return Err(Error::AssetNotDeployed),
+        // The derived SAC: the fixture token for `"aaa"` of its issuer; for any other request an
+        // address with no deployed SAC, which is neither the quote token nor in this fixture's
+        // registry (the constructor seeded fixture tokens only, `list_asset` lists deployed SACs
+        // only), so the AlreadyListed-first order shows only in
+        // `list_asset_checks_already_listed_before_deployment`.
+        let derived = match issuer {
+            Issuer::Of(t) if code == SAC_CODE => Some(t),
+            _ => None,
         };
-        if t == USDX || self.listed.contains(&t) {
-            return Err(Error::AlreadyListed);
+        if let Some(t) = derived {
+            if t == USDX || self.listed.contains(&t) {
+                return Err(Error::AlreadyListed);
+            }
         }
-        Ok(t)
+        derived.ok_or(Error::AssetNotDeployed)
     }
 
-    /// ABI §3 `prune_expired(ids)`: `NotFound` if any id is unknown (the error reverts the whole
-    /// call, so its position does not matter). Otherwise, in order, each id that is `Offered` with
-    /// `now >= expiry` returns its collateral to the writer with `try_transfer`; a failed transfer
-    /// (frozen writer, de-authorized contract, drained pool) skips the id and changes nothing.
-    /// Returns the pruned ids in call order and their transfers.
-    fn plan_prune(&self, ids: &[u32]) -> Result<(Vec<u32>, Vec<Transfer>), Error> {
+    /// ABI §3 `prune_expired(pruner, ids)` (v1.3.1): after `pruner`'s auth, `InvalidArgs` if the
+    /// pruner is the contract (backstop); `NotFound` if any id is unknown (the error reverts the
+    /// whole call, so its position does not matter). Otherwise, in order, each id that is
+    /// `Offered` with `now >= expiry` returns its collateral to the writer with `try_transfer`; a
+    /// failed transfer (frozen writer, de-authorized contract, drained pool) skips the id and
+    /// changes nothing. Returns the pruned ids in call order and their transfers.
+    fn plan_prune(&self, pruner: usize, ids: &[u32]) -> Result<(Vec<u32>, Vec<Transfer>), Error> {
+        if pruner == CONTRACT {
+            return Err(Error::InvalidArgs);
+        }
         if ids.iter().any(|&id| self.opt(id).is_none()) {
             return Err(Error::NotFound);
         }
@@ -628,8 +717,8 @@ impl Model {
     /// The ids a `prune_expired` act prunes (empty for any other act or a failing prune).
     fn pruned(&self, act: &Act) -> Vec<u32> {
         match *act {
-            Act::Prune { ids, len } => self
-                .plan_prune(&ids[..len as usize])
+            Act::Prune { pruner, ids, len } => self
+                .plan_prune(pruner, &ids[..len as usize])
                 .map(|(p, _)| p)
                 .unwrap_or_default(),
             _ => Vec::new(),
@@ -673,12 +762,8 @@ impl Model {
                 if !self.auth[underlying][CONTRACT] {
                     return Err(Error::ContractNotAuthorized);
                 }
-                let open = self
-                    .opts
-                    .iter()
-                    .filter(|o| o.state == State::Offered)
-                    .count();
-                if open >= MAX_OPEN {
+                // v1.3.1: the cap is per underlying (this asset's open book).
+                if self.open_for(underlying).len() >= MAX_OPEN_PER_ASSET {
                     return Err(Error::OpenListFull);
                 }
                 // v1.3 per-writer cap, right after OpenListFull.
@@ -740,7 +825,9 @@ impl Model {
             }
             // v1.2 ABI §3 `transfer`: NotFound -> NotHolder -> WrongState -> Expired ->
             // InvalidArgs (to == holder) -> SelfTrade (to == writer) -> NotEligible (to on the
-            // underlying). No token moves.
+            // underlying) -> (v1.3.1) ContractNotAuthorized (contract on the underlying) ->
+            // CollateralShortfall (quote or underlying). The holder's own authorization is never
+            // checked (a frozen holder may transfer: its tokens do not move). No token moves.
             Act::Transfer { id, from, to } => {
                 if from == CONTRACT || to == CONTRACT {
                     return Err(Error::InvalidArgs); // v1.3 backstop, right after auth
@@ -763,6 +850,13 @@ impl Model {
                 }
                 if !self.auth[o.underlying][to] {
                     return Err(Error::NotEligible);
+                }
+                // v1.3.1 (ABI §13.2): no hand-over while the escrow cannot settle the position.
+                if !self.auth[o.underlying][CONTRACT] {
+                    return Err(Error::ContractNotAuthorized);
+                }
+                if self.shortfall(o.underlying) {
+                    return Err(Error::CollateralShortfall);
                 }
                 Ok(vec![])
             }
@@ -814,7 +908,9 @@ impl Model {
                 }
                 self.list_target(code, issuer).map(|_| vec![])
             }
-            Act::Prune { ids, len } => self.plan_prune(&ids[..len as usize]).map(|(_, t)| t),
+            Act::Prune { pruner, ids, len } => self
+                .plan_prune(pruner, &ids[..len as usize])
+                .map(|(_, t)| t),
             Act::SetTime { .. }
             | Act::SetAuthRwa { .. }
             | Act::SetAuthUsdx { .. }
@@ -947,7 +1043,10 @@ struct Snap {
     bal: Balances,
     open_collateral: [i128; N_TOKENS],
     opts: Vec<Opt>,
+    /// `list_open()` (v1.3.1: the per-asset books concatenated in registry order, at most 200).
     open: Vec<u32>,
+    /// v1.3.1 `list_open_for(t, ..)` of every fixture token, read page by page.
+    open_for: [Vec<u32>; N_TOKENS],
     count: u32,
     /// v1.3 `writer_open_count` of every holder (actors and the contract address).
     writer_open: [u32; N_HOLDERS],
@@ -1158,6 +1257,39 @@ fn tally_report(cases: u32) -> String {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Selector resolution helpers
+// ---------------------------------------------------------------------------------------------
+
+/// `Who::Buyer`: an actor that may buy option `id` (not its writer, authorized on its
+/// underlying), rotated by id so that every candidate buys sometimes; holder1 if none.
+fn buyer_for(m: &Model, id: u32) -> usize {
+    let c = [HOLDER1, HOLDER2, WRITER1, WRITER2];
+    m.opt(id)
+        .and_then(|o| {
+            (0..c.len())
+                .map(|k| c[(id as usize + k) % c.len()])
+                .find(|&a| a != o.writer && m.auth[o.underlying][a])
+        })
+        .unwrap_or(HOLDER1)
+}
+
+/// `To`: a fixed actor, or (`To::Eligible`) the first actor that can receive option `id`
+/// (neither its holder nor its writer, authorized on its underlying); holder2 if none.
+fn recipient_for(m: &Model, id: u32, to: To) -> usize {
+    match to {
+        To::Actor(a) => a,
+        To::Eligible => m
+            .opt(id)
+            .and_then(|o| {
+                [HOLDER1, HOLDER2, WRITER1, WRITER2]
+                    .into_iter()
+                    .find(|&a| Some(a) != o.holder && a != o.writer && m.auth[o.underlying][a])
+            })
+            .unwrap_or(HOLDER2),
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
 // World: environment + model + invariant checks
 // ---------------------------------------------------------------------------------------------
 
@@ -1294,6 +1426,7 @@ impl World {
                 open_collateral: [0; N_TOKENS],
                 opts: Vec::new(),
                 open: Vec::new(),
+                open_for: Default::default(),
                 count: 0,
                 writer_open: [0; N_HOLDERS],
                 listed: [false; N_TOKENS],
@@ -1338,6 +1471,7 @@ impl World {
             Who::Actor(a) => a,
             Who::Writer => m.opt(id).map(|o| o.writer).unwrap_or(WRITER1),
             Who::Holder => m.opt(id).and_then(|o| o.holder).unwrap_or(HOLDER1),
+            Who::Buyer => buyer_for(m, id),
         };
         match *op {
             Op::Create {
@@ -1371,23 +1505,14 @@ impl World {
                     who: who_of(id, w),
                 }
             }
+            // Resolved by `World::stress_transfer`; as a plain transfer here.
+            Op::StressTransfer(s, to, _) => self.resolve(&Op::Transfer(s, Who::Holder, to)),
             Op::Transfer(s, w, to) => {
                 let id = pick(s, &[State::Active]);
-                let to = match to {
-                    To::Actor(a) => a,
-                    To::Eligible => m
-                        .opt(id)
-                        .and_then(|o| {
-                            [HOLDER1, HOLDER2, WRITER1, WRITER2].into_iter().find(|&a| {
-                                Some(a) != o.holder && a != o.writer && m.auth[o.underlying][a]
-                            })
-                        })
-                        .unwrap_or(HOLDER2),
-                };
                 Act::Transfer {
                     id,
                     from: who_of(id, w),
-                    to,
+                    to: recipient_for(m, id, to),
                 }
             }
             Op::Cancel(s, w) => {
@@ -1442,7 +1567,7 @@ impl World {
                     issuer,
                 }
             }
-            Op::Prune(sels, len, _) => {
+            Op::Prune(pruner, sels, len, _) => {
                 let prunable: Vec<u32> = m
                     .opts
                     .iter()
@@ -1459,13 +1584,13 @@ impl World {
                         sel as u32 % n
                     };
                 }
-                Act::Prune { ids, len }
+                Act::Prune { pruner, ids, len }
             }
             Op::EqtyContractAuth(authorized) => Act::SetAuthEqty {
                 target: CONTRACT,
                 authorized,
             },
-            Op::Backstop(kind, s) => match kind % 6 {
+            Op::Backstop(kind, s) => match kind % 7 {
                 0 => Act::Create {
                     writer: CONTRACT,
                     underlying: [RWA, BOND, EQTY, USDX][s as usize % 4],
@@ -1500,6 +1625,27 @@ impl World {
                         to: CONTRACT,
                     }
                 }
+                // v1.3.1: the contract as pruner, with an id that is often prunable (and
+                // sometimes unknown: the backstop comes before NotFound).
+                5 => {
+                    let prunable: Vec<u32> = m
+                        .opts
+                        .iter()
+                        .filter(|o| o.state == State::Offered && m.now >= o.expiry)
+                        .map(|o| o.id)
+                        .collect();
+                    let id = match prunable.as_slice() {
+                        [] => pick(s, &[State::Offered]),
+                        p => p[s as usize % p.len()],
+                    };
+                    let mut ids = [0u32; MAX_PRUNE];
+                    ids[0] = id;
+                    Act::Prune {
+                        pruner: CONTRACT,
+                        ids,
+                        len: 1,
+                    }
+                }
                 _ => {
                     let (code, issuer) = LIST_CANDIDATES[s as usize % LIST_CANDIDATES.len()];
                     Act::List {
@@ -1513,12 +1659,133 @@ impl World {
     }
 
     fn step(&mut self, op: &Op) -> Outcome {
-        if let Op::Prune(_, _, Some(sel)) = *op {
+        if let Op::Prune(_, _, _, Some(sel)) = *op {
             let warp = self.resolve(&Op::WarpToExpiry(sel, 0));
             self.run(warp);
         }
+        if let Op::StressTransfer(sel, to, stress) = *op {
+            return self.stress_transfer(sel, to, stress);
+        }
         let act = self.resolve(op);
         self.run(act)
+    }
+
+    /// `Op::StressTransfer` (v1.3.1 transfer guards, ABI §13.2), in checked steps. Candidates are
+    /// live (`now < expiry`) options the issuer action bites on: RWA or EQTY for a
+    /// de-authorization of the contract; for a clawback, RWA options while the escrow holds RWA,
+    /// or RWA CALLs (their collateral is RWA). In order of preference: an `Active` candidate whose
+    /// holder's transfer to `to` would succeed as things stand; an `Offered` one an eligible
+    /// buyer can buy (bought first); an `Active` one whose transfer fails anyway (it runs
+    /// without the issuer action; an earlier issuer action or deficit may already block it).
+    /// With no candidate, a writer offers an RWA CALL and an eligible buyer buys it (each only if
+    /// the model says it succeeds; otherwise the operation stops there). For a transfer that
+    /// would succeed, the issuer acts on the escrow first (de-authorize, transfer, re-authorize,
+    /// transfer again; or claw back 1 RWA unit, then transfer), so that the v1.3.1 guard, not an
+    /// earlier check, decides.
+    fn stress_transfer(&mut self, sel: u8, to: To, stress: Stress) -> Outcome {
+        let transfer_of = |m: &Model, id: u32| Act::Transfer {
+            id,
+            from: m.opts[id as usize].holder.unwrap_or(HOLDER1),
+            to: recipient_for(m, id, to),
+        };
+        let candidates = |m: &Model, s: State| -> Vec<u32> {
+            m.opts
+                .iter()
+                .filter(|o| o.state == s && m.now < o.expiry)
+                .filter(|o| match stress {
+                    Stress::DeauthContract => o.underlying == RWA || o.underlying == EQTY,
+                    Stress::ClawbackRwa => {
+                        o.underlying == RWA
+                            && (o.ty == OptionType::Call || m.bal[RWA][CONTRACT] > 0)
+                    }
+                })
+                .map(|o| o.id)
+                .collect()
+        };
+        let choose = |ids: &[u32]| (!ids.is_empty()).then(|| ids[sel as usize % ids.len()]);
+        let m = &self.model;
+        let active = candidates(m, State::Active);
+        let ready: Vec<u32> = active
+            .iter()
+            .copied()
+            .filter(|&id| m.predict(&transfer_of(m, id)) == Expect::Ok)
+            .collect();
+        let buyable: Vec<u32> = candidates(m, State::Offered)
+            .into_iter()
+            .filter(|&id| {
+                m.predict(&Act::Buy {
+                    id,
+                    who: buyer_for(m, id),
+                }) == Expect::Ok
+            })
+            .collect();
+        let id = if let Some(id) = choose(&ready) {
+            id
+        } else if let Some(id) = choose(&buyable) {
+            let who = buyer_for(&self.model, id);
+            self.run(Act::Buy { id, who });
+            id
+        } else if let Some(id) = choose(&active) {
+            let act = transfer_of(&self.model, id);
+            return self.run(act);
+        } else {
+            // No candidate: a writer offers an RWA CALL (its RWA collateral is what a clawback
+            // reaches) and an eligible buyer buys it, if the model says both succeed.
+            let create = Act::Create {
+                writer: [WRITER1, WRITER2][sel as usize % 2],
+                underlying: RWA,
+                ty: OptionType::Call,
+                qty: UNIT,
+                strike: 10 * UNIT,
+                premium: UNIT,
+                expiry: self.model.now + 10_000,
+            };
+            if self.model.predict(&create) != Expect::Ok {
+                return Outcome::Ok;
+            }
+            self.run(create);
+            let id = self.model.opts.len() as u32 - 1;
+            let buy = Act::Buy {
+                id,
+                who: buyer_for(&self.model, id),
+            };
+            if self.model.predict(&buy) != Expect::Ok {
+                return Outcome::Ok;
+            }
+            self.run(buy);
+            id
+        };
+        let act = transfer_of(&self.model, id);
+        if self.model.predict(&act) != Expect::Ok {
+            return self.run(act);
+        }
+        // Issuer actions on the contract change no id, holder or actor authorization, so `act`
+        // stays the same transfer.
+        let underlying = self.model.opts[id as usize].underlying;
+        let contract_auth = |authorized| match underlying {
+            RWA => Act::SetAuthRwa {
+                target: CONTRACT,
+                authorized,
+            },
+            _ => Act::SetAuthEqty {
+                target: CONTRACT,
+                authorized,
+            },
+        };
+        match stress {
+            // Once the issuer re-authorizes the escrow, the same transfer goes through.
+            Stress::DeauthContract => {
+                self.run(contract_auth(false));
+                let outcome = self.run(act);
+                self.run(contract_auth(true));
+                self.run(act);
+                outcome
+            }
+            Stress::ClawbackRwa => {
+                self.run(Act::ClawbackRwa { amount: 1 });
+                self.run(act)
+            }
+        }
     }
 
     /// Executes one act, checks the oracle and every invariant, returns the observed outcome.
@@ -1681,12 +1948,12 @@ impl World {
                 let (o, d) = classify(r);
                 (o, d, ret)
             }
-            Act::Prune { ids, len } => {
+            Act::Prune { pruner, ids, len } => {
                 let mut v = soroban_sdk::Vec::new(&self.env);
                 for &id in &ids[..len as usize] {
                     v.push_back(id);
                 }
-                let r = c.try_prune_expired(&v);
+                let r = c.try_prune_expired(&h[pruner], &v);
                 let ret = match &r {
                     Ok(Ok(n)) => Ret::U32(*n),
                     _ => Ret::Unit,
@@ -1735,14 +2002,13 @@ impl World {
         }
     }
 
-    /// The ABI §5 events a successful `act` emits, in order (`pruner` is not predicted, see the
-    /// header: it is taken from the observed event, every other byte is compared).
+    /// The ABI §5 events a successful `act` emits, in order (every byte is predicted, including
+    /// the v1.3.1 `OfferPruned.pruner`, the authenticated pruner argument).
     fn expected_events(
         &self,
         act: &Act,
         before: &Snap,
         pruned: &[u32],
-        observed: &[xdr::ContractEvent],
     ) -> Result<Vec<xdr::ContractEvent>, String> {
         let env = &self.env;
         let me = &self.holders[CONTRACT];
@@ -1805,17 +2071,18 @@ impl World {
                 }
                 .to_xdr(env, me)]
             }
-            Act::Prune { .. } => {
-                let mut v = Vec::with_capacity(pruned.len());
-                for (k, &id) in pruned.iter().enumerate() {
-                    let pruner = observed
-                        .get(k)
-                        .and_then(|e| pruner_of(env, e))
-                        .unwrap_or_else(|| me.clone());
-                    v.push(OfferPruned { id, pruner }.to_xdr(env, me));
-                }
-                v
-            }
+            // One OfferPruned per pruned id, in call order, naming the pruner (v1.3 emitted the
+            // contract's own address here).
+            Act::Prune { pruner, .. } => pruned
+                .iter()
+                .map(|&id| {
+                    OfferPruned {
+                        id,
+                        pruner: h[pruner].clone(),
+                    }
+                    .to_xdr(env, me)
+                })
+                .collect(),
             Act::SetTime { .. }
             | Act::SetAuthRwa { .. }
             | Act::SetAuthUsdx { .. }
@@ -1848,7 +2115,7 @@ impl World {
                 "RETURN: `{act}` returned {ret:?}, the ABI says {want_ret:?}"
             ));
         }
-        let want = self.expected_events(act, before, pruned, events.events())?;
+        let want = self.expected_events(act, before, pruned)?;
         if *events != want {
             return Err(format!(
                 "EVENTS: `{act}` emitted\n  {:?}\n  the ABI says\n  {:?}",
@@ -1856,11 +2123,12 @@ impl World {
                 want
             ));
         }
-        // ABI §3: `list_asset` is signed by the lister (accountability only); `prune_expired`
-        // requires no auth at all.
+        // ABI §3: `list_asset` is signed by the lister and (v1.3.1) `prune_expired` by the pruner
+        // (accountability only), and by nobody else: the contract's own collateral transfers
+        // need no external auth.
         let want_auths: Vec<Address> = match *act {
             Act::List { lister, .. } => vec![self.holders[lister].clone()],
-            Act::Prune { .. } => vec![],
+            Act::Prune { pruner, .. } => vec![self.holders[pruner].clone()],
             _ => return Ok(()),
         };
         if auths != want_auths.as_slice() {
@@ -1941,8 +2209,27 @@ impl World {
         }
         let open_collateral = std::array::from_fn(|t| c.open_collateral(&self.tokens[t]));
         let open: Vec<u32> = c.list_open().iter().collect();
+        let listed: [bool; N_TOKENS] = std::array::from_fn(|t| c.is_listed(&self.tokens[t]));
+        // v1.3.1 per-asset books: listed assets page by page (with the paging edge cases); a
+        // token that is not listed (the quote token, EQTY before `list_asset`) and the contract
+        // address can have no offer, one page must say so.
+        let mut open_for: [Vec<u32>; N_TOKENS] = Default::default();
+        for t in 0..N_TOKENS {
+            open_for[t] = if listed[t] {
+                read_book(c, &self.tokens[t], TOKEN_NAMES[t], BOOK_PAGE)?
+            } else {
+                c.list_open_for(&self.tokens[t], &0, &MAX_PAGE)
+                    .iter()
+                    .collect()
+            };
+        }
+        let own_book = c.list_open_for(&self.holders[CONTRACT], &0, &MAX_PAGE);
+        if !own_book.is_empty() {
+            return Err(format!(
+                "INV5 (open books): list_open_for(contract address) = {own_book:?}, expected empty"
+            ));
+        }
         let writer_open = std::array::from_fn(|h| c.writer_open_count(&self.holders[h]));
-        let listed = std::array::from_fn(|t| c.is_listed(&self.tokens[t]));
         if c.is_listed(&self.holders[CONTRACT]) {
             return Err("INV9 (registry): is_listed(contract address) is true".into());
         }
@@ -1961,6 +2248,7 @@ impl World {
             open_collateral,
             opts,
             open,
+            open_for,
             count,
             writer_open,
             listed,
@@ -2002,7 +2290,7 @@ impl World {
             }
         }
         let all: Vec<Address> = c.list_assets(&0, &u32::MAX).iter().collect();
-        if all.len() != raw.len().min(50) || all[..] != raw[..all.len()] {
+        if all.len() != raw.len().min(MAX_PAGE as usize) || all[..] != raw[..all.len()] {
             return Err(format!(
                 "INV9 (list_assets): list_assets(0, u32::MAX) = {all:?}, the pages say {raw:?}"
             ));
@@ -2099,17 +2387,45 @@ impl World {
             }
         }
 
-        // INV5: open list and count.
-        let expected_open: Vec<u32> = s
+        // INV5 (v1.3.1 per-asset open books): every book == the ids on that underlying in
+        // Offered, creation order (empty for the quote token and unlisted assets); every Offered
+        // option is on a listed asset; list_open() == the books concatenated in registry order,
+        // truncated to LIST_OPEN_CAP.
+        let offered_on = |t: usize| -> Vec<u32> {
+            s.opts
+                .iter()
+                .filter(|o| o.underlying == t && o.state == State::Offered)
+                .map(|o| o.id)
+                .collect()
+        };
+        for t in 0..N_TOKENS {
+            let want = offered_on(t);
+            if s.open_for[t] != want {
+                return Err(format!(
+                    "INV5 (open books): list_open_for({}) = {:?}, expected the ids on {} in \
+                     Offered state {:?}",
+                    TOKEN_NAMES[t], s.open_for[t], TOKEN_NAMES[t], want
+                ));
+            }
+        }
+        if let Some(o) = s
             .opts
             .iter()
-            .filter(|o| o.state == State::Offered)
-            .map(|o| o.id)
-            .collect();
+            .find(|o| o.state == State::Offered && !m.listed.contains(&o.underlying))
+        {
+            return Err(format!(
+                "INV5 (open books): Offered option on an unlisted asset: {o}"
+            ));
+        }
+        let mut expected_open: Vec<u32> = m.listed.iter().flat_map(|&t| offered_on(t)).collect();
+        expected_open.truncate(LIST_OPEN_CAP);
         if s.open != expected_open {
             return Err(format!(
-                "INV5 (open list): list_open() = {:?}, expected ids in Offered state {:?}",
-                s.open, expected_open
+                "INV5 (open list): list_open() = {:?}, expected the per-asset books in registry \
+                 order {:?}, truncated to {LIST_OPEN_CAP}: {:?}",
+                s.open,
+                m.listed.iter().map(|&t| TOKEN_NAMES[t]).collect::<Vec<_>>(),
+                expected_open
             ));
         }
         if s.count != m.creates_ok || s.opts.len() != s.count as usize {
@@ -2242,18 +2558,64 @@ fn check_paging(
     Ok(())
 }
 
-/// The `pruner` field of an observed `OfferPruned` event (`#[contractevent]` map data), if any.
-fn pruner_of(env: &Env, e: &xdr::ContractEvent) -> Option<Address> {
-    let xdr::ContractEventBody::V0(body) = &e.body;
-    let xdr::ScVal::Map(Some(map)) = &body.data else {
-        return None;
-    };
-    map.iter().find_map(|entry| match (&entry.key, &entry.val) {
-        (xdr::ScVal::Symbol(k), xdr::ScVal::Address(a)) if k.0.as_slice() == b"pruner" => {
-            Address::try_from_val(env, a).ok()
+/// Page length the random model reads `list_open_for` with (small, so that books of a few ids
+/// already span several pages).
+const BOOK_PAGE: u32 = 4;
+
+/// INV5 (paging, v1.3.1 `list_open_for(asset, from, limit)`, ABI §3: `asset`'s `Offered` ids,
+/// oldest first, paged like `get_options` with `MAX_PAGE`). Pages of `page` read from 0 with
+/// `from += returned.len()` until a short page: no page is longer than `page`, every page
+/// before the last is full, the page at `from == len` and the `limit == 0` page are empty, and
+/// `list_open_for(asset, 0, u32::MAX)` (limit clamped to `MAX_PAGE`) is the head of the book.
+/// A book can never exceed `MAX_OPEN_PER_ASSET`. Returns the whole book.
+fn read_book(
+    c: &OptionsContractClient<'static>,
+    asset: &Address,
+    name: &str,
+    page: u32,
+) -> Result<Vec<u32>, String> {
+    let mut book: Vec<u32> = Vec::new();
+    let mut from = 0u32;
+    let last = loop {
+        let got: Vec<u32> = c.list_open_for(asset, &from, &page).iter().collect();
+        if got.len() > page as usize {
+            return Err(format!(
+                "INV5 (list_open_for): list_open_for({name}, {from}, {page}) returned {} ids",
+                got.len()
+            ));
         }
-        _ => None,
-    })
+        book.extend(&got);
+        from += got.len() as u32;
+        if got.len() < page as usize {
+            break got.len();
+        }
+        if book.len() > MAX_OPEN_PER_ASSET {
+            return Err(format!(
+                "INV5 (list_open_for): the {name} book holds more than {MAX_OPEN_PER_ASSET} ids"
+            ));
+        }
+    };
+    // The page at the end (unless the last page read was already that empty page) and the
+    // `limit == 0` page.
+    let edges = [(from, page), (0, 0)];
+    for &(f, l) in &edges[usize::from(last == 0)..] {
+        let got = c.list_open_for(asset, &f, &l);
+        if !got.is_empty() {
+            return Err(format!(
+                "INV5 (list_open_for): list_open_for({name}, {f}, {l}) = {got:?}, expected none \
+                 (book length {})",
+                book.len()
+            ));
+        }
+    }
+    let head: Vec<u32> = c.list_open_for(asset, &0, &u32::MAX).iter().collect();
+    if head[..] != book[..book.len().min(MAX_PAGE as usize)] {
+        return Err(format!(
+            "INV5 (list_open_for): list_open_for({name}, 0, u32::MAX) = {head:?}, the pages say \
+             {book:?}"
+        ));
+    }
+    Ok(book)
 }
 
 // ----- invariants on a transition -----
@@ -2588,19 +2950,21 @@ fn expiry_in() -> impl Strategy<Value = u64> {
     ]
 }
 
-/// `prune_expired` id selectors: up to `MAX_PRUNE`, rarely an unknown id (whole call NotFound).
+/// `prune_expired`: any actor as pruner, rarely the contract address (v1.3.1 backstop); id
+/// selectors: up to `MAX_PRUNE`, rarely an unknown id (whole call NotFound).
 fn prune_op() -> impl Strategy<Value = Op> {
     (
+        prop_oneof![12 => 0..N_ACTORS, 1 => Just(CONTRACT)],
         prop::collection::vec(
             prop_oneof![60 => 0u8..UNKNOWN_ID, 1 => Just(UNKNOWN_ID)],
             0..=MAX_PRUNE,
         ),
         prop::option::of(0u8..128),
     )
-        .prop_map(|(v, warp)| {
+        .prop_map(|(pruner, v, warp)| {
             let mut sels = [0u8; MAX_PRUNE];
             sels[..v.len()].copy_from_slice(&v);
-            Op::Prune(sels, v.len() as u8, warp)
+            Op::Prune(pruner, sels, v.len() as u8, warp)
         })
 }
 
@@ -2627,7 +2991,8 @@ fn op() -> impl Strategy<Value = Op> {
         );
     prop_oneof![
         6 => create,
-        4 => (id_sel(), any_actor()).prop_map(|(i, w)| Op::Buy(i, w)),
+        4 => (id_sel(), prop_oneof![1 => Just(Who::Buyer), 1 => any_actor()])
+            .prop_map(|(i, w)| Op::Buy(i, w)),
         4 => (id_sel(), who(Who::Holder)).prop_map(|(i, w)| Op::Exercise(i, w)),
         3 => (
             id_sel(),
@@ -2635,6 +3000,12 @@ fn op() -> impl Strategy<Value = Op> {
             prop_oneof![3 => Just(To::Eligible), 2 => (0..N_ACTORS).prop_map(To::Actor)],
         )
             .prop_map(|(i, w, to)| Op::Transfer(i, w, to)),
+        2 => (
+            any::<u8>(),
+            prop_oneof![4 => Just(To::Eligible), 1 => (0..N_ACTORS).prop_map(To::Actor)],
+            prop_oneof![Just(Stress::DeauthContract), Just(Stress::ClawbackRwa)],
+        )
+            .prop_map(|(i, to, stress)| Op::StressTransfer(i, to, stress)),
         1 => (id_sel(), who(Who::Writer)).prop_map(|(i, w)| Op::Cancel(i, w)),
         2 => (id_sel(), who(Who::Writer)).prop_map(|(i, w)| Op::Reclaim(i, w)),
         3 => (id_sel(), who(Who::Writer)).prop_map(|(i, w)| Op::Claim(i, w)),
@@ -2647,7 +3018,7 @@ fn op() -> impl Strategy<Value = Op> {
         2 => (0..N_ACTORS, any::<u8>()).prop_map(|(l, s)| Op::List(l, s)),
         2 => prune_op(),
         1 => prop_oneof![3 => Just(true), 1 => Just(false)].prop_map(Op::EqtyContractAuth),
-        1 => (0u8..6, any::<u8>()).prop_map(|(k, s)| Op::Backstop(k, s)),
+        1 => (0u8..7, any::<u8>()).prop_map(|(k, s)| Op::Backstop(k, s)),
     ]
 }
 
@@ -2655,7 +3026,7 @@ fn config() -> ProptestConfig {
     let cases = std::env::var("PROPTEST_CASES")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(200); // keeps the default run under a minute
+        .unwrap_or(200); // default case count (about 105 s here)
     ProptestConfig {
         cases,
         // Failures are reported with the full trace; no regression files are written.
@@ -2666,9 +3037,9 @@ fn config() -> ProptestConfig {
 }
 
 /// (call, outcome) rows every run of at least `MIN_CASES_FOR_COVERAGE` cases must observe, so
-/// that a generator change cannot silently stop exercising the v1.3 paths (each row occurs
-/// dozens of times per 200 cases).
-const REQUIRED_COVERAGE: [(&str, &str); 10] = [
+/// that a generator change cannot silently stop exercising the v1.3 / v1.3.1 paths (each row
+/// occurs dozens of times per 200 cases).
+const REQUIRED_COVERAGE: [(&str, &str); 14] = [
     ("list_asset", "Ok"),
     ("list_asset", "AlreadyListed"),
     ("list_asset", "AssetNotDeployed"),
@@ -2676,9 +3047,13 @@ const REQUIRED_COVERAGE: [(&str, &str); 10] = [
     ("prune_expired", "Ok (pruned >= 1)"),
     ("prune_expired", "Ok (pruned 0)"),
     ("prune_expired", "NotFound"),
+    ("prune_expired", "InvalidArgs"),
     ("create_offer", "Ok"),
     ("create_offer", "TenorOutOfRange"),
     ("create_offer", "InvalidArgs"),
+    ("transfer", "Ok"),
+    ("transfer", "ContractNotAuthorized"),
+    ("transfer", "CollateralShortfall"),
 ];
 const MIN_CASES_FOR_COVERAGE: u32 = 100;
 
@@ -3576,21 +3951,23 @@ fn list(lister: usize, code: &'static str, issuer: Issuer) -> Act {
     }
 }
 
-fn prune(ids: &[u32]) -> Act {
+fn prune(pruner: usize, ids: &[u32]) -> Act {
     assert!(ids.len() <= MAX_PRUNE, "at most {MAX_PRUNE} ids per prune");
     let mut a = [0u32; MAX_PRUNE];
     a[..ids.len()].copy_from_slice(ids);
     Act::Prune {
+        pruner,
         ids: a,
         len: ids.len() as u8,
     }
 }
 
 impl World {
-    /// `prune_expired(ids)` succeeds and prunes exactly `pruned` (hand-computed, cross-checked
-    /// against the model before the call; `run` checks the returned count and the events).
-    fn prune_ok(&mut self, ids: &[u32], pruned: &[u32]) {
-        let act = prune(ids);
+    /// `prune_expired(pruner, ids)` succeeds and prunes exactly `pruned` (hand-computed,
+    /// cross-checked against the model before the call; `run` checks the returned count, that
+    /// exactly the pruner signed, and the events, which name the pruner).
+    fn prune_ok(&mut self, pruner: usize, ids: &[u32], pruned: &[u32]) {
+        let act = prune(pruner, ids);
         assert_eq!(
             self.model.pruned(&act),
             pruned,
@@ -3902,7 +4279,7 @@ fn writer_open_limit_is_exactly_fifty_offers_per_writer() {
         Error::WriterOpenLimit,
     );
     // ...and a prune by anyone (ids 4 and 5 expire at expiry + 4 / + 5: still live).
-    w.prune_ok(&[3, 4, 5], &[3]);
+    w.prune_ok(HOLDER2, &[3, 4, 5], &[3]);
     assert_eq!(w.snap.writer_open[WRITER1], 49);
     w.ok(tiny(WRITER1, BOND, OptionType::Put, expiry + 100)); // id 55
     w.err(
@@ -3996,7 +4373,7 @@ fn tenor_cap_is_inclusive_at_two_years_from_now() {
     });
     // The unsold one is prunable once expired.
     w.ok(Act::SetTime { t: t1 + MAX_TENOR });
-    w.prune_ok(&[0, 1], &[1]);
+    w.prune_ok(OUTSIDER, &[0, 1], &[1]);
     w.ok(Act::Claim {
         id: 0,
         who: WRITER1,
@@ -4004,10 +4381,13 @@ fn tenor_cap_is_inclusive_at_two_years_from_now() {
     assert_eq!([w.oc(USDX), w.oc(RWA), w.oc(BOND)], [0, 0, 0]);
 }
 
-/// ABI §3 `prune_expired`: no auth; any unknown id reverts the call; ids that are not `Offered`
-/// with `now >= expiry` are skipped; an expired offer whose collateral cannot be returned (writer
-/// frozen on a CALL underlying, contract de-authorized, pooled balance drained by a clawback) is
-/// skipped and stays `Offered`; pruned collateral always lands at the writer (INV10).
+/// ABI §3 `prune_expired(pruner, ids)` (v1.3.1): any account may prune, it signs and is named
+/// in every `OfferPruned` (checked by `run`), the contract address as pruner is rejected
+/// (`InvalidArgs`, before `NotFound`); any unknown id reverts the call; ids that are not
+/// `Offered` with `now >= expiry` are skipped; an expired offer whose collateral cannot be
+/// returned (writer frozen on a CALL underlying, contract de-authorized, pooled balance drained by
+/// a clawback) is skipped and stays `Offered`; pruned collateral always lands at the writer, never
+/// at the pruner (INV10).
 #[test]
 fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
     let mut w = World::new();
@@ -4076,9 +4456,9 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
         who: WRITER2,
     });
 
-    // Before expiry nothing is prunable; an empty list is a no-op.
-    w.prune_ok(&[0, 1, 2, 3], &[]);
-    w.prune_ok(&[], &[]);
+    // Before expiry nothing is prunable; an empty list is a no-op (the pruner still signs).
+    w.prune_ok(OUTSIDER, &[0, 1, 2, 3], &[]);
+    w.prune_ok(HOLDER2, &[], &[]);
 
     // At expiry, with writer2 frozen on RWA (id 1's CALL collateral cannot reach it).
     w.ok(Act::SetTime { t: e });
@@ -4086,13 +4466,20 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
         target: WRITER2,
         authorized: false,
     });
+    // v1.3.1 backstop: the contract cannot be the pruner, even with only prunable ids, and the
+    // check comes right after auth (before NotFound); nothing is pruned, no event.
+    w.err(prune(CONTRACT, &[0, 2]), Error::InvalidArgs);
+    w.err(prune(CONTRACT, &[6]), Error::InvalidArgs);
+    w.err(prune(CONTRACT, &[]), Error::InvalidArgs);
     // One unknown id reverts the whole call, wherever it is.
-    w.err(prune(&[0, 2, 6]), Error::NotFound);
-    w.err(prune(&[6, 0]), Error::NotFound);
+    w.err(prune(OUTSIDER, &[0, 2, 6]), Error::NotFound);
+    w.err(prune(WRITER1, &[6, 0]), Error::NotFound);
     assert_eq!(w.state(0), State::Offered);
-    // Live, Active, Cancelled and frozen-writer ids are skipped; a duplicate counts once.
-    w.prune_ok(&[3, 4, 5, 1, 0, 0], &[0]);
-    w.prune_ok(&[2, 2], &[2]);
+    // Live, Active, Cancelled and frozen-writer ids are skipped; a duplicate counts once. The
+    // pruner is an account the RWA issuer never authorized: pruning needs no eligibility.
+    w.prune_ok(OUTSIDER, &[3, 4, 5, 1, 0, 0], &[0]);
+    // A writer may prune someone else's offer; the collateral still goes to that offer's writer.
+    w.prune_ok(WRITER2, &[2, 2], &[2]);
     assert_eq!(
         [0, 1, 2, 3, 4, 5].map(|id| w.state(id)),
         [
@@ -4108,13 +4495,13 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
     // BOND back.
     assert_eq!(w.bal(USDX, WRITER1), FUND - strike + premium);
     assert_eq!(w.bal(BOND, WRITER1), FUND);
-    w.prune_ok(&[1], &[]);
+    w.prune_ok(WRITER2, &[1], &[]);
     // Re-authorized, the writer gets its collateral back through anyone's prune.
     w.ok(Act::SetAuthRwa {
         target: WRITER2,
         authorized: true,
     });
-    w.prune_ok(&[1, 1], &[1]);
+    w.prune_ok(HOLDER1, &[1, 1], &[1]);
     assert_eq!(w.bal(RWA, WRITER2), FUND);
     // Pruned options are terminal like reclaimed ones.
     w.err(
@@ -4143,7 +4530,7 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
         id: 4,
         who: WRITER1,
     });
-    w.prune_ok(&[4], &[]);
+    w.prune_ok(HOLDER1, &[4], &[]);
     assert_eq!(w.snap.writer_open, [0, 1, 0, 0, 0, 0]);
 
     // A de-authorized contract skips RWA CALL collateral but not PUT (USDx) collateral.
@@ -4171,12 +4558,12 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
         target: CONTRACT,
         authorized: false,
     });
-    w.prune_ok(&[6, 7], &[7]);
+    w.prune_ok(HOLDER2, &[6, 7], &[7]);
     w.ok(Act::SetAuthRwa {
         target: CONTRACT,
         authorized: true,
     });
-    w.prune_ok(&[6, 7], &[6]);
+    w.prune_ok(WRITER1, &[6, 7], &[6]);
 
     // A pooled balance drained by a clawback pays prunes first-come-first-served; the one that
     // would overdraw it is skipped (SAC #10 inside try_transfer) and stays Offered.
@@ -4185,9 +4572,9 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
     w.ok(create(WRITER2, RWA, OptionType::Call, 100, 1_000, 10, e3)); // 9
     w.ok(Act::ClawbackRwa { amount: 50 });
     w.ok(Act::SetTime { t: e3 });
-    w.prune_ok(&[9, 8], &[9]);
+    w.prune_ok(OUTSIDER, &[9, 8], &[9]);
     assert_eq!(w.bal(RWA, CONTRACT), 50);
-    w.prune_ok(&[8], &[]);
+    w.prune_ok(HOLDER1, &[8], &[]);
     w.sac_err(
         Act::Cancel {
             id: 8,
@@ -4200,8 +4587,9 @@ fn prune_expired_skips_live_bought_frozen_and_underfunded_offers() {
 }
 
 /// ABI §3/§12.3 backstop: the contract's own address is rejected with `InvalidArgs` as writer,
-/// buyer, holder, transfer recipient and `list_asset` lister ("any party"), right after auth
-/// (before `AssetNotAllowed`, `NotFound`, `AssetNotDeployed` and `AlreadyListed`).
+/// buyer, holder, transfer recipient, `list_asset` lister and (v1.3.1, ABI §13.1)
+/// `prune_expired` pruner ("any party"), right after auth (before `AssetNotAllowed`, `NotFound`,
+/// `AssetNotDeployed` and `AlreadyListed`).
 #[test]
 fn contract_address_is_rejected_as_any_party() {
     let mut w = World::new();
@@ -4317,4 +4705,679 @@ fn contract_address_is_rejected_as_any_party() {
         Error::InvalidArgs,
     );
     assert_eq!(w.snap.asset_count, 3);
+    // v1.3.1: the contract is not a pruner either (before NotFound), even for a prunable offer.
+    w.ok(create(
+        WRITER2,
+        BOND,
+        OptionType::Call,
+        qty,
+        strike,
+        premium,
+        expiry,
+    )); // id 1
+    w.ok(Act::SetTime { t: expiry });
+    w.err(prune(CONTRACT, &[1]), Error::InvalidArgs);
+    w.err(prune(CONTRACT, &[1, 9]), Error::InvalidArgs);
+    assert_eq!(w.state(1), State::Offered);
+    w.prune_ok(WRITER1, &[1], &[1]);
+}
+
+// ---------------------------------------------------------------------------------------------
+// v1.3.1 deterministic regressions (ABI §13)
+// ---------------------------------------------------------------------------------------------
+
+/// ABI §13.3: one open book per underlying. `list_open()` is the books concatenated in registry
+/// order (RWA, BOND, then EQTY once listed), not creation order; a new offer goes to the end of
+/// its own book; leaving `Offered` (buy, cancel, reclaim, prune) removes the id from its own book
+/// only; expired unsold offers stay in their book until reclaimed or pruned. INV5 reads every
+/// book page by page after every step.
+#[test]
+fn open_books_concatenate_in_registry_order() {
+    let mut w = World::new();
+    let expiry = T0 + 1_000;
+    let tiny = |writer, u, ty| create(writer, u, ty, UNIT, 10 * UNIT, UNIT, expiry);
+    w.ok(tiny(WRITER1, BOND, OptionType::Put)); // 0
+    w.ok(list(HOLDER1, SAC_CODE, Issuer::Of(EQTY)));
+    w.ok(Act::SetAuthEqty {
+        target: CONTRACT,
+        authorized: true,
+    });
+    w.ok(tiny(WRITER2, EQTY, OptionType::Call)); // 1
+    w.ok(tiny(WRITER2, RWA, OptionType::Call)); // 2
+    w.ok(tiny(WRITER1, BOND, OptionType::Call)); // 3
+    w.ok(tiny(WRITER1, RWA, OptionType::Put)); // 4
+    w.ok(tiny(WRITER2, EQTY, OptionType::Put)); // 5
+    assert_eq!(w.snap.open, [2, 4, 0, 3, 1, 5]);
+    assert_eq!(
+        w.snap.open_for,
+        [vec![], vec![2, 4], vec![0, 3], vec![1, 5]]
+    );
+
+    w.ok(Act::Buy {
+        id: 0,
+        who: HOLDER1,
+    });
+    w.ok(Act::Cancel {
+        id: 4,
+        who: WRITER1,
+    });
+    assert_eq!(w.snap.open, [2, 3, 1, 5]);
+    w.ok(tiny(HOLDER2, RWA, OptionType::Put)); // 6
+    assert_eq!(w.snap.open, [2, 6, 3, 1, 5]);
+
+    w.ok(Act::SetTime { t: expiry });
+    assert_eq!(w.snap.open, [2, 6, 3, 1, 5]);
+    w.ok(Act::Reclaim {
+        id: 3,
+        who: WRITER1,
+    });
+    w.prune_ok(OUTSIDER, &[1, 2], &[1, 2]);
+    assert_eq!(w.snap.open, [6, 5]);
+    assert_eq!(w.snap.open_for, [vec![], vec![6], vec![], vec![5]]);
+}
+
+/// ABI §13.2 (v1.3.1): `transfer` refuses a new holder while the escrow cannot settle the
+/// position: `ContractNotAuthorized` while the issuer has de-authorized the contract on the
+/// underlying, then `CollateralShortfall` while the pooled balance of the quote or the underlying
+/// is below its reserved total; both come after `NotEligible` and every earlier check. Options on
+/// other assets transfer normally, a frozen holder may still hand its position over (its tokens
+/// never move), and the guards stop hand-overs only: the current holder still exercises.
+#[test]
+fn transfer_refuses_new_holders_while_the_escrow_cannot_settle() {
+    let mut w = World::new();
+    let (qty, strike, premium, expiry) = (5 * UNIT, 50 * UNIT, 2 * UNIT, T0 + 1_000);
+    let tr = |id, from, to| Act::Transfer { id, from, to };
+    w.ok(create(
+        WRITER1,
+        RWA,
+        OptionType::Put,
+        qty,
+        strike,
+        premium,
+        expiry,
+    )); // 0
+    w.ok(create(
+        WRITER2,
+        RWA,
+        OptionType::Call,
+        qty,
+        strike,
+        premium,
+        expiry,
+    )); // 1
+    w.ok(create(
+        WRITER1,
+        BOND,
+        OptionType::Call,
+        qty,
+        strike,
+        premium,
+        expiry,
+    )); // 2
+    for id in 0..3 {
+        w.ok(Act::Buy { id, who: HOLDER1 });
+    }
+
+    // The RWA issuer de-authorizes the escrow: no RWA position changes hands.
+    w.ok(Act::SetAuthRwa {
+        target: CONTRACT,
+        authorized: false,
+    });
+    w.err(tr(0, HOLDER1, HOLDER2), Error::ContractNotAuthorized);
+    w.err(tr(1, HOLDER1, WRITER1), Error::ContractNotAuthorized);
+    // Every earlier check wins.
+    w.err(tr(0, HOLDER1, OUTSIDER), Error::NotEligible);
+    w.err(tr(0, HOLDER1, WRITER1), Error::SelfTrade);
+    w.err(tr(0, HOLDER1, HOLDER1), Error::InvalidArgs);
+    w.err(tr(0, HOLDER2, WRITER2), Error::NotHolder);
+    w.err(tr(9, HOLDER1, HOLDER2), Error::NotFound);
+    // Another asset is unaffected.
+    w.ok(tr(2, HOLDER1, HOLDER2));
+    w.ok(Act::SetAuthRwa {
+        target: CONTRACT,
+        authorized: true,
+    });
+    w.ok(tr(0, HOLDER1, HOLDER2));
+
+    // A frozen holder may still transfer.
+    w.ok(Act::SetAuthRwa {
+        target: HOLDER2,
+        authorized: false,
+    });
+    w.ok(tr(0, HOLDER2, WRITER2));
+    w.ok(Act::SetAuthRwa {
+        target: HOLDER2,
+        authorized: true,
+    });
+
+    // A clawback opens an RWA deficit: no RWA position changes hands, PUT or CALL.
+    w.ok(Act::ClawbackRwa { amount: 1 });
+    w.err(tr(1, HOLDER1, HOLDER2), Error::CollateralShortfall);
+    w.err(tr(0, WRITER2, HOLDER1), Error::CollateralShortfall);
+    w.err(tr(1, HOLDER1, OUTSIDER), Error::NotEligible);
+    // ContractNotAuthorized precedes CollateralShortfall.
+    w.ok(Act::SetAuthRwa {
+        target: CONTRACT,
+        authorized: false,
+    });
+    w.err(tr(1, HOLDER1, HOLDER2), Error::ContractNotAuthorized);
+    w.ok(Act::SetAuthRwa {
+        target: CONTRACT,
+        authorized: true,
+    });
+    // BOND (and the USDx pool) is untouched by the RWA deficit.
+    w.ok(tr(2, HOLDER2, HOLDER1));
+    // The current holder of the RWA PUT still exercises (delivering RWA into the pool); the
+    // deficit stays exactly the clawed amount (INV2) and keeps blocking hand-overs.
+    w.ok(Act::Exercise {
+        id: 0,
+        who: WRITER2,
+    });
+    assert_eq!(w.oc(RWA) - w.bal(RWA, CONTRACT), 1);
+    w.err(tr(1, HOLDER1, HOLDER2), Error::CollateralShortfall);
+    // After expiry the time check comes first.
+    w.ok(Act::SetTime { t: expiry });
+    w.err(tr(1, HOLDER1, HOLDER2), Error::Expired);
+    assert_eq!(w.snap.opts[1].holder, Some(HOLDER1));
+    assert_eq!(w.snap.opts[2].holder, Some(HOLDER1));
+}
+
+/// The options error of a `list_asset(lister, code, issuer)` call that must fail.
+fn listing_error(
+    env: &Env,
+    c: &OptionsContractClient<'_>,
+    lister: &Address,
+    code: &str,
+    issuer: &Address,
+) -> Error {
+    match c.try_list_asset(lister, &soroban_sdk::String::from_str(env, code), issuer) {
+        Err(Ok(e)) => e,
+        other => panic!("list_asset({code:?}) should fail with an options error, got {other:?}"),
+    }
+}
+
+/// ABI §13.4 (v1.3.1): `list_asset` checks `AlreadyListed` (derived SAC in the registry, or the
+/// quote token) before the deployment probe. In the main fixture every listed address is a
+/// deployed SAC, so the order cannot show there; here the constructor is handed the derived
+/// address of a classic asset whose SAC is not deployed (the constructor does not probe), as an
+/// underlying (contract A) or as the quote token (contract B).
+#[test]
+fn list_asset_checks_already_listed_before_deployment() {
+    use soroban_sdk::xdr::WriteXdr as _;
+    let env = Env::new_with_config(EnvTestConfig {
+        capture_snapshot_at_drop: false,
+    });
+    env.mock_all_auths();
+    let usdx = env.register_stellar_asset_contract_v2(Address::generate(&env));
+    let rwa = env.register_stellar_asset_contract_v2(Address::generate(&env));
+    // A `G…` account that issues nothing: none of its assets has a SAC.
+    let key = [0x5a; 32];
+    let account = || xdr::AccountId(xdr::PublicKey::PublicKeyTypeEd25519(xdr::Uint256(key)));
+    let issuer = Address::try_from_val(&env, &xdr::ScAddress::Account(account())).unwrap();
+    let sac_of = |code: &[u8; 4]| {
+        let asset = xdr::Asset::CreditAlphanum4(xdr::AlphaNum4 {
+            asset_code: xdr::AssetCode4(*code),
+            issuer: account(),
+        });
+        let bytes = asset.to_xdr(xdr::Limits::none()).unwrap();
+        env.deployer()
+            .with_stellar_asset(soroban_sdk::Bytes::from_slice(&env, &bytes))
+            .deployed_address()
+    };
+    let aaa = sac_of(b"aaa\0");
+    let bbb = sac_of(b"bbb\0");
+    for sac in [&aaa, &bbb] {
+        assert!(
+            TokenClient::new(&env, sac).try_decimals().is_err(),
+            "fixture: {sac:?} must not be deployed"
+        );
+    }
+    let lister = Address::generate(&env);
+
+    // A: the undeployed "aaa" SAC is a constructor underlying.
+    let a = env.register(
+        OptionsContract,
+        (
+            usdx.address(),
+            soroban_sdk::vec![&env, rwa.address(), aaa.clone()],
+        ),
+    );
+    let ca = OptionsContractClient::new(&env, &a);
+    assert!(ca.is_listed(&aaa));
+    let err_a = |lister: &Address, code: &str| listing_error(&env, &ca, lister, code, &issuer);
+    assert_eq!(err_a(&lister, "aaa"), Error::AlreadyListed);
+    assert_eq!(err_a(&lister, "bbb"), Error::AssetNotDeployed);
+    // The backstop and the argument checks still come first.
+    assert_eq!(err_a(&a, "aaa"), Error::InvalidArgs);
+    assert_eq!(err_a(&lister, "aa-a"), Error::InvalidArgs);
+    assert_eq!(ca.asset_count(), 2);
+
+    // B: the undeployed "bbb" SAC is the quote token.
+    let b = env.register(
+        OptionsContract,
+        (bbb.clone(), soroban_sdk::vec![&env, rwa.address()]),
+    );
+    let cb = OptionsContractClient::new(&env, &b);
+    assert!(!cb.is_listed(&bbb));
+    let err_b = |code: &str| listing_error(&env, &cb, &lister, code, &issuer);
+    assert_eq!(err_b("bbb"), Error::AlreadyListed);
+    assert_eq!(err_b("aaa"), Error::AssetNotDeployed);
+    assert_eq!(cb.asset_count(), 1);
+}
+
+/// Fixture of `open_book_cap_is_per_asset_at_five_hundred`: its own contract (USDx quote, RWA and
+/// BOND underlyings; RWA regulated with clawback like the main fixture) with 13 accounts, and a
+/// small model of what the test does to it.
+struct BookFixture {
+    env: Env,
+    c: OptionsContractClient<'static>,
+    contract: Address,
+    /// USDx, RWA, BOND.
+    tokens: [Address; 3],
+    /// 0..=9 fill the RWA book, `BF_SPARE` writes later, `BF_OUTSIDER` is never authorized on
+    /// RWA, `BF_BUYER` buys.
+    accounts: Vec<Address>,
+    /// (writer account, token index, type, state) by id; every offer is qty = strike = premium = 1.
+    opts: Vec<(usize, usize, OptionType, State)>,
+    /// RWA clawed from the contract and not yet minted back to it.
+    rwa_deficit: i128,
+}
+
+const BF_USDX: usize = 0;
+const BF_RWA: usize = 1;
+const BF_BOND: usize = 2;
+const BF_SPARE: usize = 10;
+const BF_OUTSIDER: usize = 11;
+const BF_BUYER: usize = 12;
+
+impl BookFixture {
+    fn new() -> BookFixture {
+        let env = Env::new_with_config(EnvTestConfig {
+            capture_snapshot_at_drop: false,
+        });
+        env.mock_all_auths();
+        env.host().set_diagnostic_level(Default::default()).unwrap();
+        env.ledger().set_timestamp(T0);
+        let usdx = env.register_stellar_asset_contract_v2(Address::generate(&env));
+        let rwa = env.register_stellar_asset_contract_v2(Address::generate(&env));
+        let bond = env.register_stellar_asset_contract_v2(Address::generate(&env));
+        let ri = rwa.issuer();
+        ri.set_flag(IssuerFlags::RequiredFlag);
+        ri.set_flag(IssuerFlags::RevocableFlag);
+        ri.set_flag(IssuerFlags::ClawbackEnabledFlag);
+        let tokens = [usdx.address(), rwa.address(), bond.address()];
+        let contract = env.register(
+            OptionsContract,
+            (
+                tokens[BF_USDX].clone(),
+                soroban_sdk::vec![&env, tokens[BF_RWA].clone(), tokens[BF_BOND].clone()],
+            ),
+        );
+        let c = OptionsContractClient::new(&env, &contract);
+        let accounts: Vec<Address> = (0..=BF_BUYER).map(|_| Address::generate(&env)).collect();
+        let admin = |t: usize| StellarAssetClient::new(&env, &tokens[t]);
+        admin(BF_RWA).set_authorized(&contract, &true);
+        for (k, a) in accounts.iter().enumerate() {
+            if k != BF_OUTSIDER {
+                admin(BF_RWA).set_authorized(a, &true);
+                admin(BF_RWA).mint(a, &FUND);
+            }
+            admin(BF_USDX).mint(a, &FUND);
+            admin(BF_BOND).mint(a, &FUND);
+        }
+        BookFixture {
+            env,
+            c,
+            contract,
+            tokens,
+            accounts,
+            opts: Vec::new(),
+            rwa_deficit: 0,
+        }
+    }
+
+    fn try_create(
+        &mut self,
+        k: usize,
+        t: usize,
+        ty: OptionType,
+        expiry: u64,
+    ) -> Result<u32, Error> {
+        let r =
+            self.c
+                .try_create_offer(&self.accounts[k], &self.tokens[t], &ty, &1, &1, &1, &expiry);
+        match r {
+            Ok(Ok(id)) => {
+                assert_eq!(id as usize, self.opts.len(), "ids are sequential");
+                self.opts.push((k, t, ty, State::Offered));
+                Ok(id)
+            }
+            Err(Ok(e)) => {
+                assert!(
+                    self.env
+                        .events()
+                        .all()
+                        .filter_by_contract(&self.contract)
+                        .events()
+                        .is_empty(),
+                    "a failed create_offer emitted events"
+                );
+                Err(e)
+            }
+            other => panic!("create_offer by account {k}: unexpected {other:?}"),
+        }
+    }
+
+    /// `create_offer` succeeds (returns the id); the full check runs afterwards.
+    fn ok(&mut self, k: usize, t: usize, ty: OptionType, expiry: u64) -> u32 {
+        let id = self
+            .try_create(k, t, ty, expiry)
+            .unwrap_or_else(|e| panic!("create_offer by account {k} on token {t}: {e:?}"));
+        self.check();
+        id
+    }
+
+    /// `create_offer` fails with `e`; the full check runs afterwards (atomicity).
+    fn err(&mut self, k: usize, t: usize, ty: OptionType, expiry: u64, e: Error) {
+        assert_eq!(
+            self.try_create(k, t, ty, expiry),
+            Err(e),
+            "create_offer by account {k} on token {t} ({ty:?}, expiry {expiry})"
+        );
+        self.check();
+    }
+
+    /// Records the state changes made by one direct client call, then runs the full check.
+    fn set_states(&mut self, changes: &[(u32, State)]) {
+        for &(id, s) in changes {
+            self.opts[id as usize].3 = s;
+        }
+        self.check();
+    }
+
+    /// Model book of token `t`: its `Offered` ids, oldest first.
+    fn book(&self, t: usize) -> Vec<u32> {
+        (0..self.opts.len() as u32)
+            .filter(|&id| {
+                let (_, u, _, s) = self.opts[id as usize];
+                u == t && s == State::Offered
+            })
+            .collect()
+    }
+
+    /// The chain against the model: every option's writer, underlying, type and state (paged
+    /// `get_options`), both books read in `MAX_PAGE` pages (INV5 paging rules), the quote token's
+    /// (empty) book, `list_open()` (books in registry order, truncated to 200), every account's
+    /// `writer_open_count`, `open_collateral` of the three tokens and the contract's balances
+    /// (equal, except RWA short by exactly the deficit).
+    fn check(&self) {
+        let c = &self.c;
+        let count = c.option_count();
+        assert_eq!(count as usize, self.opts.len(), "option_count");
+        let mut from = 0u32;
+        while from < count {
+            let page = c.get_options(&from, &MAX_PAGE);
+            assert!(
+                !page.is_empty(),
+                "get_options({from}) is empty below option_count"
+            );
+            for d in page.iter() {
+                let (k, t, ty, s) = self.opts[d.id as usize];
+                assert_eq!(
+                    (&d.writer, &d.underlying, d.option_type, d.state),
+                    (&self.accounts[k], &self.tokens[t], ty, s),
+                    "option {}",
+                    d.id
+                );
+            }
+            from += page.len();
+        }
+        let rwa =
+            read_book(c, &self.tokens[BF_RWA], "RWA", MAX_PAGE).unwrap_or_else(|e| panic!("{e}"));
+        let bond =
+            read_book(c, &self.tokens[BF_BOND], "BOND", MAX_PAGE).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(rwa, self.book(BF_RWA), "list_open_for(RWA)");
+        assert_eq!(bond, self.book(BF_BOND), "list_open_for(BOND)");
+        assert!(c
+            .list_open_for(&self.tokens[BF_USDX], &0, &MAX_PAGE)
+            .is_empty());
+        let mut open: Vec<u32> = rwa.iter().chain(&bond).copied().collect();
+        open.truncate(LIST_OPEN_CAP);
+        assert_eq!(
+            c.list_open().iter().collect::<Vec<u32>>(),
+            open,
+            "list_open()"
+        );
+        for (k, a) in self.accounts.iter().enumerate() {
+            let n = self
+                .opts
+                .iter()
+                .filter(|o| o.0 == k && o.3 == State::Offered)
+                .count();
+            assert_eq!(c.writer_open_count(a) as usize, n, "writer_open_count({k})");
+        }
+        // Only Offered, Active, Cancelled and Expired options exist here: one locked unit of
+        // collateral per Offered/Active option (PUT: USDx, CALL: the underlying).
+        let mut reserved = [0i128; 3];
+        for &(_, t, ty, s) in &self.opts {
+            if matches!(s, State::Offered | State::Active) {
+                reserved[if ty == OptionType::Put { BF_USDX } else { t }] += 1;
+            }
+        }
+        for t in 0..3 {
+            assert_eq!(
+                c.open_collateral(&self.tokens[t]),
+                reserved[t],
+                "open_collateral({t})"
+            );
+            let balance = TokenClient::new(&self.env, &self.tokens[t]).balance(&self.contract);
+            let deficit = if t == BF_RWA { self.rwa_deficit } else { 0 };
+            assert_eq!(
+                balance,
+                reserved[t] - deficit,
+                "balance(contract) of token {t}"
+            );
+        }
+    }
+}
+
+/// ABI §13.3 (v1.3.1, the fix for F-1R): `OpenListFull` is per underlying, at
+/// `MAX_OPEN_PER_ASSET = 500` ids in that asset's book. Own fixture (`BookFixture`): 500 offers
+/// on one asset need 10 writers (`MAX_OPEN_PER_WRITER = 50`). 10 writers x 50 offers fill the RWA
+/// book (writer 9's are CALLs, so RWA collateral sits in the escrow). The 501st RWA offer fails
+/// for any writer and type, after every earlier check (backstop, AssetNotAllowed, InvalidArgs,
+/// TenorOutOfRange, NotEligible, ContractNotAuthorized) and before WriterOpenLimit and
+/// CollateralShortfall, while a BOND offer succeeds and lands outside the 200-id `list_open()`
+/// window. A buy, a cancel, a reclaim and a prune each free RWA slots, refilled at the end of the
+/// book. The whole state is compared with the fixture's model after every step.
+#[test]
+fn open_book_cap_is_per_asset_at_five_hundred() {
+    let mut f = BookFixture::new();
+    let (short, long) = (T0 + 10, T0 + 100_000);
+    for k in 0..10 {
+        let ty = if k == 9 {
+            OptionType::Call
+        } else {
+            OptionType::Put
+        };
+        for j in 0..MAX_OPEN_PER_WRITER {
+            // ids 0..=2 (writer 0) expire early, for the reclaim and the prune below.
+            let expiry = if k == 0 && j < 3 { short } else { long };
+            assert_eq!(
+                f.try_create(k, BF_RWA, ty, expiry),
+                Ok((k * MAX_OPEN_PER_WRITER + j) as u32)
+            );
+        }
+    }
+    f.check();
+    assert_eq!(f.book(BF_RWA), (0..500).collect::<Vec<u32>>());
+    assert_eq!(f.c.list_open().len() as usize, LIST_OPEN_CAP);
+
+    // The 501st RWA offer fails, whatever the writer and the type...
+    for ty in [OptionType::Put, OptionType::Call] {
+        f.err(BF_SPARE, BF_RWA, ty, long, Error::OpenListFull);
+    }
+    // ...before WriterOpenLimit (writer 0 has 50 open offers, all on RWA), which still binds on
+    // an asset whose book has room...
+    f.err(0, BF_RWA, OptionType::Put, long, Error::OpenListFull);
+    f.err(0, BF_BOND, OptionType::Put, long, Error::WriterOpenLimit);
+    // ...and after every earlier check.
+    assert!(matches!(
+        f.c.try_create_offer(
+            &f.contract,
+            &f.tokens[BF_RWA],
+            &OptionType::Put,
+            &1,
+            &1,
+            &1,
+            &long
+        ),
+        Err(Ok(Error::InvalidArgs))
+    ));
+    f.err(
+        BF_SPARE,
+        BF_USDX,
+        OptionType::Put,
+        long,
+        Error::AssetNotAllowed,
+    );
+    f.err(BF_SPARE, BF_RWA, OptionType::Put, T0, Error::InvalidArgs);
+    f.err(
+        BF_SPARE,
+        BF_RWA,
+        OptionType::Put,
+        T0 + MAX_TENOR + 1,
+        Error::TenorOutOfRange,
+    );
+    f.err(
+        BF_OUTSIDER,
+        BF_RWA,
+        OptionType::Put,
+        long,
+        Error::NotEligible,
+    );
+    let rwa_admin = StellarAssetClient::new(&f.env, &f.tokens[BF_RWA]);
+    rwa_admin.set_authorized(&f.contract, &false);
+    f.err(
+        BF_SPARE,
+        BF_RWA,
+        OptionType::Call,
+        long,
+        Error::ContractNotAuthorized,
+    );
+    rwa_admin.set_authorized(&f.contract, &true);
+
+    // A clawback opens an RWA deficit: the full RWA book still answers OpenListFull (checked
+    // first), and a BOND offer is accepted (neither BOND nor USDx is short).
+    rwa_admin.clawback(&f.contract, &1);
+    f.rwa_deficit = 1;
+    f.check();
+    f.err(BF_SPARE, BF_RWA, OptionType::Put, long, Error::OpenListFull);
+    assert_eq!(f.ok(BF_SPARE, BF_BOND, OptionType::Put, long), 500);
+    // The BOND id is in its own book but outside the first 200 ids of list_open().
+    assert_eq!(f.book(BF_BOND), [500]);
+    assert!(!f.c.list_open().contains(500));
+    rwa_admin.mint(&f.contract, &1);
+    f.rwa_deficit = 0;
+    f.check();
+
+    // A sale frees a slot (the id leaves the middle of the book; the new one goes to its end)...
+    f.c.buy(&f.accounts[BF_BUYER], &10);
+    f.set_states(&[(10, State::Active)]);
+    assert_eq!(f.ok(BF_SPARE, BF_RWA, OptionType::Put, long), 501);
+    assert_eq!(f.book(BF_RWA).last(), Some(&501));
+    f.err(BF_SPARE, BF_RWA, OptionType::Put, long, Error::OpenListFull);
+    // ...so does a cancellation...
+    f.c.cancel_offer(&f.accounts[3], &150);
+    f.set_states(&[(150, State::Cancelled)]);
+    assert_eq!(f.ok(BF_SPARE, BF_RWA, OptionType::Call, long), 502);
+    f.err(
+        BF_SPARE,
+        BF_RWA,
+        OptionType::Call,
+        long,
+        Error::OpenListFull,
+    );
+    // ...a reclaim of an expired unsold offer...
+    f.env.ledger().set_timestamp(short);
+    f.c.reclaim(&f.accounts[0], &1);
+    f.set_states(&[(1, State::Expired)]);
+    assert_eq!(f.ok(BF_SPARE, BF_RWA, OptionType::Put, long), 503);
+    f.err(BF_SPARE, BF_RWA, OptionType::Put, long, Error::OpenListFull);
+    // ...and a prune by anyone (two slots; id 3 is live and skipped).
+    assert_eq!(
+        f.c.prune_expired(
+            &f.accounts[BF_OUTSIDER],
+            &soroban_sdk::vec![&f.env, 0u32, 2, 3]
+        ),
+        2
+    );
+    f.set_states(&[(0, State::Expired), (2, State::Expired)]);
+    assert_eq!(f.ok(BF_SPARE, BF_RWA, OptionType::Put, long), 504);
+    assert_eq!(f.ok(BF_BUYER, BF_RWA, OptionType::Put, long), 505);
+    f.err(BF_BUYER, BF_RWA, OptionType::Put, long, Error::OpenListFull);
+
+    // Paging across the full book: pages are clamped to MAX_PAGE and stop at the end.
+    let book = f.book(BF_RWA);
+    assert_eq!(book.len(), MAX_OPEN_PER_ASSET);
+    let rwa = &f.tokens[BF_RWA];
+    let page = |from: u32, limit: u32| -> Vec<u32> {
+        f.c.list_open_for(rwa, &from, &limit).iter().collect()
+    };
+    assert_eq!(page(450, 1_000), book[450..]);
+    assert_eq!(page(480, 50), book[480..]);
+    assert_eq!(page(499, 50), book[499..]);
+    assert!(page(500, 50).is_empty());
+    assert!(page(u32::MAX, u32::MAX).is_empty());
+    assert_eq!(page(0, u32::MAX), book[..50]);
+}
+
+/// ABI §3 `list_open()` (v1.3.1): the per-asset books concatenated in registry order, truncated
+/// to 200 ids. The cap is on ids, not on assets: with 52 listed assets (2 constructor
+/// underlyings, then 50 `list_asset` calls; more than `MAX_PAGE`) and one offer on the first
+/// and one on the last asset, `list_open()` holds both, in registry order.
+///
+/// Ignored: the v1.3.1 implementation stops after the first `MAX_PAGE` registry assets, so the
+/// offer on asset #52 is missing (observed `[1]`, expected `[1, 0]`). Un-ignore once the ABI and
+/// the implementation agree.
+#[test]
+#[ignore = "ABI deviation: list_open() visits only the first MAX_PAGE (50) registry assets; ABI §3/§13.3 cap ids (200), not assets (observed [1], expected [1, 0])"]
+fn list_open_spans_the_whole_registry() {
+    let env = Env::new_with_config(EnvTestConfig {
+        capture_snapshot_at_drop: false,
+    });
+    env.mock_all_auths();
+    env.host().set_diagnostic_level(Default::default()).unwrap();
+    env.ledger().set_timestamp(T0);
+    let sac = || env.register_stellar_asset_contract_v2(Address::generate(&env));
+    let usdx = sac();
+    let mut assets: Vec<Address> = vec![sac().address(), sac().address()];
+    let contract = env.register(
+        OptionsContract,
+        (
+            usdx.address(),
+            soroban_sdk::vec![&env, assets[0].clone(), assets[1].clone()],
+        ),
+    );
+    let c = OptionsContractClient::new(&env, &contract);
+    let lister = Address::generate(&env);
+    let code = soroban_sdk::String::from_str(&env, SAC_CODE);
+    for _ in 0..50 {
+        let s = sac();
+        assert_eq!(
+            c.list_asset(&lister, &code, &s.issuer().address()),
+            s.address()
+        );
+        assets.push(s.address());
+    }
+    assert_eq!(c.asset_count(), 52);
+    // Unflagged assets: the writer (a contract address) is eligible on every underlying; it
+    // needs USDx for the PUT collateral.
+    let writer = Address::generate(&env);
+    StellarAssetClient::new(&env, &usdx.address()).mint(&writer, &FUND);
+    let put = |u: &Address| c.create_offer(&writer, u, &OptionType::Put, &1, &1, &1, &(T0 + 1_000));
+    assert_eq!(put(&assets[51]), 0);
+    assert_eq!(put(&assets[0]), 1);
+    assert_eq!(c.list_open_for(&assets[51], &0, &MAX_PAGE).len(), 1);
+    assert_eq!(c.list_open().iter().collect::<Vec<u32>>(), [1, 0]);
 }
