@@ -44,13 +44,13 @@ Timings are targets; the spoken lines are in `docs/pitch-speech.md` §2. One cla
 | # | Time | Screen and exact actions | Beat |
 |---|---|---|---|
 | 1 | 0:00-0:20 | App, **Markets**. No wallet yet. | Tokenized assets on Stellar have no risk tools. StellSec: fully collateralized options for eligible assets, Testnet. |
-| 2 | 0:20-0:45 | Wallet: Maker A. Connect. **Markets → Sell → Post an offer**: RWA, PUT, qty 5, total strike 50 USDx, premium 1 USDx, expiry. Keep **Full collateral**. Sign. Then **Collateral**: Held rises by 50 USDx. | The full strike is locked now. No margin, no leverage. |
+| 2 | 0:20-0:45 | Wallet: Maker A. Connect. **Markets → Sell → Post an offer**: RWA, PUT, qty 5, total strike 50 USDx, premium 1 USDx, expiry. Keep **Full collateral**. Sign. Then **Locked reserves**: Held rises by 50 USDx. | The full strike is locked now. No margin, no leverage. |
 | 3 | 0:45-1:00 | Wallet: Maker B. Same series, premium 0.8 USDx. Sign. **Markets**: two funded offers on one series, best on top. | A second maker undercuts with a funded on-chain offer. Not an order book we invented. |
 | 4 | 1:00-1:20 | Wallet: Investor. **Markets → Buy** on the 0.8 offer. Buy dialog: premium, eligibility, hypothetical payoff. Sign. **Positions**: `Active`. | Premium to the maker at purchase. The investor may sell 5 RWA for 50 USDx any time before expiry. |
 | 4b | optional, 1:20-1:30 | Wallet: Investor. **Positions → Sell** on the pre-staged second put, ask 2 USDx, sign. Wallet: Investor 2. **Markets**, resale ask → **Buy**, sign. **Positions** (Investor 2): holder. | Holders are not locked in. The price goes to the holder; strike, expiry and collateral do not change. |
 | 5 | 1:30-1:53 | Wallet: Investor. **Positions → Exercise**, sign. Click the tx link: on stellar.expert, RWA investor → contract and USDx contract → investor in one transaction. | Atomic delivery-versus-payment. If any leg fails, nothing moves. |
 | 6 | 1:53-2:02 | Wallet: **Maker B**. **Positions**: `Exercised` → **Claim delivery**, sign → `Settled`. | The writer claims the delivered RWA. Settled. |
-| 7 | 2:02-2:33 | **Collateral** page first: Owed vs Held per token, read at a ledger. Then wallet: RWA issuer. **Issuer**: RWA, target = Investor, **Revoke / freeze**, sign. Wallet: Investor. **Positions → Exercise** on the pre-staged option: failure banner (SAC error 11, balance deauthorized). | Anyone can check the backing. The issuer keeps its powers; a frozen holder cannot exercise and nothing moves. Not a guarantee against issuer action. |
+| 7 | 2:02-2:33 | **Locked reserves** page first: Owed vs Held per token, read at a ledger. Then wallet: RWA issuer. **Issuer**: RWA, target = Investor, **Revoke / freeze**, sign. Wallet: Investor. **Positions → Exercise** on the pre-staged option: failure banner (SAC error 11, balance deauthorized). | Anyone can check the backing. The issuer keeps its powers; a frozen holder cannot exercise and nothing moves. Not a guarantee against issuer action. |
 | 8 | 2:33-2:43 | stellar.expert: EQTY `list_asset` tx `9e83e587…bf69`, then the EQTY exercise `f2ad8d0e…10a5`. | Anyone can list a classic asset with one call; the issuer still decides who may hold it. |
 | 9 | 2:43-3:00 | Closing card: app URL, repo URL, the disclosure line. If Margin is mentioned, show its warning banner. | Testnet, fictional assets, unaudited. Real assets need their issuer. Protection for any eligible Stellar asset. |
 
@@ -69,7 +69,7 @@ Hashes are from `docs/contract-testnet-evidence.md`; a version tag means the has
 
 | Spoken claim | Evidence | Status |
 |---|---|---|
-| Collateral is locked when an offer is created | `create_offer` pulls the full strike or quantity before the offer exists (ABI §3); seeded offer tx `5dc15250…2531` (v1.5); `open_collateral` on the Collateral page | Verified on chain |
+| Collateral is locked when an offer is created | `create_offer` pulls the full strike or quantity before the offer exists (ABI §3); seeded offer tx `5dc15250…2531` (v1.5); `open_collateral` on the Locked reserves page | Verified on chain |
 | Covered options carry no margin or leverage | no margin path in `contracts/options/src/lib.rs`; ABI §2 derived values | True by construction |
 | Two makers compete with funded on-chain offers | `seed-demo-offers.sh` creates the 1.0 / 0.8 USDx pair; competition txs `2275ee06…0404` / `9f7dce74…bd97` (v1.2) | Verified; recording tx to add |
 | Premium goes to the maker at purchase, never refunded | `buy` (ABI §3), PRODUCT_SPEC D1; buy tx `03ce25be…` (v1.4) | Verified; policy decided |
@@ -78,7 +78,7 @@ Hashes are from `docs/contract-testnet-evidence.md`; a version tag means the has
 | Exercise is atomic delivery-versus-payment | `exercise` in one invocation (ABI §3); forced failure left balances identical, tx `a005ab41…` (`research/decision/20_rwa_options_spike.md`); EQTY exercise `f2ad8d0e…10a5` | Verified on chain |
 | Writer claims after exercise | `claim_delivery`; `80196949…506e` (v1.5) | Verified on chain |
 | Frozen holder cannot exercise; nothing moves | freeze `3f0d711d…f462` then exercise rejected with SAC error 11 (v1.3.1 run); the rejection happens in simulation, so no fee is spent | Verified on chain |
-| Collateral page shows owed vs held and a clawback shortfall | `open_collateral` vs SAC balance; clawback run `f45330be…` / `c6ef0692…` (RWA short, BOND unaffected, issuer repays) | Verified on chain |
+| Locked reserves page shows owed vs held and a clawback shortfall | `open_collateral` vs SAC balance; clawback run `f45330be…` / `c6ef0692…` (RWA short, BOND unaffected, issuer repays) | Verified on chain |
 | Anyone can list a classic asset; the issuer decides eligibility | `list_asset` derives the canonical SAC on chain; `9e83e587…bf69` (v1.5) | Verified on chain |
 | Testnet, fictional assets, unaudited | Deployed contracts table; asset labels | True by construction |
 

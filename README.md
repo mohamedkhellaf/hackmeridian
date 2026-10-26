@@ -74,7 +74,7 @@ Earlier versions v1 to v1.4: [AGENTS.md](AGENTS.md#deployed-contracts-testnet-on
 
 ## Try it
 
-Without a wallet: Markets, Collateral and option history in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
+Without a wallet: Markets, Locked reserves and option history in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
 
 With a wallet: Freighter on Testnet, funded by Friendbot. The underlyings require issuer authorization, so open an issue with your Testnet `G…` address and we run `scripts/setup-testnet/onboard-account.sh`: trustlines, authorization on the three assets, `USDx` and underlying balances. With `USDx` alone you can buy and exercise a call.
 
@@ -138,7 +138,7 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 ## Limits
 
 - Issuer action is not insured. A freeze, de-authorization of the escrow or clawback after a sale can make an option unexercisable. The premium is not refunded.
-- After a clawback the escrow is short. It holds one balance per token, so remaining payouts are first come, first served. While a token is short, new offers, purchases and transfers on it fail with `CollateralShortfall`; other tokens continue. The Collateral page shows the shortfall.
+- After a clawback the escrow is short. It holds one balance per token, so remaining payouts are first come, first served. While a token is short, new offers, purchases and transfers on it fail with `CollateralShortfall`; other tokens continue. The Locked reserves page shows the shortfall.
 - Quotes are indicative until an on-chain funded offer is confirmed. The demo makers are our own Testnet accounts. There is no order book depth and no pricing model.
 - Resale prices are set by holders: one ask per option, no matching, no writer buy-back.
 - Soroban storage expires; `extend_ttl` is public and a keeper script runs it.
@@ -146,7 +146,7 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 
 ## Built at the event
 
-Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale), v1.5 (buyer requests). Five app screens (Markets, Positions, Collateral, Issuer, Margin) on the live contracts, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 94 commits, 79 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
+Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale), v1.5 (buyer requests). Five app screens (Markets, Positions, Locked reserves, Issuer, Margin) on the live contracts, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 96 commits, 79 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
 
 ## Next
 
