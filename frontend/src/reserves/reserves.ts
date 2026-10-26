@@ -1,5 +1,5 @@
 import { formatAmount } from '../options/format'
-import type { CollateralHealth, CollateralLine } from '../options/types'
+import type { CollateralHealth, CollateralLine, OptionOffer, TokenInfo } from '../options/types'
 
 // Pure helpers for the Reserves page. Amounts are exact bigint token units.
 
@@ -58,4 +58,15 @@ export function formatFixed(units: bigint, decimals: number): string {
 
 export function stellarExpertContract(id: string): string {
   return `https://stellar.expert/explorer/testnet/contract/${id}`
+}
+
+/** Tokens whose pooled balance is below what the contract owes (issuer clawback). Empty when health is unknown. */
+export function shortTokens(health: CollateralHealth[]): TokenInfo[] {
+  return health.filter((h) => h.held < h.reserved).map((h) => h.token)
+}
+
+/** Short tokens that touch this option (its underlying or its quote token). */
+export function shortfallFor(o: Pick<OptionOffer, 'underlying' | 'quote'>, health: CollateralHealth[]): TokenInfo[] {
+  const ids = new Set([o.underlying.contractId, o.quote.contractId])
+  return shortTokens(health).filter((t) => ids.has(t.contractId))
 }

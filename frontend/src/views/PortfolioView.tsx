@@ -1,17 +1,23 @@
 import { useMemo, useState } from 'react'
 import { OptionsTable } from '../market/OptionsTable'
-import type { OptionOffer } from '../options/types'
-import { computeKpis, filterPositions, moneyWith, nowMs, waitingActions } from '../portfolio/positions'
+import { formatAmount, formatExpiry } from '../options/format'
+import type { CollateralHealth, OptionOffer, TokenInfo } from '../options/types'
+import { actionKindOf, computeKpis, filterPositions, moneyWith, nowMs, roleOf, waitingActions } from '../portfolio/positions'
 import type { PositionFilter } from '../portfolio/positions'
-import { Banner, PageHero, Segmented } from '../ui'
+import { shortfallFor } from '../reserves/reserves'
+import { ShortfallBanner } from '../reserves/ShortfallWarning'
+import { Banner, Button, Dialog, PageHero, Segmented } from '../ui'
 import type { PositionAction } from '../state/useStrata'
 import '../portfolio/portfolio.css'
+import '../payoff/payoff.css'
 
 export interface PortfolioViewProps {
   me: string | null
   /** Options the connected wallet holds or wrote. */
   rows: OptionOffer[]
   actionFor: (o: OptionOffer) => PositionAction | undefined
+  /** Reserved vs held per token, for the clawback shortfall warning on affected rows. */
+  health?: CollateralHealth[]
 }
 
 function joinPhrases(p: string[]): string {
@@ -19,7 +25,68 @@ function joinPhrases(p: string[]): string {
   return `${p.slice(0, -1).join(', ')}, and ${p[p.length - 1]}`
 }
 
-export function PortfolioView({ me, rows, actionFor }: PortfolioViewProps) {
+const exact = (units: bigint, t: TokenInfo) => `${formatAmount(units, t.decimals, t.decimals, 2)} ${t.code}`
+
+/** The two physical legs of an exercise, stated explicitly (PUT: deliver the underlying; CALL: pay the strike). */
+function exerciseLegs(o: OptionOffer): { give: string; get: string; sentence: string } {
+  const qty = exact(o.underlyingQty, o.underlying)
+  const strike = exact(o.totalStrike, o.quote)
+  return o.kind === 'put'
+    ? { give: qty, get: strike, sentence: `You deliver ${qty} and receive ${strike}.` }
+    : { give: strike, get: qty, sentence: `You pay ${strike} and receive ${qty}.` }
+}
+
+function ExerciseConfirm({ o, health, onConfirm, onCancel }: { o: OptionOffer; health: CollateralHealth[]; onConfirm: () => void; onCancel: () => void }) {
+  const legs = exerciseLegs(o)
+  const short = shortfallFor(o, health)
+  return (
+    <Dialog
+      title={`Exercise ${o.underlying.code} ${o.kind}`}
+      width={480}
+      onClose={onCancel}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={onConfirm}>
+            Sign and exercise
+          </Button>
+        </>
+      }
+    >
+      <p className="po-hint">Physical settlement. Both transfers happen in one transaction or not at all.</p>
+      <ul className="po-deliver" aria-label="Exercise settlement">
+        <li>
+          {o.kind === 'put' ? 'You deliver' : 'You pay'} <b>{legs.give}</b>
+        </li>
+        <li>
+          You receive <b>{legs.get}</b>
+        </li>
+      </ul>
+      <p className="po-hint">
+        {o.kind === 'put'
+          ? `${o.underlying.code} leaves your wallet and ${o.quote.code} arrives from the contract.`
+          : `${o.quote.code} leaves your wallet and ${o.underlying.code} arrives from the contract.`}{' '}
+        Exercise is possible until {formatExpiry(o.expiry)}. After that the writer reclaims the collateral. Your wallet must hold what you deliver, or the transaction fails.
+      </p>
+      {short.map((t) => (
+        <ShortfallBanner key={t.contractId} token={t} />
+      ))}
+    </Dialog>
+  )
+}
+
+export function PortfolioView({ me, rows, actionFor, health = [] }: PortfolioViewProps) {
+  const [exercising, setExercising] = useState<bigint | null>(null)
+  const pending = exercising === null ? undefined : rows.find((r) => r.id === exercising)
+  // Exercise is intercepted: the row button opens the confirmation, which then runs the original action.
+  const guardedActionFor = (o: OptionOffer): PositionAction | undefined => {
+    const a = actionFor(o)
+    const role = roleOf(o, me)
+    if (a && role && actionKindOf(o, role) === 'exercise') return { ...a, onClick: () => setExercising(o.id) }
+    return a
+  }
   const [filter, setFilter] = useState<PositionFilter>('all')
   const [showClosed, setShowClosed] = useState(false)
 
@@ -93,12 +160,24 @@ export function PortfolioView({ me, rows, actionFor }: PortfolioViewProps) {
           <OptionsTable
             rows={visible}
             me={me}
-            actionFor={actionFor}
+            actionFor={guardedActionFor}
+            health={health}
             empty={rows.length === 0 ? 'No positions yet. Buy an option in Markets or write one.' : 'Nothing matches this filter. Try "Show closed".'}
           />
         </>
       ) : (
         <p className="pf-empty">Connect a wallet to see your positions.</p>
+      )}
+      {pending && (
+        <ExerciseConfirm
+          o={pending}
+          health={health}
+          onCancel={() => setExercising(null)}
+          onConfirm={() => {
+            setExercising(null)
+            actionFor(pending)?.onClick()
+          }}
+        />
       )}
     </div>
   )

@@ -153,3 +153,21 @@
 .rs-fig-v { font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .rs-row span:last-child { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .rs-figs { grid-template-columns: 1fr 1fr; } .rs-grid { grid-template-columns: 1fr; } }
+
+.rs-short-note {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: var(--r-sm);
+  background: var(--warn-bg);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.rs-short-note b {
+  color: var(--warn);
+  font-weight: 600;
+}
+.rs-short-note a {
+  color: var(--link);
+}
