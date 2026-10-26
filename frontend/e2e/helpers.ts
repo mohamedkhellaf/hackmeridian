@@ -35,7 +35,7 @@ export async function switchTo(page: Page, address: string | null) {
   await connect(page)
 }
 
-export type NavName = 'Markets' | 'Protect' | 'Write' | 'Positions' | 'Collateral' | 'Issuer'
+export type NavName = 'Markets' | 'Protect' | 'Write' | 'Positions' | 'Locked reserves' | 'Issuer'
 
 // Sidebar label -> hash route. Labels changed in the fix round; routes did not.
 export const ROUTE_OF: Record<NavName, string> = {
@@ -43,7 +43,7 @@ export const ROUTE_OF: Record<NavName, string> = {
   Protect: 'protect',
   Write: 'write',
   Positions: 'portfolio',
-  Collateral: 'reserves',
+  'Locked reserves': 'reserves',
   Issuer: 'issuer',
 }
 
@@ -67,7 +67,7 @@ export const offerRows = (page: Page) => page.getByRole('table', { name: 'Offers
 
 // "Owed" figure of a token on the Collateral page (= total collateral locked), as a number.
 export async function totalHeld(page: Page, code: string): Promise<number> {
-  const row = page.getByRole('table', { name: 'Collateral by token' }).getByRole('row', { name: new RegExp(`^${code} `) })
+  const row = page.getByRole('table', { name: 'Locked reserves by token' }).getByRole('row', { name: new RegExp(`^${code} `) })
   const text = (await row.getByTestId('owed').innerText()).replace(/,/g, '')
   return Number(text)
 }

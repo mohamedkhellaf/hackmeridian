@@ -58,6 +58,11 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, health }: Markets
           </>
         }
       />
+      <p className="mk-intro">
+        Each row is one option a market maker is selling, with the maker's reserves already locked in the contract. A <b>put</b> gives
+        you the right to <b>sell</b> the asset at the strike before expiry; a <b>call</b> gives you the right to <b>buy</b> it. You pay the
+        premium once, up front.
+      </p>
       <ShortfallNotice tokens={shortTokens} className="mk-short-note" />
       <div className="mk-layout">
         <div className="mk-main">
@@ -71,16 +76,21 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, health }: Markets
             empty={n === 0 ? 'No open offers.' : 'No open offers match.'}
           />
         </div>
-        <Card title="Collateral" actions={<a href="#/reserves">Details</a>} flush className="mk-collateral">
+        <Card title="Locked reserves" actions={<a href="#/reserves">Details</a>} flush className="mk-collateral">
+          <p className="mk-empty mk-pad mk-card-note">What makers must have locked for these offers, next to what the contract actually holds.</p>
           {health.length === 0 ? (
             <p className="mk-empty mk-pad">Not available.</p>
           ) : (
-            <table className="ui-table" aria-label="Collateral">
+            <table className="ui-table" aria-label="Locked reserves">
               <thead>
                 <tr>
                   <th>Token</th>
-                  <th className="num">Owed</th>
-                  <th className="num">Held</th>
+                  <th className="num" title="Reserves the contract must hold for open options">
+                    Locked
+                  </th>
+                  <th className="num" title="Balance the contract actually holds">
+                    Held
+                  </th>
                 </tr>
               </thead>
               <tbody>

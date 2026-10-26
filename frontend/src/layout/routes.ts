@@ -16,7 +16,7 @@ export const NAV: NavItem[] = [
   { route: 'protect', label: 'Protect' },
   { route: 'write', label: 'Write' },
   { route: 'portfolio', label: 'Positions' },
-  { route: 'reserves', label: 'Collateral' },
+  { route: 'reserves', label: 'Locked reserves' },
   { route: 'issuer', label: 'Issuer' },
   ...(PRO_ENABLED ? [{ route: 'pro' as const, label: 'Pro' }] : []),
 ]

@@ -51,16 +51,24 @@ export function MarketTable({
       <table className="ui-table" aria-label="Offers">
         <thead>
           <tr>
-            <th>Asset</th>
-            <th>Kind</th>
-            <th className="num">Qty</th>
-            <th className="num">Strike{unit}</th>
-            <th>Expiry</th>
-            <th className="num">Premium{unit}</th>
-            <th className="num hide-sm" title="Total premium">
-              Total{unit}
+            <th title="Underlying token">Asset</th>
+            <th title="Put: right to sell. Call: right to buy.">Type</th>
+            <th className="num" title="Units of the asset covered by this option">
+              Qty
             </th>
-            <th className="hide-sm">Maker</th>
+            <th className="num" title="Price per unit you can sell (put) or buy (call) at">
+              Strike / unit{unit}
+            </th>
+            <th title="Exercise any time before this">Expires</th>
+            <th className="num" title="Price of the option per unit of the asset">
+              Premium / unit{unit}
+            </th>
+            <th className="num hide-sm" title="What you pay in total for this option">
+              You pay{unit}
+            </th>
+            <th className="hide-sm" title="The market maker selling this option">
+              Maker
+            </th>
             <th>
               <span className="mk-sr">Action</span>
             </th>
@@ -86,7 +94,12 @@ export function MarketTable({
                     </span>
                   )}
                 </td>
-                <td className="mk-kind">{o.kind === 'put' ? 'Put' : 'Call'}</td>
+                <td className="mk-kind">
+                  <Tag tone="neutral" className={o.kind === 'put' ? 'mk-put' : 'mk-call'}>
+                    {o.kind === 'put' ? 'Put' : 'Call'}
+                  </Tag>
+                  <span className="mk-kind-hint hide-sm">{o.kind === 'put' ? 'right to sell' : 'right to buy'}</span>
+                </td>
                 <td className="num">{formatDisplay(o.underlyingQty, o.underlying.decimals)}</td>
                 <td className="num">
                   {strikePerUnit(o)}

@@ -176,7 +176,7 @@ export function WriteOfferForm({
         <div className="wr-summary" role="group" aria-label="Order summary">
           <dl className="ui-kv">
             <div>
-              <dt>Collateral to lock</dt>
+              <dt>Reserves to lock</dt>
               <dd>{collateral ? moneyWith(collateral.amount, collateral.token) : ''}</dd>
             </div>
             <div>

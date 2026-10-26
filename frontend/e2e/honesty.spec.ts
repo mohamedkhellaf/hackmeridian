@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { CHART_TEXT, DEMO_TEXT, ISSUER_TEXT, MOCK_TEXT, PREMIUM_TEXT, connect, countVisible, goTo, openApp, openBuyDialogForSeed } from './helpers.ts'
 import type { NavName } from './helpers.ts'
 
-const ROUTES: NavName[] = ['Markets', 'Protect', 'Write', 'Positions', 'Collateral', 'Issuer']
+const ROUTES: NavName[] = ['Markets', 'Protect', 'Write', 'Positions', 'Locked reserves', 'Issuer']
 
 // Old disclaimers that the de-slop pass removed; none may come back anywhere.
 const RETIRED = [
@@ -52,14 +52,14 @@ test('the open Buy dialog states the issuer, premium and chart disclosures exact
 
 test('collateral page is honest about mock data and shows owed vs held', async ({ page }) => {
   await openApp(page)
-  await goTo(page, 'Collateral')
-  await expect(page.getByRole('heading', { level: 1, name: 'Collateral' })).toBeVisible()
+  await goTo(page, 'Locked reserves')
+  await expect(page.getByRole('heading', { level: 1, name: 'Locked reserves' })).toBeVisible()
   // Mock-data honesty lives in the footer only (said once), not repeated in the page.
   await expect(page.getByRole('contentinfo')).toContainText(MOCK_TEXT)
   expect(await countVisible(page, MOCK_TEXT)).toBe(1)
   await expect(page.getByRole('main')).not.toContainText('Mock data')
-  const table = page.getByRole('table', { name: 'Collateral by token' })
-  await expect(table.getByRole('columnheader')).toHaveText(['Token', 'Owed', 'Held', 'Difference'])
+  const table = page.getByRole('table', { name: 'Locked reserves by token' })
+  await expect(table.getByRole('columnheader')).toHaveText(['Token', 'Locked', 'Held', 'Difference'])
   const cells = table.getByRole('row', { name: /^USDx / }).getByRole('cell')
   const [owed, held, diff] = [await cells.nth(1).innerText(), await cells.nth(2).innerText(), await cells.nth(3).innerText()]
   expect(Number(owed.replace(/,/g, ''))).toBeGreaterThan(0)

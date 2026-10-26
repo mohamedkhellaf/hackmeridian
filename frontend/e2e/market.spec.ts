@@ -65,7 +65,7 @@ test('buy is disabled until a wallet is connected', async ({ page }) => {
 
 test('collateral card on Markets shows owed and held per token', async ({ page }) => {
   await openApp(page)
-  const usdx = page.getByRole('table', { name: 'Collateral', exact: true }).getByRole('row', { name: /^USDx / })
+  const usdx = page.getByRole('table', { name: 'Locked reserves', exact: true }).getByRole('row', { name: /^USDx / })
   const cells = usdx.getByRole('cell')
   await expect(cells).toHaveCount(3)
   const [owed, held] = [await cells.nth(1).innerText(), await cells.nth(2).innerText()]
@@ -75,8 +75,8 @@ test('collateral card on Markets shows owed and held per token', async ({ page }
 
 test('hash routes drive the sidebar and every view renders', async ({ page }) => {
   await page.goto('/#/reserves')
-  await expect(page.getByRole('heading', { level: 1, name: 'Collateral' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Collateral', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { level: 1, name: 'Locked reserves' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Locked reserves', exact: true })).toHaveAttribute('aria-current', 'page')
   for (const [link, title] of [
     ['Positions', 'Positions'],
     ['Write', 'Write'],
