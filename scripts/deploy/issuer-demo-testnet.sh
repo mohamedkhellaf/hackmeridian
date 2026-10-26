@@ -19,8 +19,9 @@
 #
 # Expected failures are simulated with --send=no (no fee, no state change) and pass only with the exact error code.
 # Every submitted transaction prints "TX <label> <hash>" and is appended to scripts/out/tx-log.tsv; the full output
-# is saved to scripts/out/issuer-demo-<UTC time>.log. Whatever happens, the script ends by re-authorizing investor,
-# maker1, maker2 and the contracts on RWA (EXIT trap) and cancelling any offer it left open on the main contract.
+# is saved to scripts/out/issuer-demo-<UTC time>.log. After a failed step or Ctrl-C the script ends by re-authorizing
+# investor, maker1, maker2 and the contracts on RWA (EXIT trap) and cancelling any offer it left open on the main
+# contract. A SIGKILL or a closed terminal can skip the trap; a re-run re-authorizes everyone in its PRE step.
 # Exit status is 0 only if every check passed.
 set -uo pipefail
 
@@ -68,7 +69,9 @@ O="$MAIN"          # contract targeted by send / expect_fail
 
 mkdir -p "$OUT_DIR"
 DEMO_LOG="$OUT_DIR/issuer-demo-$(date -u +%Y%m%dT%H%M%SZ).log"
-exec > >(tee -a "$DEMO_LOG") 2>&1
+# tee -i: Ctrl-C signals the whole process group; tee must survive it so the INT trap and the EXIT cleanup can
+# still write, otherwise the script dies of SIGPIPE before re-authorizing anyone.
+exec > >(tee -ia "$DEMO_LOG") 2>&1
 
 # Amounts are 7-decimal integer units (1 token = 10_000_000).
 PUT_QTY=20000000      # 2 RWA
