@@ -74,7 +74,8 @@ class Recorder:
             "contract_balance": m.contract_balance,
             "accounts": {k: {"cash": a.cash, "shorts": {str(s): q for s, q in sorted(a.shorts.items()) if q},
                              "books": list(a.books), "owed": a.owed, "reserved": a.reserved}
-                         for k, a in sorted(m.accounts.items()) if a.cash or any(a.shorts.values()) or a.books},
+                         for k, a in sorted(m.accounts.items())
+                         if a.cash or any(a.shorts.values()) or a.books or a.owed or a.reserved},
             "wallets": dict(sorted(m.wallets.items())),
             "series": {str(s.id): {"oi": s.oi, "settlement_price": s.settlement_price, "open_books": s.open_books,
                                    "shortfall": s.shortfall, "vault_paid": s.vault_paid, "pool": s.pool,
@@ -635,9 +636,47 @@ def s_taker_oi_cap():
     return r
 
 
+def s_private_takeover_debt():
+    r = Recorder("private_takeover_debt",
+                 "Un vendeur qui doit déjà au vault est repris par un maker privé : la reprise prélève la créance du vault "
+                 "sur le cash restant (revue 7) ; cas limite où le cash vaut exactement prix de reprise + dette.")
+    r.fund(MAKER_A=300_000, MAKER_B=600_000, ALICE=50_000, BOB=50_000, LP1=60_000)
+    r.step("lp_deposit", "LP1", 50_000 * SCALE)
+    sid = r.step("list_series", "ADMIN", K, EXPIRY)
+    r.publish(sid, 100.0)
+    open_short_at_im(r, "MAKER_A", "ALICE", sid, 300)
+    r.advance(3_600)
+    r.publish(sid, 160.0)
+    out = r.step("liquidate", "KEEPER", "MAKER_A", VAULT, note="saut : reprise par le vault avec déficit")
+    owed = r.m.acct("MAKER_A").owed
+    assert out["deficit"] > 0 and owed > 0 and r.m.acct("MAKER_A").cash == 0
+    open_short_at_im(r, "MAKER_A", "BOB", sid, 100, extra=owed)
+    spot = 160.0
+    while True:
+        spot += 1.0
+        r.advance(3_600)
+        r.publish(sid, spot)
+        a = r.m.acct("MAKER_A")
+        x = 100 * r.m.snaps[sid].mark * (BPS + r.m.cfg.bonus_bps) // BPS
+        if x >= a.cash - a.owed:
+            break
+    top = x + a.owed - a.cash
+    if top > 0:
+        r.step("deposit", "MAKER_A", top, note="cash = prix de reprise + dette, exactement")
+    req = r.view("MAKER_A", "liquidable ; tout le cash est pris par la reprise et la dette")
+    assert req["nlv"] < req["mm"]
+    vault_cash = r.m.accounts[VAULT].cash
+    r.step("deposit", "MAKER_B", 500_000 * SCALE)
+    out = r.step("liquidate", "MAKER_B", "MAKER_A", "MAKER_B", note="reprise privée : la créance du vault est prélevée")
+    a = r.m.acct("MAKER_A")
+    assert out["deficit"] == 0 and a.owed == 0 and r.m.accounts[VAULT].cash - vault_cash == owed
+    return r
+
+
 SCENARIOS = [s_happy_path, s_insufficient_margin, s_snapshot_bounds, s_liquidation_private, s_gap_to_vault,
              s_settlement_deficit, s_limits_and_staleness, s_american_exercise, s_review_regressions,
-             s_writer_cash_pro_rata, s_negative_paths, s_takeover_debt, s_takeover_debt_short, s_margin_boundaries, s_taker_oi_cap]
+             s_writer_cash_pro_rata, s_negative_paths, s_takeover_debt, s_takeover_debt_short, s_private_takeover_debt, s_margin_boundaries,
+             s_taker_oi_cap]
 
 
 if __name__ == "__main__":

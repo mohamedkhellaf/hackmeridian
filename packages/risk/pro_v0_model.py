@@ -28,8 +28,9 @@ porteurs au règlement avant toute mutualisation ; le déficit de reprise devien
 
 v0.3.1 (5e revue) : la dette de reprise est prélevée sur le cash du vendeur dès le règlement de son dernier book
 échu (sans attendre un retrait) ; elle passe aussi avant le paiement d'une nouvelle reprise.
-v0.3.2 (6e revue) : le vault prélève aussi sa créance au moment même de la reprise, sur le cash non réservé à la
-dette échue ; une reprise de positions vivantes seules ne laisse donc plus de cash bloqué.
+v0.3.2 (6e et 7e revues) : toute reprise, par le vault ou par un repreneur privé, prélève la créance du vault au
+moment même de la reprise, sur le cash non réservé à la dette échue ; aucune reprise ne laisse de cash bloqué à côté
+d'une dette. Événements dans `liquidate` : DebtRepaid (s'il y a lieu) puis TakenOver.
 
 Conventions de risque (publiées par le publieur, bornées par le contrat) :
 - `ra[w]`  : perte par lot COURT dans le scénario w (16 scénarios, ordre de strata_risk.ScanConfig),
@@ -570,11 +571,11 @@ class ProModel:
                 t.reserved += share
             t.cash += pay - sum(chk(pay * v) // total_v if total_v else 0 for v in vals.values())
             w.owed += deficit
-            # le vault est le repreneur : il prélève sa créance tout de suite sur le cash non réservé à la dette
-            # échue (sinon une reprise de positions vivantes seules laisse la dette sans déclencheur de collecte)
-            self._repay(writer, cap=max(w.cash - r["expired"], 0))
         else:
             t.cash += pay
+        # toute reprise (vault ou privée) prélève tout de suite la créance du vault sur le cash non réservé à la
+        # dette échue : sinon une reprise de positions vivantes seules laisse la dette sans déclencheur de collecte
+        self._repay(writer, cap=max(w.cash - r["expired"], 0))
         for sid, q in live.items():
             t.shorts[sid] = t.shorts.get(sid, 0) + q
             del w.shorts[sid]

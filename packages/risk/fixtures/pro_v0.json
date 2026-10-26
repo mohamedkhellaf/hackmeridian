@@ -4868,6 +4868,13 @@
       "now": 1800172800,
       "contract_balance": 6751191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -4967,6 +4974,13 @@
       "now": 1800172800,
       "contract_balance": 6751191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -5076,6 +5090,13 @@
       "now": 1800777600,
       "contract_balance": 6751191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -5154,6 +5175,13 @@
       "now": 1800777600,
       "contract_balance": 7251191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -5239,6 +5267,13 @@
       "now": 1801814400,
       "contract_balance": 7251191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -5320,6 +5355,13 @@
       "now": 1801814400,
       "contract_balance": 7251191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -5402,6 +5444,13 @@
       "now": 1801814400,
       "contract_balance": 7251191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -5482,6 +5531,13 @@
       "now": 1801814400,
       "contract_balance": 7251191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -5562,6 +5618,13 @@
       "now": 1801814400,
       "contract_balance": 6851191082840,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 169429363000,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 4000000000000,
         "shorts": {},
@@ -13141,6 +13204,13 @@
       "now": 1801814400,
       "contract_balance": 4354846979550,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 125285956375,
         "shorts": {
@@ -13282,6 +13352,13 @@
       "now": 1801814400,
       "contract_balance": 4354846979550,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 125285956375,
         "shorts": {
@@ -13424,6 +13501,13 @@
       "now": 1801814400,
       "contract_balance": 4354846979550,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_C": {
         "cash": 4000000000000,
         "shorts": {},
@@ -13555,6 +13639,13 @@
       "now": 1801814400,
       "contract_balance": 4354846979550,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_C": {
         "cash": 4000000000000,
         "shorts": {},
@@ -13687,6 +13778,13 @@
       "now": 1801814400,
       "contract_balance": 4354846979550,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_C": {
         "cash": 4000000000000,
         "shorts": {},
@@ -13819,6 +13917,13 @@
       "now": 1801814400,
       "contract_balance": 4137459974407,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_C": {
         "cash": 4000000000000,
         "shorts": {},
@@ -13951,6 +14056,13 @@
       "now": 1801814400,
       "contract_balance": 4000000000001,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_C": {
         "cash": 4000000000000,
         "shorts": {},
@@ -14082,6 +14194,13 @@
       "now": 1801814400,
       "contract_balance": 4000000000001,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 79042551210,
+        "reserved": 0
+       },
        "MAKER_C": {
         "cash": 4000000000000,
         "shorts": {},
@@ -22339,6 +22458,13 @@
       "now": 1801814400,
       "contract_balance": 703281005238,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 26686689785,
+        "reserved": 0
+       },
        "VAULT": {
         "cash": 553281005238,
         "shorts": {
@@ -22443,6 +22569,13 @@
       "now": 1801814400,
       "contract_balance": 703281005238,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 26686689785,
+        "reserved": 0
+       },
        "VAULT": {
         "cash": 553281005238,
         "shorts": {
@@ -22547,6 +22680,13 @@
       "now": 1801814400,
       "contract_balance": 553281005238,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 26686689785,
+        "reserved": 0
+       },
        "VAULT": {
         "cash": 553281005238,
         "shorts": {
@@ -22669,6 +22809,13 @@
       "now": 1801814400,
       "contract_balance": 553281005238,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 26686689785,
+        "reserved": 0
+       },
        "VAULT": {
         "cash": 553281005238,
         "shorts": {
@@ -39437,6 +39584,13 @@
       "now": 1802170800,
       "contract_balance": 3741269616971,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 668510410,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 3000000000000,
         "shorts": {},
@@ -39539,6 +39693,8817 @@
         "holder": "CAROL",
         "book": 2,
         "qty": 200,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    }
+   ]
+  },
+  {
+   "name": "private_takeover_debt",
+   "description": "Un vendeur qui doit déjà au vault est repris par un maker privé : la reprise prélève la créance du vault sur le cash restant (revue 7) ; cas limite où le cash vaut exactement prix de reprise + dette.",
+   "t0": 1800000000,
+   "config": {
+    "psr_bps": 1500,
+    "ext_mult": 2,
+    "short_min_bps": 500,
+    "im_bps": 12500,
+    "max_age": 3600,
+    "max_series_oi": 50000,
+    "max_writer_oi": 20000,
+    "bonus_bps": 500,
+    "reserve_fee_bps": 1000,
+    "settle_window": 86400,
+    "exercise_max_age": 120
+   },
+   "initial_wallets": {
+    "MAKER_A": 3000000000000,
+    "MAKER_B": 6000000000000,
+    "ALICE": 500000000000,
+    "BOB": 500000000000,
+    "LP1": 600000000000
+   },
+   "steps": [
+    {
+     "op": "lp_deposit",
+     "args": [
+      "LP1",
+      500000000000
+     ],
+     "expect": "ok",
+     "result": 500000000000,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       }
+      },
+      "wallets": {
+       "ALICE": 500000000000,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 3000000000000,
+       "MAKER_B": 6000000000000
+      },
+      "series": {},
+      "books": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "list_series",
+     "args": [
+      "ADMIN",
+      1100000000,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       }
+      },
+      "wallets": {
+       "ALICE": 500000000000,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 3000000000000,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null,
+        "open_books": 0,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 1,
+       "ts": 1800000000,
+       "spot": 1000000000,
+       "mark": 5628819,
+       "ra": [
+        5249763,
+        -3753884,
+        18699597,
+        3416907,
+        -1673198,
+        -5412102,
+        40401735,
+        21997654,
+        -4511958,
+        -5616658,
+        70604552,
+        54384485,
+        -5396884,
+        -5628534,
+        195246392,
+        -5628817
+       ],
+       "smin": 50000000,
+       "liq": 708083
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 500000000000,
+      "accounts": {
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       }
+      },
+      "wallets": {
+       "ALICE": 500000000000,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 3000000000000,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null,
+        "open_books": 0,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      73499814582
+     ],
+     "expect": "ok",
+     "note": "dépôt calculé pour être exactement à l'IM après la vente",
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 573499814582,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 73499814582,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       }
+      },
+      "wallets": {
+       "ALICE": 500000000000,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 2926500185418,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null,
+        "open_books": 0,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      300,
+      1857510270,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 573499814582,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 73499814582,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 500000000000,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       }
+      },
+      "wallets": {
+       "ALICE": 500000000000,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 2926500185418,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 0,
+        "settlement_price": null,
+        "open_books": 0,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {},
+      "positions": {},
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "ALICE",
+      0
+     ],
+     "expect": "ok",
+     "result": 0,
+     "state": {
+      "now": 1800000000,
+      "contract_balance": 575357324852,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 75171573825,
+        "shorts": {
+         "0": 300
+        },
+        "books": [
+         0
+        ],
+        "owed": 0,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 500185751027,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 2926500185418,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 300,
+        "settlement_price": null,
+        "open_books": 1,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800003600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 2,
+       "ts": 1800003600,
+       "spot": 1600000000,
+       "mark": 500000090,
+       "ra": [
+        5936,
+        -89,
+        80000761,
+        79999911,
+        -79961890,
+        -80000087,
+        160000020,
+        159999911,
+        -159787330,
+        -159999934,
+        239999923,
+        239999911,
+        -238980155,
+        -239992702,
+        479999911,
+        -452018735
+       ],
+       "smin": 80000000,
+       "liq": 22310826
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800003600,
+      "contract_balance": 575357324852,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 75171573825,
+        "shorts": {
+         "0": 300
+        },
+        "books": [
+         0
+        ],
+        "owed": 0,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 500185751027,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 2926500185418,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 300,
+        "settlement_price": null,
+        "open_books": 1,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "KEEPER",
+      "MAKER_A",
+      "VAULT"
+     ],
+     "expect": "ok",
+     "result": {
+      "x": 157500028350,
+      "paid": 75171573825,
+      "deficit": 82328454525
+     },
+     "note": "saut : reprise par le vault avec déficit",
+     "state": {
+      "now": 1800003600,
+      "contract_balance": 575357324852,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 500185751027,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 2926500185418,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 300,
+        "settlement_price": null,
+        "open_books": 1,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      145617296740
+     ],
+     "expect": "ok",
+     "note": "dépôt calculé pour être exactement à l'IM après la vente",
+     "state": {
+      "now": 1800003600,
+      "contract_balance": 720974621592,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 145617296740,
+        "shorts": {},
+        "books": [],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 500185751027,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 300,
+        "settlement_price": null,
+        "open_books": 1,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "create_offer",
+     "args": [
+      "MAKER_A",
+      0,
+      100,
+      55000009900,
+      1801814400
+     ],
+     "expect": "ok",
+     "result": 1,
+     "state": {
+      "now": 1800003600,
+      "contract_balance": 720974621592,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 145617296740,
+        "shorts": {},
+        "books": [],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 500185751027,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 500000000000,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 300,
+        "settlement_price": null,
+        "open_books": 1,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "buy",
+     "args": [
+      "BOB",
+      1
+     ],
+     "expect": "ok",
+     "result": 1,
+     "state": {
+      "now": 1800003600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800007200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 3,
+       "ts": 1800007200,
+       "spot": 1610000000,
+       "mark": 510000062,
+       "ra": [
+        4609,
+        -61,
+        80500580,
+        80499939,
+        -80469569,
+        -80500060,
+        161000019,
+        160999939,
+        -160825083,
+        -160999965,
+        241499948,
+        241499939,
+        -240635658,
+        -241495103,
+        482999939,
+        -457745104
+       ],
+       "smin": 80500000,
+       "liq": 22450303
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800007200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800010800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 4,
+       "ts": 1800010800,
+       "spot": 1620000000,
+       "mark": 520000042,
+       "ra": [
+        3569,
+        -41,
+        81000440,
+        80999959,
+        -80975766,
+        -81000040,
+        162000017,
+        161999959,
+        -161856502,
+        -161999983,
+        242999966,
+        242999959,
+        -242269259,
+        -242996740,
+        485999959,
+        -463274327
+       ],
+       "smin": 81000000,
+       "liq": 22589769
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800010800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800014400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 5,
+       "ts": 1800014400,
+       "spot": 1630000000,
+       "mark": 530000029,
+       "ra": [
+        2756,
+        -28,
+        81500333,
+        81499972,
+        -81480751,
+        -81500027,
+        163000015,
+        162999972,
+        -162882577,
+        -162999992,
+        244499977,
+        244499972,
+        -243883728,
+        -244497847,
+        488999972,
+        -468612326
+       ],
+       "smin": 81500000,
+       "liq": 22729229
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800014400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800018000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 6,
+       "ts": 1800018000,
+       "spot": 1640000000,
+       "mark": 540000019,
+       "ra": [
+        2122,
+        -18,
+        82000251,
+        81999982,
+        -81984750,
+        -82000018,
+        164000013,
+        163999982,
+        -163904158,
+        -163999997,
+        245999985,
+        245999982,
+        -245481538,
+        -245998589,
+        491999982,
+        -473765821
+       ],
+       "smin": 82000000,
+       "liq": 22868684
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800018000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800021600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 7,
+       "ts": 1800021600,
+       "spot": 1650000000,
+       "mark": 550000013,
+       "ra": [
+        1629,
+        -12,
+        82500188,
+        82499988,
+        -82487950,
+        -82500012,
+        165000010,
+        164999988,
+        -164921969,
+        -165000000,
+        247499990,
+        247499988,
+        -247064888,
+        -247499082,
+        494999988,
+        -478742215
+       ],
+       "smin": 82500000,
+       "liq": 23008135
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800021600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800025200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 8,
+       "ts": 1800025200,
+       "spot": 1660000000,
+       "mark": 560000009,
+       "ra": [
+        1248,
+        -8,
+        83000141,
+        82999992,
+        -82990503,
+        -83000008,
+        166000008,
+        165999992,
+        -165936629,
+        -166000001,
+        248999994,
+        248999992,
+        -248635726,
+        -248999408,
+        497999992,
+        -483549492
+       ],
+       "smin": 83000000,
+       "liq": 23147583
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800025200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800028800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 9,
+       "ts": 1800028800,
+       "spot": 1670000000,
+       "mark": 570000006,
+       "ra": [
+        953,
+        -5,
+        83500105,
+        83499995,
+        -83492534,
+        -83500005,
+        167000007,
+        166999995,
+        -166948663,
+        -167000001,
+        250499996,
+        250499995,
+        -250195768,
+        -250499620,
+        500999995,
+        -488196098
+       ],
+       "smin": 83500000,
+       "liq": 23287030
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800028800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800032400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 10,
+       "ts": 1800032400,
+       "spot": 1680000000,
+       "mark": 580000004,
+       "ra": [
+        726,
+        -3,
+        84000078,
+        83999997,
+        -83994146,
+        -84000003,
+        168000005,
+        167999997,
+        -167958515,
+        -168000001,
+        251999998,
+        251999997,
+        -251746527,
+        -251999759,
+        503999997,
+        -492690830
+       ],
+       "smin": 84000000,
+       "liq": 23426476
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800032400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800036000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 11,
+       "ts": 1800036000,
+       "spot": 1690000000,
+       "mark": 590000003,
+       "ra": [
+        552,
+        -2,
+        84500058,
+        84499998,
+        -84495421,
+        -84500002,
+        169000004,
+        168999998,
+        -168966559,
+        -169000000,
+        253499999,
+        253499998,
+        -253289323,
+        -253499848,
+        506999998,
+        -497042714
+       ],
+       "smin": 84500000,
+       "liq": 23565921
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800036000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800039600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 12,
+       "ts": 1800039600,
+       "spot": 1700000000,
+       "mark": 600000002,
+       "ra": [
+        418,
+        -1,
+        85000043,
+        84999999,
+        -84996427,
+        -85000001,
+        170000003,
+        169999999,
+        -169973110,
+        -170000000,
+        254999999,
+        254999999,
+        -254825312,
+        -254999904,
+        509999999,
+        -501260907
+       ],
+       "smin": 85000000,
+       "liq": 23705366
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800039600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800043200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 13,
+       "ts": 1800043200,
+       "spot": 1710000000,
+       "mark": 610000002,
+       "ra": [
+        316,
+        -1,
+        85500032,
+        85499999,
+        -85497219,
+        -85500001,
+        171000003,
+        170999999,
+        -170978430,
+        -171000000,
+        256500000,
+        256499999,
+        -256355498,
+        -256499940,
+        512999999,
+        -505354588
+       ],
+       "smin": 85500000,
+       "liq": 23844810
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800043200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800046800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 14,
+       "ts": 1800046800,
+       "spot": 1720000000,
+       "mark": 620000001,
+       "ra": [
+        239,
+        0,
+        86000024,
+        86000000,
+        -85997841,
+        -86000000,
+        172000002,
+        172000000,
+        -171982739,
+        -172000000,
+        258000000,
+        258000000,
+        -257880751,
+        -257999963,
+        516000000,
+        -509332862
+       ],
+       "smin": 86000000,
+       "liq": 23984254
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800046800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800050400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 15,
+       "ts": 1800050400,
+       "spot": 1730000000,
+       "mark": 630000001,
+       "ra": [
+        179,
+        0,
+        86500017,
+        86500000,
+        -86498328,
+        -86500000,
+        173000002,
+        173000000,
+        -172986221,
+        -173000000,
+        259500000,
+        259500000,
+        -259401824,
+        -259499977,
+        519000000,
+        -513204682
+       ],
+       "smin": 86500000,
+       "liq": 24123697
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800050400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800054000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 16,
+       "ts": 1800054000,
+       "spot": 1740000000,
+       "mark": 640000001,
+       "ra": [
+        135,
+        0,
+        87000013,
+        87000000,
+        -86998708,
+        -87000000,
+        174000001,
+        174000000,
+        -173989027,
+        -174000000,
+        261000000,
+        261000000,
+        -260919363,
+        -260999986,
+        522000000,
+        -516978766
+       ],
+       "smin": 87000000,
+       "liq": 24263141
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800054000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800057600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 17,
+       "ts": 1800057600,
+       "spot": 1750000000,
+       "mark": 650000001,
+       "ra": [
+        101,
+        0,
+        87500010,
+        87500000,
+        -87499004,
+        -87500000,
+        175000001,
+        175000000,
+        -174991283,
+        -175000000,
+        262500000,
+        262500000,
+        -262433923,
+        -262499991,
+        525000000,
+        -520663539
+       ],
+       "smin": 87500000,
+       "liq": 24402584
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800057600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800061200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 18,
+       "ts": 1800061200,
+       "spot": 1760000000,
+       "mark": 660000001,
+       "ra": [
+        75,
+        0,
+        88000007,
+        88000000,
+        -87999235,
+        -88000000,
+        176000001,
+        176000000,
+        -175993091,
+        -176000000,
+        264000000,
+        264000000,
+        -263945981,
+        -263999995,
+        528000000,
+        -524267074
+       ],
+       "smin": 88000000,
+       "liq": 24542028
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800061200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800064800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 19,
+       "ts": 1800064800,
+       "spot": 1770000000,
+       "mark": 670000001,
+       "ra": [
+        56,
+        0,
+        88500005,
+        88500000,
+        -88499413,
+        -88500000,
+        177000001,
+        177000000,
+        -176994537,
+        -177000000,
+        265500000,
+        265500000,
+        -265455941,
+        -265499997,
+        531000000,
+        -527797053
+       ],
+       "smin": 88500000,
+       "liq": 24681471
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800064800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800068400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 20,
+       "ts": 1800068400,
+       "spot": 1780000000,
+       "mark": 680000001,
+       "ra": [
+        42,
+        0,
+        89000004,
+        89000000,
+        -88999551,
+        -89000000,
+        178000001,
+        178000000,
+        -177995691,
+        -178000000,
+        267000000,
+        267000000,
+        -266964148,
+        -266999998,
+        534000000,
+        -531260731
+       ],
+       "smin": 89000000,
+       "liq": 24820915
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800068400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800072000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 21,
+       "ts": 1800072000,
+       "spot": 1790000000,
+       "mark": 690000001,
+       "ra": [
+        31,
+        0,
+        89500003,
+        89500000,
+        -89499657,
+        -89500000,
+        179000001,
+        179000000,
+        -178996609,
+        -179000000,
+        268500000,
+        268500000,
+        -268470893,
+        -268499998,
+        537000000,
+        -534664916
+       ],
+       "smin": 89500000,
+       "liq": 24960358
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800072000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800075600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 22,
+       "ts": 1800075600,
+       "spot": 1800000000,
+       "mark": 700000001,
+       "ra": [
+        23,
+        0,
+        90000002,
+        90000000,
+        -89999739,
+        -90000000,
+        180000001,
+        180000000,
+        -179997338,
+        -180000000,
+        270000000,
+        270000000,
+        -269976424,
+        -269999999,
+        540000000,
+        -538015952
+       ],
+       "smin": 90000000,
+       "liq": 25099801
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800075600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800079200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 23,
+       "ts": 1800079200,
+       "spot": 1810000000,
+       "mark": 710000001,
+       "ra": [
+        17,
+        0,
+        90500002,
+        90500000,
+        -90499801,
+        -90500000,
+        181000001,
+        181000000,
+        -180997915,
+        -181000000,
+        271500000,
+        271500000,
+        -271480947,
+        -271499999,
+        543000000,
+        -541319716
+       ],
+       "smin": 90500000,
+       "liq": 25239245
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800079200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800082800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 24,
+       "ts": 1800082800,
+       "spot": 1820000000,
+       "mark": 720000001,
+       "ra": [
+        13,
+        0,
+        91000001,
+        91000000,
+        -90999849,
+        -91000000,
+        182000001,
+        182000000,
+        -181998370,
+        -182000000,
+        273000000,
+        273000000,
+        -272984638,
+        -272999999,
+        546000000,
+        -544581615
+       ],
+       "smin": 91000000,
+       "liq": 25378688
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800082800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800086400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 25,
+       "ts": 1800086400,
+       "spot": 1830000000,
+       "mark": 730000001,
+       "ra": [
+        10,
+        0,
+        91500001,
+        91500000,
+        -91499886,
+        -91500000,
+        183000001,
+        183000000,
+        -182998729,
+        -183000000,
+        274500000,
+        274500000,
+        -274487642,
+        -274499999,
+        549000000,
+        -547806601
+       ],
+       "smin": 91500000,
+       "liq": 25518131
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800086400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800090000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 26,
+       "ts": 1800090000,
+       "spot": 1840000000,
+       "mark": 740000001,
+       "ra": [
+        7,
+        0,
+        92000001,
+        92000000,
+        -91999914,
+        -92000000,
+        184000001,
+        184000000,
+        -183999012,
+        -184000000,
+        276000000,
+        276000000,
+        -275990081,
+        -275999999,
+        552000000,
+        -550999175
+       ],
+       "smin": 92000000,
+       "liq": 25657575
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800090000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800093600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 27,
+       "ts": 1800093600,
+       "spot": 1850000000,
+       "mark": 750000001,
+       "ra": [
+        5,
+        0,
+        92500001,
+        92500000,
+        -92499935,
+        -92500000,
+        185000001,
+        185000000,
+        -184999233,
+        -185000000,
+        277500000,
+        277500000,
+        -277492056,
+        -277499999,
+        555000000,
+        -554163411
+       ],
+       "smin": 92500000,
+       "liq": 25797018
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800093600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800097200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 28,
+       "ts": 1800097200,
+       "spot": 1860000000,
+       "mark": 760000001,
+       "ra": [
+        4,
+        0,
+        93000001,
+        93000000,
+        -92999951,
+        -93000000,
+        186000001,
+        186000000,
+        -185999406,
+        -186000000,
+        279000000,
+        279000000,
+        -278993653,
+        -278999999,
+        558000000,
+        -557302976
+       ],
+       "smin": 93000000,
+       "liq": 25936461
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800097200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800100800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 29,
+       "ts": 1800100800,
+       "spot": 1870000000,
+       "mark": 770000001,
+       "ra": [
+        3,
+        0,
+        93500001,
+        93500000,
+        -93499963,
+        -93500000,
+        187000001,
+        187000000,
+        -186999541,
+        -187000000,
+        280500000,
+        280500000,
+        -280494940,
+        -280499999,
+        561000000,
+        -560421150
+       ],
+       "smin": 93500000,
+       "liq": 26075905
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800100800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800104400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 30,
+       "ts": 1800104400,
+       "spot": 1880000000,
+       "mark": 780000001,
+       "ra": [
+        2,
+        0,
+        94000001,
+        94000000,
+        -93999972,
+        -94000000,
+        188000001,
+        188000000,
+        -187999646,
+        -188000000,
+        282000000,
+        282000000,
+        -281995975,
+        -281999999,
+        564000000,
+        -563520853
+       ],
+       "smin": 94000000,
+       "liq": 26215348
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800104400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800108000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 31,
+       "ts": 1800108000,
+       "spot": 1890000000,
+       "mark": 790000001,
+       "ra": [
+        2,
+        0,
+        94500001,
+        94500000,
+        -94499979,
+        -94500000,
+        189000001,
+        189000000,
+        -188999728,
+        -189000000,
+        283500000,
+        283500000,
+        -283496805,
+        -283499999,
+        567000000,
+        -566604673
+       ],
+       "smin": 94500000,
+       "liq": 26354791
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800108000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800111600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 32,
+       "ts": 1800111600,
+       "spot": 1900000000,
+       "mark": 800000001,
+       "ra": [
+        1,
+        0,
+        95000001,
+        95000000,
+        -94999984,
+        -95000000,
+        190000001,
+        190000000,
+        -189999791,
+        -190000000,
+        285000001,
+        285000000,
+        -284997470,
+        -284999999,
+        570000000,
+        -569674889
+       ],
+       "smin": 95000000,
+       "liq": 26494235
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800111600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800115200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 33,
+       "ts": 1800115200,
+       "spot": 1910000000,
+       "mark": 810000001,
+       "ra": [
+        1,
+        0,
+        95500001,
+        95500000,
+        -95499988,
+        -95500000,
+        191000001,
+        191000000,
+        -190999840,
+        -191000000,
+        286500001,
+        286500000,
+        -286498001,
+        -286499999,
+        573000000,
+        -572733501
+       ],
+       "smin": 95500000,
+       "liq": 26633678
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800115200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800118800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 34,
+       "ts": 1800118800,
+       "spot": 1920000000,
+       "mark": 820000001,
+       "ra": [
+        1,
+        0,
+        96000001,
+        96000000,
+        -95999991,
+        -96000000,
+        192000001,
+        192000000,
+        -191999878,
+        -192000000,
+        288000001,
+        288000000,
+        -287998424,
+        -287999999,
+        576000000,
+        -575782254
+       ],
+       "smin": 96000000,
+       "liq": 26773121
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800118800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800122400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 35,
+       "ts": 1800122400,
+       "spot": 1930000000,
+       "mark": 830000001,
+       "ra": [
+        1,
+        0,
+        96500001,
+        96500000,
+        -96499993,
+        -96500000,
+        193000001,
+        193000000,
+        -192999907,
+        -193000000,
+        289500001,
+        289500000,
+        -289498760,
+        -289499999,
+        579000000,
+        -578822664
+       ],
+       "smin": 96500000,
+       "liq": 26912565
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800122400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800126000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 36,
+       "ts": 1800126000,
+       "spot": 1940000000,
+       "mark": 840000001,
+       "ra": [
+        1,
+        0,
+        97000001,
+        97000000,
+        -96999995,
+        -97000000,
+        194000001,
+        194000000,
+        -193999929,
+        -194000000,
+        291000001,
+        291000000,
+        -290999026,
+        -290999999,
+        582000000,
+        -581856041
+       ],
+       "smin": 97000000,
+       "liq": 27052008
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800126000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800129600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 37,
+       "ts": 1800129600,
+       "spot": 1950000000,
+       "mark": 850000001,
+       "ra": [
+        1,
+        0,
+        97500001,
+        97500000,
+        -97499996,
+        -97500000,
+        195000001,
+        195000000,
+        -194999946,
+        -195000000,
+        292500001,
+        292500000,
+        -292499237,
+        -292499999,
+        585000000,
+        -584883513
+       ],
+       "smin": 97500000,
+       "liq": 27191451
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800129600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800133200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 38,
+       "ts": 1800133200,
+       "spot": 1960000000,
+       "mark": 860000001,
+       "ra": [
+        1,
+        0,
+        98000001,
+        98000000,
+        -97999997,
+        -98000000,
+        196000001,
+        196000000,
+        -195999959,
+        -196000000,
+        294000001,
+        294000000,
+        -293999404,
+        -293999999,
+        588000000,
+        -587906047
+       ],
+       "smin": 98000000,
+       "liq": 27330895
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800133200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800136800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 39,
+       "ts": 1800136800,
+       "spot": 1970000000,
+       "mark": 870000001,
+       "ra": [
+        1,
+        0,
+        98500001,
+        98500000,
+        -98499998,
+        -98500000,
+        197000001,
+        197000000,
+        -196999969,
+        -197000000,
+        295500001,
+        295500000,
+        -295499535,
+        -295499999,
+        591000000,
+        -590924464
+       ],
+       "smin": 98500000,
+       "liq": 27470338
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800136800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800140400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 40,
+       "ts": 1800140400,
+       "spot": 1980000000,
+       "mark": 880000001,
+       "ra": [
+        1,
+        0,
+        99000001,
+        99000000,
+        -98999998,
+        -99000000,
+        198000001,
+        198000000,
+        -197999976,
+        -198000000,
+        297000001,
+        297000000,
+        -296999638,
+        -296999999,
+        594000000,
+        -593939467
+       ],
+       "smin": 99000000,
+       "liq": 27609781
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800140400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800144000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 41,
+       "ts": 1800144000,
+       "spot": 1990000000,
+       "mark": 890000001,
+       "ra": [
+        1,
+        0,
+        99500001,
+        99500000,
+        -99499999,
+        -99500000,
+        199000001,
+        199000000,
+        -198999982,
+        -199000000,
+        298500001,
+        298500000,
+        -298499719,
+        -298499999,
+        597000000,
+        -596951645
+       ],
+       "smin": 99500000,
+       "liq": 27749225
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800144000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800147600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 42,
+       "ts": 1800147600,
+       "spot": 2000000000,
+       "mark": 900000001,
+       "ra": [
+        1,
+        0,
+        100000001,
+        100000000,
+        -99999999,
+        -100000000,
+        200000001,
+        200000000,
+        -199999986,
+        -200000000,
+        300000001,
+        300000000,
+        -299999782,
+        -299999999,
+        600000000,
+        -599961496
+       ],
+       "smin": 100000000,
+       "liq": 27888668
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800147600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800151200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 43,
+       "ts": 1800151200,
+       "spot": 2010000000,
+       "mark": 910000000,
+       "ra": [
+        1,
+        0,
+        100500001,
+        100500000,
+        -100499999,
+        -100500000,
+        201000001,
+        201000000,
+        -200999990,
+        -201000000,
+        301500001,
+        301500000,
+        -301499831,
+        -301499999,
+        603000000,
+        -602969439
+       ],
+       "smin": 100500000,
+       "liq": 28028111
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800151200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800154800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 44,
+       "ts": 1800154800,
+       "spot": 2020000000,
+       "mark": 920000000,
+       "ra": [
+        1,
+        0,
+        101000001,
+        101000000,
+        -100999999,
+        -101000000,
+        202000001,
+        202000000,
+        -201999992,
+        -202000000,
+        303000000,
+        303000000,
+        -302999870,
+        -303000000,
+        606000000,
+        -605975820
+       ],
+       "smin": 101000000,
+       "liq": 28167555
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800154800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800158400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 45,
+       "ts": 1800158400,
+       "spot": 2030000000,
+       "mark": 930000000,
+       "ra": [
+        1,
+        0,
+        101500001,
+        101500000,
+        -101499999,
+        -101500000,
+        203000001,
+        203000000,
+        -202999994,
+        -203000000,
+        304500000,
+        304500000,
+        -304499900,
+        -304500000,
+        609000000,
+        -608980930
+       ],
+       "smin": 101500000,
+       "liq": 28306998
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800158400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800162000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 46,
+       "ts": 1800162000,
+       "spot": 2040000000,
+       "mark": 940000000,
+       "ra": [
+        1,
+        0,
+        102000001,
+        102000000,
+        -101999999,
+        -102000000,
+        204000001,
+        204000000,
+        -203999995,
+        -204000000,
+        306000000,
+        306000000,
+        -305999923,
+        -306000000,
+        612000000,
+        -611985008
+       ],
+       "smin": 102000000,
+       "liq": 28446441
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800162000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800165600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 47,
+       "ts": 1800165600,
+       "spot": 2050000000,
+       "mark": 950000000,
+       "ra": [
+        1,
+        0,
+        102500001,
+        102500000,
+        -102499999,
+        -102500000,
+        205000001,
+        205000000,
+        -204999997,
+        -205000000,
+        307500000,
+        307500000,
+        -307499941,
+        -307500000,
+        615000000,
+        -614988251
+       ],
+       "smin": 102500000,
+       "liq": 28585885
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800165600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800169200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 48,
+       "ts": 1800169200,
+       "spot": 2060000000,
+       "mark": 960000000,
+       "ra": [
+        1,
+        0,
+        103000001,
+        103000000,
+        -102999999,
+        -103000000,
+        206000001,
+        206000000,
+        -205999997,
+        -206000000,
+        309000000,
+        309000000,
+        -308999955,
+        -309000000,
+        618000000,
+        -617990821
+       ],
+       "smin": 103000000,
+       "liq": 28725328
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800169200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800172800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 49,
+       "ts": 1800172800,
+       "spot": 2070000000,
+       "mark": 970000000,
+       "ra": [
+        1,
+        0,
+        103500001,
+        103500000,
+        -103499999,
+        -103500000,
+        207000001,
+        207000000,
+        -206999998,
+        -207000000,
+        310500000,
+        310500000,
+        -310499965,
+        -310500000,
+        621000000,
+        -620992852
+       ],
+       "smin": 103500000,
+       "liq": 28864771
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800172800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800176400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 50,
+       "ts": 1800176400,
+       "spot": 2080000000,
+       "mark": 980000000,
+       "ra": [
+        1,
+        0,
+        104000001,
+        104000000,
+        -103999999,
+        -104000000,
+        208000001,
+        208000000,
+        -207999998,
+        -208000000,
+        312000000,
+        312000000,
+        -311999973,
+        -312000000,
+        624000000,
+        -623994451
+       ],
+       "smin": 104000000,
+       "liq": 29004215
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800176400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800180000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 51,
+       "ts": 1800180000,
+       "spot": 2090000000,
+       "mark": 990000000,
+       "ra": [
+        1,
+        0,
+        104500001,
+        104500000,
+        -104499999,
+        -104500000,
+        209000001,
+        209000000,
+        -208999999,
+        -209000000,
+        313500000,
+        313500000,
+        -313499980,
+        -313500000,
+        627000000,
+        -626995706
+       ],
+       "smin": 104500000,
+       "liq": 29143658
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800180000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800183600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 52,
+       "ts": 1800183600,
+       "spot": 2100000000,
+       "mark": 1000000000,
+       "ra": [
+        1,
+        0,
+        105000001,
+        105000000,
+        -104999999,
+        -105000000,
+        210000001,
+        210000000,
+        -209999999,
+        -210000000,
+        315000000,
+        315000000,
+        -314999984,
+        -315000000,
+        630000000,
+        -629996687
+       ],
+       "smin": 105000000,
+       "liq": 29283101
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800183600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800187200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 53,
+       "ts": 1800187200,
+       "spot": 2110000000,
+       "mark": 1010000000,
+       "ra": [
+        1,
+        0,
+        105500001,
+        105500000,
+        -105499999,
+        -105500000,
+        211000001,
+        211000000,
+        -210999999,
+        -211000000,
+        316500000,
+        316500000,
+        -316499988,
+        -316500000,
+        633000000,
+        -632997453
+       ],
+       "smin": 105500000,
+       "liq": 29422545
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800187200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800190800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 54,
+       "ts": 1800190800,
+       "spot": 2120000000,
+       "mark": 1020000000,
+       "ra": [
+        1,
+        0,
+        106000001,
+        106000000,
+        -105999999,
+        -106000000,
+        212000000,
+        212000000,
+        -211999999,
+        -212000000,
+        318000000,
+        318000000,
+        -317999991,
+        -318000000,
+        636000000,
+        -635998047
+       ],
+       "smin": 106000000,
+       "liq": 29561988
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800190800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800194400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 55,
+       "ts": 1800194400,
+       "spot": 2130000000,
+       "mark": 1030000000,
+       "ra": [
+        1,
+        0,
+        106500001,
+        106500000,
+        -106499999,
+        -106500000,
+        213000000,
+        213000000,
+        -212999999,
+        -213000000,
+        319500000,
+        319500000,
+        -319499993,
+        -319500000,
+        639000000,
+        -638998508
+       ],
+       "smin": 106500000,
+       "liq": 29701431
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800194400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800198000
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 56,
+       "ts": 1800198000,
+       "spot": 2140000000,
+       "mark": 1040000000,
+       "ra": [
+        1,
+        0,
+        107000001,
+        107000000,
+        -106999999,
+        -107000000,
+        214000000,
+        214000000,
+        -213999999,
+        -214000000,
+        321000000,
+        321000000,
+        -320999995,
+        -321000000,
+        642000000,
+        -641998863
+       ],
+       "smin": 107000000,
+       "liq": 29840875
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800198000,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800201600
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 57,
+       "ts": 1800201600,
+       "spot": 2150000000,
+       "mark": 1050000000,
+       "ra": [
+        1,
+        0,
+        107500001,
+        107500000,
+        -107499999,
+        -107500000,
+        215000000,
+        215000000,
+        -214999999,
+        -215000000,
+        322500000,
+        322500000,
+        -322499996,
+        -322500000,
+        645000000,
+        -644999136
+       ],
+       "smin": 107500000,
+       "liq": 29980318
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800201600,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800205200
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 58,
+       "ts": 1800205200,
+       "spot": 2160000000,
+       "mark": 1060000000,
+       "ra": [
+        1,
+        0,
+        108000001,
+        108000000,
+        -107999999,
+        -108000000,
+        216000000,
+        216000000,
+        -215999999,
+        -216000000,
+        324000000,
+        324000000,
+        -323999997,
+        -324000000,
+        648000000,
+        -647999346
+       ],
+       "smin": 108000000,
+       "liq": 30119761
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800205200,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800208800
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 59,
+       "ts": 1800208800,
+       "spot": 2170000000,
+       "mark": 1070000000,
+       "ra": [
+        1,
+        0,
+        108500001,
+        108500000,
+        -108499999,
+        -108500000,
+        217000000,
+        217000000,
+        -216999999,
+        -217000000,
+        325500000,
+        325500000,
+        -325499997,
+        -325500000,
+        651000000,
+        -650999506
+       ],
+       "smin": 108500000,
+       "liq": 30259205
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800208800,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "set_time",
+     "args": [
+      1800212400
+     ],
+     "expect": "ok"
+    },
+    {
+     "op": "publish_risk",
+     "args": [
+      "PUBLISHER",
+      {
+       "series_id": 0,
+       "seq": 60,
+       "ts": 1800212400,
+       "spot": 2180000000,
+       "mark": 1080000000,
+       "ra": [
+        1,
+        0,
+        109000001,
+        109000000,
+        -108999999,
+        -109000000,
+        218000000,
+        218000000,
+        -217999999,
+        -218000000,
+        327000000,
+        327000000,
+        -326999998,
+        -327000000,
+        654000000,
+        -653999628
+       ],
+       "smin": 109000000,
+       "liq": 30398648
+      }
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800212400,
+      "contract_balance": 775974631492,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195117305650,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780882888678,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_A",
+      611148875
+     ],
+     "expect": "ok",
+     "note": "cash = prix de reprise + dette, exactement",
+     "state": {
+      "now": 1800212400,
+      "contract_balance": 776585780367,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195728454525,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780271739803,
+       "MAKER_B": 6000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "get_requirement",
+     "args": [
+      "MAKER_A"
+     ],
+     "expect": "ok",
+     "result": {
+      "nlv": 5400000000,
+      "liability": 108000000000,
+      "expired": 0,
+      "scan": 65400000000,
+      "smin": 10900000000,
+      "liq": 3039864800,
+      "mm": 68439864800,
+      "im": 85549831000,
+      "worst": 14
+     },
+     "note": "liquidable ; tout le cash est pris par la reprise et la dette"
+    },
+    {
+     "op": "deposit",
+     "args": [
+      "MAKER_B",
+      5000000000000
+     ],
+     "expect": "ok",
+     "state": {
+      "now": 1800212400,
+      "contract_balance": 5776585780367,
+      "accounts": {
+       "MAKER_A": {
+        "cash": 195728454525,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 82328454525,
+        "reserved": 0
+       },
+       "MAKER_B": {
+        "cash": 5000000000000,
+        "shorts": {},
+        "books": [],
+        "owed": 0,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 505685752017,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780271739803,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_A",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       }
+      },
+      "lp_shares": {
+       "LP1": 500000000000
+      },
+      "total_shares": 500000000000
+     }
+    },
+    {
+     "op": "liquidate",
+     "args": [
+      "MAKER_B",
+      "MAKER_A",
+      "MAKER_B"
+     ],
+     "expect": "ok",
+     "result": {
+      "x": 113400000000,
+      "paid": 113400000000,
+      "deficit": 0
+     },
+     "note": "reprise privée : la créance du vault est prélevée",
+     "state": {
+      "now": 1800212400,
+      "contract_balance": 5776585780367,
+      "accounts": {
+       "MAKER_B": {
+        "cash": 5113400000000,
+        "shorts": {
+         "0": 100
+        },
+        "books": [
+         1
+        ],
+        "owed": 0,
+        "reserved": 0
+       },
+       "VAULT": {
+        "cash": 588014206542,
+        "shorts": {
+         "0": 300
+        },
+        "books": [],
+        "owed": 0,
+        "reserved": 75171573825
+       }
+      },
+      "wallets": {
+       "ALICE": 498142489730,
+       "BOB": 444999990100,
+       "LP1": 100000000000,
+       "MAKER_A": 2780271739803,
+       "MAKER_B": 1000000000000
+      },
+      "series": {
+       "0": {
+        "oi": 400,
+        "settlement_price": null,
+        "open_books": 2,
+        "shortfall": 0,
+        "vault_paid": 0,
+        "pool": 0,
+        "claimed": 0,
+        "closed": false
+       }
+      },
+      "books": {
+       "0": {
+        "series_id": 0,
+        "owner": "VAULT",
+        "qty": 300,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 75171573825
+       },
+       "1": {
+        "series_id": 0,
+        "owner": "MAKER_B",
+        "qty": 100,
+        "settled": false,
+        "due": 0,
+        "from_owner": 0,
+        "shortfall": 0,
+        "reserve": 0
+       }
+      },
+      "positions": {
+       "0": {
+        "holder": "ALICE",
+        "book": 0,
+        "qty": 300,
+        "settled": false,
+        "exercised": false,
+        "paid": 0,
+        "deficit": 0
+       },
+       "1": {
+        "holder": "BOB",
+        "book": 1,
+        "qty": 100,
         "settled": false,
         "exercised": false,
         "paid": 0,
@@ -41047,6 +50012,13 @@
       "now": 1800086460,
       "contract_balance": 934246915350,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 496366043600,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 50062915091,
         "shorts": {
@@ -41168,6 +50140,13 @@
       "now": 1800086460,
       "contract_balance": 934246915350,
       "accounts": {
+       "MAKER_A": {
+        "cash": 0,
+        "shorts": {},
+        "books": [],
+        "owed": 496366043600,
+        "reserved": 0
+       },
        "MAKER_B": {
         "cash": 50062915091,
         "shorts": {
