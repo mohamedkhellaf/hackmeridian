@@ -19,7 +19,7 @@ test('writer claims delivery after a second account buys and exercises', async (
   await buy.getByRole('button', { name: /^Buy for / }).click()
   // Purchase confirmation is the dialog's confirmed step (no "Bought" toast by design).
   await expect(buy).toContainText(/Bought\. Position \d+/)
-  await buy.getByRole('button', { name: 'Back to markets' }).click()
+  await buy.getByRole('button', { name: 'Done' }).click()
   await expect(buy).toBeHidden()
   await goTo(page, 'Positions')
   await page.getByRole('button', { name: 'Exercise' }).click()
