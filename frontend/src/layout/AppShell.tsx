@@ -12,9 +12,9 @@ export const MOCK_TEXT = 'Mock data: no contract connected.'
 function LogoMark({ size = 26 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 26 26" aria-hidden="true">
-      <rect x="3" y="4" width="20" height="4" rx="2" fill="#F2F4F7" />
-      <rect x="3" y="11" width="15" height="4" rx="2" fill="#9DB1FF" />
-      <rect x="3" y="18" width="10" height="4" rx="2" fill="#4E5A6E" />
+      <rect x="2.4" y="3.5" width="21.2" height="4.2" rx="1.2" fill="#ECE9E2" />
+      <rect x="2.4" y="11.2" width="15.4" height="4.2" rx="1.2" fill="#D9A05B" />
+      <rect x="2.4" y="18.9" width="9.5" height="4.2" rx="1.2" fill="#55585F" />
     </svg>
   )
 }
@@ -134,6 +134,11 @@ export interface AppShellProps {
   mock: boolean
   /** Options contract id (links to stellar.expert). */
   contractId?: string
+  /**
+   * Real mode only: latest backing read, for "Backing verified · ledger N" in the contract card.
+   * `ok` = held covers reserved for every token. Omit (null) when unknown or in mock mode.
+   */
+  backing?: { ok: boolean; ledger: number | null } | null
   /** Token balances for the top bar. */
   balances?: ReactNode
   /** Wallet chip / connect button. */
@@ -146,7 +151,7 @@ export interface AppShellProps {
  * Desktop: left sidebar + top bar + content. Phones (<= 768px): sidebar hidden, bottom tab bar
  * (Markets, Write, Portfolio, Reserves) and an Issuer shortcut in the top bar.
  */
-export function AppShell({ route, portfolioBadge, mock, contractId, balances, wallet, children }: AppShellProps) {
+export function AppShell({ route, portfolioBadge, mock, contractId, backing, balances, wallet, children }: AppShellProps) {
   return (
     <div className="shell">
       <div className="demo-banner">
@@ -177,6 +182,15 @@ export function AppShell({ route, portfolioBadge, mock, contractId, balances, wa
             {contractId ? (
               <>
                 <Mono title={contractId}>{shortAddress(contractId)}</Mono>
+                {backing && (
+                  <span className={backing.ok ? 'contract-backing' : 'contract-backing contract-backing--bad'}>
+                    <StatusDot tone={backing.ok ? 'ok' : 'danger'} />
+                    <span>
+                      {backing.ok ? 'Backing verified' : 'Backing shortfall'}
+                      {backing.ledger != null && ` · ledger ${backing.ledger.toLocaleString('en-US')}`}
+                    </span>
+                  </span>
+                )}
                 <a href={`https://stellar.expert/explorer/testnet/contract/${contractId}`} target="_blank" rel="noreferrer">
                   View on StellarExpert <Icon name="external" size={12} />
                 </a>

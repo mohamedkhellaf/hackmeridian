@@ -61,11 +61,11 @@ export function Segmented<T extends string>({
 }
 
 const BADGE_PALETTE: [string, string][] = [
-  ['#1a2633', '#9fd0e8'], // blue (FUND)
-  ['#2a2333', '#cdb7ee'], // violet (BOND)
-  ['#1f2a22', '#a6d9b5'], // green
-  ['#2d2620', '#e6c39a'], // amber
-  ['#2b2228', '#e8b4c8'], // rose
+  ['#2a2018', '#d9a05b'], // amber (FUND)
+  ['#1a2633', '#8fb4e3'], // blue (BOND)
+  ['#1a2a22', '#8fcda8'], // green (USDX)
+  ['#26282d', '#ece9e2'], // ink
+  ['#2b2220', '#e0b86a'], // gold
 ]
 const KNOWN: Record<string, number> = { FUND: 0, BOND: 1, USDX: 2 }
 
@@ -85,7 +85,7 @@ export function AssetBadge({ code, size = 34 }: { code: string; size?: number })
     <span
       className="ui-asset-badge"
       aria-hidden="true"
-      style={{ width: size, height: size, background: bg, color: fg, fontSize: Math.round(size * 0.35) }}
+      style={{ width: size, height: size, background: bg, color: fg, fontSize: Math.round(size * 0.4), border: `1px solid ${fg}33` }}
     >
       {letters.toUpperCase()}
     </span>
