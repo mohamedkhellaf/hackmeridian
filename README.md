@@ -237,7 +237,7 @@ We used AI coding agents throughout, in bounded lanes with human owners for fina
 ## Where this goes
 
 - **Position tokens** so options become composable collateral in the rest of the ecosystem.
-- **Cash-settled spreads and a partial-margin product.** A risk model and integer reference implementation for a margined product ("Strata Pro") are specified and simulated in `packages/risk/` and `docs/pro-*.md`; it is deliberately not on chain yet, because it needs an oracle and a liquidation design we were not willing to ship unreviewed.
+- **Cash-settled spreads and a partial-margin product ("Strata Pro").** Specified in `docs/pro-*.md` with an integer reference model and fixtures in `packages/risk/`, implemented as a separate experimental contract in `contracts/pro/` that replays all 691 fixture steps and passes its negative suite, and previewed on fixtures in the app behind a build flag. It is deliberately **not deployed**: a margined product needs an oracle and a liquidation design we were not willing to put on chain unreviewed. Nothing in it touches the options contract or its collateral.
 - **Issuer onboarding** for real tokenized assets: the contract already respects their rules; the work is legal and operational, not technical.
 - **RFQ layer** for makers, with the on-chain funded offer remaining the only executable truth.
 
