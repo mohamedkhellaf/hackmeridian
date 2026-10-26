@@ -1,5 +1,5 @@
 {
- "version": "pro-v0.3.1",
+ "version": "pro-v0.3.2",
  "units": {
   "amount": "USDx, 7 décimales (1 USDx = 10_000_000)",
   "qty": "lots entiers",
@@ -39432,18 +39432,11 @@
       "paid": 155781489800,
       "deficit": 668510410
      },
-     "note": "le vault reprend ; la dette grossit du déficit",
+     "note": "le vault reprend ; sa créance (ancienne dette + déficit) est prélevée sur le cash restant",
      "state": {
       "now": 1802170800,
       "contract_balance": 3741269616971,
       "accounts": {
-       "MAKER_A": {
-        "cash": 26686689785,
-        "shorts": {},
-        "books": [],
-        "owed": 27355200195,
-        "reserved": 0
-       },
        "MAKER_B": {
         "cash": 3000000000000,
         "shorts": {},
@@ -39452,7 +39445,7 @@
         "reserved": 0
        },
        "VAULT": {
-        "cash": 558801437386,
+        "cash": 585488127171,
         "shorts": {
          "1": 500
         },

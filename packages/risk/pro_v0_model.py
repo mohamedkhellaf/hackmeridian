@@ -1,5 +1,5 @@
 """
-Strata Pro v0.3 — modèle de référence en entiers.
+Strata Pro v0.3.2 — modèle de référence en entiers.
 
 Spécification exécutable de `contracts/pro/`. Chaque fonction publique correspond à une fonction
 du contrat, avec les mêmes contrôles dans le même ordre et les mêmes erreurs. Aucun flottant :
@@ -28,6 +28,8 @@ porteurs au règlement avant toute mutualisation ; le déficit de reprise devien
 
 v0.3.1 (5e revue) : la dette de reprise est prélevée sur le cash du vendeur dès le règlement de son dernier book
 échu (sans attendre un retrait) ; elle passe aussi avant le paiement d'une nouvelle reprise.
+v0.3.2 (6e revue) : le vault prélève aussi sa créance au moment même de la reprise, sur le cash non réservé à la
+dette échue ; une reprise de positions vivantes seules ne laisse donc plus de cash bloqué.
 
 Conventions de risque (publiées par le publieur, bornées par le contrat) :
 - `ra[w]`  : perte par lot COURT dans le scénario w (16 scénarios, ordre de strata_risk.ScanConfig),
@@ -568,6 +570,9 @@ class ProModel:
                 t.reserved += share
             t.cash += pay - sum(chk(pay * v) // total_v if total_v else 0 for v in vals.values())
             w.owed += deficit
+            # le vault est le repreneur : il prélève sa créance tout de suite sur le cash non réservé à la dette
+            # échue (sinon une reprise de positions vivantes seules laisse la dette sans déclencheur de collecte)
+            self._repay(writer, cap=max(w.cash - r["expired"], 0))
         else:
             t.cash += pay
         for sid, q in live.items():
@@ -657,9 +662,9 @@ class ProModel:
             self._repay(b.owner)                      # dernier book échu réglé : la dette de reprise est prélevée
         return {"due": due, "from_owner": from_owner, "shortfall": due - from_owner}
 
-    def _repay(self, who: str):
+    def _repay(self, who: str, cap: int | None = None):
         a = self.acct(who)
-        paid = min(a.cash, a.owed)
+        paid = min(a.cash if cap is None else min(a.cash, cap), a.owed)
         if paid:
             a.cash -= paid
             a.owed -= paid

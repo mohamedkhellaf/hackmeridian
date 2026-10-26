@@ -556,8 +556,13 @@ def s_takeover_debt(s1_price: int = 112, name: str = "takeover_debt"):
         r.step("deposit", "MAKER_B", 300_000 * SCALE)
         r.step("liquidate", "MAKER_B", "MAKER_A", "MAKER_B", expect="InsolventTakeover",
                note="le cash couvrirait la reprise, mais pas après la dette envers le vault : elle passe avant")
-        out = r.step("liquidate", "KEEPER", "MAKER_A", VAULT, note="le vault reprend ; la dette grossit du déficit")
-        assert out["deficit"] > 0 and r.m.acct("MAKER_A").owed == owed + out["deficit"]
+        cash = r.m.acct("MAKER_A").cash
+        out = r.step("liquidate", "KEEPER", "MAKER_A", VAULT,
+                     note="le vault reprend ; sa créance (ancienne dette + déficit) est prélevée sur le cash restant")
+        a = r.m.acct("MAKER_A")
+        collected = cash - out["paid"] - a.cash
+        assert out["deficit"] > 0 and collected > 0 and a.owed == owed + out["deficit"] - collected
+        assert a.cash == 0 or a.owed == 0, "aucun cash libre ne reste bloqué à côté d'une dette"
     return r
 
 
@@ -636,7 +641,7 @@ SCENARIOS = [s_happy_path, s_insufficient_margin, s_snapshot_bounds, s_liquidati
 
 
 if __name__ == "__main__":
-    out = {"version": "pro-v0.3.1", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
+    out = {"version": "pro-v0.3.2", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
                                           "time": "secondes Unix"},
            "scenario_order": "index 0..13 : prix {0,+1/3,-1/3,+2/3,-2/3,+1,-1} x U, vol {x1.25, x0.75} ; 14 : +ext ; 15 : -ext",
            "errors": ERRORS, "scenarios": [f().dump() for f in SCENARIOS]}

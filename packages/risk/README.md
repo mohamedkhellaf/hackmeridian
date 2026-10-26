@@ -8,7 +8,7 @@ Python 3 + numpy. Owner: Dev 1.
 |---|---|
 | `strata_risk.py` | Float reference engine: Black–Scholes, 16-scenario margin, liquidation helpers, jump-diffusion calibration simulator (`python strata_risk.py 30000`, ~5 min) |
 | `test_strata_risk.py` | Engine tests (`python test_strata_risk.py`) |
-| `pro_v0_model.py` | **Integer reference model of a future `contracts/pro`, v0.3** (American cash-settled calls, books, pull claims, no LP withdrawal) — the executable spec |
+| `pro_v0_model.py` | **Integer reference model of a future `contracts/pro`, v0.3.2** (American cash-settled calls, books, pull claims, no LP withdrawal) — the executable spec |
 | `gen_pro_fixtures.py` | Builds `fixtures/pro_v0.json` (deterministic; fails if the model breaks its own expectations); `make_snapshot()` is what the publisher runs |
 | `fuzz_pro_model.py` | Random operation sequences with invariants checked after every step (`python fuzz_pro_model.py`, deterministic) |
 | `fixtures/pro_v0.json` | 15 scenarios / 559 steps a future contract must replay (necessary, not sufficient: see brief §7) |

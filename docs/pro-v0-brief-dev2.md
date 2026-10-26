@@ -1,12 +1,21 @@
-# Strata Pro v0.3 — build brief for Dev 2
+# Strata Pro v0.3.2 — build brief for Dev 2
 
 Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **experimental track, spec + integer model + simulator for the hackathon.** Dev 2's review of PR #30 recommended no-go for on-chain Pro before the 06:00 freeze; Dev 1 accepts. This brief is the build spec for when `contracts/pro/` is built. Dev 2 keeps the veto on unsafe behavior.
 
-**The executable spec is `packages/risk/pro_v0_model.py` (v0.3).** Every function below exists there with the same checks, in the same order, with the same errors. The brief and the model must agree. If Dev 2 finds that a behavior is unsafe or unbuildable on-chain, Dev 2 may deviate. Dev 1 then updates the model and the fixtures to match before the contract merges. The model never overrides on-chain safety. Background and calibration: `docs/pro-architecture.md`.
+**The executable spec is `packages/risk/pro_v0_model.py` (v0.3.2).** Every function below exists there with the same checks, in the same order, with the same errors. The brief and the model must agree. If Dev 2 finds that a behavior is unsafe or unbuildable on-chain, Dev 2 may deviate. Dev 1 then updates the model and the fixtures to match before the contract merges. The model never overrides on-chain safety. Background and calibration: `docs/pro-architecture.md`.
 
 **Done means:** `contracts/pro` replays every scenario in `packages/risk/fixtures/pro_v0.json` (15 scenarios, 559 steps) with identical results, error codes and state. **Replay is necessary, not sufficient**: the fixtures do not cover every bound or error, so contract tests must also include the negative tests listed in §7. A Testnet run covers fill → early exercise → price move → vault liquidation → settlement → claim, with the transaction hashes recorded in `docs/contract-testnet-evidence.md`. Until then, every public claim says **specified and simulated**.
 
 ## 0. What changed
+
+### v0.3.2 (sixth review of PR #30, head `00260aa`)
+
+| Round-6 item | v0.3.2 resolution |
+|---|---|
+| Medium: takeover debt still stranded after a takeover of live positions only (no expired book left to trigger collection; `withdraw` fails while cash ≤ `owed`) | A vault takeover now collects the vault's claim (old debt + new deficit) **at the takeover itself**, from the writer's cash not reserved for expired debt (`_repay(writer, cap = cash − expired)`). After any vault takeover, either the writer's free cash is 0 or nothing is owed. Dev 2's probe: the `takeover_debt_cash_short` end state goes from cash 2,668.67 / owed 2,735.52 to cash 0 / owed 66.85; the live-only path collects 8,232.85 at the second takeover instead of waiting for a withdrawal. |
+| Low: v0.3 labels | Brief, model and `packages/risk/README.md` say v0.3.2. |
+
+Mutation check: removing the new collection makes the generator fail; the 20 earlier mutants are still detected.
 
 ### v0.3.1 (fifth review of PR #30, head `54d8b74`)
 
@@ -208,7 +217,8 @@ liquidate(caller, writer, taker: Option<Address>)   // None = vault, anyone; Som
                                          // private taker: RoleNotAllowed, deficit > 0 -> InsolventTakeover,
                                          //   TooManySeries / OiCapExceeded / TooManyPositions (books)
                                          // move live shorts + live books (owner = taker); expired books stay
-                                         // vault: pay split into Book.reserve per moved book; owed += deficit
+                                         // vault: pay split into Book.reserve per moved book; owed += deficit;
+                                         //   then move min(cash − expired, owed) → vault cash
                                          // then private taker nlv ≥ im (InsufficientMargin); the vault always accepts
 publish_settlement(publisher, series_id, price)      // expiry ≤ now ≤ expiry + settle_window; once; team-set
 settle(book_id)                          // anyone. NotFound, NoSettlementPrice, WrongState if settled;
@@ -303,7 +313,7 @@ Never cut:
 - **The publisher is trusted.** Its spot and settlement price decide liquidations, early exercises and payouts. The §5 bounds only reject inconsistent snapshots. The demo feed and the settlement price are operated by the team.
 - **Early exercise is paid at the publisher's spot** (snapshot ≤ 120 s old), not at a live market price. It is refused when the vault owns the position (paid at expiry, pro rata), when the writer is unhealthy (taken over first) or while the writer has expired debt without a price.
 - The vault always takes over an account below MM, even when that pushes the vault below its own margin or below zero. Within a series the vault pays pro rata; across series it pays in `settle_vault` order.
-- **Vault takeovers ring-fence the writer's payment per book; the takeover shortfall is the writer's debt to the vault**, collected from the writer's cash when its last expired book settles (and before any withdrawal); any part its cash cannot cover stays a recorded, unrecovered debt, not counted in the vault's value. The debt ranks ahead of any later takeover payment. The first LP takes any fee income earned before the first deposit.
+- **Vault takeovers ring-fence the writer's payment per book; the takeover shortfall is the writer's debt to the vault**, collected from the writer's free cash at the takeover itself, then from its cash when its last expired book settles, and before any withdrawal; any part its cash cannot cover stays a recorded, unrecovered debt, not counted in the vault's value. The debt ranks ahead of any later takeover payment. The first LP takes any fee income earned before the first deposit.
 - **LP capital cannot be withdrawn in v0.** A deposit is priced at the vault's value, which does not include writers that are insolvent but not yet taken over: a deposit made in that window (before the keeper acts) buys into a hidden loss. New deposits are refused while the vault's value is ≤ 0.
 - The payoff is not guaranteed beyond writer margin plus vault cash. Holders can take a haircut, which is shown as `deficit`.
 - Settlement uses one price, not a TWAP. If the window closes with no price, the series never closes and keeps one of the 16 live-series slots; margin and claims stay locked. A price ≥ 2^120 would overflow and lock the series. v1 needs a bounded or two-step settlement price, an overflow guard, a fallback oracle, publisher key rotation and a permissionless close for expired zero-OI series. A stale snapshot on any series of a writer blocks early exercise against that writer (publisher liveness).
