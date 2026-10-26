@@ -146,7 +146,7 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 
 ## Built at the event
 
-Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale), v1.5 (buyer requests). Six app screens on the live contract, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 77 commits, 62 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
+Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale), v1.5 (buyer requests). Six app screens on the live contract, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 89 commits, 74 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
 
 ## Next
 
