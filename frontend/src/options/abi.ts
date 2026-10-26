@@ -19,7 +19,7 @@ export interface AbiOptionData {
   premium_total: bigint
   expiry: bigint
   writer: string
-  holder: string | undefined
+  holder: string | null | undefined // the SDK decodes Option::None as null at runtime
   state: AbiState
 }
 
