@@ -30,7 +30,7 @@ use soroban_sdk::{
 use pro::{
     Account, Book, ClaimResult, Error, ExerciseResult, MarketConfig, Position, ProContract,
     ProContractClient, Requirement, Series, SettleResult, Snapshot, TakeoverResult, VaultAccount,
-    VaultSettleResult, Writer, N_SCEN,
+    VaultSettleResult, Writer,
 };
 
 const FIXTURES: &str = include_str!("../../../packages/risk/fixtures/pro_v0.json");
@@ -224,7 +224,8 @@ fn market_config(cfg: &Value) -> MarketConfig {
 
 fn snapshot(env: &Env, s: &Value) -> Snapshot {
     let ra_json = s["ra"].as_array().expect("snapshot.ra must be an array");
-    assert_eq!(ra_json.len(), N_SCEN as usize, "snapshot.ra must have {N_SCEN} entries: {s}");
+    // The fixture deliberately publishes malformed vectors (e.g. 15 entries) to get BadSnapshot:
+    // pass them through unchanged and let the contract reject them.
     let mut ra: Vec<i128> = Vec::new(env);
     for (i, x) in ra_json.iter().enumerate() {
         ra.push_back(j_i128(x, &std::format!("snapshot.ra[{i}]")));
