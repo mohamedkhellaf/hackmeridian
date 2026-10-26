@@ -1,10 +1,10 @@
-//! Negative-path (misuse) tests for the `options` contract v1.3 (ABI: `docs/contract-abi.md`).
+//! Negative-path (misuse) tests for the `options` contract v1.3.1 (ABI: `docs/contract-abi.md`).
 //!
 //! Every test drives a misuse path from the attacker's side and asserts BOTH that the contract
 //! rejects it (typed `Error` by name, or a host/SAC error identified by its root cause) AND that
 //! nothing observable changed (all balances of every tracked party, reserved totals, the open
-//! list, `option_count`, every stored `OptionData`, every tracked party's `writer_open_count`
-//! and the asset registry) and that no contract event was emitted.
+//! list, every per-asset open book, `option_count`, every stored `OptionData`, every tracked
+//! party's `writer_open_count` and the asset registry) and that no contract event was emitted.
 //!
 //! Contract errors are `options::Error`, codes 101–119 (renumbered in v1.1, 116–119 appended in
 //! v1.3), and are matched by variant name, never by number. v1.2 adds `transfer(holder, to, id)`,
@@ -17,8 +17,21 @@
 //! backstop that rejects the contract's own address as any party. Sections 18–23 cover them;
 //! section 2 (`transfer` to the contract), section 8 (open-list griefing, finding F-1, which v1.3
 //! fixes for a single writer) and section 17 (more than 50 offers from one writer) are adapted.
-//! `finding_f1r_*` documents what v1.3 leaves open: MAX_OPEN is global, so 20 sybil writers on a
-//! self-listed unflagged asset still fill the book.
+//!
+//! v1.3.1 (ABI §13): `prune_expired(pruner, ids)` takes an authenticated caller (every prune here
+//! is signed by exactly its pruner, and section 24 forges that signature); `transfer` gains the
+//! `ContractNotAuthorized` and `CollateralShortfall` guards (section 16); the single global open
+//! list (`MAX_OPEN = 1000`) is replaced by per-asset books capped at `MAX_OPEN_PER_ASSET = 500`
+//! with `list_open_for(asset, from, limit)`, and `list_open()` returns the books concatenated in
+//! registry order truncated to 200 ids; `extend_ttl` also extends the registry, writer and book
+//! entries. The former F-1R finding (20 sybil writers on a self-listed unflagged asset fill the
+//! global list) is now the passing regression `griefing8_f1r_*`; section 24 covers the rest,
+//! including the cost of the `list_open()` window with a large registry. Section 8 also pins
+//! the persistent `Reserved(token)` entries (§13.8: the instance entry never grows with listings,
+//! and every path that touches a reserve keeps it alive) and section 18 the `list_asset` check
+//! order (§13.4: `AlreadyListed` without probing the SAC).
+//! Every snapshot also checks the open-book invariant: each asset's book is exactly its
+//! `Offered` ids in id order, and `list_open()` is the registry-order concatenation, truncated.
 //!
 //! Conventions (soroban-sdk 28 / soroban-env-host 28):
 //! - `Address::generate` returns CONTRACT addresses. Classic `G` accounts are built explicitly
@@ -34,7 +47,8 @@
 //! - `env.events().all()` and the diagnostic events describe only the most recent top-level
 //!   invocation, so they are read immediately after the call under test (before `snap()`).
 //! - Tests whose name starts with `finding_` are `#[ignore]`d on purpose: they assert the
-//!   secure behaviour and FAIL against v1.3. Run them with `-- --ignored`.
+//!   secure behaviour and FAIL against the current contract. Run them with `-- --ignored`.
+//!   None remains open against v1.3.1.
 //! - Classic assets with a chosen code and issuer (for `list_asset`) are deployed with the same
 //!   host function the SDK uses for `register_stellar_asset_contract_v2` (whose assets are all
 //!   coded `aaa` with a random issuer), and their canonical SAC address is computed with
@@ -78,8 +92,11 @@ const EXPIRY: u64 = START + 7 * 86_400;
 
 const DAY: u32 = 17_280; // ledgers per day (ABI §8)
 
-/// ABI §10: `create_offer` fails with `OpenListFull` at this many `Offered` ids.
-const MAX_OPEN: u32 = 1000;
+/// ABI §8 (v1.3.1): `create_offer` fails with `OpenListFull` once the underlying's own open book
+/// holds this many ids (v1.3 and before: one global list of 1000).
+const MAX_OPEN_PER_ASSET: u32 = 500;
+/// ABI §3 (v1.3.1): `list_open()` returns at most this many ids.
+const LIST_OPEN_MAX: u32 = 200;
 /// soroban-sdk 28 default (mainnet snapshot) limit on footprint ledger entries per invocation.
 const FOOTPRINT_LIMIT: u32 = 400;
 /// ABI §3 (v1.2): one `get_options` call returns at most this many options.
@@ -146,6 +163,9 @@ struct Snap {
     open_collateral: [i128; 3],
     count: u32,
     open: std::vec::Vec<u32>,
+    /// v1.3.1: every registry asset's complete open book (`list_open_for`, all pages), in
+    /// registry order.
+    open_for: std::vec::Vec<(Address, std::vec::Vec<u32>)>,
     options: std::vec::Vec<OptionData>,
     /// v1.3: `writer_open_count` of every tracked party, in `tracked()` order.
     writer_open: std::vec::Vec<u32>,
@@ -257,7 +277,7 @@ impl T {
     fn snap(&self) -> Snap {
         let tokens = self.tokens();
         let count = self.c.option_count();
-        Snap {
+        let snap = Snap {
             balances: self
                 .tracked()
                 .into_iter()
@@ -277,6 +297,14 @@ impl T {
             ],
             count,
             open: self.c.list_open().iter().collect(),
+            open_for: self
+                .assets()
+                .into_iter()
+                .map(|a| {
+                    let book = self.open_book(&a);
+                    (a, book)
+                })
+                .collect(),
             options: (0..count)
                 .filter_map(|id| self.c.try_get_option(&id).ok().map(|r| r.unwrap()))
                 .collect(),
@@ -286,7 +314,37 @@ impl T {
                 .map(|a| self.c.writer_open_count(a))
                 .collect(),
             assets: self.assets(),
+        };
+        snap.assert_open_books();
+        snap
+    }
+
+    /// v1.3.1: one asset's complete open book, paged through `list_open_for` with
+    /// `from += returned.len()` (`from` is a position in the book; every page is asked with
+    /// `limit = u32::MAX` and must hold at most `MAX_PAGE` ids).
+    fn open_book(&self, asset: &Address) -> std::vec::Vec<u32> {
+        let mut out = std::vec::Vec::new();
+        loop {
+            let page = self.c.list_open_for(asset, &(out.len() as u32), &u32::MAX);
+            assert!(
+                page.len() <= MAX_PAGE,
+                "list_open_for page size {}",
+                page.len()
+            );
+            if page.is_empty() {
+                break;
+            }
+            let full = page.len() == MAX_PAGE;
+            out.extend(page.iter());
+            assert!(
+                out.len() as u32 <= MAX_OPEN_PER_ASSET,
+                "open book of {asset:?} exceeds MAX_OPEN_PER_ASSET"
+            );
+            if !full {
+                break;
+            }
         }
+        out
     }
 
     /// v1.3 registry in listing order, read through the paged view (at most `MAX_PAGE` a call).
@@ -527,9 +585,80 @@ impl T {
         })
     }
 
+    /// TTL of the persistent entry `Key::<name>(arg)` (a `contracttype` enum key serializes as
+    /// `[Symbol(name), arg]`; the names are the ABI §8 `Key` variants).
+    fn entry_ttl(&self, name: &str, arg: Val) -> u32 {
+        let key: Vec<Val> = vec![
+            &self.env,
+            Symbol::new(&self.env, name).into_val(&self.env),
+            arg,
+        ];
+        self.env.as_contract(&self.contract, || {
+            self.env.storage().persistent().get_ttl(&key)
+        })
+    }
+
     fn instance_ttl(&self) -> u32 {
         self.env
             .as_contract(&self.contract, || self.env.storage().instance().get_ttl())
+    }
+
+    /// Names of the `Key` variants stored in the contract's instance entry, sorted.
+    fn instance_keys(&self) -> std::vec::Vec<std::string::String> {
+        let all = self
+            .env
+            .as_contract(&self.contract, || self.env.storage().instance().all());
+        let mut names: std::vec::Vec<std::string::String> = all
+            .keys()
+            .iter()
+            .map(|k| match xdr::ScVal::try_from_val(&self.env, &k).unwrap() {
+                xdr::ScVal::Vec(Some(v)) => match v.first() {
+                    Some(xdr::ScVal::Symbol(s)) => s.0.to_utf8_string_lossy(),
+                    other => panic!("unexpected instance key head {other:?}"),
+                },
+                other => panic!("unexpected instance key {other:?}"),
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// The persistent `Key::Reserved(token)` entry (ABI §8, v1.3.1), `None` if absent.
+    fn reserved_entry(&self, token: &Address) -> Option<i128> {
+        let key: Vec<Val> = vec![
+            &self.env,
+            Symbol::new(&self.env, "Reserved").into_val(&self.env),
+            token.into_val(&self.env),
+        ];
+        self.env
+            .as_contract(&self.contract, || self.env.storage().persistent().get(&key))
+    }
+
+    /// (contract, function) of every contract call the last top-level invocation made, the
+    /// invocation itself first (read from the host's `fn_call` diagnostic events).
+    fn calls(&self) -> std::vec::Vec<(Address, std::string::String)> {
+        let evs = self.env.host().get_diagnostic_events().unwrap();
+        evs.0
+            .iter()
+            .filter_map(|he| {
+                let xdr::ContractEventBody::V0(v0) = &he.event.body;
+                match (v0.topics.first(), v0.topics.get(1), v0.topics.get(2)) {
+                    (
+                        Some(xdr::ScVal::Symbol(s)),
+                        Some(xdr::ScVal::Bytes(id)),
+                        Some(xdr::ScVal::Symbol(f)),
+                    ) if s.0.to_utf8_string_lossy() == "fn_call" => {
+                        let hash: [u8; 32] = id.0.as_slice().try_into().unwrap();
+                        let a = xdr::ScAddress::Contract(xdr::ContractId(xdr::Hash(hash)));
+                        Some((
+                            Address::try_from_val(&self.env, &a).unwrap(),
+                            f.0.to_utf8_string_lossy(),
+                        ))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
     }
 
     /// ABI §2 derived reserve per token [USDx, RWA, BOND], summed over every stored option.
@@ -685,6 +814,91 @@ impl T {
             .collect()
     }
 
+    /// (id topic, `pruner` data field) of the `offer_pruned` events of the last invocation, in
+    /// emission order (v1.3.1: the pruner is the authenticated caller).
+    fn pruned_by(&self) -> std::vec::Vec<(u32, Address)> {
+        self.env
+            .events()
+            .all()
+            .filter_by_contract(&self.contract)
+            .events()
+            .iter()
+            .filter_map(|e| {
+                let xdr::ContractEventBody::V0(v0) = &e.body;
+                let (xdr::ScVal::Symbol(name), Some(xdr::ScVal::U32(id))) =
+                    (&v0.topics[0], v0.topics.get(1))
+                else {
+                    return None;
+                };
+                if name.0.to_utf8_string_lossy() != "offer_pruned" {
+                    return None;
+                }
+                let pruner = match &v0.data {
+                    xdr::ScVal::Map(Some(m)) => m
+                        .0
+                        .iter()
+                        .find(|kv| {
+                            matches!(&kv.key, xdr::ScVal::Symbol(k) if k.0.to_utf8_string_lossy() == "pruner")
+                        })
+                        .map(|kv| kv.val.clone())
+                        .expect("offer_pruned data has a `pruner` field"),
+                    xdr::ScVal::Vec(Some(v)) => v.0[0].clone(),
+                    other => other.clone(),
+                };
+                let xdr::ScVal::Address(a) = pruner else {
+                    panic!("offer_pruned pruner is not an address: {pruner:?}");
+                };
+                Some((*id, Address::try_from_val(&self.env, &a).unwrap()))
+            })
+            .collect()
+    }
+
+    /// v1.3.1 `prune_expired(pruner, ids)` signed by exactly `pruner`: one root invocation with no
+    /// sub-invocation (the collateral leaves the contract under the contract's own authority), so
+    /// every prune in this suite also proves that the pruner's signature is all it takes and that
+    /// the pruner authorizes no token movement. `pruner` must be a contract-address actor
+    /// (`Address::generate`), which is what `mock_auths` can sign for. Restores `mock_all_auths`.
+    fn try_prune(
+        &self,
+        pruner: &Address,
+        ids: &Vec<u32>,
+    ) -> Result<u32, Result<Error, InvokeError>> {
+        let root = MockAuthInvoke {
+            contract: &self.contract,
+            fn_name: "prune_expired",
+            args: (pruner, ids.clone()).into_val(&self.env),
+            sub_invokes: &[],
+        };
+        self.env.mock_auths(&[MockAuth {
+            address: pruner,
+            invoke: &root,
+        }]);
+        let r = self.c.try_prune_expired(pruner, ids);
+        self.env.mock_all_auths();
+        match r {
+            Ok(Ok(n)) => Ok(n),
+            Ok(Err(e)) => panic!("prune_expired returned an unconvertible value: {e:?}"),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// `try_prune` that must succeed; returns the number of options pruned and checks that every
+    /// `offer_pruned` event names `pruner`.
+    #[track_caller]
+    fn prune(&self, pruner: &Address, ids: &Vec<u32>) -> u32 {
+        let n = match self.try_prune(pruner, ids) {
+            Ok(n) => n,
+            Err(e) => panic!("prune_expired({ids:?}) by {pruner:?}: {e:?}"),
+        };
+        let by = self.pruned_by();
+        assert_eq!(by.len() as u32, n, "one offer_pruned event per pruned id");
+        assert!(
+            by.iter().all(|(_, p)| p == pruner),
+            "offer_pruned must name the authenticated pruner: {by:?}"
+        );
+        n
+    }
+
     /// (sac topic, number of topics) of the `asset_listed` events of the last invocation.
     fn listed_events(&self) -> std::vec::Vec<(Address, usize)> {
         self.env
@@ -817,9 +1031,61 @@ impl Snap {
     fn set_state(&mut self, id: u32, state: State) {
         self.options.iter_mut().find(|o| o.id == id).unwrap().state = state;
         if state != State::Offered {
-            self.open.retain(|&i| i != id);
+            for (_, book) in self.open_for.iter_mut() {
+                book.retain(|&i| i != id);
+            }
+            self.open = list_open_of(&self.open_for, usize::MAX);
         }
     }
+
+    /// Open-book invariant (ABI §3/§8, v1.3.1), checked on every snapshot: each registry asset's
+    /// book is exactly its `Offered` ids in id order (oldest first), no option is open on an
+    /// unlisted asset, and `list_open()` is the books concatenated in registry order, truncated
+    /// to `LIST_OPEN_MAX`.
+    #[track_caller]
+    fn assert_open_books(&self) {
+        let mut seen = 0usize;
+        for (asset, book) in &self.open_for {
+            let offered: std::vec::Vec<u32> = self
+                .options
+                .iter()
+                .filter(|o| o.state == State::Offered && o.underlying == *asset)
+                .map(|o| o.id)
+                .collect();
+            assert_eq!(book, &offered, "open book of {asset:?}");
+            seen += offered.len();
+        }
+        let all_offered = self
+            .options
+            .iter()
+            .filter(|o| o.state == State::Offered)
+            .count();
+        assert_eq!(
+            seen, all_offered,
+            "an Offered option is missing from every book"
+        );
+        assert!(
+            self.open == list_open_of(&self.open_for, usize::MAX)
+                || self.open == list_open_of(&self.open_for, MAX_PAGE as usize),
+            "list_open() {:?} is not the registry-order concatenation of the books",
+            self.open
+        );
+    }
+}
+
+/// `list_open()` per ABI §3 (v1.3.1): the per-asset books concatenated in registry order,
+/// truncated to `LIST_OPEN_MAX`, visiting at most the first `max_assets` registry assets. ABI §3
+/// states no visiting bound (`usize::MAX`); an implementation that stops after the first
+/// `MAX_PAGE` registry assets, to keep the view bounded however many assets are listed
+/// (`books24_list_open_stays_within_limits_*`), is accepted too. Both agree whenever at most
+/// `MAX_PAGE` assets are listed.
+fn list_open_of(books: &[(Address, std::vec::Vec<u32>)], max_assets: usize) -> std::vec::Vec<u32> {
+    books
+        .iter()
+        .take(max_assets)
+        .flat_map(|(_, b)| b.iter().copied())
+        .take(LIST_OPEN_MAX as usize)
+        .collect()
 }
 
 /// SAC rejection + no event + nothing changed.
@@ -1777,11 +2043,17 @@ fn accounting3_scripted_sequence_reserves_equal_abi_sum_and_contract_balance() {
             );
         }
         assert_eq!(t.totals(), totals0, "step {step} ({label}) conservation");
-        let offered: std::vec::Vec<u32> = (0..t.c.option_count())
-            .filter(|id| t.state(*id) == State::Offered)
-            .collect();
+        // v1.3.1: list_open() is the per-asset books in registry order (RWA, then BOND)
+        let mut offered = std::vec::Vec::new();
+        for u in [rwa, bond] {
+            offered.extend((0..t.c.option_count()).filter(|id| {
+                let o = t.c.get_option(id);
+                o.state == State::Offered && o.underlying == *u
+            }));
+        }
         let open: std::vec::Vec<u32> = t.c.list_open().iter().collect();
         assert_eq!(open, offered, "step {step} ({label}) list_open");
+        t.snap(); // asserts the per-asset open-book invariant
     };
     use OptionType::{Call, Put};
 
@@ -2259,16 +2531,33 @@ fn terminal7_every_mutation_on_terminal_options_fails_without_events() {
 #[test]
 fn griefing8_extend_ttl_unknown_id_extends_nothing() {
     let t = setup();
+    let env = &t.env;
     let a = t.put(&t.writer);
     let b = t.call(&t.maker2);
     let seq = t.env.ledger().sequence();
     t.env.ledger().set_sequence_number(seq + 24 * DAY);
-    let ttls = |t: &T| (t.option_ttl(a), t.option_ttl(b), t.instance_ttl());
+    // v1.3.1 keeper coverage (ABI §13.5, §13.8): besides the options and the instance,
+    // `extend_ttl` extends each id's Listed / WriterOpen / OpenFor / Reserved(quote) /
+    // Reserved(underlying) entries and the first MAX_PAGE registry slots (AssetAt and their
+    // Listed entries: here RWA and BOND, although no id is on BOND).
+    let ttls = |t: &T| {
+        std::vec![
+            t.option_ttl(a),
+            t.option_ttl(b),
+            t.instance_ttl(),
+            t.entry_ttl("Listed", t.rwa.into_val(env)),
+            t.entry_ttl("Listed", t.bond.into_val(env)),
+            t.entry_ttl("AssetAt", 0u32.into_val(env)),
+            t.entry_ttl("AssetAt", 1u32.into_val(env)),
+            t.entry_ttl("WriterOpen", t.writer.into_val(env)),
+            t.entry_ttl("WriterOpen", t.maker2.into_val(env)),
+            t.entry_ttl("OpenFor", t.rwa.into_val(env)),
+            t.entry_ttl("Reserved", t.usdx.into_val(env)),
+            t.entry_ttl("Reserved", t.rwa.into_val(env)),
+        ]
+    };
     let aged = ttls(&t);
-    assert!(
-        aged.0 < 7 * DAY && aged.1 < 7 * DAY && aged.2 < 7 * DAY,
-        "{aged:?}"
-    );
+    assert!(aged.iter().all(|&ttl| ttl < 7 * DAY), "{aged:?}");
 
     for ids in [
         vec![&t.env, a, 999],
@@ -2287,13 +2576,14 @@ fn griefing8_extend_ttl_unknown_id_extends_nothing() {
     }
     t.c.extend_ttl(&vec![&t.env, a, b]);
     let fresh = ttls(&t);
-    assert_eq!(fresh, (30 * DAY, 30 * DAY, 30 * DAY));
+    assert!(fresh.iter().all(|&ttl| ttl == 30 * DAY), "{fresh:?}");
 }
 
 #[test]
 fn griefing8_extend_ttl_batch_size_fits_footprint_limit() {
     let t = setup();
-    let n = FOOTPRINT_LIMIT; // 400 options from 8 writers (v1.3: at most 50 open offers each)
+    let env = &t.env;
+    let n = FOOTPRINT_LIMIT; // 400 options on RWA from 8 writers (at most 50 open offers each)
     let writers: std::vec::Vec<Address> = (0..n / MAX_OPEN_PER_WRITER)
         .map(|_| t.fresh_writer(false))
         .collect();
@@ -2301,33 +2591,395 @@ fn griefing8_extend_ttl_batch_size_fits_footprint_limit() {
         let w = &writers[(i / MAX_OPEN_PER_WRITER) as usize];
         t.offer_x(w, &t.rwa, OptionType::Put, 1, 1, 1, EXPIRY);
     }
-    // Largest batch under the default (mainnet snapshot) limits, which the test env ENFORCES:
-    // footprint = ids + instance + code.
-    let fit = FOOTPRINT_LIMIT - 2;
-    t.c.extend_ttl(&Vec::from_iter(&t.env, 0..fit));
-    let r = t.env.cost_estimate().resources();
-    assert_eq!(r.memory_read_entries + r.disk_read_entries, fit + 2);
-    std::println!("griefing8: extend_ttl({fit} ids) ok: {r:?}");
-    // One more id exceeds the per-transaction footprint (measured with enforcement disabled,
-    // since the test env panics instead of returning an error when a limit is exceeded).
-    t.env.cost_estimate().disable_resource_limits();
-    t.c.extend_ttl(&Vec::from_iter(&t.env, 0..fit + 1));
-    let r = t.env.cost_estimate().resources();
+    let fp = |t: &T| {
+        let r = t.env.cost_estimate().resources();
+        r.memory_read_entries + r.disk_read_entries + r.write_entries
+    };
+    // Largest batch, searched with enforcement disabled (the test env panics instead of
+    // returning an error when a limit is exceeded); extend_ttl only moves TTLs, so probes repeat.
+    env.cost_estimate().disable_resource_limits();
+    let fits = |k: u32| -> bool {
+        t.c.extend_ttl(&Vec::from_iter(env, 0..k));
+        t.exceeded_ledger().is_empty()
+    };
+    let (mut lo, mut hi) = (1u32, n);
+    assert!(fits(lo) && !fits(hi), "400 ids must exceed the footprint");
+    while hi - lo > 1 {
+        let mid = (lo + hi) / 2;
+        if fits(mid) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let fit = lo;
+    fits(fit + 1);
+    assert_eq!(t.exceeded_ledger(), ["footprint entries"]);
+    assert_eq!(fp(&t), FOOTPRINT_LIMIT + 1);
+    // ABI §13.5, §13.8: one more id on an asset and writer already in the batch costs exactly one
+    // entry (its Opt); the rest is per call: instance + code, the SEEDED registry slots (AssetAt
+    // and Listed each), one WriterOpen per writer, and three entries for the asset and the quote
+    // token: OpenFor(RWA), Reserved(USDx) and Reserved(RWA) (in the footprint even while absent:
+    // these PUTs lock no RWA).
+    t.c.extend_ttl(&Vec::from_iter(env, 0..10));
+    let fp10 = fp(&t);
+    t.c.extend_ttl(&Vec::from_iter(env, 0..11));
     assert_eq!(
-        r.memory_read_entries + r.disk_read_entries,
-        FOOTPRINT_LIMIT + 1
+        fp(&t) - fp10,
+        1,
+        "marginal footprint of an id on a shared asset and writer"
+    );
+    let overhead = FOOTPRINT_LIMIT - fit;
+    assert_eq!(
+        overhead,
+        2 + 2 * SEEDED + writers.len() as u32 + 3,
+        "per-call extend_ttl footprint on a single asset"
+    );
+    // the mainnet limits, enforced again, accept exactly that batch
+    env.cost_estimate()
+        .enforce_resource_limits(NetworkInvocationResourceLimits::mainnet());
+    t.c.extend_ttl(&Vec::from_iter(env, 0..fit));
+    let r = env.cost_estimate().resources();
+    std::println!(
+        "griefing8: max extend_ttl batch, one asset, 8 writers = {fit} ids (per-call entries {overhead}): {r:?}"
     );
 }
 
 #[test]
-fn griefing8_open_list_cap_and_full_list_operations_fit_limits() {
+fn griefing8_extend_ttl_spanning_many_assets_and_writers_fits_footprint_limit() {
+    // Worst case for a keeper (ABI §13.5, §13.8): every id on its own listed asset beyond the
+    // first MAX_PAGE registry slots and written by its own writer, so each id adds five entries
+    // (Opt, Listed(asset), OpenFor(asset), WriterOpen(writer), Reserved(asset)) on top of the
+    // per-call part (instance, code, AssetAt(0..MAX_PAGE) and their Listed entries, plus the
+    // shared Reserved(USDx)), which must stay bounded however many assets are listed.
     let t = setup();
-    // v1.3: filling MAX_OPEN now takes MAX_OPEN / MAX_OPEN_PER_WRITER = 20 issuer-authorized
-    // writers (see finding_f1r for what that still allows).
-    let writers: std::vec::Vec<Address> = (0..MAX_OPEN / MAX_OPEN_PER_WRITER)
+    let env = &t.env;
+    env.cost_estimate().budget().reset_unlimited();
+    let fp = |t: &T| {
+        let r = t.env.cost_estimate().resources();
+        r.memory_read_entries + r.disk_read_entries + r.write_entries
+    };
+    let lister = Address::generate(env);
+    let list_junk = |code: &str| -> Address {
+        let (iss, iss_id) = t.issuer(0); // unflagged: no issuer action needed for anyone
+        let sac = t.deploy_sac(&classic_asset(code.as_bytes(), &iss_id));
+        assert_eq!(t.c.list_asset(&lister, &t.s(code), &iss), sac);
+        sac
+    };
+    t.c.extend_ttl(&vec![env]);
+    assert_eq!(
+        fp(&t),
+        2 + 2 * SEEDED,
+        "per-call part with the seeded registry"
+    );
+    for i in 0..MAX_PAGE - SEEDED {
+        list_junk(&std::format!("F{i}"));
+    }
+    t.c.extend_ttl(&vec![env]);
+    let per_call = fp(&t);
+    assert_eq!(
+        per_call,
+        2 + 2 * MAX_PAGE,
+        "per-call part with a full first page"
+    );
+    let k_assets = 90u32;
+    let mut ids = std::vec::Vec::new();
+    for i in 0..k_assets {
+        let asset = list_junk(&std::format!("W{i}"));
+        let w = Address::generate(env);
+        t.sac(&asset).mint(&w, &1);
+        ids.push(t.c.create_offer(&w, &asset, &OptionType::Call, &1, &1, &1, &EXPIRY));
+    }
+    assert_eq!(t.c.asset_count(), MAX_PAGE + k_assets);
+    t.c.extend_ttl(&vec![env]);
+    assert_eq!(
+        fp(&t),
+        per_call,
+        "the registry part grew past MAX_PAGE slots with the registry"
+    );
+
+    env.cost_estimate().disable_resource_limits();
+    let batch = |k: usize| Vec::from_iter(env, ids[..k].iter().copied());
+    let fits = |k: usize| -> bool {
+        t.c.extend_ttl(&batch(k));
+        t.exceeded_ledger().is_empty()
+    };
+    let (mut lo, mut hi) = (1usize, ids.len());
+    assert!(
+        fits(lo) && !fits(hi),
+        "{} spread ids must exceed the footprint",
+        ids.len()
+    );
+    while hi - lo > 1 {
+        let mid = (lo + hi) / 2;
+        if fits(mid) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    let max_spread = lo as u32;
+    fits(lo + 1);
+    assert_eq!(t.exceeded_ledger(), ["footprint entries"]);
+    // the cost is linear in the ids: ABI §13.5 and §13.8 need Opt, Listed(asset), OpenFor(asset),
+    // WriterOpen(writer) and Reserved(asset) for each such id (5), and once per call the quote's
+    // Reserved(USDx) (in the footprint even while absent: these CALLs lock no USDx); the measured
+    // line predicts the maximum exactly
+    t.c.extend_ttl(&batch(1));
+    let fp1 = fp(&t);
+    t.c.extend_ttl(&batch(2));
+    let per_id = fp(&t) - fp1;
+    t.c.extend_ttl(&batch(3));
+    assert_eq!(
+        fp(&t) - fp1,
+        2 * per_id,
+        "extend_ttl footprint is not linear"
+    );
+    assert_eq!(per_id, 5, "footprint per id on its own asset and writer");
+    assert_eq!(
+        fp1 - per_id,
+        per_call + 1,
+        "per-call footprint: the registry part plus Reserved(USDx)"
+    );
+    assert_eq!(
+        max_spread,
+        (FOOTPRINT_LIMIT - (fp1 - per_id)) / per_id,
+        "the linear footprint model does not predict the largest batch"
+    );
+    assert!(
+        max_spread >= MAX_PAGE,
+        "a keeper must be able to extend one full get_options page per call, got {max_spread}"
+    );
+    env.cost_estimate()
+        .enforce_resource_limits(NetworkInvocationResourceLimits::mainnet());
+    t.c.extend_ttl(&batch(lo));
+    let r = env.cost_estimate().resources();
+    std::println!(
+        "griefing8: max extend_ttl batch, every id on its own asset (registry {}) and writer = {max_spread} ids ({per_id} entries per id): {r:?}",
+        MAX_PAGE + k_assets
+    );
+
+    // ids whose book or writer count has since been emptied (sold, cancelled) still extend
+    t.c.buy(&t.holder, &ids[0]);
+    let w1 = t.c.get_option(&ids[1]).writer;
+    t.c.cancel_offer(&w1, &ids[1]);
+    assert!(t.open_book(&t.c.get_option(&ids[0]).underlying).is_empty());
+    assert_eq!(t.c.writer_open_count(&w1), 0);
+    t.c.extend_ttl(&vec![env, ids[0], ids[1], ids[2]]);
+    assert!(t.opt_events().is_empty());
+}
+
+/// v1.3.1 (ABI §8, §13.8): permissionless listing lets anyone create per-token state, so none of
+/// it may live in the single instance entry that every call loads (v1.3 kept `Reserved(token)`
+/// there, so listing assets and locking one unit on each grew it without bound). However many
+/// assets are listed and carry collateral, and whatever lifecycle paths run, instance storage
+/// holds exactly `Quote`, `Underlyings`, `Next` and `AssetCount`, and each token's reserved total
+/// is its own persistent `Reserved(token)` entry, equal to `open_collateral(token)`.
+#[test]
+fn griefing8_listing_and_collateral_spam_never_grows_the_instance_entry() {
+    let t = setup();
+    let env = &t.env;
+    env.cost_estimate().budget().reset_unlimited();
+    let only = ["AssetCount", "Next", "Quote", "Underlyings"];
+    assert_eq!(t.instance_keys(), only, "after the constructor");
+    assert_eq!(t.reserved_entry(&t.usdx), None);
+
+    // every lifecycle path on the fixture tokens
+    let (w, m, h, h2) = (&t.writer, &t.maker2, &t.holder, &t.holder2);
+    let p = t.put(w);
+    t.c.buy(h, &p);
+    t.c.exercise(h, &p);
+    t.c.claim_delivery(w, &p);
+    let c = t.call(m);
+    t.c.buy(h, &c);
+    t.c.transfer(h, h2, &c);
+    let x = t.offer(w, &t.bond, OptionType::Call);
+    t.c.cancel_offer(w, &x);
+    let y = t.offer_x(
+        w,
+        &t.bond,
+        OptionType::Put,
+        QTY,
+        STRIKE,
+        PREMIUM,
+        START + 10,
+    );
+    let z = t.offer_x(m, &t.rwa, OptionType::Put, QTY, STRIKE, PREMIUM, START + 10);
+    t.at(START + 10);
+    t.c.reclaim(w, &y);
+    assert_eq!(t.prune(&Address::generate(env), &vec![env, z]), 1);
+    t.at(START);
+    assert_eq!(t.instance_keys(), only, "after every lifecycle path");
+
+    // a spammer lists MAX_PAGE + 10 unflagged assets and locks collateral on each
+    let lister = Address::generate(env);
+    let n = MAX_PAGE + 10;
+    let mut junk = std::vec::Vec::new();
+    for i in 0..n {
+        let (iss, iss_id) = t.issuer(0);
+        let code = std::format!("S{i}");
+        let sac = t.deploy_sac(&classic_asset(code.as_bytes(), &iss_id));
+        assert_eq!(t.c.list_asset(&lister, &t.s(&code), &iss), sac);
+        let sybil = Address::generate(env);
+        let amt = i as i128 + 1;
+        t.sac(&sac).mint(&sybil, &amt);
+        t.c.create_offer(&sybil, &sac, &OptionType::Call, &amt, &1, &1, &EXPIRY);
+        junk.push(sac);
+    }
+    assert_eq!(t.c.asset_count(), SEEDED + n);
+    assert_eq!(
+        t.instance_keys(),
+        only,
+        "after {n} listings with collateral"
+    );
+
+    // each token's reserve is its own persistent entry, the one `open_collateral` reports
+    for (i, sac) in junk.iter().enumerate() {
+        assert_eq!(
+            t.reserved_entry(sac),
+            Some(i as i128 + 1),
+            "Reserved(junk {i})"
+        );
+        assert_eq!(t.c.open_collateral(sac), i as i128 + 1);
+    }
+    for (label, tok) in [("USDx", &t.usdx), ("RWA", &t.rwa), ("BOND", &t.bond)] {
+        let held = t.c.open_collateral(tok);
+        assert_eq!(t.reserved_entry(tok), Some(held), "Reserved({label})");
+    }
+    assert_eq!(
+        t.c.open_collateral(&t.usdx),
+        0,
+        "every PUT exercised and claimed, reclaimed or pruned"
+    );
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY, "the transferred CALL");
+    assert_eq!(t.c.open_collateral(&t.bond), 0);
+}
+
+/// v1.3.1 (ABI §8, §13.8): a persistent `Reserved(token)` entry must not archive under live
+/// positions (every later path on that token would then fail until someone restores it), so each
+/// state-changing path extends the TTL of the reserves it touches: the legs it moves and, for
+/// `create_offer`, `buy` and `transfer`, both of the option's tokens, which the
+/// `CollateralShortfall` guard reads. Each case starts from aged entries (6 days left).
+#[test]
+fn griefing8_reserved_entries_are_kept_alive_by_every_path_that_touches_them() {
+    type Step = fn(&T, u32, u32);
+    let none: Step = |_, _, _| {};
+    let cases: [(&str, Step, Step, [bool; 2]); 11] = [
+        (
+            "create_offer PUT",
+            none,
+            |t, _, _| {
+                t.put(&t.writer);
+            },
+            [true, true],
+        ),
+        (
+            "create_offer CALL",
+            none,
+            |t, _, _| {
+                t.call(&t.writer);
+            },
+            [true, true],
+        ),
+        (
+            "buy PUT",
+            none,
+            |t, p, _| t.c.buy(&t.holder, &p),
+            [true, true],
+        ),
+        (
+            "buy CALL",
+            none,
+            |t, _, c| t.c.buy(&t.holder, &c),
+            [true, true],
+        ),
+        (
+            "transfer",
+            |t, _, c| t.c.buy(&t.holder, &c),
+            |t, _, c| t.c.transfer(&t.holder, &t.holder2, &c),
+            [true, true],
+        ),
+        (
+            "exercise PUT",
+            |t, p, _| t.c.buy(&t.holder, &p),
+            |t, p, _| t.c.exercise(&t.holder, &p),
+            [true, true],
+        ),
+        (
+            "exercise CALL",
+            |t, _, c| t.c.buy(&t.holder, &c),
+            |t, _, c| t.c.exercise(&t.holder, &c),
+            [true, true],
+        ),
+        (
+            "claim_delivery PUT",
+            |t, p, _| {
+                t.c.buy(&t.holder, &p);
+                t.c.exercise(&t.holder, &p);
+            },
+            |t, p, _| t.c.claim_delivery(&t.writer, &p),
+            [false, true],
+        ),
+        (
+            "cancel_offer CALL",
+            none,
+            |t, _, c| t.c.cancel_offer(&t.maker2, &c),
+            [false, true],
+        ),
+        (
+            "reclaim PUT",
+            |t, p, _| t.c.buy(&t.holder, &p),
+            |t, p, _| {
+                t.at(EXPIRY);
+                t.c.reclaim(&t.writer, &p);
+            },
+            [true, false],
+        ),
+        (
+            "prune_expired PUT",
+            none,
+            |t, p, _| {
+                t.at(EXPIRY);
+                assert_eq!(t.prune(&Address::generate(&t.env), &vec![&t.env, p]), 1);
+            },
+            [true, false],
+        ),
+    ];
+    for (label, pre, act, touched) in cases {
+        let t = setup();
+        let p = t.put(&t.writer); // Reserved(USDx)
+        let c = t.call(&t.maker2); // Reserved(RWA)
+        pre(&t, p, c);
+        let ttls = |t: &T| {
+            [
+                t.entry_ttl("Reserved", t.usdx.into_val(&t.env)),
+                t.entry_ttl("Reserved", t.rwa.into_val(&t.env)),
+            ]
+        };
+        let seq = t.env.ledger().sequence();
+        t.env.ledger().set_sequence_number(seq + 24 * DAY);
+        let aged = ttls(&t);
+        assert!(aged.iter().all(|&ttl| ttl < 7 * DAY), "{label}: {aged:?}");
+        act(&t, p, c);
+        let after = ttls(&t);
+        for (i, tok) in ["Reserved(USDx)", "Reserved(RWA)"].iter().enumerate() {
+            if touched[i] {
+                assert_eq!(after[i], 30 * DAY, "{label}: {tok} not extended");
+            }
+        }
+    }
+}
+
+#[test]
+fn griefing8_open_book_cap_is_per_asset_and_full_book_operations_fit_limits() {
+    let t = setup();
+    let env = &t.env;
+    // v1.3.1: filling RWA's book takes MAX_OPEN_PER_ASSET / MAX_OPEN_PER_WRITER = 10
+    // issuer-authorized writers, and fills RWA's book only
+    let writers: std::vec::Vec<Address> = (0..MAX_OPEN_PER_ASSET / MAX_OPEN_PER_WRITER)
         .map(|i| t.fresh_writer(i == 0))
         .collect();
-    for i in 0..MAX_OPEN {
+    for i in 0..MAX_OPEN_PER_ASSET {
         let w = &writers[(i / MAX_OPEN_PER_WRITER) as usize];
         assert_eq!(t.offer_x(w, &t.rwa, OptionType::Put, 1, 1, 1, EXPIRY), i);
     }
@@ -2335,33 +2987,55 @@ fn griefing8_open_list_cap_and_full_list_operations_fit_limits() {
         assert_eq!(t.c.writer_open_count(w), MAX_OPEN_PER_WRITER);
     }
     let before = t.snap();
-    for (u, ty) in [(&t.rwa, OptionType::Put), (&t.bond, OptionType::Call)] {
+    assert_eq!(before.open_for[0].1.len() as u32, MAX_OPEN_PER_ASSET);
+    assert_eq!(before.open.len() as u32, LIST_OPEN_MAX);
+    for ty in [OptionType::Put, OptionType::Call] {
         rejected(
             &t,
-            t.c.try_create_offer(&t.maker2, u, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+            t.c.try_create_offer(&t.maker2, &t.rwa, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
             Error::OpenListFull,
             &before,
         );
         // a writer at its own cap on a full book: OpenListFull is checked first (ABI §3)
         rejected(
             &t,
-            t.c.try_create_offer(&writers[0], u, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
+            t.c.try_create_offer(&writers[0], &t.rwa, &ty, &QTY, &STRIKE, &PREMIUM, &EXPIRY),
             Error::OpenListFull,
             &before,
         );
     }
-    // operations on a full list stay within the enforced mainnet limits (no panic):
-    // buy the newest (open_remove scans the whole list), cancel the oldest
-    t.c.buy(&t.holder, &(MAX_OPEN - 1));
-    let r = t.env.cost_estimate().resources();
-    std::println!("griefing8: buy on a full open list: {r:?}");
+    // ... while BOND's book is independent: the same writer at its cap is WriterOpenLimit there,
+    // and a writer under its cap lists
+    rejected(
+        &t,
+        t.c.try_create_offer(
+            &writers[0],
+            &t.bond,
+            &OptionType::Call,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::WriterOpenLimit,
+        &before,
+    );
+    let bond_id = t.offer(&t.maker2, &t.bond, OptionType::Call);
+    assert_eq!(t.open_book(&t.bond), [bond_id]);
+
+    // operations on a full book stay within the enforced mainnet limits (no panic):
+    // buy the newest (the book scan covers all 500 ids), cancel the oldest, extend over 300 ids
+    t.c.buy(&t.holder, &(MAX_OPEN_PER_ASSET - 1));
+    let r = env.cost_estimate().resources();
+    std::println!("griefing8: buy on a full per-asset book: {r:?}");
     t.c.cancel_offer(&writers[0], &0);
-    t.c.extend_ttl(&vec![&t.env]);
-    assert_eq!(t.c.list_open().len(), MAX_OPEN - 2);
+    t.c.extend_ttl(&Vec::from_iter(env, 1..301));
+    assert_eq!(t.open_book(&t.rwa).len() as u32, MAX_OPEN_PER_ASSET - 2);
+    assert_eq!(t.c.list_open().len(), LIST_OPEN_MAX);
     assert_eq!(t.c.writer_open_count(&writers[0]), MAX_OPEN_PER_WRITER - 1);
-    assert_eq!(t.c.writer_open_count(&writers[19]), MAX_OPEN_PER_WRITER - 1);
+    assert_eq!(t.c.writer_open_count(&writers[9]), MAX_OPEN_PER_WRITER - 1);
     t.offer(&t.maker2, &t.rwa, OptionType::Put);
-    t.offer(&t.maker2, &t.bond, OptionType::Call);
+    t.offer(&t.maker2, &t.rwa, OptionType::Call);
     let before = t.snap();
     rejected(
         &t,
@@ -2377,15 +3051,19 @@ fn griefing8_open_list_cap_and_full_list_operations_fit_limits() {
         Error::OpenListFull,
         &before,
     );
+    // BOND keeps accepting
+    t.offer(&t.maker2, &t.bond, OptionType::Put);
 }
 
 /// FINDING F-1 (availability), fixed in v1.3 for a single writer. Before v1.3 one eligible writer
-/// could occupy every `MAX_OPEN` slot with dust offers (qty = strike = premium = 1 unit,
+/// could occupy every slot of the global open list (v1.1–v1.3 `MAX_OPEN = 1000`) with dust offers
+/// (qty = strike = premium = 1 unit,
 /// expiry = u64::MAX) for 0.0001 USDx, and the slots never aged out. v1.3 caps each writer at
 /// `MAX_OPEN_PER_WRITER` open offers (on every asset together), rejects expiries beyond
 /// `MAX_TENOR`, and lets anyone `prune_expired` unsold expired offers (collateral back to the
 /// writer). This test is the former `finding_f1_dust_offers_must_not_block_other_writers`,
-/// converted into a passing test; `finding_f1r_*` below covers the multi-writer residual.
+/// converted into a passing test; `griefing8_f1r_*` below covers the multi-writer variant (F-1R),
+/// fixed in v1.3.1 by per-asset books.
 #[test]
 fn griefing8_f1_writer_cap_blocks_the_squatter_at_50_and_others_still_list() {
     let t = setup();
@@ -2445,18 +3123,19 @@ fn griefing8_f1_writer_cap_blocks_the_squatter_at_50_and_others_still_list() {
         "an honest maker is locked out by dust offers"
     );
 
-    // after the dust expires a stranger (no signature at all) prunes it; the collateral goes back
-    // to the squatter, never to the pruner, and the squatter's slots are free again
+    // after the dust expires a stranger (signing only its own prune_expired call) prunes it; the
+    // collateral goes back to the squatter, never to the pruner, and the squatter's slots are
+    // free again
     t.at(far);
-    env.set_auths(&[]);
+    let stranger = Address::generate(env);
     let mut pruned = 0;
     for chunk in 0..(MAX_OPEN_PER_WRITER / 10) {
         let ids = Vec::from_iter(env, chunk * 10..chunk * 10 + 10);
-        pruned += t.c.prune_expired(&ids);
+        pruned += t.prune(&stranger, &ids);
     }
-    env.mock_all_auths();
     assert_eq!(pruned, MAX_OPEN_PER_WRITER);
     assert_eq!(t.bal(&t.usdx, squatter), usdx_before);
+    assert_eq!(t.bal(&t.usdx, &stranger), 0);
     assert_eq!(t.c.writer_open_count(squatter), 0);
     assert_eq!(
         t.c.list_open().iter().collect::<std::vec::Vec<_>>(),
@@ -2466,45 +3145,68 @@ fn griefing8_f1_writer_cap_blocks_the_squatter_at_50_and_others_still_list() {
     t.assert_writer_count(squatter);
 }
 
-/// FINDING F-1R (availability, residual after v1.3). `MAX_OPEN` is ONE global list across all
-/// assets and v1.3 listing is permissionless, so the per-writer cap only multiplies the number of
-/// accounts a squatter needs by 20, and no issuer authorization is needed at all: the attacker
-/// issues its own UNFLAGGED classic asset (the escrow and every account are eligible on it),
-/// lists it, and 20 sybil writers (contract accounts, or G accounts with a USDx trustline) each
-/// post 50 dust CALLs whose collateral is 1 unit of the attacker's own token, at the maximum
-/// tenor. Every honest maker on every asset (RWA, BOND, EQTY) then gets `OpenListFull` for up to
-/// `MAX_TENOR` (2 years): `prune_expired` cannot touch live offers and only the sybils can cancel.
-/// Cost: 1000 units of a worthless token plus 1000 transaction fees. Candidate fixes are an
-/// economic decision for Dev 1 / Dev 2 (per-underlying open lists, a minimum collateral in quote
-/// units, or not counting self-listed assets against the shared list).
+/// FINDING F-1R (availability), fixed in v1.3.1. Under v1.3 `MAX_OPEN` was ONE global list
+/// across all assets and listing is permissionless, so an attacker could issue its own UNFLAGGED
+/// classic asset (the escrow and every account are eligible on it), list it, and let 20 sybil
+/// writers post dust CALLs (1 unit of its own token each) at the maximum tenor until every honest
+/// maker on every asset got `OpenListFull` for up to 2 years. v1.3.1 (ABI §13.3) gives each
+/// underlying its own book capped at `MAX_OPEN_PER_ASSET`: the same attack (20 writers x 25 dust
+/// CALLs, each sybil at half its writer cap) now fills only the junk asset's book; RWA and BOND
+/// keep accepting offers, and `list_open()` (registry order) still shows the RWA ids first.
+/// This is the former `finding_f1r_sybil_writers_on_a_self_listed_asset_must_not_block_other_writers`,
+/// converted into a passing test.
 #[test]
-#[ignore = "finding F-1R: 20 sybil writers on a self-listed unflagged asset still fill MAX_OPEN for up to MAX_TENOR"]
-fn finding_f1r_sybil_writers_on_a_self_listed_asset_must_not_block_other_writers() {
+fn griefing8_f1r_sybil_dust_on_a_self_listed_asset_fills_only_its_own_book() {
     let t = setup();
     let env = &t.env;
     let (junk_issuer, junk_id) = t.issuer(0); // no AUTH_REQUIRED: nobody needs authorization
     let junk = t.deploy_sac(&classic_asset(b"JUNK", &junk_id));
     let lister = Address::generate(env);
     assert_eq!(t.c.list_asset(&lister, &t.s("JUNK"), &junk_issuer), junk);
+    // an honest RWA offer that predates the attack
+    let early = t.put(&t.writer);
     let far = START + MAX_TENOR;
-    for _ in 0..MAX_OPEN / MAX_OPEN_PER_WRITER {
+    let per_sybil = 25u32;
+    let sybils: std::vec::Vec<Address> = (0..MAX_OPEN_PER_ASSET / per_sybil)
+        .map(|_| Address::generate(env))
+        .collect();
+    assert_eq!(sybils.len(), 20);
+    let mut junk_ids = std::vec::Vec::new();
+    for sybil in &sybils {
         // a contract account: eligible on unflagged USDx and JUNK with no trustline or issuer act
-        let sybil = Address::generate(env);
-        t.sac(&junk).mint(&sybil, &(MAX_OPEN_PER_WRITER as i128));
-        for _ in 0..MAX_OPEN_PER_WRITER {
-            t.c.create_offer(&sybil, &junk, &OptionType::Call, &1, &1, &1, &far);
+        t.sac(&junk).mint(sybil, &(per_sybil as i128 + 1));
+        for _ in 0..per_sybil {
+            junk_ids.push(t.c.create_offer(sybil, &junk, &OptionType::Call, &1, &1, &1, &far));
         }
-        assert_eq!(t.bal(&junk, &sybil), 0);
+        assert_eq!(t.c.writer_open_count(sybil), per_sybil);
     }
-    assert_eq!(t.c.list_open().len(), MAX_OPEN);
-    assert_eq!(t.c.open_collateral(&t.usdx), 0, "no USDx locked at all");
-    // a year and a half later the dust is still live, so nobody can prune it
-    t.at(START + 3 * MAX_TENOR / 4);
+    assert_eq!(junk_ids.len() as u32, MAX_OPEN_PER_ASSET);
     assert_eq!(
-        t.c.prune_expired(&Vec::from_iter(env, 0..MAX_OPEN_PER_WRITER)),
-        0
+        t.c.open_collateral(&t.usdx),
+        STRIKE,
+        "only the honest PUT locks USDx"
     );
-    // expected (secure): an honest maker can still list on a regulated asset
+    assert_eq!(t.c.open_collateral(&junk), MAX_OPEN_PER_ASSET as i128);
+
+    // the junk book is full: one more dust offer fails for every sybil (all under their writer
+    // cap) and for a fresh one, either type, and changes nothing
+    let fresh = Address::generate(env);
+    t.sac(&junk).mint(&fresh, &1);
+    t.extra.borrow_mut().push(fresh.clone());
+    let before = t.snap();
+    assert_eq!(before.open_for[2], (junk.clone(), junk_ids.clone()));
+    for (label, w) in [
+        ("sybil 0", &sybils[0]),
+        ("sybil 19", &sybils[19]),
+        ("fresh", &fresh),
+    ] {
+        for ty in [OptionType::Call, OptionType::Put] {
+            let r = t.c.try_create_offer(w, &junk, &ty, &1, &1, &1, &far);
+            rejected_as(&t, label, r, Error::OpenListFull, &before);
+        }
+    }
+
+    // honest makers still list on RWA and BOND, at the maximum tenor too
     assert_eq!(
         t.c.try_create_offer(
             &t.maker2,
@@ -2513,11 +3215,50 @@ fn finding_f1r_sybil_writers_on_a_self_listed_asset_must_not_block_other_writers
             &QTY,
             &STRIKE,
             &PREMIUM,
-            &(START + MAX_TENOR)
+            &far
         ),
-        Ok(Ok(MAX_OPEN)),
-        "an honest maker is locked out by sybil dust on a self-listed asset"
+        Ok(Ok(MAX_OPEN_PER_ASSET + 1)),
+        "an honest maker is locked out of RWA by sybil dust on a self-listed asset"
     );
+    let rwa_late = MAX_OPEN_PER_ASSET + 1;
+    let bond_id = t.offer(&t.writer, &t.bond, OptionType::Call);
+    // list_open() follows registry order, so the RWA ids come first whatever their age relative
+    // to the dust, then BOND, then the junk book, truncated to LIST_OPEN_MAX
+    let open: std::vec::Vec<u32> = t.c.list_open().iter().collect();
+    assert_eq!(open.len() as u32, LIST_OPEN_MAX);
+    assert_eq!(&open[..3], &[early, rwa_late, bond_id]);
+    assert_eq!(&open[3..], &junk_ids[..LIST_OPEN_MAX as usize - 3]);
+    assert_eq!(t.open_book(&t.rwa), [early, rwa_late]);
+    assert_eq!(t.open_book(&junk), junk_ids);
+
+    // a year and a half later the dust is still live, so nobody can prune it ...
+    t.at(START + 3 * MAX_TENOR / 4);
+    let keeper = Address::generate(env);
+    assert_eq!(
+        t.prune(
+            &keeper,
+            &Vec::from_iter(env, junk_ids[..50].iter().copied())
+        ),
+        0
+    );
+    // ... but it only ever occupies the junk book: RWA still accepts new offers
+    let rwa_later = t.offer_x(
+        &t.maker2,
+        &t.rwa,
+        OptionType::Call,
+        QTY,
+        STRIKE,
+        PREMIUM,
+        START + MAX_TENOR,
+    );
+    assert_eq!(t.c.list_open().get(2), Some(rwa_later));
+    // a freed junk slot goes to whoever takes it, and the book is full again afterwards
+    t.c.cancel_offer(&sybils[0], &junk_ids[0]);
+    t.c.create_offer(&fresh, &junk, &OptionType::Call, &1, &1, &1, &far);
+    let before = t.snap();
+    let r =
+        t.c.try_create_offer(&sybils[0], &junk, &OptionType::Call, &1, &1, &1, &far);
+    rejected_as(&t, "refilled", r, Error::OpenListFull, &before);
 }
 
 // =============================================================================================
@@ -3278,6 +4019,8 @@ fn extra15_muxed_address_rejected_as_party() {
         ("buy", vec![env, mv, id.into_val(env)]),
         ("exercise", vec![env, mv, id.into_val(env)]),
         ("cancel_offer", vec![env, mv, id.into_val(env)]),
+        // v1.3.1: the pruner
+        ("prune_expired", vec![env, mv, vec![env, id].into_val(env)]),
         (
             "transfer",
             vec![env, mv, t.holder2.into_val(env), active.into_val(env)]
@@ -3671,10 +4414,11 @@ fn transfer16_moves_no_tokens_and_changes_no_reserves() {
     }
 }
 
-/// Pins the ABI §3 rule that `transfer` checks only the RECIPIENT's eligibility. An issuer freeze
-/// of the holder blocks its own `exercise` (SAC #11) but not a hand-over to an issuer-authorized
-/// account; the frozen account's tokens never move, and the new holder settles with its own
-/// authorized balance. No regulated token moves without issuer authorization.
+/// Pins the ABI §3 rule that `transfer` checks the RECIPIENT's eligibility, not the holder's
+/// (v1.3.1 adds only the escrow guards, see the next two tests). An issuer freeze of the holder
+/// blocks its own `exercise` (SAC #11) but not a hand-over to an issuer-authorized account; the
+/// frozen account's tokens never move, and the new holder settles with its own authorized
+/// balance. No regulated token moves without issuer authorization.
 #[test]
 fn transfer16_frozen_holder_can_hand_over_but_its_tokens_never_move() {
     let t = setup();
@@ -3700,6 +4444,188 @@ fn transfer16_frozen_holder_can_hand_over_but_its_tokens_never_move() {
     // h2: PUT delivers QTY RWA for STRIKE USDx, CALL pays STRIKE USDx for QTY RWA
     assert_eq!(t.bal(&t.usdx, h2), USDX_START);
     assert_eq!(t.bal(&t.rwa, h2), UNDERLYING_START);
+}
+
+/// v1.3.1 (ABI §3, §13.2): while the escrow's pooled balance of the option's quote or underlying
+/// token is below `open_collateral` (an issuer clawback hit the contract), a position cannot be
+/// handed to a new participant: `transfer` fails with `CollateralShortfall`, after every earlier
+/// check, with no event and no state change. Options on other tokens are unaffected, and an
+/// issuer repair restores transfers.
+#[test]
+fn transfer16_deficit_blocks_hand_over_with_no_state_change() {
+    let t = setup();
+    let (w, m, h, h2) = (&t.writer, &t.maker2, &t.holder, &t.holder2);
+    // USDx clawback must be enabled before the escrow holds any USDx
+    t.usdx_flags.set_flag(IssuerFlags::RevocableFlag);
+    t.usdx_flags.set_flag(IssuerFlags::ClawbackEnabledFlag);
+    let rput = t.put(w); // USDx collateral, RWA underlying
+    let rcall = t.call(m); // RWA collateral
+    let bcall = t.offer(m, &t.bond, OptionType::Call); // BOND collateral, USDx quote
+    for id in [rput, rcall, bcall] {
+        t.c.buy(h, &id);
+    }
+
+    // the RWA issuer claws back a single unit from the escrow: pooled deficit on RWA only
+    t.sac(&t.rwa).clawback(&t.contract, &1);
+    assert_eq!(
+        t.c.open_collateral(&t.rwa) - t.bal(&t.rwa, &t.contract),
+        1,
+        "RWA deficit"
+    );
+    let before = t.snap();
+    for id in [rput, rcall] {
+        // the PUT's collateral is USDx, but its underlying (RWA) is short: both are blocked
+        rejected(
+            &t,
+            t.c.try_transfer(h, h2, &id),
+            Error::CollateralShortfall,
+            &before,
+        );
+        // every earlier check keeps its precedence (ABI §3 order)
+        rejected(&t, t.c.try_transfer(h2, h, &id), Error::NotHolder, &before);
+        rejected(&t, t.c.try_transfer(h, h, &id), Error::InvalidArgs, &before);
+        let writer = t.c.get_option(&id).writer;
+        rejected(
+            &t,
+            t.c.try_transfer(h, &writer, &id),
+            Error::SelfTrade,
+            &before,
+        );
+        rejected(
+            &t,
+            t.c.try_transfer(h, &t.outsider, &id),
+            Error::NotEligible,
+            &before,
+        );
+    }
+    rejected(&t, t.c.try_transfer(h, h2, &99), Error::NotFound, &before);
+    // an option on untouched tokens (BOND underlying, USDx quote) still changes hands
+    t.c.transfer(h, h2, &bcall);
+    t.c.transfer(h2, h, &bcall);
+
+    // a USDx deficit blocks every option from the quote side, BOND ones included
+    t.sac(&t.usdx).clawback(&t.contract, &1);
+    let before = t.snap();
+    for id in [rput, rcall, bcall] {
+        rejected(
+            &t,
+            t.c.try_transfer(h, h2, &id),
+            Error::CollateralShortfall,
+            &before,
+        );
+    }
+    // after expiry, Expired comes first
+    t.at(EXPIRY);
+    let expired = t.snap();
+    for id in [rput, rcall, bcall] {
+        rejected(&t, t.c.try_transfer(h, h2, &id), Error::Expired, &expired);
+    }
+    t.at(EXPIRY - 1);
+
+    // the issuers repair the escrow (mint the missing units back): transfers work again and move
+    // only the holder
+    t.sac(&t.rwa).mint(&t.contract, &1);
+    let before = t.snap();
+    rejected(
+        &t,
+        t.c.try_transfer(h, h2, &rcall),
+        Error::CollateralShortfall,
+        &before,
+    );
+    t.sac(&t.usdx).mint(&t.contract, &1);
+    for id in [rput, rcall, bcall] {
+        let mut expect = t.snap();
+        t.c.transfer(h, h2, &id);
+        t.assert_one_event("option_transferred", id);
+        expect
+            .options
+            .iter_mut()
+            .find(|o| o.id == id)
+            .unwrap()
+            .holder = Some(h2.clone());
+        assert_eq!(t.snap(), expect, "transfer of {id} after the repair");
+    }
+}
+
+/// v1.3.1 (ABI §3, §13.2): while the underlying's issuer has de-authorized the escrow, the
+/// contract cannot settle the option (every SAC transfer into or out of it fails), so `transfer`
+/// fails with `ContractNotAuthorized` after the recipient checks and before the deficit check,
+/// with no event and no state change. A frozen holder may still hand over once the escrow is
+/// re-authorized (its own tokens never move).
+#[test]
+fn transfer16_deauthorized_escrow_blocks_hand_over() {
+    let t = setup();
+    let (w, m, h, h2) = (&t.writer, &t.maker2, &t.holder, &t.holder2);
+    let put = t.put(w);
+    let call = t.call(m);
+    let bput = t.offer(m, &t.bond, OptionType::Put);
+    for id in [put, call, bput] {
+        t.c.buy(h, &id);
+    }
+    t.sac(&t.rwa).set_authorized(&t.contract, &false);
+    assert!(!t.c.is_eligible(&t.rwa, &t.contract));
+    let before = t.snap();
+    for id in [put, call] {
+        rejected(
+            &t,
+            t.c.try_transfer(h, h2, &id),
+            Error::ContractNotAuthorized,
+            &before,
+        );
+        // recipient checks come first (ABI §3 order)
+        rejected(
+            &t,
+            t.c.try_transfer(h, &t.outsider, &id),
+            Error::NotEligible,
+            &before,
+        );
+        rejected(&t, t.c.try_transfer(h, h, &id), Error::InvalidArgs, &before);
+        rejected(&t, t.c.try_transfer(h2, h, &id), Error::NotHolder, &before);
+    }
+    // the holder frozen as well: still ContractNotAuthorized (the holder's own authorization is
+    // not what blocks it)
+    t.sac(&t.rwa).set_authorized(h, &false);
+    let frozen = t.snap();
+    for id in [put, call] {
+        rejected(
+            &t,
+            t.c.try_transfer(h, h2, &id),
+            Error::ContractNotAuthorized,
+            &frozen,
+        );
+    }
+    // the BOND option is unaffected
+    t.c.transfer(h, h2, &bput);
+    assert_eq!(t.c.get_option(&bput).holder, Some(h2.clone()));
+
+    // de-authorized AND short: ContractNotAuthorized comes before CollateralShortfall
+    t.sac(&t.rwa).clawback(&t.contract, &1);
+    let before = t.snap();
+    rejected(
+        &t,
+        t.c.try_transfer(h, h2, &call),
+        Error::ContractNotAuthorized,
+        &before,
+    );
+    t.sac(&t.rwa).set_authorized(&t.contract, &true);
+    let before = t.snap();
+    rejected(
+        &t,
+        t.c.try_transfer(h, h2, &call),
+        Error::CollateralShortfall,
+        &before,
+    );
+    // repaired: the frozen holder hands both positions over
+    t.sac(&t.rwa).mint(&t.contract, &1);
+    let frozen_bals = [t.bal(&t.usdx, h), t.bal(&t.rwa, h), t.bal(&t.bond, h)];
+    t.c.transfer(h, h2, &put);
+    t.c.transfer(h, h2, &call);
+    assert_eq!(
+        [t.bal(&t.usdx, h), t.bal(&t.rwa, h), t.bal(&t.bond, h)],
+        frozen_bals
+    );
+    assert_eq!(t.c.get_option(&put).holder, Some(h2.clone()));
+    assert_eq!(t.c.get_option(&call).holder, Some(h2.clone()));
 }
 
 // =============================================================================================
@@ -3974,6 +4900,48 @@ fn listing18_lookalike_codes_never_alias_a_listed_asset() {
     let id = t.offer(&t.writer, &real, OptionType::Call);
     assert_eq!(t.c.get_option(&id).underlying, real);
     assert_eq!(t.bal(&real, &t.contract), QTY);
+}
+
+/// v1.3.1 (ABI §3 `list_asset`, §13.4): `AlreadyListed` is decided from the contract's own
+/// storage before the deployment probe. A re-listing of a self-listed asset, of a
+/// constructor-seeded asset or of the quote token makes no call into that asset's SAC, so its
+/// answer can never depend on the SAC (v1.3 probed first), while a first listing probes the SAC
+/// exactly once (`decimals`) and calls nothing else.
+#[test]
+fn listing18_relisting_is_rejected_before_the_deployment_probe() {
+    let t = setup();
+    let env = &t.env;
+    let root = (t.contract.clone(), std::string::String::from("list_asset"));
+    let (iss, iss_id) = t.issuer(REGULATED);
+    let eqty = t.deploy_sac(&classic_asset(b"EQTY", &iss_id));
+    assert_eq!(t.c.list_asset(&t.writer, &t.s("EQTY"), &iss), eqty);
+    assert_eq!(
+        t.calls(),
+        [root.clone(), (eqty.clone(), "decimals".into())],
+        "a first listing probes the SAC once"
+    );
+    let g = |id: &xdr::AccountId| {
+        Address::try_from_val(env, &xdr::ScAddress::Account(id.clone())).unwrap()
+    };
+    let before = t.snap();
+    for (label, code, issuer) in [
+        ("the self-listed EQTY", "EQTY", iss.clone()),
+        ("the seeded RWA (code aaa)", "aaa", g(&t.rwa_issuer)),
+        ("the quote token (code aaa)", "aaa", g(&t.usdx_issuer)),
+    ] {
+        let r = t.c.try_list_asset(&t.maker2, &t.s(code), &issuer);
+        let calls = t.calls();
+        rejected_as(&t, label, r, Error::AlreadyListed, &before);
+        assert_eq!(
+            calls,
+            std::slice::from_ref(&root),
+            "{label}: probed the SAC before AlreadyListed"
+        );
+    }
+    // the same code under another issuer is a different, undeployed asset: the probe decides
+    let (other, _) = t.issuer(REGULATED);
+    let r = t.c.try_list_asset(&t.maker2, &t.s("EQTY"), &other);
+    rejected_as(&t, "undeployed", r, Error::AssetNotDeployed, &before);
 }
 
 #[test]
@@ -4295,12 +5263,11 @@ fn prune19_skips_live_active_and_terminal_options_and_expiry_boundary_is_inclusi
     // now = T - 1: nothing is prunable; a prune that prunes nothing changes and emits nothing
     t.at(tx - 1);
     let before = t.snap();
-    env.set_auths(&[]); // a stranger, no signature at all
-    assert_eq!(t.c.prune_expired(&all), 0);
+    let stranger = Address::generate(env); // signs only its own prune_expired call
+    assert_eq!(t.prune(&stranger, &all), 0);
     assert!(t.no_events(), "a prune that pruned nothing emitted events");
-    env.mock_all_auths();
     assert_eq!(t.snap(), before);
-    assert_eq!(t.c.prune_expired(&vec![env]), 0);
+    assert_eq!(t.prune(&stranger, &vec![env]), 0);
     assert!(t.no_events());
 
     // now = T: expiry <= now is prunable (`at_t` only); expiry == now + 1 is not; the bought
@@ -4308,7 +5275,7 @@ fn prune19_skips_live_active_and_terminal_options_and_expiry_boundary_is_inclusi
     t.at(tx);
     t.c.reclaim(w, &reclaimed);
     let mut expect = t.snap();
-    assert_eq!(t.c.prune_expired(&all), 1);
+    assert_eq!(t.prune(&stranger, &all), 1);
     assert_eq!(t.pruned_ids(), [at_t]);
     expect.set_state(at_t, State::Expired);
     expect.add(w, 0, STRIKE);
@@ -4323,7 +5290,7 @@ fn prune19_skips_live_active_and_terminal_options_and_expiry_boundary_is_inclusi
     // now = T + 1: `at_t1` becomes prunable; `at_t` is Expired and skipped, never paid twice
     t.at(tx + 1);
     let mut expect = t.snap();
-    assert_eq!(t.c.prune_expired(&vec![env, at_t, at_t1, at_t, at_t1]), 1);
+    assert_eq!(t.prune(&stranger, &vec![env, at_t, at_t1, at_t, at_t1]), 1);
     assert_eq!(t.pruned_ids(), [at_t1]);
     expect.set_state(at_t1, State::Expired);
     expect.add(m, 1, QTY);
@@ -4336,7 +5303,7 @@ fn prune19_skips_live_active_and_terminal_options_and_expiry_boundary_is_inclusi
     let dup = t.offer_x(w, &t.rwa, OptionType::Put, QTY, STRIKE, PREMIUM, tx + 5);
     t.at(tx + 5);
     let w_usdx = t.bal(&t.usdx, w);
-    assert_eq!(t.c.prune_expired(&vec![env, dup, dup, dup, dup]), 1);
+    assert_eq!(t.prune(&stranger, &vec![env, dup, dup, dup, dup]), 1);
     assert_eq!(t.pruned_ids(), [dup]);
     assert_eq!(t.bal(&t.usdx, w), w_usdx + STRIKE);
 
@@ -4351,7 +5318,7 @@ fn prune19_skips_live_active_and_terminal_options_and_expiry_boundary_is_inclusi
         vec![env, 999, late],
         vec![env, late, u32::MAX],
     ] {
-        let r = t.c.try_prune_expired(&ids);
+        let r = t.try_prune(&stranger, &ids);
         rejected_as(&t, &std::format!("{ids:?}"), r, Error::NotFound, &before);
     }
     assert_eq!(t.state(late), State::Offered);
@@ -4360,9 +5327,10 @@ fn prune19_skips_live_active_and_terminal_options_and_expiry_boundary_is_inclusi
     t.at(EXPIRY + 1);
     let mut expect = t.snap();
     assert_eq!(
-        t.c.prune_expired(&vec![
-            env, active, exercised, settled, cancelled, reclaimed, late
-        ]),
+        t.prune(
+            &stranger,
+            &vec![env, active, exercised, settled, cancelled, reclaimed, late]
+        ),
         1
     );
     assert_eq!(t.pruned_ids(), [late]);
@@ -4397,11 +5365,9 @@ fn prune19_collateral_returns_to_the_writer_whoever_prunes() {
     let gput = t.put(&g);
     t.at(EXPIRY);
     let mut expect = t.snap();
-    // No signature at all and no pruner argument: nobody can name a recipient.
-    env.set_auths(&[]);
-    let n =
-        t.c.prune_expired(&vec![env, bought, put, call, bcall, gput]);
-    env.mock_all_auths();
+    // The holder of `bought` prunes, signing only its own prune_expired call; the pruner argument
+    // names who pruned (the event), never a recipient.
+    let n = t.prune(h, &vec![env, bought, put, call, bcall, gput]);
     assert_eq!(n, 4);
     assert_eq!(t.pruned_ids(), [put, call, bcall, gput]);
     for id in [put, call, bcall, gput] {
@@ -4447,7 +5413,8 @@ fn prune19_frozen_writer_or_deauthorized_escrow_is_skipped_never_redirected() {
     // (stays Offered, collateral stays in the contract); its USDx PUT is still pruned
     t.sac(&t.rwa).set_authorized(w, &false);
     let mut expect = t.snap();
-    assert_eq!(t.c.prune_expired(&vec![env, call, put]), 1);
+    let keeper = Address::generate(env);
+    assert_eq!(t.prune(&keeper, &vec![env, call, put]), 1);
     assert_eq!(t.pruned_ids(), [put]);
     expect.set_state(put, State::Expired);
     expect.add(w, 0, STRIKE);
@@ -4458,14 +5425,14 @@ fn prune19_frozen_writer_or_deauthorized_escrow_is_skipped_never_redirected() {
     assert_eq!(t.state(call), State::Offered);
     // only skipped ids: Ok(0), no event, nothing changes
     let before = t.snap();
-    assert_eq!(t.c.prune_expired(&vec![env, call, call]), 0);
+    assert_eq!(t.prune(&keeper, &vec![env, call, call]), 0);
     assert!(t.no_events());
     assert_eq!(t.snap(), before);
 
     // the issuer de-authorizes the escrow on BOND: maker2's CALL cannot leave, skipped too
     t.sac(&t.bond).set_authorized(&t.contract, &false);
     let before = t.snap();
-    assert_eq!(t.c.prune_expired(&vec![env, bcall]), 0);
+    assert_eq!(t.prune(&keeper, &vec![env, bcall]), 0);
     assert!(t.no_events());
     assert_eq!(t.snap(), before);
 
@@ -4473,7 +5440,7 @@ fn prune19_frozen_writer_or_deauthorized_escrow_is_skipped_never_redirected() {
     t.sac(&t.rwa).set_authorized(w, &true);
     t.sac(&t.bond).set_authorized(&t.contract, &true);
     let mut expect = t.snap();
-    assert_eq!(t.c.prune_expired(&vec![env, call, bcall]), 2);
+    assert_eq!(t.prune(&keeper, &vec![env, call, bcall]), 2);
     assert_eq!(t.pruned_ids(), [call, bcall]);
     expect.set_state(call, State::Expired);
     expect.set_state(bcall, State::Expired);
@@ -4507,8 +5474,11 @@ fn prune19_huge_id_lists_fit_the_footprint_or_fail_as_a_whole() {
     }
     // binary search the largest list of live ids that fits (no state change, so probes repeat)
     t.env.cost_estimate().disable_resource_limits();
+    // Measured under `mock_all_auths` (recording mode), which adds no auth entries to the
+    // footprint: the model of a keeper that signs as the transaction source account.
+    let keeper = Address::generate(env);
     let fits = |k: u32| -> bool {
-        assert_eq!(t.c.prune_expired(&Vec::from_iter(env, 0..k)), 0);
+        assert_eq!(t.c.prune_expired(&keeper, &Vec::from_iter(env, 0..k)), 0);
         t.exceeded().is_empty()
     };
     let (mut lo, mut hi) = (1u32, live_n);
@@ -4528,7 +5498,10 @@ fn prune19_huge_id_lists_fit_the_footprint_or_fail_as_a_whole() {
         .cost_estimate()
         .enforce_resource_limits(NetworkInvocationResourceLimits::mainnet());
     let before = t.snap();
-    assert_eq!(t.c.prune_expired(&Vec::from_iter(env, 0..max_skip)), 0);
+    assert_eq!(
+        t.c.prune_expired(&keeper, &Vec::from_iter(env, 0..max_skip)),
+        0
+    );
     let r = env.cost_estimate().resources();
     assert!(t.no_events());
     assert_eq!(t.snap(), before);
@@ -4560,10 +5533,15 @@ fn prune19_huge_id_lists_fit_the_footprint_or_fail_as_a_whole() {
     u.at(EXPIRY);
     env.cost_estimate().disable_resource_limits();
     let mut cursor = 0u32;
+    let keeper = Address::generate(env);
     let mut prune = |k: u32| {
         let ids = Vec::from_iter(env, cursor..cursor + k);
         cursor += k;
-        assert_eq!(u.c.prune_expired(&ids), k, "prune of {k} expired offers");
+        assert_eq!(
+            u.c.prune_expired(&keeper, &ids),
+            k,
+            "prune of {k} expired offers"
+        );
         assert_eq!(u.pruned_ids().len() as u32, k);
         env.cost_estimate().resources()
     };
@@ -4642,7 +5620,8 @@ fn prune19_huge_id_lists_fit_the_footprint_or_fail_as_a_whole() {
     for id in 0..cursor {
         assert_eq!(u.state(id), State::Expired);
     }
-    assert_eq!(u.c.list_open().len(), pool - cursor);
+    assert_eq!(u.open_book(&u.rwa).len() as u32, pool - cursor);
+    assert_eq!(u.c.list_open().len(), (pool - cursor).min(LIST_OPEN_MAX));
     assert_eq!(u.c.open_collateral(&u.usdx), (pool - cursor) as i128);
 }
 
@@ -4871,10 +5850,9 @@ fn writercap20_cannot_be_bypassed_by_buy_transfer_cancel_reclaim_or_prune_loops(
     t.offer_x(w, &t.rwa, OptionType::Put, 1, 1, 1, EXPIRY + 10);
     capped(&t, "refilled after a reclaim");
     // a stranger's prune frees one slot per pruned offer; the same id twice frees one
-    env.set_auths(&[]);
-    assert_eq!(t.c.prune_expired(&vec![env, open[1], open[1]]), 1);
-    assert_eq!(t.c.prune_expired(&vec![env, open[1]]), 0);
-    env.mock_all_auths();
+    let stranger = Address::generate(env);
+    assert_eq!(t.prune(&stranger, &vec![env, open[1], open[1]]), 1);
+    assert_eq!(t.prune(&stranger, &vec![env, open[1]]), 0);
     assert_eq!(count(&t), MAX_OPEN_PER_WRITER - 1);
     t.offer_x(w, &t.rwa, OptionType::Put, 1, 1, 1, EXPIRY + 10);
     capped(&t, "refilled after a prune");
@@ -5203,10 +6181,20 @@ fn events23_v13_calls_emit_one_event_per_effect_and_views_change_nothing() {
         START + 10,
     );
     t.at(START + 10);
-    assert_eq!(t.c.prune_expired(&vec![env, c, a, b]), 3);
+    let pruner = Address::generate(env);
+    assert_eq!(t.prune(&pruner, &vec![env, c, a, b]), 3);
     assert_eq!(t.pruned_ids(), [c, a, b]);
     assert_eq!(t.opt_event_names(), ["offer_pruned"; 3]);
-    assert_eq!(t.c.prune_expired(&vec![env, a, b, c]), 0);
+    // v1.3.1: the event names the authenticated pruner (v1.3 named the contract itself)
+    assert_eq!(
+        t.pruned_by(),
+        [
+            (c, pruner.clone()),
+            (a, pruner.clone()),
+            (b, pruner.clone())
+        ]
+    );
+    assert_eq!(t.prune(&pruner, &vec![env, a, b, c]), 0);
     assert!(t.no_events());
 
     // views: no events and no state change
@@ -5229,4 +6217,496 @@ fn events23_v13_calls_emit_one_event_per_effect_and_views_change_nothing() {
         t.c.config().underlyings,
         vec![env, t.rwa.clone(), t.bond.clone()]
     );
+}
+
+// =============================================================================================
+// 24. v1.3.1: authenticated pruner, per-asset open books, list_open window
+// =============================================================================================
+
+#[test]
+fn prune24_forged_pruner_signatures_are_rejected() {
+    let t = setup();
+    let env = &t.env;
+    let (w, m) = (&t.writer, &t.maker2);
+    let exp = START + 10;
+    let a = t.offer_x(w, &t.rwa, OptionType::Put, QTY, STRIKE, PREMIUM, exp);
+    let b = t.offer_x(m, &t.bond, OptionType::Call, QTY, STRIKE, PREMIUM, exp);
+    let c = t.offer_x(w, &t.rwa, OptionType::Call, QTY, STRIKE, PREMIUM, exp);
+    t.at(exp); // all three are prunable
+    let pruner = Address::generate(env);
+    let mallory = Address::generate(env);
+    let ab = vec![env, a, b];
+    let abc = vec![env, a, b, c];
+    let only_c = vec![env, c];
+    let prune_tree = |who: &Address, ids: &Vec<u32>| MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "prune_expired",
+        args: (who, ids.clone()).into_val(env),
+        sub_invokes: &[],
+    };
+    let pruner_shaped = prune_tree(&pruner, &abc);
+    let mallory_own = prune_tree(&mallory, &abc);
+    let pruner_ab = prune_tree(&pruner, &ab);
+    let pruner_for_mallory = prune_tree(&mallory, &abc);
+    let pruner_other_fn = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "cancel_offer",
+        args: (&pruner, a).into_val(env),
+        sub_invokes: &[],
+    };
+    let pruner_other_contract = MockAuthInvoke {
+        contract: &t.rwa,
+        fn_name: "prune_expired",
+        args: (&pruner, abc.clone()).into_val(env),
+        sub_invokes: &[],
+    };
+
+    // A third party submits prune_expired(pruner, [a, b, c]) to have the pruner's identity in
+    // the `offer_pruned` events: the host rejects every tree that is not the pruner's own
+    // signature over exactly this call.
+    let cases: std::vec::Vec<(&str, std::vec::Vec<MockAuth>)> = std::vec![
+        ("no signature at all", std::vec![]),
+        (
+            "mallory signs a pruner-shaped tree",
+            std::vec![MockAuth {
+                address: &mallory,
+                invoke: &pruner_shaped
+            }]
+        ),
+        (
+            "mallory's tree for her own prune",
+            std::vec![MockAuth {
+                address: &mallory,
+                invoke: &mallory_own
+            }]
+        ),
+        (
+            "the pruner's [a, b] tree replayed for [a, b, c]",
+            std::vec![MockAuth {
+                address: &pruner,
+                invoke: &pruner_ab
+            }]
+        ),
+        (
+            "the pruner's signature over a prune naming mallory",
+            std::vec![MockAuth {
+                address: &pruner,
+                invoke: &pruner_for_mallory
+            }]
+        ),
+        (
+            "the pruner's tree for another function",
+            std::vec![MockAuth {
+                address: &pruner,
+                invoke: &pruner_other_fn
+            }]
+        ),
+        (
+            "the pruner's tree for another contract",
+            std::vec![MockAuth {
+                address: &pruner,
+                invoke: &pruner_other_contract
+            }]
+        ),
+    ];
+    assert_auth_cases(
+        &t,
+        "prune_expired",
+        &(&pruner, abc.clone()).into_val(env),
+        &cases,
+    );
+
+    // The writer's signatures do not cross over either: a signed prune of its own expired offer
+    // authorizes neither cancel_offer nor reclaim of it, and a signed cancel_offer is not a prune.
+    let w_prune_c = prune_tree(w, &only_c);
+    let w_cancel_c = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "cancel_offer",
+        args: (w, c).into_val(env),
+        sub_invokes: &[],
+    };
+    let w_c: Vec<Val> = (w, c).into_val(env);
+    let prune_as_writer = std::vec![(
+        "the writer's prune tree for a cancel/reclaim",
+        std::vec![MockAuth {
+            address: w,
+            invoke: &w_prune_c
+        }]
+    )];
+    assert_auth_cases(&t, "cancel_offer", &w_c, &prune_as_writer);
+    assert_auth_cases(&t, "reclaim", &w_c, &prune_as_writer);
+    assert_auth_cases(
+        &t,
+        "prune_expired",
+        &(w, only_c.clone()).into_val(env),
+        &[(
+            "the writer's cancel_offer tree for a prune",
+            std::vec![MockAuth {
+                address: w,
+                invoke: &w_cancel_c,
+            }],
+        )],
+    );
+    env.mock_all_auths();
+    assert_eq!(t.c.writer_open_count(w), 2);
+
+    // the backstop applies to the pruner (ABI §13.1): even under mock_all_auths, where
+    // `contract.require_auth()` passes, the contract cannot be named as the pruner
+    let before = t.snap();
+    let r = t.c.try_prune_expired(&t.contract, &abc);
+    rejected_as(&t, "pruner = contract", r, Error::InvalidArgs, &before);
+
+    // positive controls: the pruner's own [a, b] tree prunes exactly a and b and the events name
+    // it; mallory may prune c under her own name (anyone may prune). Collateral only ever goes
+    // back to the writers; the pruners receive nothing.
+    let mut expect = t.snap();
+    assert_eq!(t.prune(&pruner, &ab), 2);
+    assert_eq!(t.pruned_by(), [(a, pruner.clone()), (b, pruner.clone())]);
+    expect.set_state(a, State::Expired);
+    expect.set_state(b, State::Expired);
+    expect.add(w, 0, STRIKE);
+    expect.add(m, 2, QTY);
+    expect.add(&t.contract, 0, -STRIKE);
+    expect.add(&t.contract, 2, -QTY);
+    expect.open_collateral[0] -= STRIKE;
+    expect.open_collateral[2] -= QTY;
+    expect.add_open(w, -1);
+    expect.add_open(m, -1);
+    assert_eq!(t.snap(), expect);
+    assert_eq!(t.prune(&mallory, &only_c), 1);
+    assert_eq!(t.pruned_by(), [(c, mallory.clone())]);
+    // a classic G account prunes too, and the event names it (signed here with
+    // `mock_all_auths`, the way a keeper signs as the transaction source account)
+    let late = t.offer_x(w, &t.rwa, OptionType::Put, QTY, STRIKE, PREMIUM, exp + 1);
+    t.at(exp + 1);
+    let g = t.g_account();
+    assert_eq!(t.c.prune_expired(&g, &vec![env, late]), 1);
+    assert_eq!(t.pruned_by(), [(late, g.clone())]);
+    assert_eq!(
+        t.bal_opt(&t.usdx, &g),
+        None,
+        "the G pruner holds no USDx trustline"
+    );
+    for p in [&pruner, &mallory] {
+        for tok in t.tokens() {
+            assert_eq!(t.bal(&tok, p), 0);
+        }
+    }
+    assert_eq!(t.bal(&t.rwa, w), UNDERLYING_START);
+    assert_eq!(t.c.writer_open_count(w), 0);
+}
+
+#[test]
+fn books24_per_asset_cap_cannot_be_bypassed_by_alternating_assets() {
+    let t = setup();
+    let env = &t.env;
+    use OptionType::{Call, Put};
+    let (iss, iss_id) = t.issuer(0); // unflagged: every contract account is eligible
+    let junk = t.deploy_sac(&classic_asset(b"JUNK", &iss_id));
+    assert_eq!(t.c.list_asset(&t.maker2, &t.s("JUNK"), &iss), junk);
+    // RWA's book filled by 10 issuer-authorized writers, each at its own writer cap
+    let fillers: std::vec::Vec<Address> = (0..MAX_OPEN_PER_ASSET / MAX_OPEN_PER_WRITER)
+        .map(|_| t.fresh_writer(false))
+        .collect();
+    for i in 0..MAX_OPEN_PER_ASSET {
+        let ty = if i % 2 == 0 { Put } else { Call };
+        t.offer_x(
+            &fillers[(i / MAX_OPEN_PER_WRITER) as usize],
+            &t.rwa,
+            ty,
+            1,
+            1,
+            1,
+            EXPIRY,
+        );
+    }
+    let rwa_book = t.open_book(&t.rwa);
+    assert_eq!(rwa_book.len() as u32, MAX_OPEN_PER_ASSET);
+
+    // A fresh writer cycles RWA -> BOND -> JUNK, alternating PUT and CALL. Every RWA attempt is
+    // OpenListFull and changes nothing; BOND and JUNK list until the writer's cap, which counts
+    // its offers on every asset together (50 in total, not 50 per asset).
+    let x = t.fresh_writer(true);
+    t.sac(&junk).mint(&x, &UNDERLYING_START);
+    let assets = [t.rwa.clone(), t.bond.clone(), junk.clone()];
+    let mut listed = [0u32; 3];
+    let mut x_ids: [std::vec::Vec<u32>; 3] = Default::default();
+    for round in 0..90u32 {
+        let k = (round % 3) as usize;
+        let ty = if round % 2 == 0 { Put } else { Call };
+        let count = t.c.writer_open_count(&x);
+        let x_bals = [t.bal(&t.usdx, &x), t.bal(&t.rwa, &x), t.bal(&t.bond, &x)];
+        let r =
+            t.c.try_create_offer(&x, &assets[k], &ty, &1, &1, &1, &EXPIRY);
+        let quiet = t.no_events();
+        let label = std::format!("round {round} on asset {k} {ty:?}");
+        if k == 0 || count >= MAX_OPEN_PER_WRITER {
+            let want = if k == 0 {
+                Error::OpenListFull
+            } else {
+                Error::WriterOpenLimit
+            };
+            assert_eq!(r, Err(Ok(want)), "{label}");
+            assert!(quiet, "{label}: a failed call emitted events");
+            assert_eq!(t.c.writer_open_count(&x), count, "{label}");
+            assert_eq!(
+                [t.bal(&t.usdx, &x), t.bal(&t.rwa, &x), t.bal(&t.bond, &x)],
+                x_bals,
+                "{label}"
+            );
+        } else {
+            let Ok(Ok(id)) = r else {
+                panic!("{label}: {r:?}")
+            };
+            listed[k] += 1;
+            x_ids[k].push(id);
+        }
+        assert_eq!(t.open_book(&t.rwa), rwa_book, "{label}: RWA book changed");
+    }
+    assert_eq!(listed, [0, 25, 25]);
+    assert_eq!(t.c.writer_open_count(&x), MAX_OPEN_PER_WRITER);
+    assert_eq!(t.open_book(&t.bond), x_ids[1]);
+    assert_eq!(t.open_book(&junk), x_ids[2]);
+    let before = t.snap();
+    for (k, u) in assets.iter().enumerate() {
+        for ty in [Put, Call] {
+            let want = if k == 0 {
+                Error::OpenListFull // the asset cap is checked first (ABI §3)
+            } else {
+                Error::WriterOpenLimit
+            };
+            let r = t.c.try_create_offer(&x, u, &ty, &1, &1, &1, &EXPIRY);
+            rejected_as(
+                &t,
+                &std::format!("x capped, asset {k} {ty:?}"),
+                r,
+                want,
+                &before,
+            );
+        }
+    }
+
+    // Books are independent: another writer still lists on BOND and JUNK, never on RWA.
+    let m = &t.maker2;
+    t.sac(&junk).mint(m, &UNDERLYING_START);
+    t.offer_x(m, &t.bond, Call, 1, 1, 1, EXPIRY);
+    t.offer_x(m, &junk, Call, 1, 1, 1, EXPIRY);
+    let before = t.snap();
+    let r = t.c.try_create_offer(m, &t.rwa, &Put, &1, &1, &1, &EXPIRY);
+    rejected_as(&t, "maker2 on full RWA", r, Error::OpenListFull, &before);
+
+    // A slot freed on one asset never opens another asset's book: x cancels a BOND offer (one
+    // writer slot and one BOND slot free), RWA stays full for it, JUNK takes the writer slot.
+    t.c.cancel_offer(&x, &x_ids[1][0]);
+    let before = t.snap();
+    let r = t.c.try_create_offer(&x, &t.rwa, &Call, &1, &1, &1, &EXPIRY);
+    rejected_as(
+        &t,
+        "x after a BOND cancel, on RWA",
+        r,
+        Error::OpenListFull,
+        &before,
+    );
+    t.offer_x(&x, &junk, Put, 1, 1, 1, EXPIRY);
+    let before = t.snap();
+    let r = t.c.try_create_offer(&x, &t.bond, &Put, &1, &1, &1, &EXPIRY);
+    rejected_as(&t, "x back at its cap", r, Error::WriterOpenLimit, &before);
+
+    // A slot freed on RWA: x (at its writer cap) cannot take it, a writer under its cap can,
+    // and the book is full again afterwards.
+    t.c.cancel_offer(&fillers[0], &rwa_book[0]);
+    let before = t.snap();
+    let r = t.c.try_create_offer(&x, &t.rwa, &Put, &1, &1, &1, &EXPIRY);
+    rejected_as(&t, "x on RWA with room", r, Error::WriterOpenLimit, &before);
+    t.offer_x(m, &t.rwa, Put, 1, 1, 1, EXPIRY);
+    let before = t.snap();
+    let r =
+        t.c.try_create_offer(&fillers[0], &t.rwa, &Put, &1, &1, &1, &EXPIRY);
+    rejected_as(&t, "RWA refilled", r, Error::OpenListFull, &before);
+
+    // BOND fills to its own cap too: RWA and BOND hold MAX_OPEN_PER_ASSET each (the old global
+    // cap of 1000 in total) and JUNK still accepts, so no global list remains to be filled.
+    let mut bond_len = t.open_book(&t.bond).len() as u32;
+    let mut w = t.fresh_writer(false);
+    let mut w_open = 0;
+    while bond_len < MAX_OPEN_PER_ASSET {
+        if w_open == MAX_OPEN_PER_WRITER {
+            w = t.fresh_writer(false);
+            w_open = 0;
+        }
+        t.offer_x(&w, &t.bond, Put, 1, 1, 1, EXPIRY);
+        w_open += 1;
+        bond_len += 1;
+    }
+    let fresh = t.fresh_writer(true);
+    t.sac(&junk).mint(&fresh, &UNDERLYING_START);
+    let before = t.snap();
+    assert_eq!(before.open_for[0].1.len() as u32, MAX_OPEN_PER_ASSET);
+    assert_eq!(before.open_for[1].1.len() as u32, MAX_OPEN_PER_ASSET);
+    for u in [&t.rwa, &t.bond] {
+        let r = t.c.try_create_offer(&fresh, u, &Call, &1, &1, &1, &EXPIRY);
+        rejected_as(
+            &t,
+            "fresh writer, full book",
+            r,
+            Error::OpenListFull,
+            &before,
+        );
+    }
+    let id = t.offer_x(&fresh, &junk, Call, 1, 1, 1, EXPIRY);
+    let after = t.snap();
+    let total: usize = after.open_for.iter().map(|(_, b)| b.len()).sum();
+    assert_eq!(total as u32, 2 * MAX_OPEN_PER_ASSET + 28);
+    assert_eq!(after.open_for[2].1.last(), Some(&id));
+    for p in [&x, m, &fresh, &fillers[0]] {
+        t.assert_writer_count(p);
+    }
+    let _ = env;
+}
+
+#[test]
+fn books24_list_open_truncation_never_hides_the_first_registry_assets() {
+    let t = setup();
+    let env = &t.env;
+    let lister = Address::generate(env);
+    let mut junk = std::vec::Vec::new();
+    for code in ["JUNK", "JUNKB"] {
+        let (iss, iss_id) = t.issuer(0);
+        let sac = t.deploy_sac(&classic_asset(code.as_bytes(), &iss_id));
+        assert_eq!(t.c.list_asset(&lister, &t.s(code), &iss), sac);
+        junk.push(sac);
+    }
+    assert_eq!(
+        t.assets(),
+        [
+            t.rwa.clone(),
+            t.bond.clone(),
+            junk[0].clone(),
+            junk[1].clone()
+        ]
+    );
+    // the junk books are flooded first (lower ids than any honest offer), by sybil contract
+    // accounts at their writer cap
+    let flood = |asset: &Address, n: u32| -> std::vec::Vec<u32> {
+        let mut ids = std::vec::Vec::new();
+        for _ in 0..n / MAX_OPEN_PER_WRITER {
+            let sybil = Address::generate(env);
+            t.sac(asset).mint(&sybil, &(MAX_OPEN_PER_WRITER as i128));
+            for _ in 0..MAX_OPEN_PER_WRITER {
+                ids.push(t.c.create_offer(&sybil, asset, &OptionType::Call, &1, &1, &1, &EXPIRY));
+            }
+        }
+        ids
+    };
+    let j1 = flood(&junk[0], 250);
+    let j2 = flood(&junk[1], 100);
+    // honest offers arrive later, BOND before RWA
+    let b_ids = [
+        t.offer(&t.writer, &t.bond, OptionType::Call),
+        t.offer(&t.maker2, &t.bond, OptionType::Put),
+    ];
+    let r_ids = [t.put(&t.writer), t.call(&t.maker2)];
+
+    // the window follows registry order, not age: RWA, then BOND, then the junk books
+    let open: std::vec::Vec<u32> = t.c.list_open().iter().collect();
+    let mut expect: std::vec::Vec<u32> = r_ids.iter().chain(b_ids.iter()).copied().collect();
+    expect.extend(&j1[..LIST_OPEN_MAX as usize - 4]);
+    assert_eq!(open, expect);
+    // the tail is hidden from the window (all of JUNKB, part of JUNK) but each book is complete
+    // through list_open_for
+    assert!(j2.iter().all(|id| !open.contains(id)));
+    assert_eq!(t.open_book(&junk[0]), j1);
+    assert_eq!(t.open_book(&junk[1]), j2);
+    assert_eq!(t.open_book(&t.rwa), r_ids);
+    assert_eq!(t.open_book(&t.bond), b_ids);
+    // list_open_for paging edges never panic and never reveal another asset's ids
+    let page = |a: &Address, from: u32, limit: u32| -> std::vec::Vec<u32> {
+        t.c.list_open_for(a, &from, &limit).iter().collect()
+    };
+    assert_eq!(page(&junk[0], 240, 50), &j1[240..]);
+    assert_eq!(page(&junk[0], 0, 7), &j1[..7]);
+    assert_eq!(
+        page(&junk[0], 10, u32::MAX),
+        &j1[10..10 + MAX_PAGE as usize]
+    );
+    for (from, limit) in [(250, 10), (0, 0), (u32::MAX, u32::MAX), (u32::MAX, 1)] {
+        assert!(page(&junk[0], from, limit).is_empty(), "({from}, {limit})");
+    }
+    for unlisted in [&t.usdx, &t.contract, &Address::generate(env)] {
+        assert!(page(unlisted, 0, MAX_PAGE).is_empty());
+    }
+    assert!(t.no_events());
+
+    // sold and cancelled offers leave both the window and their book; nothing is reordered
+    t.c.buy(&t.holder, &r_ids[0]);
+    t.c.cancel_offer(&t.writer, &b_ids[0]);
+    let open: std::vec::Vec<u32> = t.c.list_open().iter().collect();
+    let mut expect = std::vec![r_ids[1], b_ids[1]];
+    expect.extend(&j1[..LIST_OPEN_MAX as usize - 2]);
+    assert_eq!(open, expect);
+    t.snap();
+
+    // Only RWA's own writers (all issuer-authorized) can crowd the window from the front: once
+    // RWA holds more than LIST_OPEN_MAX open offers, the window is RWA's oldest ids and BOND is
+    // visible through list_open_for only. list_open() is a convenience window, not a complete view.
+    let mut rwa_ids = std::vec![r_ids[1]];
+    for _ in 0..5 {
+        let w = t.fresh_writer(false);
+        for _ in 0..MAX_OPEN_PER_WRITER {
+            rwa_ids.push(t.offer_x(&w, &t.rwa, OptionType::Put, 1, 1, 1, EXPIRY));
+        }
+    }
+    let open: std::vec::Vec<u32> = t.c.list_open().iter().collect();
+    assert_eq!(open, &rwa_ids[..LIST_OPEN_MAX as usize]);
+    assert_eq!(t.open_book(&t.bond), [b_ids[1]]);
+    t.snap();
+}
+
+/// `list_open()` must stay within the per-transaction limits however many assets are listed
+/// (listing is permissionless and permanent: no delisting). A literal reading of ABI §3 (the
+/// books concatenated in registry order, truncated to 200 ids) reads two entries per registry
+/// asset (`AssetAt(i)`, `OpenFor(asset)`) while the books in front hold fewer than 200 ids: with
+/// such an implementation the 200th registry asset was the first to push the view past the
+/// 400-entry footprint (measured), so ~200 junk listings would break it for good.
+/// feat/v131-impl visits at most the first `MAX_PAGE` registry assets, which keeps the view
+/// bounded; offers on later assets are visible through `list_open_for`, which this test checks
+/// without asserting whether the window shows them (ABI §3 does not state the bound).
+#[test]
+fn books24_list_open_stays_within_limits_whatever_the_registry_size() {
+    let t = setup();
+    let env = &t.env;
+    env.cost_estimate().budget().reset_unlimited();
+    let id = t.put(&t.writer);
+    let lister = Address::generate(env);
+    env.cost_estimate().disable_resource_limits();
+    let mut first_over = None;
+    let mut last = None;
+    for i in 0..250u32 {
+        let code = std::format!("S{i}");
+        let (iss, iss_id) = t.issuer(0);
+        t.deploy_sac(&classic_asset(code.as_bytes(), &iss_id));
+        last = Some(t.c.list_asset(&lister, &t.s(&code), &iss));
+        assert_eq!(t.c.list_open(), vec![env, id]);
+        let over = t.exceeded_ledger();
+        if first_over.is_none() && !over.is_empty() {
+            first_over = Some((SEEDED + i + 1, over));
+        }
+    }
+    std::println!("books24 list_open: first registry size over the limits: {first_over:?}");
+    assert_eq!(
+        first_over, None,
+        "list_open() exceeds the per-transaction limits once the registry holds this many assets"
+    );
+    // an offer on the last listed asset (registry index 251): always in its own book, and the
+    // window still starts with RWA and stays within the limits
+    let last = last.unwrap();
+    let w = Address::generate(env);
+    t.sac(&last).mint(&w, &1);
+    let tail =
+        t.c.create_offer(&w, &last, &OptionType::Call, &1, &1, &1, &EXPIRY);
+    assert_eq!(t.open_book(&last), [tail]);
+    let open = t.c.list_open();
+    assert!(t.exceeded_ledger().is_empty(), "{:?}", t.exceeded_ledger());
+    assert_eq!(open.get(0), Some(id));
+    assert!(open.len() <= 2);
 }
