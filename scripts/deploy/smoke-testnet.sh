@@ -7,6 +7,11 @@
 #                                               # cap, per-asset open books via list_open_for; needs contract v1.3.1)
 #   scripts/deploy/smoke-testnet.sh --p0-only   # stop after P0
 #   scripts/deploy/smoke-testnet.sh --no-v13    # skip V1.3 and V1.3.1 (for a v1.2 or v1.3 contract)
+#   scripts/deploy/smoke-testnet.sh --no-v14    # skip V1.4 (resale: list_for_sale / buy_resale / cancel_sale;
+#                                               # needs contract v1.4)
+#   scripts/deploy/smoke-testnet.sh --no-v15    # skip V1.5 (funded bids: create_bid / fill_bid / cancel_bid / prune_bids;
+#                                               # needs contract v1.5)
+#   scripts/deploy/smoke-testnet.sh --v15-only  # PRE, then V1.5 only (skips P0 ... V1.4)
 #   scripts/deploy/smoke-testnet.sh --full      # V1.3 also fills maker2 to the 50-offer per-WRITER cap, expects #116
 #                                               # on the 51st, reads the multi-page RWA book, then cancels the dust
 #                                               # (~100 extra txs, ~2 test XLM, 10-20 min)
@@ -33,17 +38,23 @@ require_tools stellar jq curl
 
 RUN_P0PLUS=1
 RUN_V13=1
+RUN_V14=1
+RUN_V15=1
+V15_ONLY=0
 RUN_FULL=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --p0-only) RUN_P0PLUS=0 ;;
     --no-v13) RUN_V13=0 ;;
+    --no-v14) RUN_V14=0 ;;
+    --no-v15) RUN_V15=0 ;;
+    --v15-only) V15_ONLY=1 ;;
     --full) RUN_FULL=1 ;;
     -h | --help)
-      sed -n '2,27p' "$0"
+      sed -n '2,32p' "$0"
       exit 0
       ;;
-    *) die "unknown argument: $1 (usage: $0 [--p0-only | --no-v13 | --full])" ;;
+    *) die "unknown argument: $1 (usage: $0 [--p0-only | --no-v13 | --no-v14 | --no-v15 | --v15-only | --full])" ;;
   esac
   shift
 done
@@ -51,6 +62,14 @@ if [[ $RUN_FULL == 1 && ($RUN_P0PLUS == 0 || $RUN_V13 == 0) ]]; then
   die "--full runs inside the V1.3 section; do not combine it with --p0-only or --no-v13"
 fi
 [[ $RUN_P0PLUS == 1 ]] || RUN_V13=0
+[[ $RUN_P0PLUS == 1 ]] || RUN_V14=0
+[[ $RUN_P0PLUS == 1 || $V15_ONLY == 1 ]] || RUN_V15=0
+if [[ $V15_ONLY == 1 ]]; then
+  [[ $RUN_FULL == 0 && $RUN_V15 == 1 ]] || die "--v15-only cannot be combined with --full or --no-v15"
+  RUN_P0PLUS=0
+  RUN_V13=0
+  RUN_V14=0
+fi
 [[ "${DRY_RUN:-0}" != 1 ]] || die "DRY_RUN is not supported: the smoke run always sends real testnet transactions"
 
 load_env
@@ -76,9 +95,9 @@ COMP_PREM=8000000     # maker2's competing premium, 0.8 USDx
 EXP_SECS=45           # tenor of the offer used for the expiry path
 
 # ---------- results ----------
-declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
-declare -A NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
-declare -A NSKIP=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
+declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [V1.4]=0 [V1.5]=0 [PRE]=0)
+declare -A NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [V1.4]=0 [V1.5]=0 [PRE]=0)
+declare -A NSKIP=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [V1.4]=0 [V1.5]=0 [PRE]=0)
 GROUP=PRE
 SUMMARY=()
 pass() {
@@ -1196,8 +1215,245 @@ v13_writer_cap() {
   fi
 }
 
+# resale_path (v1.4, docs/contract-abi.md §14): on-chain secondary market. maker1 writes an RWA PUT, the investor buys
+# it, lists it for resale (list_for_sale), maker2 takes the ask with a price cap (buy_resale), the old holder is out,
+# a second buy of the same ask is NoAsk, maker2 lists and withdraws (cancel_sale), then exercises; maker1 claims.
+RESALE_ASK=20000000 # 2 USDx for the whole position
+resale_path() {
+  local q="$PUT_QTY" k="$PUT_STRIKE" p="$PUT_PREM" a="$RESALE_ASK" id exp got
+  snap_reset
+  snapshot "RESALE before" "$RWA_SAC" RWA
+  exp=$(($(date +%s) + 3600))
+  send RESALE_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" --option_type Put \
+    --qty "$q" --strike_total "$k" --premium_total "$p" --expiry "$exp" || return 1
+  id="$RESULT"
+  [[ "$id" =~ ^[0-9]+$ ]] || {
+    fail RESALE_CREATE_ID "create_offer returned '$id', not a u32 id"
+    return 1
+  }
+  echo "   resale option id $id (Put, RWA, qty $q, strike_total $k, premium_total $p, expiry $exp)"
+  expect_fail FAIL_RESALE_LIST_OFFERED 106 WrongState "$ID_MAKER1" list_for_sale --holder "$MAKER1" --id "$id" \
+    --ask_total "$a"
+  send RESALE_BUY_PRIMARY "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$id" || return 1
+  expect_option RESALE_PRIMARY_STATE "$id" Active "$INVESTOR" || return 1
+  snapshot "RESALE after create + buy #$id" "$RWA_SAC" RWA
+
+  expect_fail FAIL_RESALE_NO_ASK 120 NoAsk "$ID_MAKER2" buy_resale --buyer "$MAKER2" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_LIST_NOT_HOLDER 108 NotHolder "$ID_MAKER2" list_for_sale --holder "$MAKER2" --id "$id" \
+    --ask_total "$a"
+  expect_fail FAIL_RESALE_LIST_ZERO 102 InvalidArgs "$ID_INVESTOR" list_for_sale --holder "$INVESTOR" --id "$id" \
+    --ask_total 0
+
+  send RESALE_LIST "$ID_INVESTOR" list_for_sale --holder "$INVESTOR" --id "$id" --ask_total "$a" || return 1
+  if grep -qi 'ask_listed' <<<"$ERR"; then pass RESALE_LIST_EVENT "ask_listed event in tx $HASH"; else
+    fail RESALE_LIST_EVENT "no ask_listed event in the CLI output of tx $HASH"
+  fi
+  got="$(view "$O" get_ask --id "$id" | num)"
+  expect_eq RESALE_GET_ASK "$got" "$a" "get_ask($id)"
+  got="$(view "$O" list_asks --from "$id" --limit 1)"
+  echo "   list_asks($id, 1) = $got"
+  if jq -e --argjson id "$id" --arg h "$INVESTOR" --arg a "$a" \
+    'length == 1 and .[0].id == $id and .[0].holder == $h and (.[0].ask_total | tostring) == $a' <<<"$got" >/dev/null 2>&1; then
+    pass RESALE_LIST_ASKS "list_asks($id, 1) = [{id $id, holder investor, ask_total $a}]"
+  else
+    fail RESALE_LIST_ASKS "list_asks($id, 1) = $got"
+  fi
+  snapshot "RESALE after list_for_sale #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_LIST_BAL "" || return 1
+
+  expect_fail FAIL_RESALE_SELF 111 SelfTrade "$ID_INVESTOR" buy_resale --buyer "$INVESTOR" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_WRITER 111 SelfTrade "$ID_MAKER1" buy_resale --buyer "$MAKER1" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_NOT_ELIGIBLE 104 NotEligible "$ID_OUTSIDER" buy_resale --buyer "$OUTSIDER" --id "$id" \
+    --max_total "$a"
+  expect_fail FAIL_RESALE_PRICE_MOVED 121 PriceMoved "$ID_MAKER2" buy_resale --buyer "$MAKER2" --id "$id" \
+    --max_total "$((a - 1))"
+
+  send RESALE_BUY "$ID_MAKER2" buy_resale --buyer "$MAKER2" --id "$id" --max_total "$a" || return 1
+  if grep -qi 'resale_bought' <<<"$ERR"; then pass RESALE_BUY_EVENT "resale_bought event in tx $HASH"; else
+    fail RESALE_BUY_EVENT "no resale_bought event in the CLI output of tx $HASH"
+  fi
+  expect_option RESALE_BUY_STATE "$id" Active "$MAKER2" || return 1
+  snapshot "RESALE after maker2 buy_resale #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_BUY_BAL "m2Q=-$a invQ=$a" || return 1
+  got="$(view "$O" get_ask --id "$id")"
+  if [[ -z "$got" || "$got" == null ]]; then pass RESALE_ASK_GONE "get_ask($id) = none"; else
+    fail RESALE_ASK_GONE "get_ask($id) = $got after buy_resale"
+  fi
+  expect_fail FAIL_RESALE_AGAIN 120 NoAsk "$ID_INVESTOR" buy_resale --buyer "$INVESTOR" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_OLD_HOLDER 108 NotHolder "$ID_INVESTOR" exercise --holder "$INVESTOR" --id "$id"
+
+  send RESALE_RELIST "$ID_MAKER2" list_for_sale --holder "$MAKER2" --id "$id" --ask_total "$((a * 2))" || return 1
+  expect_fail FAIL_RESALE_CANCEL_NOT_HOLDER 108 NotHolder "$ID_INVESTOR" cancel_sale --holder "$INVESTOR" --id "$id"
+  send RESALE_CANCEL "$ID_MAKER2" cancel_sale --holder "$MAKER2" --id "$id" || return 1
+  if grep -qi 'ask_cancelled' <<<"$ERR"; then pass RESALE_CANCEL_EVENT "ask_cancelled event in tx $HASH"; else
+    fail RESALE_CANCEL_EVENT "no ask_cancelled event in the CLI output of tx $HASH"
+  fi
+  got="$(view "$O" get_ask --id "$id")"
+  if [[ -z "$got" || "$got" == null ]]; then pass RESALE_CANCEL_GONE "get_ask($id) = none"; else
+    fail RESALE_CANCEL_GONE "get_ask($id) = $got after cancel_sale"
+  fi
+  expect_fail FAIL_RESALE_CANCEL_AGAIN 120 NoAsk "$ID_MAKER2" cancel_sale --holder "$MAKER2" --id "$id"
+  expect_fail FAIL_RESALE_AFTER_CANCEL 120 NoAsk "$ID_INVESTOR" buy_resale --buyer "$INVESTOR" --id "$id" \
+    --max_total "$((a * 2))"
+
+  snapshot "RESALE before maker2 exercise #$id" "$RWA_SAC" RWA
+  send RESALE_EXERCISE "$ID_MAKER2" exercise --holder "$MAKER2" --id "$id" || return 1
+  expect_option RESALE_EXERCISE_STATE "$id" Exercised "$MAKER2" || return 1
+  snapshot "RESALE after maker2 exercise #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_EXERCISE_BAL "m2U=-$q m2Q=$k ctrU=$q ctrQ=-$k ocQ=-$k ocU=$q" || return 1
+  send RESALE_CLAIM "$ID_MAKER1" claim_delivery --writer "$MAKER1" --id "$id" || return 1
+  snapshot "RESALE after claim_delivery #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_CLAIM_BAL "ctrU=-$q m1U=$q ocU=-$q"
+}
+
+# ---------- V1.5: funded bids (create_bid / fill_bid / cancel_bid / prune_bids) ----------
+BID_SECS=45 # tenor of the bid used for the expiry / prune path
+BID_JSON=""
+# expect_bid <label> <bid id> <BidState> [option id]: get_bid, then check state and option_id (none if omitted).
+expect_bid() {
+  local label="$1" id="$2" want="$3" want_opt="${4:-}" st o
+  BID_JSON="$(view "$O" get_bid --id "$id")" || {
+    fail "$label" "get_bid($id) failed"
+    return 1
+  }
+  echo "   get_bid($id) = $(jq -c . <<<"$BID_JSON" 2>/dev/null || echo "$BID_JSON")"
+  st="$(jq -r '.state | if type == "string" then . elif type == "object" then (keys[0]) else tostring end' <<<"$BID_JSON" 2>/dev/null)"
+  o="$(jq -r '.option_id // "" | tostring' <<<"$BID_JSON" 2>/dev/null)"
+  if [[ "$st" == "$want" && "$o" == "$want_opt" ]]; then
+    pass "$label" "bid #$id state=$st option_id=${o:-none}"
+    return 0
+  fi
+  fail "$label" "bid #$id state=$st option_id=${o:-none}; wanted state=$want option_id=${want_opt:-none}"
+  return 1
+}
+# bid_in_book <bid id>: true iff the id is in RWA's open bid book (first page of 50 is enough here only if the
+# book is short, so page through it).
+bid_in_book() {
+  local from=0 page n
+  while :; do
+    page="$(view "$O" list_open_bids_for --asset "$RWA_SAC" --from "$from" --limit 50)" || return 2
+    jq -e --argjson id "$1" 'index($id) != null' <<<"$page" >/dev/null 2>&1 && return 0
+    n="$(jq 'length' <<<"$page" 2>/dev/null || echo 0)"
+    ((n > 0)) || return 1
+    from=$((from + n))
+  done
+}
+event_check() { # event_check <label> <event name>
+  if grep -qi "$2" <<<"$ERR"; then pass "$1" "$2 event in tx $HASH"; else
+    fail "$1" "no $2 event in the CLI output of tx $HASH"
+  fi
+}
+
+bids_path() {
+  local q="$PUT_QTY" k="$PUT_STRIKE" p="$PUT_PREM" cq="$CALL_QTY" ck="$CALL_STRIKE" cp="$CALL_PREM"
+  local short short_exp exp id opt cid got boc0
+  view "$O" bid_count >/dev/null || {
+    fail V15_INTERFACE "bid_count() not readable: contract older than v1.5?"
+    return 1
+  }
+  pass V15_INTERFACE "bid_count() = $(view "$O" bid_count)"
+  boc0="$(view "$O" buyer_open_count --buyer "$INVESTOR" | num)"
+
+  # the short bid first, so its expiry passes while the rest runs
+  short_exp=$(($(date +%s) + BID_SECS))
+  send BID_SHORT_CREATE "$ID_INVESTOR" create_bid --buyer "$INVESTOR" --kind Put --underlying "$RWA_SAC" \
+    --quote "$USDX_SAC" --qty "$q" --strike_total "$k" --premium_total "$p" --expiry "$short_exp" || return 1
+  short="$RESULT"
+  echo "   short bid id $short (expiry $short_exp)"
+
+  # PUT bid: investor escrows the premium, maker2 fills, investor exercises, maker2 claims
+  snap_reset
+  snapshot "BID before" "$RWA_SAC" RWA
+  exp=$(($(date +%s) + 3600))
+  send BID_PUT_CREATE "$ID_INVESTOR" create_bid --buyer "$INVESTOR" --kind Put --underlying "$RWA_SAC" \
+    --quote "$USDX_SAC" --qty "$q" --strike_total "$k" --premium_total "$p" --expiry "$exp" || return 1
+  id="$RESULT"
+  [[ "$id" =~ ^[0-9]+$ ]] || {
+    fail BID_PUT_CREATE_ID "create_bid returned '$id', not a u32 id"
+    return 1
+  }
+  echo "   bid id $id (Put, RWA, qty $q, strike_total $k, premium_total $p, expiry $exp)"
+  event_check BID_PUT_CREATE_EVENT bid_created
+  expect_bid BID_PUT_OPEN "$id" Open || return 1
+  if bid_in_book "$id"; then pass BID_PUT_IN_BOOK "bid #$id in list_open_bids_for(RWA)"; else
+    fail BID_PUT_IN_BOOK "bid #$id missing from list_open_bids_for(RWA)"
+  fi
+  got="$(view "$O" buyer_open_count --buyer "$INVESTOR" | num)"
+  expect_eq BID_BUYER_OPEN_COUNT "$got" "$((boc0 + 2))" "buyer_open_count(investor)"
+  snapshot "BID after create_bid #$id" "$RWA_SAC" RWA
+  check_deltas BID_PUT_CREATE_BAL "invQ=-$p ctrQ=$p ocQ=$p" || return 1
+
+  expect_fail FAIL_BID_CANCEL_NOT_BIDDER 123 NotBidder "$ID_MAKER2" cancel_bid --buyer "$MAKER2" --id "$id"
+  expect_fail FAIL_BID_SELF_FILL 111 SelfTrade "$ID_INVESTOR" fill_bid --writer "$INVESTOR" --id "$id"
+  expect_fail FAIL_BID_FILL_NOT_ELIGIBLE 104 NotEligible "$ID_OUTSIDER" fill_bid --writer "$OUTSIDER" --id "$id"
+
+  send BID_FILL "$ID_MAKER2" fill_bid --writer "$MAKER2" --id "$id" || return 1
+  opt="$RESULT"
+  [[ "$opt" =~ ^[0-9]+$ ]] || {
+    fail BID_FILL_ID "fill_bid returned '$opt', not an option id"
+    return 1
+  }
+  echo "   bid #$id filled by maker2 -> option #$opt"
+  event_check BID_FILL_EVENT bid_filled
+  event_check BID_FILL_BOUGHT_EVENT option_bought
+  expect_bid BID_FILL_STATE "$id" Filled "$opt" || return 1
+  expect_option BID_FILL_OPTION "$opt" Active "$INVESTOR" || return 1
+  got="$(jq -r '.writer' <<<"$OPT_JSON")"
+  expect_eq BID_FILL_WRITER "$got" "$MAKER2" "option #$opt writer"
+  if bid_in_book "$id"; then fail BID_FILL_LEFT_BOOK "bid #$id still in the open bid book"; else
+    pass BID_FILL_LEFT_BOOK "bid #$id gone from list_open_bids_for(RWA)"
+  fi
+  snapshot "BID after fill_bid #$id -> option #$opt" "$RWA_SAC" RWA
+  check_deltas BID_FILL_BAL "m2Q=$((p - k)) ctrQ=$((k - p)) ocQ=$((k - p))" || return 1
+
+  expect_fail FAIL_BID_DOUBLE_FILL 122 BidNotOpen "$ID_MAKER1" fill_bid --writer "$MAKER1" --id "$id"
+  expect_fail FAIL_BID_CANCEL_FILLED 122 BidNotOpen "$ID_INVESTOR" cancel_bid --buyer "$INVESTOR" --id "$id"
+
+  send BID_EXERCISE "$ID_INVESTOR" exercise --holder "$INVESTOR" --id "$opt" || return 1
+  expect_option BID_EXERCISE_STATE "$opt" Exercised "$INVESTOR" || return 1
+  snapshot "BID after investor exercise #$opt" "$RWA_SAC" RWA
+  check_deltas BID_EXERCISE_BAL "invU=-$q invQ=$k ctrU=$q ctrQ=-$k ocQ=-$k ocU=$q" || return 1
+  send BID_CLAIM "$ID_MAKER2" claim_delivery --writer "$MAKER2" --id "$opt" || return 1
+  snapshot "BID after maker2 claim_delivery #$opt" "$RWA_SAC" RWA
+  check_deltas BID_CLAIM_BAL "ctrU=-$q m2U=$q ocU=-$q" || return 1
+
+  # CALL bid, cancelled by the buyer: premium back, nothing else moves
+  send BID_CALL_CREATE "$ID_INVESTOR" create_bid --buyer "$INVESTOR" --kind Call --underlying "$RWA_SAC" \
+    --quote "$USDX_SAC" --qty "$cq" --strike_total "$ck" --premium_total "$cp" --expiry "$exp" || return 1
+  cid="$RESULT"
+  snapshot "BID after create_bid (Call) #$cid" "$RWA_SAC" RWA
+  check_deltas BID_CALL_CREATE_BAL "invQ=-$cp ctrQ=$cp ocQ=$cp" || return 1
+  send BID_CANCEL "$ID_INVESTOR" cancel_bid --buyer "$INVESTOR" --id "$cid" || return 1
+  event_check BID_CANCEL_EVENT bid_cancelled
+  expect_bid BID_CANCEL_STATE "$cid" Cancelled || return 1
+  snapshot "BID after cancel_bid #$cid" "$RWA_SAC" RWA
+  check_deltas BID_CANCEL_BAL "invQ=$cp ctrQ=-$cp ocQ=-$cp" || return 1
+  expect_fail FAIL_BID_CANCEL_AGAIN 122 BidNotOpen "$ID_INVESTOR" cancel_bid --buyer "$INVESTOR" --id "$cid"
+
+  # the short bid: live prune is a no-op, then after expiry fill fails and prune refunds the buyer
+  if (($(date +%s) < short_exp)); then
+    sim_ok BID_PRUNE_LIVE_SIM "$ID_MAKER2" prune_bids --pruner "$MAKER2" --ids "[$short]" &&
+      expect_eq BID_PRUNE_LIVE_RET "$SIM_RESULT" 0 "prune_bids([$short]) before expiry"
+  else
+    skip BID_PRUNE_LIVE_SIM "the short bid already expired before the live-prune check"
+  fi
+  wait_past "$short_exp"
+  expect_fail FAIL_BID_FILL_EXPIRED 109 Expired "$ID_MAKER1" fill_bid --writer "$MAKER1" --id "$short"
+  snapshot "BID before prune_bids [$short]" "$RWA_SAC" RWA
+  send BID_PRUNE "$ID_MAKER2" prune_bids --pruner "$MAKER2" --ids "[$short]" || return 1
+  expect_eq BID_PRUNE_RET "$RESULT" 1 "prune_bids([$short]) return"
+  event_check BID_PRUNE_EVENT bid_pruned
+  expect_bid BID_PRUNE_STATE "$short" Expired || return 1
+  snapshot "BID after prune_bids [$short]" "$RWA_SAC" RWA
+  check_deltas BID_PRUNE_BAL "invQ=$p ctrQ=-$p ocQ=-$p" || return 1
+  sim_ok BID_PRUNE_AGAIN_SIM "$ID_MAKER2" prune_bids --pruner "$MAKER2" --ids "[$short]" &&
+    expect_eq BID_PRUNE_AGAIN_RET "$SIM_RESULT" 0 "second prune_bids([$short])"
+  got="$(view "$O" buyer_open_count --buyer "$INVESTOR" | num)"
+  expect_eq BID_BUYER_OPEN_AFTER "$got" "$boc0" "buyer_open_count(investor) after fill, cancel and prune"
+}
+
 # ---------- run ----------
-section "Strata options smoke run on Stellar TESTNET ($(date -u +%FT%TZ))"
+section "StellSec options smoke run on Stellar TESTNET ($(date -u +%FT%TZ))"
 echo "options contract  $O"
 echo "                  https://stellar.expert/explorer/testnet/contract/$O"
 echo "USDx SAC (quote)  $USDX_SAC"
@@ -1220,6 +1476,7 @@ for spec in "contract:$O:RWA:true" "contract:$O:BOND:true" "investor:$INVESTOR:R
   echo "   is_eligible($sym, $who) = $got"
 done
 
+if [[ $V15_ONLY == 0 ]]; then
 GROUP=P0
 section "P0-1 PUT happy path on RWA (create_offer -> buy -> exercise -> claim_delivery)"
 lifecycle P0_PUT Put "$RWA_SAC" RWA "$PUT_QTY" "$PUT_STRIKE" "$PUT_PREM" checks || echo "   P0 PUT path stopped"
@@ -1288,6 +1545,19 @@ if [[ $RUN_V13 == 1 ]]; then
   fi
 fi
 
+if [[ $RUN_V14 == 1 ]]; then
+  GROUP=V1.4
+  section "V1.4-1 resale market on an RWA PUT (list_for_sale -> buy_resale with cap -> cancel_sale -> exercise)"
+  resale_path || echo "   resale path stopped"
+fi
+fi # V15_ONLY == 0
+
+if [[ $RUN_V15 == 1 ]]; then
+  GROUP=V1.5
+  section "V1.5-1 funded bids on RWA (create_bid -> fill_bid -> exercise -> claim; cancel_bid; prune_bids after expiry)"
+  bids_path || echo "   bids path stopped"
+fi
+
 # Every required check must have run (a stopped path leaves its later checks unreached).
 require_ran() {
   local g="$1" l
@@ -1297,7 +1567,7 @@ require_ran() {
     GROUP="$g" fail "$l" "not reached (an earlier step of its path failed)"
   done
 }
-require_ran P0 P0_PUT_CREATE P0_PUT_BUY P0_PUT_EXERCISE P0_PUT_CLAIM P0_PUT_CLAIM_BAL FAIL_NOT_HOLDER \
+[[ $V15_ONLY == 1 ]] || require_ran P0 P0_PUT_CREATE P0_PUT_BUY P0_PUT_EXERCISE P0_PUT_CLAIM P0_PUT_CLAIM_BAL FAIL_NOT_HOLDER \
   FAIL_DOUBLE_EXERCISE FAIL_NOT_EXPIRED FAIL_NOT_WRITER FAIL_NOT_ELIGIBLE FAIL_ASSET_NOT_ALLOWED FAIL_INVALID_ARGS \
   FAIL_BUY_EXPIRED EXP_RECLAIM EXP_RECLAIM_BAL COMP_LIST_BOTH COMP_LIST_SHRINKS
 [[ $RUN_P0PLUS != 1 ]] || require_ran P0+ P0P_CALL_CREATE P0P_CALL_BUY P0P_CALL_EXERCISE P0P_CALL_CLAIM \
@@ -1318,7 +1588,20 @@ require_ran P0 P0_PUT_CREATE P0_PUT_BUY P0_PUT_EXERCISE P0_PUT_CLAIM P0_PUT_CLAI
   V131_LIST_OPEN_PREFIX V131_OPEN_FOR_HAS_OFFER V131_OPEN_FOR_OTHER_ASSET V131_OPEN_FOR_PAST_END V131_OPEN_FOR_CAP \
   V131_OPEN_FOR_UNLISTED V131_BOOKS_OPEN V131_LIST_OPEN_CONCAT_OPEN V131_PRUNE_EVENT_PRUNER V131_BOOKS_PRUNED \
   V131_LIST_OPEN_CONCAT_PRUNED
+[[ $RUN_V14 != 1 ]] || require_ran V1.4 RESALE_CREATE FAIL_RESALE_LIST_OFFERED RESALE_BUY_PRIMARY FAIL_RESALE_NO_ASK \
+  FAIL_RESALE_LIST_NOT_HOLDER FAIL_RESALE_LIST_ZERO RESALE_LIST RESALE_LIST_EVENT RESALE_GET_ASK RESALE_LIST_ASKS \
+  RESALE_LIST_BAL FAIL_RESALE_SELF FAIL_RESALE_WRITER FAIL_RESALE_NOT_ELIGIBLE FAIL_RESALE_PRICE_MOVED RESALE_BUY \
+  RESALE_BUY_EVENT RESALE_BUY_STATE RESALE_BUY_BAL RESALE_ASK_GONE FAIL_RESALE_AGAIN FAIL_RESALE_OLD_HOLDER RESALE_RELIST \
+  FAIL_RESALE_CANCEL_NOT_HOLDER RESALE_CANCEL RESALE_CANCEL_EVENT RESALE_CANCEL_GONE FAIL_RESALE_CANCEL_AGAIN \
+  FAIL_RESALE_AFTER_CANCEL RESALE_EXERCISE RESALE_EXERCISE_BAL RESALE_CLAIM RESALE_CLAIM_BAL
 [[ $RUN_FULL != 1 ]] || require_ran V1.3.1 V131_CAP_BOOK V131_BOOKS_CAP V131_LIST_OPEN_CONCAT_CAP
+[[ $RUN_V15 != 1 ]] || require_ran V1.5 V15_INTERFACE BID_SHORT_CREATE BID_PUT_CREATE BID_PUT_CREATE_EVENT BID_PUT_OPEN \
+  BID_PUT_IN_BOOK BID_BUYER_OPEN_COUNT BID_PUT_CREATE_BAL FAIL_BID_CANCEL_NOT_BIDDER FAIL_BID_SELF_FILL \
+  FAIL_BID_FILL_NOT_ELIGIBLE BID_FILL BID_FILL_EVENT BID_FILL_BOUGHT_EVENT BID_FILL_STATE BID_FILL_OPTION BID_FILL_WRITER \
+  BID_FILL_LEFT_BOOK BID_FILL_BAL FAIL_BID_DOUBLE_FILL FAIL_BID_CANCEL_FILLED BID_EXERCISE BID_EXERCISE_STATE \
+  BID_EXERCISE_BAL BID_CLAIM BID_CLAIM_BAL BID_CALL_CREATE BID_CALL_CREATE_BAL BID_CANCEL BID_CANCEL_EVENT \
+  BID_CANCEL_STATE BID_CANCEL_BAL FAIL_BID_CANCEL_AGAIN FAIL_BID_FILL_EXPIRED BID_PRUNE BID_PRUNE_RET BID_PRUNE_EVENT \
+  BID_PRUNE_STATE BID_PRUNE_BAL BID_PRUNE_AGAIN_SIM BID_PRUNE_AGAIN_RET BID_BUYER_OPEN_AFTER
 
 section "SUMMARY"
 printf '%-6s %-32s %-5s %s\n' GROUP CHECK RESULT DETAIL
@@ -1329,7 +1612,7 @@ done
 echo
 verdict() { if ((NFAIL[$1] == 0)); then echo PASS; else echo FAIL; fi; }
 echo "PRE: $(verdict PRE) (${NPASS[PRE]} passed, ${NFAIL[PRE]} failed)"
-echo "P0:  $(verdict P0) (${NPASS[P0]} passed, ${NFAIL[P0]} failed)"
+if [[ $V15_ONLY == 1 ]]; then echo "P0 .. V1.4: not run (--v15-only)"; else echo "P0:  $(verdict P0) (${NPASS[P0]} passed, ${NFAIL[P0]} failed)"; fi
 if [[ $RUN_P0PLUS == 1 ]]; then echo "P0+: $(verdict P0+) (${NPASS[P0+]} passed, ${NFAIL[P0+]} failed)"; else echo "P0+: not run (--p0-only)"; fi
 if [[ $RUN_P0PLUS == 1 ]]; then echo "V1.2: $(verdict V1.2) (${NPASS[V1.2]} passed, ${NFAIL[V1.2]} failed)"; else echo "V1.2: not run (--p0-only)"; fi
 if [[ $RUN_V13 == 1 ]]; then
@@ -1339,6 +1622,8 @@ else
   echo "V1.3: not run (--p0-only or --no-v13)"
   echo "V1.3.1: not run (--p0-only or --no-v13)"
 fi
+if [[ $RUN_V14 == 1 ]]; then echo "V1.4: $(verdict V1.4) (${NPASS[V1.4]} passed, ${NFAIL[V1.4]} failed)"; else echo "V1.4: not run (--p0-only or --no-v14)"; fi
+if [[ $RUN_V15 == 1 ]]; then echo "V1.5: $(verdict V1.5) (${NPASS[V1.5]} passed, ${NFAIL[V1.5]} failed, ${NSKIP[V1.5]} skipped)"; else echo "V1.5: not run (--p0-only or --no-v15)"; fi
 echo "log: $SMOKE_LOG"
-total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2] + NFAIL[V1.3] + NFAIL[V1.3.1]))
+total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2] + NFAIL[V1.3] + NFAIL[V1.3.1] + NFAIL[V1.4] + NFAIL[V1.5]))
 exit $((total_fail > 0 ? 1 : 0))

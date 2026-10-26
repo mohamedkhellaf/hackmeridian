@@ -1,4 +1,4 @@
-// Domain types and the client interface for Strata Pro (experimental).
+// Domain types and the client interface for StellSec Pro (experimental).
 // Names follow the integer reference model (packages/risk/pro_v0_model.py) and docs/pro-v0-brief-dev2.md.
 // Amounts are exact integer units (bigint, USDx has 7 decimals); quantities are whole lots.
 // Margin figures (nlv, mm, im...) always come from the client (get_requirement); the UI never computes them.

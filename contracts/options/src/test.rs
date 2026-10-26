@@ -5441,3 +5441,746 @@ fn instance_storage_stays_four_keys_as_assets_and_tokens_grow() {
         assert!(p.has(&Key::WriterOpen(t.writer.clone())));
     });
 }
+
+// ---------------------------------------------------------------------------
+// v1.4 secondary market: list_for_sale / cancel_sale / buy_resale / get_ask /
+// list_asks
+// ---------------------------------------------------------------------------
+
+const ASK: i128 = 30_000_000; // 3 USDx resale price
+
+/// PUT on RWA written by `writer`, bought by `holder`, so it is `Active`.
+fn active_put(t: &T) -> u32 {
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    id
+}
+
+#[test]
+fn resale_list_then_buy_moves_price_and_holder() {
+    let t = setup();
+    let id = active_put(&t);
+    assert_eq!(t.c.get_ask(&id), None);
+
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [AskListed {
+            id,
+            holder: t.holder.clone(),
+            ask_total: ASK,
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.c.get_ask(&id), Some(ASK));
+
+    let seller0 = t.bals(&t.holder);
+    let buyer0 = t.bals(&t.maker2);
+    let contract0 = t.bals(&t.contract);
+    let writer0 = t.bals(&t.writer);
+    let open_usdx = t.c.open_collateral(&t.usdx);
+    let open_rwa = t.c.open_collateral(&t.rwa);
+
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [ResaleBought {
+            id,
+            seller: t.holder.clone(),
+            buyer: t.maker2.clone(),
+            ask_total: ASK,
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+
+    assert_eq!(t.bals(&t.maker2).usdx, buyer0.usdx - ASK);
+    assert_eq!(t.bals(&t.holder).usdx, seller0.usdx + ASK);
+    assert_eq!(t.bals(&t.holder).rwa, seller0.rwa);
+    assert_eq!(t.bals(&t.contract), contract0);
+    assert_eq!(t.bals(&t.writer), writer0);
+    assert_eq!(t.c.open_collateral(&t.usdx), open_usdx);
+    assert_eq!(t.c.open_collateral(&t.rwa), open_rwa);
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+    assert_eq!(t.state(id), State::Active);
+    assert_eq!(t.c.get_ask(&id), None);
+    assert_eq!(t.c.list_asks(&0, &50).len(), 0);
+}
+
+#[test]
+fn resale_ask_overwrite_keeps_latest_price() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.list_for_sale(&t.holder, &id, &(ASK * 2));
+    assert_eq!(t.c.get_ask(&id), Some(ASK * 2));
+    let buyer0 = t.bal(&t.usdx, &t.maker2);
+    // max_total == ask_total is accepted
+    t.c.buy_resale(&t.maker2, &id, &(ASK * 2));
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0 - ASK * 2);
+}
+
+#[test]
+fn resale_cancel_then_buy_is_no_ask() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.cancel_sale(&t.holder, &id);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [AskCancelled { id }.to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.c.get_ask(&id), None);
+    assert_err(t.c.try_buy_resale(&t.maker2, &id, &i128::MAX), Error::NoAsk);
+    assert_err(t.c.try_cancel_sale(&t.holder, &id), Error::NoAsk);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+}
+
+#[test]
+fn resale_new_holder_exercises_old_holder_cannot() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    assert_err(t.c.try_exercise(&t.holder, &id), Error::NotHolder);
+    assert_err(
+        t.c.try_list_for_sale(&t.holder, &id, &ASK),
+        Error::NotHolder,
+    );
+    let b0 = t.bals(&t.maker2);
+    t.c.exercise(&t.maker2, &id);
+    assert_eq!(t.state(id), State::Exercised);
+    assert_eq!(t.bals(&t.maker2).usdx, b0.usdx + STRIKE);
+    assert_eq!(t.bals(&t.maker2).rwa, b0.rwa - QTY);
+    // the writer still claims the delivered underlying
+    t.c.claim_delivery(&t.writer, &id);
+    assert_eq!(t.state(id), State::Settled);
+}
+
+#[test]
+fn resale_call_resold_then_exercised() {
+    let t = setup();
+    let id = t.call(&t.writer);
+    t.c.buy(&t.holder, &id);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    let b0 = t.bals(&t.maker2);
+    t.c.exercise(&t.maker2, &id);
+    assert_eq!(t.bals(&t.maker2).rwa, b0.rwa + QTY);
+    assert_eq!(t.bals(&t.maker2).usdx, b0.usdx - STRIKE);
+}
+
+#[test]
+fn resale_ask_cleared_by_exercise_transfer_and_reclaim() {
+    let t = setup();
+    // exercise
+    let a = active_put(&t);
+    t.c.list_for_sale(&t.holder, &a, &ASK);
+    t.c.exercise(&t.holder, &a);
+    assert_eq!(t.c.get_ask(&a), None);
+    assert_err(t.c.try_buy_resale(&t.maker2, &a, &i128::MAX), Error::NoAsk);
+
+    // transfer: the old holder's ask does not follow the option
+    let b = active_put(&t);
+    t.c.list_for_sale(&t.holder, &b, &ASK);
+    t.c.transfer(&t.holder, &t.maker2, &b);
+    assert_eq!(t.c.get_ask(&b), None);
+    assert_err(
+        t.c.try_buy_resale(&t.outsider, &b, &i128::MAX),
+        Error::NoAsk,
+    );
+
+    // reclaim (Active -> Expired)
+    let c = active_put(&t);
+    t.c.list_for_sale(&t.holder, &c, &ASK);
+    t.at(EXPIRY);
+    assert_err(
+        t.c.try_buy_resale(&t.maker2, &c, &i128::MAX),
+        Error::Expired,
+    );
+    assert_eq!(t.c.list_asks(&0, &50).len(), 1); // still listed until reclaimed
+    t.c.reclaim(&t.writer, &c);
+    assert_eq!(t.c.get_ask(&c), None);
+    assert_eq!(t.c.list_asks(&0, &50).len(), 0);
+}
+
+#[test]
+fn resale_list_asks_paging() {
+    let t = setup();
+    let mut ids = std::vec::Vec::new();
+    for _ in 0..6 {
+        ids.push(active_put(&t));
+    }
+    // an Offered option after them has no ask
+    let offered = t.put(&t.maker2);
+    for (i, id) in ids.iter().enumerate() {
+        if i % 2 == 0 {
+            t.c.list_for_sale(&t.holder, id, &(ASK + i as i128));
+        }
+    }
+    let all = t.c.list_asks(&0, &50);
+    assert_eq!(
+        all.iter().map(|a| a.id).collect::<std::vec::Vec<_>>(),
+        [ids[0], ids[2], ids[4]]
+    );
+    for a in all.iter() {
+        assert_eq!(a.holder, t.holder);
+        assert_eq!(Some(a.ask_total), t.c.get_ask(&a.id));
+    }
+    // scan windows: [0,3) and [3,6)
+    let p1 = t.c.list_asks(&0, &3);
+    let p2 = t.c.list_asks(&3, &3);
+    assert_eq!(
+        p1.iter().map(|a| a.id).collect::<std::vec::Vec<_>>(),
+        [ids[0], ids[2]]
+    );
+    assert_eq!(
+        p2.iter().map(|a| a.id).collect::<std::vec::Vec<_>>(),
+        [ids[4]]
+    );
+    assert_eq!(t.c.list_asks(&offered, &50).len(), 0);
+    assert_eq!(t.c.list_asks(&0, &0).len(), 0);
+    assert_eq!(t.c.list_asks(&u32::MAX, &50).len(), 0);
+    assert_eq!(t.c.get_ask(&offered), None);
+    assert_eq!(t.c.get_ask(&999), None);
+}
+
+#[test]
+fn resale_list_asks_capped_at_max_page() {
+    let t = setup();
+    // 55 Active options listed for sale: one call returns at most 50
+    let usdx_admin = t.sac(&t.usdx);
+    usdx_admin.mint(&t.holder, &(100 * USDX_START));
+    usdx_admin.mint(&t.writer, &(100 * USDX_START));
+    usdx_admin.mint(&t.maker2, &(100 * USDX_START));
+    for i in 0..55u32 {
+        let w = if i < 45 { &t.writer } else { &t.maker2 };
+        let id = t.put(w);
+        t.c.buy(&t.holder, &id);
+        t.c.list_for_sale(&t.holder, &id, &ASK);
+    }
+    assert_eq!(t.c.list_asks(&0, &100).len(), 50);
+    assert_eq!(t.c.list_asks(&50, &100).len(), 5);
+}
+
+#[test]
+fn resale_extend_ttl_bumps_ask_entry() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    let key: Vec<Val> = vec![
+        &t.env,
+        Symbol::new(&t.env, "Ask").into_val(&t.env),
+        id.into_val(&t.env),
+    ];
+    let ttl = |t: &T| {
+        t.env
+            .as_contract(&t.contract, || t.env.storage().persistent().get_ttl(&key))
+    };
+    assert!(ttl(&t) >= 29 * DAY);
+    t.env.ledger().with_mut(|l| l.sequence_number += 25 * DAY);
+    assert!(ttl(&t) < 7 * DAY);
+    t.c.extend_ttl(&vec![&t.env, id]);
+    assert!(ttl(&t) >= 29 * DAY);
+}
+
+#[test]
+fn resale_auths_are_holder_and_buyer() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    assert_eq!(
+        t.env.auths(),
+        std::vec![(
+            t.holder.clone(),
+            leaf(contract_fn(
+                &t,
+                &t.contract,
+                "list_for_sale",
+                (t.holder.clone(), id, ASK).into_val(&t.env)
+            ))
+        )]
+    );
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    let auths = t.env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, t.maker2);
+    t.c.list_for_sale(&t.maker2, &id, &ASK);
+    t.c.cancel_sale(&t.maker2, &id);
+    assert_eq!(t.env.auths()[0].0, t.maker2);
+}
+
+#[test]
+fn resale_price_moved_when_ask_raised_after_buyer_saw_it() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    let seen = t.c.get_ask(&id).unwrap();
+    // the seller re-lists higher before the buyer's transaction lands
+    t.c.list_for_sale(&t.holder, &id, &(ASK + 1));
+    let buyer0 = t.bal(&t.usdx, &t.maker2);
+    let seller0 = t.bal(&t.usdx, &t.holder);
+    assert_err(t.c.try_buy_resale(&t.maker2, &id, &seen), Error::PriceMoved);
+    assert!(t.env.events().all().events().is_empty());
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0);
+    assert_eq!(t.bal(&t.usdx, &t.holder), seller0);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+    assert_eq!(t.c.get_ask(&id), Some(ASK + 1));
+    // a lower ask than the cap: the buyer pays the ask, not the cap
+    t.c.list_for_sale(&t.holder, &id, &(ASK - 1));
+    t.c.buy_resale(&t.maker2, &id, &seen);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0 - (ASK - 1));
+    assert_eq!(t.bal(&t.usdx, &t.holder), seller0 + (ASK - 1));
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+}
+
+#[test]
+fn resale_edge_semantics_after_expiry() {
+    let t = setup();
+    let a = active_put(&t);
+    let b = active_put(&t);
+    t.c.list_for_sale(&t.holder, &a, &ASK);
+    t.c.list_for_sale(&t.holder, &b, &ASK);
+    t.at(EXPIRY);
+    // expired but not reclaimed: Expired, not NoAsk
+    assert_err(t.c.try_buy_resale(&t.maker2, &a, &ASK), Error::Expired);
+    // the holder may still withdraw its ask after expiry
+    t.c.cancel_sale(&t.holder, &a);
+    assert_eq!(t.c.get_ask(&a), None);
+    assert_err(t.c.try_buy_resale(&t.maker2, &a, &ASK), Error::NoAsk);
+    // reclaim clears the other one
+    t.c.reclaim(&t.writer, &b);
+    assert_eq!(t.c.get_ask(&b), None);
+}
+
+#[test]
+fn resale_ask_does_not_survive_a_round_trip_transfer() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    // A -> B -> A: the option is back with A, but A's old ask is gone
+    t.c.transfer(&t.holder, &t.maker2, &id);
+    t.c.transfer(&t.maker2, &t.holder, &id);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+    assert_eq!(t.c.get_ask(&id), None);
+    let buyer0 = t.bal(&t.usdx, &t.maker2);
+    assert_err(t.c.try_buy_resale(&t.maker2, &id, &ASK), Error::NoAsk);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+}
+
+// ---------------------------------------------------------------------------
+// v1.5 buyer side: create_bid / cancel_bid / fill_bid / prune_bids / bid views
+// ---------------------------------------------------------------------------
+
+impl T {
+    /// `holder` bids for `ty` on RWA with the standard terms.
+    fn bid(&self, ty: OptionType) -> u32 {
+        self.bid_by(&self.holder, &self.rwa, ty, EXPIRY)
+    }
+
+    fn bid_by(&self, buyer: &Address, underlying: &Address, ty: OptionType, expiry: u64) -> u32 {
+        self.c.create_bid(
+            buyer, &ty, underlying, &self.usdx, &QTY, &STRIKE, &PREMIUM, &expiry,
+        )
+    }
+
+    fn bid_ttl(&self, id: u32) -> u32 {
+        let key: Vec<Val> = vec![
+            &self.env,
+            Symbol::new(&self.env, "Bid").into_val(&self.env),
+            id.into_val(&self.env),
+        ];
+        self.env.as_contract(&self.contract, || {
+            self.env.storage().persistent().get_ttl(&key)
+        })
+    }
+}
+
+#[test]
+fn bid_put_create_fill_exercise_claim_exact_balances() {
+    let t = setup();
+    let buyer0 = t.bals(&t.holder);
+    let contract0 = t.bals(&t.contract);
+
+    let bid_id = t.bid(OptionType::Put);
+    assert_eq!(bid_id, 0);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [BidCreated {
+            id: 0,
+            buyer: t.holder.clone(),
+            kind: OptionType::Put,
+            underlying: t.rwa.clone(),
+            qty: QTY,
+            strike_total: STRIKE,
+            premium_total: PREMIUM,
+            expiry: EXPIRY,
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.bals(&t.holder).usdx, buyer0.usdx - PREMIUM);
+    assert_eq!(t.bals(&t.contract).usdx, contract0.usdx + PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.usdx), PREMIUM);
+    assert_eq!(t.c.bid_count(), 1);
+    assert_eq!(t.c.buyer_open_count(&t.holder), 1);
+    assert_eq!(t.c.list_open_bids_for(&t.rwa, &0, &50), vec![&t.env, 0u32]);
+    let bid = t.c.get_bid(&0);
+    assert_eq!(
+        bid,
+        Bid {
+            id: 0,
+            buyer: t.holder.clone(),
+            kind: OptionType::Put,
+            underlying: t.rwa.clone(),
+            quote: t.usdx.clone(),
+            qty: QTY,
+            strike_total: STRIKE,
+            premium_total: PREMIUM,
+            expiry: EXPIRY,
+            state: BidState::Open,
+            option_id: None,
+        }
+    );
+    // the bid id space is separate: no option exists yet
+    assert_eq!(t.c.option_count(), 0);
+
+    let writer0 = t.bals(&t.writer);
+    let opt_id = t.c.fill_bid(&t.writer, &bid_id);
+    assert_eq!(opt_id, 0);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [
+            OptionBought {
+                id: 0,
+                holder: t.holder.clone(),
+                premium_total: PREMIUM,
+            }
+            .to_xdr(&t.env, &t.contract),
+            BidFilled {
+                bid_id: 0,
+                option_id: 0,
+                writer: t.writer.clone(),
+            }
+            .to_xdr(&t.env, &t.contract)
+        ]
+    );
+    // writer: -strike collateral +premium; contract: premium out, strike in
+    assert_eq!(t.bals(&t.writer).usdx, writer0.usdx - STRIKE + PREMIUM);
+    assert_eq!(t.bals(&t.contract).usdx, contract0.usdx + STRIKE);
+    assert_eq!(t.bals(&t.holder).usdx, buyer0.usdx - PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE);
+    assert_eq!(t.c.open_collateral(&t.rwa), 0);
+
+    let opt = t.c.get_option(&opt_id);
+    let mut expected = expected_option(&t, 0, &t.rwa, OptionType::Put, &t.writer);
+    expected.holder = Some(t.holder.clone());
+    expected.state = State::Active;
+    assert_eq!(opt, expected);
+    let bid = t.c.get_bid(&0);
+    assert_eq!(bid.state, BidState::Filled);
+    assert_eq!(bid.option_id, Some(0));
+    assert_eq!(t.c.list_open_bids_for(&t.rwa, &0, &50).len(), 0);
+    assert_eq!(t.c.buyer_open_count(&t.holder), 0);
+    // not in any open offer book, writer cap untouched
+    assert!(t.open().is_empty());
+    assert_eq!(t.c.list_open_for(&t.rwa, &0, &50).len(), 0);
+    assert_eq!(t.c.writer_open_count(&t.writer), 0);
+
+    // buyer (holder) exercises; writer claims
+    t.c.exercise(&t.holder, &opt_id);
+    assert_eq!(t.bals(&t.holder).usdx, buyer0.usdx - PREMIUM + STRIKE);
+    assert_eq!(t.bals(&t.holder).rwa, buyer0.rwa - QTY);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY);
+    t.c.claim_delivery(&t.writer, &opt_id);
+    assert_eq!(t.bals(&t.writer).rwa, writer0.rwa + QTY);
+    assert_eq!(t.state(opt_id), State::Settled);
+    assert_eq!(t.c.open_collateral(&t.rwa), 0);
+    assert_eq!(t.bals(&t.contract), contract0);
+}
+
+#[test]
+fn bid_call_fill_locks_underlying_and_exercises() {
+    let t = setup();
+    let buyer0 = t.bals(&t.holder);
+    let writer0 = t.bals(&t.maker2);
+    let contract0 = t.bals(&t.contract);
+    let bid_id = t.bid(OptionType::Call);
+    let opt_id = t.c.fill_bid(&t.maker2, &bid_id);
+    assert_eq!(t.bals(&t.maker2).rwa, writer0.rwa - QTY);
+    assert_eq!(t.bals(&t.maker2).usdx, writer0.usdx + PREMIUM);
+    assert_eq!(t.bals(&t.contract).rwa, contract0.rwa + QTY);
+    assert_eq!(t.bals(&t.contract).usdx, contract0.usdx);
+    assert_eq!(t.c.open_collateral(&t.rwa), QTY);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    let opt = t.c.get_option(&opt_id);
+    assert_eq!(opt.holder, Some(t.holder.clone()));
+    assert_eq!(opt.writer, t.maker2);
+    assert_eq!(opt.option_type, OptionType::Call);
+    assert_eq!(opt.state, State::Active);
+
+    t.c.exercise(&t.holder, &opt_id);
+    assert_eq!(t.bals(&t.holder).rwa, buyer0.rwa + QTY);
+    assert_eq!(t.bals(&t.holder).usdx, buyer0.usdx - PREMIUM - STRIKE);
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE);
+    t.c.claim_delivery(&t.maker2, &opt_id);
+    assert_eq!(t.bals(&t.maker2).usdx, writer0.usdx + PREMIUM + STRIKE);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    assert_eq!(t.bals(&t.contract), contract0);
+}
+
+#[test]
+fn bid_cancel_refunds_premium() {
+    let t = setup();
+    let buyer0 = t.bals(&t.holder);
+    let id = t.bid(OptionType::Put);
+    t.c.cancel_bid(&t.holder, &id);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [BidCancelled { id }.to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.bals(&t.holder), buyer0);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    assert_eq!(t.c.get_bid(&id).state, BidState::Cancelled);
+    assert_eq!(t.c.get_bid(&id).option_id, None);
+    assert_eq!(t.c.buyer_open_count(&t.holder), 0);
+    assert_eq!(t.c.list_open_bids_for(&t.rwa, &0, &50).len(), 0);
+    // cancel is allowed after expiry too
+    let id2 = t.bid(OptionType::Call);
+    t.at(EXPIRY + 1);
+    t.c.cancel_bid(&t.holder, &id2);
+    assert_eq!(t.bals(&t.holder), buyer0);
+}
+
+#[test]
+fn bid_escrow_and_offer_collateral_share_the_quote_reserve() {
+    let t = setup();
+    let put = t.put(&t.writer); // STRIKE reserved
+    let b0 = t.bid(OptionType::Put); // + PREMIUM
+    let b1 = t.bid_by(&t.maker2, &t.bond, OptionType::Call, EXPIRY); // + PREMIUM
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE + 2 * PREMIUM);
+    assert_eq!(t.bal(&t.usdx, &t.contract), STRIKE + 2 * PREMIUM);
+    let o1 = t.c.fill_bid(&t.writer, &b1); // CALL on BOND: -PREMIUM usdx, +QTY bond
+    assert_eq!(o1, put + 1);
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE + PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.bond), QTY);
+    t.c.cancel_bid(&t.holder, &b0);
+    assert_eq!(t.c.open_collateral(&t.usdx), STRIKE);
+    assert_eq!(t.bal(&t.usdx, &t.contract), STRIKE);
+    // the offer book still only has the funded offer
+    assert_eq!(t.open(), std::vec![put]);
+    assert_eq!(t.c.writer_open_count(&t.writer), 1);
+}
+
+#[test]
+fn bid_prune_refunds_only_expired_open_bids() {
+    let t = setup();
+    let buyer0 = t.bals(&t.holder);
+    let short = t.bid_by(&t.holder, &t.rwa, OptionType::Put, START + 100);
+    let live = t.bid(OptionType::Put);
+    let filled = t.bid_by(&t.holder, &t.rwa, OptionType::Call, START + 100);
+    t.c.fill_bid(&t.writer, &filled);
+    let cancelled = t.bid_by(&t.holder, &t.rwa, OptionType::Call, START + 100);
+    t.c.cancel_bid(&t.holder, &cancelled);
+
+    // before expiry nothing is pruned
+    let ids = vec![&t.env, short, live, filled, cancelled];
+    assert_eq!(t.c.prune_bids(&t.pruner, &ids), 0);
+    assert_eq!(t.c.get_bid(&short).state, BidState::Open);
+
+    t.at(START + 100);
+    assert_eq!(t.c.prune_bids(&t.pruner, &ids), 1);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [BidPruned {
+            id: short,
+            pruner: t.pruner.clone(),
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.c.get_bid(&short).state, BidState::Expired);
+    assert_eq!(t.c.get_bid(&live).state, BidState::Open);
+    assert_eq!(t.c.get_bid(&filled).state, BidState::Filled);
+    assert_eq!(t.c.get_bid(&cancelled).state, BidState::Cancelled);
+    // holder paid the filled bid's premium and has the live bid escrowed
+    assert_eq!(t.bals(&t.holder).usdx, buyer0.usdx - 2 * PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.usdx), PREMIUM);
+    assert_eq!(t.c.buyer_open_count(&t.holder), 1);
+    assert_eq!(t.c.list_open_bids_for(&t.rwa, &0, &50), vec![&t.env, live]);
+    // pruning again is a no-op
+    assert_eq!(t.c.prune_bids(&t.pruner, &ids), 0);
+    // unknown id reverts
+    assert_err(
+        t.c.try_prune_bids(&t.pruner, &vec![&t.env, 99]),
+        Error::NotFound,
+    );
+}
+
+#[test]
+fn bid_paging_and_views() {
+    let t = setup();
+    assert_eq!(t.c.bid_count(), 0);
+    assert_eq!(t.c.get_bids(&0, &10).len(), 0);
+    assert_err(t.c.try_get_bid(&0), Error::NotFound);
+    for i in 0..55u32 {
+        let buyer = if i < 30 { &t.holder } else { &t.maker2 };
+        t.bid_by(buyer, &t.rwa, OptionType::Put, EXPIRY);
+    }
+    assert_eq!(t.c.bid_count(), 55);
+    let p0 = t.c.get_bids(&0, &100);
+    assert_eq!(p0.len(), 50);
+    assert_eq!(p0.get(0).unwrap().id, 0);
+    assert_eq!(p0.get(49).unwrap().id, 49);
+    let p1 = t.c.get_bids(&50, &100);
+    assert_eq!(p1.len(), 5);
+    assert_eq!(p1.get(4).unwrap().id, 54);
+    assert_eq!(t.c.get_bids(&55, &10).len(), 0);
+    assert_eq!(t.c.get_bids(&3, &0).len(), 0);
+    assert_eq!(t.c.get_bids(&u32::MAX, &10).len(), 0);
+    assert_eq!(t.c.list_open_bids_for(&t.rwa, &0, &100).len(), 50);
+    assert_eq!(t.c.list_open_bids_for(&t.rwa, &50, &100).len(), 5);
+    assert_eq!(t.c.list_open_bids_for(&t.rwa, &55, &100).len(), 0);
+    assert_eq!(t.c.list_open_bids_for(&t.bond, &0, &100).len(), 0);
+    assert_eq!(t.c.buyer_open_count(&t.holder), 30);
+    assert_eq!(t.c.buyer_open_count(&t.maker2), 25);
+    assert_eq!(t.c.buyer_open_count(&t.writer), 0);
+}
+
+#[test]
+fn bid_ttl_set_on_create_and_extended() {
+    let t = setup();
+    let id = t.bid(OptionType::Put);
+    assert!(t.bid_ttl(id) >= 29 * DAY);
+    t.env.ledger().with_mut(|l| l.sequence_number += 25 * DAY);
+    assert!(t.bid_ttl(id) < 7 * DAY);
+    t.c.extend_bid_ttl(&vec![&t.env, id]);
+    assert!(t.bid_ttl(id) >= 29 * DAY);
+    assert!(t.instance_ttl() >= 29 * DAY);
+    assert_err(t.c.try_extend_bid_ttl(&vec![&t.env, 7]), Error::NotFound);
+}
+
+#[test]
+fn bid_auths_are_buyer_writer_pruner() {
+    let t = setup();
+    let id = t.bid(OptionType::Put);
+    let auths = t.env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, t.holder);
+    t.c.fill_bid(&t.maker2, &id);
+    let auths = t.env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, t.maker2);
+    let id2 = t.bid(OptionType::Put);
+    t.c.cancel_bid(&t.holder, &id2);
+    assert_eq!(t.env.auths()[0].0, t.holder);
+    t.c.prune_bids(&t.pruner, &vec![&t.env, id2]);
+    assert_eq!(t.env.auths()[0].0, t.pruner);
+}
+
+#[test]
+fn bid_instance_gains_only_bid_count() {
+    let t = setup();
+    t.bid(OptionType::Put);
+    t.bid_by(&t.maker2, &t.bond, OptionType::Call, EXPIRY);
+    t.env.as_contract(&t.contract, || {
+        let inst = t.env.storage().instance();
+        assert_eq!(inst.all().len(), 5);
+        assert!(inst.has(&Key::BidCount));
+        let p = t.env.storage().persistent();
+        assert!(p.has(&Key::BidsFor(t.rwa.clone())));
+        assert!(p.has(&Key::BidsFor(t.bond.clone())));
+        assert!(p.has(&Key::BuyerOpen(t.holder.clone())));
+    });
+}
+
+#[test]
+fn bid_filled_option_can_be_resold_and_exercised_by_new_holder() {
+    let t = setup();
+    let id = t.bid(OptionType::Put);
+    let opt = t.c.fill_bid(&t.writer, &id);
+    t.c.list_for_sale(&t.holder, &opt, &ASK);
+    t.c.buy_resale(&t.maker2, &opt, &ASK);
+    assert_eq!(t.holder_of(opt), Some(t.maker2.clone()));
+    // the original bidder can no longer exercise
+    assert_err(t.c.try_exercise(&t.holder, &opt), Error::NotHolder);
+    t.c.exercise(&t.maker2, &opt);
+    assert_eq!(t.state(opt), State::Exercised);
+}
+
+#[test]
+fn bid_expired_active_option_reclaimed_by_writer() {
+    let t = setup();
+    let id = t.bid(OptionType::Call);
+    let w0 = t.bals(&t.writer);
+    let opt = t.c.fill_bid(&t.writer, &id);
+    t.at(EXPIRY);
+    t.c.reclaim(&t.writer, &opt);
+    assert_eq!(t.bals(&t.writer).rwa, w0.rwa);
+    assert_eq!(t.bals(&t.writer).usdx, w0.usdx + PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.rwa), 0);
+}
+
+#[test]
+fn bid_prune_failing_refund_skips_only_that_id() {
+    let t = setup();
+    let frozen = t.bid_by(&t.holder, &t.rwa, OptionType::Put, START + 100);
+    let other = t.bid_by(&t.maker2, &t.rwa, OptionType::Call, START + 100);
+    // the issuer freezes the first buyer on USDx, so its refund transfer fails
+    t.usdx_flags.set_flag(IssuerFlags::RevocableFlag);
+    t.sac(&t.usdx).set_authorized(&t.holder, &false);
+    t.at(START + 100);
+    let holder0 = t.bal(&t.usdx, &t.holder);
+    let maker0 = t.bal(&t.usdx, &t.maker2);
+    assert_eq!(t.c.prune_bids(&t.pruner, &vec![&t.env, frozen, other]), 1);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [BidPruned {
+            id: other,
+            pruner: t.pruner.clone(),
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.c.get_bid(&frozen).state, BidState::Open);
+    assert_eq!(t.c.get_bid(&other).state, BidState::Expired);
+    assert_eq!(t.bal(&t.usdx, &t.holder), holder0);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), maker0 + PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.usdx), PREMIUM);
+    assert_eq!(t.bal(&t.usdx, &t.contract), PREMIUM);
+    assert_eq!(t.c.buyer_open_count(&t.holder), 1);
+    assert_eq!(
+        t.c.list_open_bids_for(&t.rwa, &0, &50),
+        vec![&t.env, frozen]
+    );
+    // once re-authorized the same prune refunds it
+    t.sac(&t.usdx).set_authorized(&t.holder, &true);
+    assert_eq!(t.c.prune_bids(&t.pruner, &vec![&t.env, frozen, other]), 1);
+    assert_eq!(t.bal(&t.usdx, &t.holder), holder0 + PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    // a pruned bid can be neither filled nor cancelled
+    assert_err(t.c.try_fill_bid(&t.writer, &frozen), Error::BidNotOpen);
+    assert_err(t.c.try_cancel_bid(&t.holder, &frozen), Error::BidNotOpen);
+}
+
+#[test]
+fn bid_fill_and_cancel_on_cancelled_or_unknown_bid() {
+    let t = setup();
+    let id = t.bid(OptionType::Put);
+    t.c.cancel_bid(&t.holder, &id);
+    assert_err(t.c.try_fill_bid(&t.writer, &id), Error::BidNotOpen);
+    assert_err(t.c.try_fill_bid(&t.writer, &99), Error::NotFound);
+    assert_err(t.c.try_cancel_bid(&t.holder, &99), Error::NotFound);
+    assert_err(t.c.try_fill_bid(&t.contract, &id), Error::InvalidArgs);
+    assert_err(
+        t.c.try_create_bid(
+            &t.contract,
+            &OptionType::Put,
+            &t.rwa,
+            &t.usdx,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::InvalidArgs,
+    );
+}

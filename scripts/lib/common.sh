@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for the Strata testnet scripts. Source this file; do not run it.
+# Shared helpers for the StellSec testnet scripts. Source this file; do not run it.
 # STELLAR TESTNET ONLY. Identities (secret keys) live only in the stellar CLI keystore
 # (~/.config/stellar/identity). Nothing here ever reads or writes a secret.
 

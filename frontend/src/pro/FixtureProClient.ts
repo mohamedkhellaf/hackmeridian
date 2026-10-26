@@ -1,4 +1,4 @@
-// Simulated Strata Pro client: replays packages/risk/fixtures/pro_v0.json. Not on chain.
+// Simulated StellSec Pro client: replays packages/risk/fixtures/pro_v0.json. Not on chain.
 // Calls do not compute anything. Each one finds the next scripted step with the same operation and arguments
 // (who, position, book, series...), moves the cursor there and returns that step's recorded result or error.
 // Amounts typed in a form are therefore not used: the script decides. When the script has no such step the

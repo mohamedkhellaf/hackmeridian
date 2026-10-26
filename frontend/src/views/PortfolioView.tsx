@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { OptionsTable } from '../market/OptionsTable'
 import { formatCountdown, formatExpiryShort } from '../market/series'
 import { formatAmount, shortAddress, strikePerUnit } from '../options/format'
@@ -17,6 +18,8 @@ export interface PortfolioViewProps {
   actionFor: (o: OptionOffer) => PositionAction | undefined
   /** Reserved vs held per token, for the clawback shortfall warning on affected rows. */
   health?: CollateralHealth[]
+  /** Resale panel (contract v1.4), rendered below the positions. */
+  resale?: ReactNode
 }
 
 function joinPhrases(p: string[]): string {
@@ -66,7 +69,7 @@ function ExerciseConfirm({ o, health, onConfirm, onCancel }: { o: OptionOffer; h
           <dd>{moneyWith(o.totalStrike, o.quote)}</dd>
         </div>
         <div>
-          <dt>Premium paid</dt>
+          <dt>Original premium (paid to the writer)</dt>
           <dd>{moneyWith(o.totalPremium, o.quote)}</dd>
         </div>
         <div>
@@ -88,7 +91,7 @@ function ExerciseConfirm({ o, health, onConfirm, onCancel }: { o: OptionOffer; h
   )
 }
 
-export function PortfolioView({ me, rows, actionFor, health = [] }: PortfolioViewProps) {
+export function PortfolioView({ me, rows, actionFor, health = [], resale }: PortfolioViewProps) {
   const [exercising, setExercising] = useState<bigint | null>(null)
   const pending = exercising === null ? undefined : rows.find((r) => r.id === exercising)
   // Exercise is intercepted: the row button opens the confirmation, which then runs the original action.
@@ -136,7 +139,9 @@ export function PortfolioView({ me, rows, actionFor, health = [] }: PortfolioVie
           )}
 
           {held.length === 0 && written.length === 0 ? (
-            <p className="pf-empty">{rows.length === 0 ? 'No positions.' : 'No open positions.'}</p>
+            <p className="pf-empty">
+              {rows.length === 0 ? 'No positions.' : 'No open positions.'} <a href="#/markets">Browse markets</a>.
+            </p>
           ) : (
             <>
               {held.length > 0 && (
@@ -153,6 +158,7 @@ export function PortfolioView({ me, rows, actionFor, health = [] }: PortfolioVie
               )}
             </>
           )}
+          {resale}
         </>
       ) : (
         <p className="pf-empty">Connect a wallet to see your positions.</p>

@@ -1,4 +1,7 @@
-//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`, v1.3.1:
+//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`; v1.4
+//! adds the resale market of ABI §14: `list_for_sale`, `cancel_sale`, `buy_resale` with its
+//! `max_total` cap, `get_ask`, `list_asks`, errors `NoAsk` and `PriceMoved`, modelled with
+//! check order, events, auth and INV11 below. v1.3.1:
 //! error codes 101–119, `CollateralShortfall`, contract re-authorization check in `buy` (ABI §10),
 //! holder `transfer` and paged `get_options` (ABI §11), permissionless `list_asset` registry,
 //! per-writer open cap, tenor cap, `prune_expired` and the contract-address backstop (ABI §12),
@@ -62,6 +65,14 @@
 //!      writer: the balance deltas of those calls are exactly +collateral at the writer and
 //!      -collateral at the contract for every option they moved, computed from the option terms
 //!      read on chain (independent of the model);
+//!  11. (v1.4 resale) `list_asks` read in windows of 3 ids, `list_asks(0, u32::MAX)` and
+//!      `get_ask(id)` for every id agree with the model's asks; an ask exists only on an `Active`
+//!      option, names its current holder and is positive, so none survives `exercise`,
+//!      `transfer`, `reclaim` or `buy_resale`; `list_for_sale` / `cancel_sale` / `buy_resale`
+//!      leave `open_collateral` unchanged and change only their own id's ask; after `buy_resale`
+//!      the holder is the buyer and the ask is gone, the buyer paid exactly the ask to the seller
+//!      (INV6), and the seller's `exercise` then fails with `NotHolder` (composite `Op::Resale`);
+//!      other successful calls never add or reprice an ask;
 //!
 //!   plus atomicity: a failed call changes nothing observable (options, balances, reserves, open
 //!   list and per-asset books, per-writer counts, registry).
@@ -133,9 +144,9 @@
 #![allow(clippy::needless_range_loop)]
 
 use options::{
-    AssetListed, DeliveryClaimed, Error, OfferCancelled, OfferCreated, OfferPruned, OptionBought,
-    OptionData, OptionExercised, OptionReclaimed, OptionTransferred, OptionType, OptionsContract,
-    OptionsContractClient, State,
+    AskCancelled, AskListed, AssetListed, DeliveryClaimed, Error, OfferCancelled, OfferCreated,
+    OfferPruned, OptionBought, OptionData, OptionExercised, OptionReclaimed, OptionTransferred,
+    OptionType, OptionsContract, OptionsContractClient, ResaleBought, State,
 };
 use proptest::prelude::*;
 use soroban_sdk::{
@@ -290,6 +301,23 @@ enum Act {
         target: usize,
         authorized: bool,
     },
+    /// v1.4 `list_for_sale(who, id, ask)`.
+    ListSale {
+        id: u32,
+        who: usize,
+        ask: i128,
+    },
+    /// v1.4 `cancel_sale(who, id)`.
+    CancelSale {
+        id: u32,
+        who: usize,
+    },
+    /// v1.4 `buy_resale(who, id, max)`.
+    BuyResale {
+        id: u32,
+        who: usize,
+        max: i128,
+    },
 }
 
 /// The `issuer` argument of a `list_asset` request.
@@ -416,6 +444,19 @@ impl fmt::Display for Act {
                 let verb = if authorized { "unfreeze" } else { "freeze" };
                 write!(f, "issuer_{verb}(EQTY, {})", NAMES[target])
             }
+            Act::ListSale { id, who, ask } => {
+                write!(
+                    f,
+                    "list_for_sale({}, id={}, ask_total={})",
+                    NAMES[who], id, ask
+                )
+            }
+            Act::CancelSale { id, who } => write!(f, "cancel_sale({}, id={})", NAMES[who], id),
+            Act::BuyResale { id, who, max } => write!(
+                f,
+                "buy_resale({}, id={}, max_total={})",
+                NAMES[who], id, max
+            ),
         }
     }
 }
@@ -430,6 +471,8 @@ enum Who {
     Writer,
     Holder,
     Buyer,
+    /// v1.4 `buy_resale`: an actor that may take the option over (`recipient_for(.., Eligible)`).
+    Taker,
 }
 
 /// Recipient selector for `transfer`: a fixed actor, or (resolved against the model) an actor that
@@ -449,6 +492,15 @@ enum To {
 enum Stress {
     DeauthContract,
     ClawbackRwa,
+}
+
+/// v1.4 `buy_resale` price cap, resolved against the model's ask: no cap (`i128::MAX`), exactly
+/// the ask (Ok), or one unit below it (`PriceMoved`).
+#[derive(Clone, Copy, Debug)]
+enum Cap {
+    Max,
+    Exact,
+    Below,
 }
 
 /// `u8` id selector value that resolves to the first unknown id (`option_count`).
@@ -493,6 +545,15 @@ enum Op {
     Prune(usize, [u8; MAX_PRUNE], u8, Option<u8>),
     /// EQTY issuer `set_authorized(contract, bool)`.
     EqtyContractAuth(bool),
+    /// v1.4 `list_for_sale`: id selector (prefers `Active`), caller, ask_total.
+    ListSale(u8, Who, i128),
+    /// v1.4 `cancel_sale`: ask selector (prefers ids with an ask), caller.
+    CancelSale(u8, Who),
+    /// v1.4 `buy_resale`: ask selector (prefers ids with an ask), buyer.
+    BuyResale(u8, Who, Cap),
+    /// v1.4 composite (`World::step`): the holder of an `Active` option lists it at the ask, an
+    /// eligible taker buys it, then the previous holder's `exercise` must fail with `NotHolder`.
+    Resale(u8, i128),
     /// v1.3 backstop: the contract's own address as writer / buyer / holder / transfer recipient
     /// / `list_asset` lister / (v1.3.1) `prune_expired` pruner (kind, id or `LIST_CANDIDATES`
     /// selector).
@@ -610,6 +671,8 @@ struct Model {
     /// v1.3 asset registry in listing order: the constructor underlyings, then every successful
     /// `list_asset`.
     listed: Vec<usize>,
+    /// v1.4 resale asks: option id -> ask_total.
+    asks: BTreeMap<u32, i128>,
 }
 
 impl Model {
@@ -910,6 +973,71 @@ impl Model {
             Act::Prune { pruner, ids, len } => self
                 .plan_prune(pruner, &ids[..len as usize])
                 .map(|(_, t)| t),
+            // v1.4 ABI §14 `list_for_sale`: InvalidArgs (contract) -> NotFound -> WrongState ->
+            // NotHolder -> Expired -> InvalidArgs (ask_total <= 0). No token moves.
+            Act::ListSale { id, who, ask } => {
+                if who == CONTRACT {
+                    return Err(Error::InvalidArgs);
+                }
+                let o = self.opt(id).ok_or(Error::NotFound)?;
+                if o.state != State::Active {
+                    return Err(Error::WrongState);
+                }
+                if o.holder != Some(who) {
+                    return Err(Error::NotHolder);
+                }
+                if now >= o.expiry {
+                    return Err(Error::Expired);
+                }
+                if ask <= 0 {
+                    return Err(Error::InvalidArgs);
+                }
+                Ok(vec![])
+            }
+            // `cancel_sale`: NotFound -> NotHolder -> NoAsk. No token moves.
+            Act::CancelSale { id, who } => {
+                let o = self.opt(id).ok_or(Error::NotFound)?;
+                if o.holder != Some(who) {
+                    return Err(Error::NotHolder);
+                }
+                if !self.asks.contains_key(&id) {
+                    return Err(Error::NoAsk);
+                }
+                Ok(vec![])
+            }
+            // `buy_resale`: InvalidArgs (contract) -> NoAsk -> NotFound -> WrongState -> Expired ->
+            // SelfTrade (holder or writer) -> NotEligible -> ContractNotAuthorized ->
+            // CollateralShortfall; then the buyer pays the ask to the holder.
+            Act::BuyResale { id, who, max } => {
+                if who == CONTRACT {
+                    return Err(Error::InvalidArgs);
+                }
+                let ask = *self.asks.get(&id).ok_or(Error::NoAsk)?;
+                let o = self.opt(id).ok_or(Error::NotFound)?;
+                if o.state != State::Active {
+                    return Err(Error::WrongState);
+                }
+                if now >= o.expiry {
+                    return Err(Error::Expired);
+                }
+                let seller = o.holder.ok_or(Error::WrongState)?;
+                if who == seller || who == o.writer {
+                    return Err(Error::SelfTrade);
+                }
+                if !self.auth[o.underlying][who] {
+                    return Err(Error::NotEligible);
+                }
+                if !self.auth[o.underlying][CONTRACT] {
+                    return Err(Error::ContractNotAuthorized);
+                }
+                if self.shortfall(o.underlying) {
+                    return Err(Error::CollateralShortfall);
+                }
+                if ask > max {
+                    return Err(Error::PriceMoved);
+                }
+                Ok(vec![(USDX, who, seller, ask)])
+            }
             Act::SetTime { .. }
             | Act::SetAuthRwa { .. }
             | Act::SetAuthUsdx { .. }
@@ -1002,11 +1130,20 @@ impl Model {
                 o.holder = Some(who);
                 o.state = State::Active;
             }
-            Act::Exercise { id, .. } => self.opts[id as usize].state = State::Exercised,
-            // Only the holder changes; the state stays Active.
-            Act::Transfer { id, to, .. } => self.opts[id as usize].holder = Some(to),
+            Act::Exercise { id, .. } => {
+                self.opts[id as usize].state = State::Exercised;
+                self.asks.remove(&id); // v1.4: the ask leaves with Active
+            }
+            // Only the holder changes; the state stays Active. v1.4: the old holder's ask goes.
+            Act::Transfer { id, to, .. } => {
+                self.opts[id as usize].holder = Some(to);
+                self.asks.remove(&id);
+            }
             Act::Cancel { id, .. } => self.opts[id as usize].state = State::Cancelled,
-            Act::Reclaim { id, .. } => self.opts[id as usize].state = State::Expired,
+            Act::Reclaim { id, .. } => {
+                self.opts[id as usize].state = State::Expired;
+                self.asks.remove(&id);
+            }
             Act::Claim { id, .. } => self.opts[id as usize].state = State::Settled,
             Act::SetTime { t } => self.now = t,
             Act::SetAuthRwa { target, authorized } => self.auth[RWA][target] = authorized,
@@ -1028,7 +1165,25 @@ impl Model {
                 }
             }
             Act::SetAuthEqty { target, authorized } => self.auth[EQTY][target] = authorized,
+            Act::ListSale { id, ask, .. } => {
+                self.asks.insert(id, ask);
+            }
+            Act::CancelSale { id, .. } => {
+                self.asks.remove(&id);
+            }
+            Act::BuyResale { id, who, .. } => {
+                self.opts[id as usize].holder = Some(who);
+                self.asks.remove(&id);
+            }
         }
+    }
+
+    /// v1.4: the asks as `list_asks` reports them: (id, holder, ask_total) in id order.
+    fn ask_rows(&self) -> Vec<(u32, usize, i128)> {
+        self.asks
+            .iter()
+            .map(|(&id, &ask)| (id, self.opts[id as usize].holder.unwrap_or(N_HOLDERS), ask))
+            .collect()
     }
 }
 
@@ -1055,6 +1210,8 @@ struct Snap {
     assets: Vec<usize>,
     /// v1.3 `asset_count()`.
     asset_count: u32,
+    /// v1.4 every open ask `(id, holder, ask_total)` from `list_asks` (holder as an index).
+    asks: Vec<(u32, usize, i128)>,
 }
 
 /// Value returned by a successful call that the oracle checks.
@@ -1139,7 +1296,7 @@ fn outcome_matches(expect: Expect, outcome: Outcome, direct_sac: bool) -> bool {
 // ---------------------------------------------------------------------------------------------
 
 /// Every options `Error`, to name an observed code.
-const ALL_ERRORS: [Error; 19] = [
+const ALL_ERRORS: [Error; 21] = [
     Error::NotFound,
     Error::InvalidArgs,
     Error::AssetNotAllowed,
@@ -1159,6 +1316,8 @@ const ALL_ERRORS: [Error; 19] = [
     Error::AlreadyListed,
     Error::AssetNotDeployed,
     Error::TenorOutOfRange,
+    Error::NoAsk,
+    Error::PriceMoved,
 ];
 
 /// Pseudo-call under which `prune_expired` tallies the number of ids it pruned.
@@ -1197,6 +1356,9 @@ fn call_name(act: &Act) -> Option<&'static str> {
         Act::Claim { .. } => "claim_delivery",
         Act::List { .. } => "list_asset",
         Act::Prune { .. } => "prune_expired",
+        Act::ListSale { .. } => "list_for_sale",
+        Act::CancelSale { .. } => "cancel_sale",
+        Act::BuyResale { .. } => "buy_resale",
         Act::SetTime { .. }
         | Act::SetAuthRwa { .. }
         | Act::SetAuthUsdx { .. }
@@ -1410,6 +1572,7 @@ impl World {
             opts: Vec::new(),
             creates_ok: 0,
             listed: vec![RWA, BOND],
+            asks: BTreeMap::new(),
         };
         let mut w = World {
             env,
@@ -1431,6 +1594,7 @@ impl World {
                 listed: [false; N_TOKENS],
                 assets: Vec::new(),
                 asset_count: 0,
+                asks: Vec::new(),
             },
             history: Vec::new(),
         };
@@ -1466,11 +1630,20 @@ impl World {
             }
             sel as u32 % n
         };
+        // v1.4: selector < 128 picks an id with an open ask if any; otherwise like `pick`.
+        let pick_ask = |sel: u8| -> u32 {
+            if sel != UNKNOWN_ID && sel < 128 && !m.asks.is_empty() {
+                let ids: Vec<u32> = m.asks.keys().copied().collect();
+                return ids[sel as usize % ids.len()];
+            }
+            pick(sel, &[State::Active])
+        };
         let who_of = |id: u32, who: Who| match who {
             Who::Actor(a) => a,
             Who::Writer => m.opt(id).map(|o| o.writer).unwrap_or(WRITER1),
             Who::Holder => m.opt(id).and_then(|o| o.holder).unwrap_or(HOLDER1),
             Who::Buyer => buyer_for(m, id),
+            Who::Taker => recipient_for(m, id, To::Eligible),
         };
         match *op {
             Op::Create {
@@ -1589,6 +1762,35 @@ impl World {
                 target: CONTRACT,
                 authorized,
             },
+            Op::ListSale(s, w, ask) => {
+                let id = pick(s, &[State::Active]);
+                Act::ListSale {
+                    id,
+                    who: who_of(id, w),
+                    ask,
+                }
+            }
+            Op::CancelSale(s, w) => {
+                let id = pick_ask(s);
+                Act::CancelSale {
+                    id,
+                    who: who_of(id, w),
+                }
+            }
+            Op::Resale(s, ask) => self.resolve(&Op::ListSale(s, Who::Holder, ask)),
+            Op::BuyResale(s, w, cap) => {
+                let id = pick_ask(s);
+                let ask = m.asks.get(&id).copied().unwrap_or(1);
+                Act::BuyResale {
+                    id,
+                    who: who_of(id, w),
+                    max: match cap {
+                        Cap::Max => i128::MAX,
+                        Cap::Exact => ask,
+                        Cap::Below => ask - 1,
+                    },
+                }
+            }
             Op::Backstop(kind, s) => match kind % 7 {
                 0 => Act::Create {
                     writer: CONTRACT,
@@ -1664,6 +1866,43 @@ impl World {
         }
         if let Op::StressTransfer(sel, to, stress) = *op {
             return self.stress_transfer(sel, to, stress);
+        }
+        if let Op::Resale(sel, ask) = *op {
+            let list = self.resolve(&Op::ListSale(sel, Who::Holder, ask));
+            let listed = self.run(list);
+            let Act::ListSale {
+                id, who: seller, ..
+            } = list
+            else {
+                unreachable!()
+            };
+            if listed != Outcome::Ok {
+                return listed;
+            }
+            let buyer = recipient_for(&self.model, id, To::Eligible);
+            // a cap one unit below the ask first (`PriceMoved` once every earlier check passes,
+            // nothing moves), then exactly the ask
+            self.run(Act::BuyResale {
+                id,
+                who: buyer,
+                max: ask - 1,
+            });
+            let bought = self.run(Act::BuyResale {
+                id,
+                who: buyer,
+                max: ask,
+            });
+            if bought == Outcome::Ok {
+                let probe = Act::Exercise { id, who: seller };
+                let probed = self.run(probe);
+                if probed != Outcome::Typed(Error::NotHolder as u32) {
+                    self.fail(format!(
+                        "RESALE: after the resale of {id} the seller's `{probe}` returned \
+                         {probed}, expected NotHolder"
+                    ));
+                }
+            }
+            return bought;
         }
         let act = self.resolve(op);
         self.run(act)
@@ -1980,6 +2219,9 @@ impl World {
             Act::Cancel { id, who } => classify(c.try_cancel_offer(&h[who], &id)),
             Act::Reclaim { id, who } => classify(c.try_reclaim(&h[who], &id)),
             Act::Claim { id, who } => classify(c.try_claim_delivery(&h[who], &id)),
+            Act::ListSale { id, who, ask } => classify(c.try_list_for_sale(&h[who], &id, &ask)),
+            Act::CancelSale { id, who } => classify(c.try_cancel_sale(&h[who], &id)),
+            Act::BuyResale { id, who, max } => classify(c.try_buy_resale(&h[who], &id, &max)),
             Act::SetTime { t } => {
                 self.env.ledger().set_timestamp(t);
                 (Outcome::Ok, String::new())
@@ -2082,6 +2324,30 @@ impl World {
                     .to_xdr(env, me)
                 })
                 .collect(),
+            Act::ListSale { id, who, ask } => vec![AskListed {
+                id,
+                holder: h[who].clone(),
+                ask_total: ask,
+            }
+            .to_xdr(env, me)],
+            Act::CancelSale { id, .. } => vec![AskCancelled { id }.to_xdr(env, me)],
+            Act::BuyResale { id, who, .. } => {
+                let seller = opt(id).holder.ok_or_else(|| {
+                    format!("EVENTS: `{act}` succeeded on an option without holder")
+                })?;
+                let ask = *self
+                    .model
+                    .asks
+                    .get(&id)
+                    .ok_or_else(|| format!("EVENTS: `{act}` succeeded, model has no ask"))?;
+                vec![ResaleBought {
+                    id,
+                    seller: h[seller].clone(),
+                    buyer: h[who].clone(),
+                    ask_total: ask,
+                }
+                .to_xdr(env, me)]
+            }
             Act::SetTime { .. }
             | Act::SetAuthRwa { .. }
             | Act::SetAuthUsdx { .. }
@@ -2128,6 +2394,13 @@ impl World {
         let want_auths: Vec<Address> = match *act {
             Act::List { lister, .. } => vec![self.holders[lister].clone()],
             Act::Prune { pruner, .. } => vec![self.holders[pruner].clone()],
+            // v1.4: exactly the holder (list/cancel) or the buyer (buy_resale, whose tree also
+            // carries its quote payment).
+            Act::ListSale { who, .. }
+            | Act::CancelSale { who, .. }
+            | Act::BuyResale { who, .. } => {
+                vec![self.holders[who].clone()]
+            }
             _ => return Ok(()),
         };
         if auths != want_auths.as_slice() {
@@ -2241,6 +2514,7 @@ impl World {
                 "INV9 (config): config() changed from its constructor-time value: {cfg:?}"
             ));
         }
+        let asks = self.read_asks(count)?;
         Ok(Snap {
             now: self.env.ledger().timestamp(),
             bal,
@@ -2253,7 +2527,56 @@ impl World {
             listed,
             assets,
             asset_count,
+            asks,
         })
+    }
+
+    /// INV11 (v1.4 asks, reading): `list_asks` scanned in windows of 3 ids agrees with
+    /// `list_asks(0, u32::MAX)` (one window of `MAX_PAGE` ids) and with `get_ask(id)` for every id
+    /// below `option_count()` (and `None` at `option_count()`); rows are in id order.
+    fn read_asks(&self, count: u32) -> Result<Vec<(u32, usize, i128)>, String> {
+        const WINDOW: u32 = 3;
+        let c = &self.client;
+        let mut rows: Vec<(u32, usize, i128)> = Vec::new();
+        let mut from = 0u32;
+        while from < count {
+            for a in c.list_asks(&from, &WINDOW).iter() {
+                if a.id < from || a.id >= from + WINDOW {
+                    return Err(format!(
+                        "INV11 (list_asks): list_asks({from}, {WINDOW}) returned id {}",
+                        a.id
+                    ));
+                }
+                let holder = self
+                    .holders
+                    .iter()
+                    .position(|h| *h == a.holder)
+                    .ok_or_else(|| format!("INV11 (list_asks): unknown holder {:?}", a.holder))?;
+                rows.push((a.id, holder, a.ask_total));
+            }
+            from += WINDOW;
+        }
+        let whole: Vec<u32> = c.list_asks(&0, &u32::MAX).iter().map(|a| a.id).collect();
+        let head: Vec<u32> = rows
+            .iter()
+            .map(|r| r.0)
+            .filter(|&id| id < MAX_PAGE)
+            .collect();
+        if whole != head {
+            return Err(format!(
+                "INV11 (list_asks): list_asks(0, u32::MAX) = {whole:?}, the windows say {head:?}"
+            ));
+        }
+        for id in 0..=count {
+            let want = rows.iter().find(|r| r.0 == id).map(|r| r.2);
+            let got = c.get_ask(&id);
+            if got != want {
+                return Err(format!(
+                    "INV11 (get_ask): get_ask({id}) = {got:?}, list_asks says {want:?}"
+                ));
+            }
+        }
+        Ok(rows)
     }
 
     /// INV9 (paging): `list_assets` pages of `PAGE` read from 0 with `from += returned.len()` are
@@ -2328,6 +2651,27 @@ impl World {
                             .unwrap_or("<none>".into())
                     ));
                 }
+            }
+        }
+        // INV11 (v1.4 asks): chain == model, and an ask exists only on an `Active` option, names
+        // its current holder and is positive (so no ask survives a terminal transition).
+        if s.asks != m.ask_rows() {
+            return Err(format!(
+                "MODEL: asks differ\n  chain: {:?}\n  model: {:?}",
+                s.asks,
+                m.ask_rows()
+            ));
+        }
+        for &(id, holder, ask) in &s.asks {
+            let o = s
+                .opts
+                .get(id as usize)
+                .ok_or_else(|| format!("INV11 (asks): ask on unknown option {id}"))?;
+            if o.state != State::Active || o.holder != Some(holder) || ask <= 0 {
+                return Err(format!(
+                    "INV11 (asks): ask ({holder}, {ask}) on {o} (must be Active, held by the \
+                     asker, positive)"
+                ));
             }
         }
         for t in 0..N_TOKENS {
@@ -2657,8 +3001,11 @@ fn check_transition(
         let transferred = |x: usize, y: Option<usize>| {
             ok && b.state == State::Active
                 && a.state == State::Active
-                && matches!(*act, Act::Transfer { id, from, to }
+                && (matches!(*act, Act::Transfer { id, from, to }
                     if id == a.id && from == x && y == Some(to) && to != x)
+                    // v1.4: or a successful resale of this option to another actor
+                    || matches!(*act, Act::BuyResale { id, who, .. }
+                    if id == a.id && y == Some(who) && who != x))
         };
         match (b.holder, a.holder) {
             (Some(x), y) if y != Some(x) && !transferred(x, y) => {
@@ -2699,7 +3046,8 @@ fn check_transition(
         | (true, Act::Transfer { id, .. })
         | (true, Act::Cancel { id, .. })
         | (true, Act::Reclaim { id, .. })
-        | (true, Act::Claim { id, .. }) => vec![id],
+        | (true, Act::Claim { id, .. })
+        | (true, Act::BuyResale { id, .. }) => vec![id],
         // The ids the model prunes, in call order (distinct: a pruned id is skipped afterwards).
         (true, Act::Prune { .. }) => pruned.to_vec(),
         _ => vec![],
@@ -2780,13 +3128,23 @@ fn check_transition(
             (Act::Claim { .. }, Some(b), Some(a)) => {
                 b.state == State::Exercised && a.state == State::Settled
             }
+            // v1.4: only the holder changes, to the buyer; state stays Active.
+            (Act::BuyResale { who, .. }, Some(b), Some(a)) => {
+                b.state == State::Active
+                    && a.state == State::Active
+                    && a.holder == Some(who)
+                    && b.holder != Some(who)
+                    && b.writer != who
+            }
             (
                 Act::SetTime { .. }
                 | Act::SetAuthRwa { .. }
                 | Act::SetAuthUsdx { .. }
                 | Act::SetAuthEqty { .. }
                 | Act::ClawbackRwa { .. }
-                | Act::List { .. },
+                | Act::List { .. }
+                | Act::ListSale { .. }
+                | Act::CancelSale { .. },
                 None,
                 None,
             ) => true,
@@ -2882,6 +3240,52 @@ fn check_transition(
         }
     }
 
+    // INV11 (v1.4 transition): list_for_sale / cancel_sale / buy_resale never touch collateral
+    // or reserves; each changes the asks by exactly its own id; buy_resale leaves holder == buyer
+    // and no ask; every other successful call only removes asks (of ids that left Active or
+    // changed hands), never adds or reprices one.
+    if ok
+        && matches!(
+            *act,
+            Act::ListSale { .. } | Act::CancelSale { .. } | Act::BuyResale { .. }
+        )
+        && after.open_collateral != before.open_collateral
+    {
+        return Err(format!(
+            "INV11 (asks): `{act}` changed open_collateral {:?} -> {:?}",
+            before.open_collateral, after.open_collateral
+        ));
+    }
+    let ask_of = |s: &Snap, id: u32| s.asks.iter().find(|r| r.0 == id).copied();
+    let others_same = |id: u32| {
+        before
+            .asks
+            .iter()
+            .filter(|r| r.0 != id)
+            .eq(after.asks.iter().filter(|r| r.0 != id))
+    };
+    let asks_ok = match (ok, *act) {
+        (true, Act::ListSale { id, who, ask }) => {
+            others_same(id) && ask_of(after, id) == Some((id, who, ask))
+        }
+        (true, Act::CancelSale { id, .. }) => {
+            others_same(id) && ask_of(before, id).is_some() && ask_of(after, id).is_none()
+        }
+        (true, Act::BuyResale { id, who, .. }) => {
+            others_same(id)
+                && ask_of(before, id).is_some()
+                && ask_of(after, id).is_none()
+                && after.opts[id as usize].holder == Some(who)
+        }
+        _ => after.asks.iter().all(|r| before.asks.contains(r)),
+    };
+    if !asks_ok {
+        return Err(format!(
+            "INV11 (asks): `{act}` ({outcome}) moved the asks from {:?} to {:?}",
+            before.asks, after.asks
+        ));
+    }
+
     // INV9 (transition): the registry grows by exactly one asset through a successful
     // list_asset and is otherwise untouched.
     let registry = |s: &Snap| (s.assets.clone(), s.listed, s.asset_count);
@@ -2918,6 +3322,17 @@ fn amount() -> impl Strategy<Value = i128> {
     prop_oneof![
         15 => 1i128..=1_000,
         15 => 1i128..=1_000_000_000,
+        1 => Just(0i128),
+        1 => -1_000i128..=-1,
+    ]
+}
+
+/// v1.4 ask_total: mostly payable, sometimes more than any balance (SAC #10 at `buy_resale`),
+/// sometimes 0 or negative (`InvalidArgs`).
+fn ask_amount() -> impl Strategy<Value = i128> {
+    prop_oneof![
+        10 => 1i128..=1_000_000_000,
+        1 => Just(i128::MAX),
         1 => Just(0i128),
         1 => -1_000i128..=-1,
     ]
@@ -3018,6 +3433,16 @@ fn op() -> impl Strategy<Value = Op> {
         2 => prune_op(),
         1 => prop_oneof![3 => Just(true), 1 => Just(false)].prop_map(Op::EqtyContractAuth),
         1 => (0u8..7, any::<u8>()).prop_map(|(k, s)| Op::Backstop(k, s)),
+        3 => (id_sel(), who(Who::Holder), ask_amount())
+            .prop_map(|(i, w, a)| Op::ListSale(i, w, a)),
+        2 => (id_sel(), who(Who::Holder)).prop_map(|(i, w)| Op::CancelSale(i, w)),
+        2 => (0u8..128, ask_amount()).prop_map(|(i, a)| Op::Resale(i, a)),
+        3 => (
+            id_sel(),
+            prop_oneof![4 => Just(Who::Taker), 1 => Just(Who::Holder), 1 => any_actor()],
+            prop_oneof![3 => Just(Cap::Max), 2 => Just(Cap::Exact), 1 => Just(Cap::Below)],
+        )
+            .prop_map(|(i, w, c)| Op::BuyResale(i, w, c)),
     ]
 }
 
@@ -3038,7 +3463,7 @@ fn config() -> ProptestConfig {
 /// (call, outcome) rows every run of at least `MIN_CASES_FOR_COVERAGE` cases must observe, so
 /// that a generator change cannot silently stop exercising the v1.3 / v1.3.1 paths (each row
 /// occurs dozens of times per 200 cases).
-const REQUIRED_COVERAGE: [(&str, &str); 14] = [
+const REQUIRED_COVERAGE: [(&str, &str); 19] = [
     ("list_asset", "Ok"),
     ("list_asset", "AlreadyListed"),
     ("list_asset", "AssetNotDeployed"),
@@ -3053,6 +3478,11 @@ const REQUIRED_COVERAGE: [(&str, &str); 14] = [
     ("transfer", "Ok"),
     ("transfer", "ContractNotAuthorized"),
     ("transfer", "CollateralShortfall"),
+    ("list_for_sale", "Ok"),
+    ("cancel_sale", "Ok"),
+    ("buy_resale", "Ok"),
+    ("buy_resale", "NoAsk"),
+    ("buy_resale", "PriceMoved"),
 ];
 const MIN_CASES_FOR_COVERAGE: u32 = 100;
 
@@ -5383,4 +5813,729 @@ fn list_open_window_is_the_first_max_page_registry_assets() {
     assert_eq!(book(&assets[50]), [3]);
     assert_eq!(book(&assets[51]), [0]);
     assert_eq!(c.list_open().iter().collect::<Vec<u32>>(), [1, 2]);
+}
+
+// ---------------------------------------------------------------------------------------------
+// v1.5 buyer side: a separate property test for funded bids (create_bid, cancel_bid, fill_bid,
+// prune_bids) interleaved with the option lifecycle of the options they create (exercise,
+// claim_delivery, reclaim) and with ordinary offers (create_offer). Its own small reference model
+// predicts every outcome exactly (amounts are bounded so no SAC balance failure can occur) and
+// tracks every balance; after each step the whole observable state is compared with the model:
+//
+// - BINV1 balances: every actor's and the escrow's USDx and RWA balance equals the model.
+// - BINV2 reserves: open_collateral(USDx) = strike of Offered/Active PUTs + strike of Exercised
+//   CALLs (unclaimed proceeds) + premium of Open bids; open_collateral(RWA) = qty of
+//   Offered/Active CALLs + qty of Exercised PUTs; nothing counted twice; and the escrow's SAC
+//   balance equals each reserve (no clawback here).
+// - BINV3 bids: get_bids (paged) equals the model; list_open_bids_for(RWA) is exactly the Open
+//   bids in id order; buyer_open_count of every actor is its number of Open bids; a bid that left
+//   Open never returns to it; only Filled bids carry an option id.
+// - BINV4 fill: a successful fill creates exactly one option (option_count + 1), Active, holder =
+//   bid buyer, writer = filler, terms = bid terms, and it is in no open book.
+// - BINV5 offers: list_open_for(RWA) is exactly the Offered options; writer_open_count is the
+//   number of each writer's Offered options (fills never change it).
+// ---------------------------------------------------------------------------------------------
+
+mod bids {
+    use super::*;
+    use options::{Bid, BidState};
+
+    const B_ACTORS: usize = 5; // 0..=3 authorized on RWA, 4 = outsider
+    const B_OUTSIDER: usize = 4;
+    const B_CONTRACT: usize = 5;
+    const B_FUND: i128 = 100_000 * UNIT;
+    const B_DAY: u64 = 86_400;
+
+    #[derive(Clone, Debug)]
+    pub enum BOp {
+        CreateBid {
+            buyer: usize,
+            call: bool,
+            qty: i128,
+            strike: i128,
+            premium: i128,
+            days: u64,
+        },
+        CancelBid(u8, Option<usize>),
+        FillBid(u8, usize),
+        PruneBids(usize, Vec<u8>),
+        CreateOffer(usize, bool, u64),
+        Exercise(u8, Option<usize>),
+        Claim(u8),
+        Reclaim(u8),
+        Advance(u64),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct MBid {
+        buyer: usize,
+        call: bool,
+        qty: i128,
+        strike: i128,
+        premium: i128,
+        expiry: u64,
+        state: BidState,
+        option_id: Option<u32>,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct MOpt {
+        writer: usize,
+        holder: Option<usize>,
+        call: bool,
+        qty: i128,
+        strike: i128,
+        premium: i128,
+        expiry: u64,
+        state: State,
+    }
+
+    struct BWorld {
+        env: Env,
+        c: OptionsContractClient<'static>,
+        usdx: Address,
+        rwa: Address,
+        parties: [Address; B_ACTORS + 1],
+        now: u64,
+        bids: Vec<MBid>,
+        opts: Vec<MOpt>,
+        /// [token: 0 = USDx, 1 = RWA][party]
+        bal: [[i128; B_ACTORS + 1]; 2],
+    }
+
+    impl BWorld {
+        fn new() -> BWorld {
+            let env = Env::new_with_config(EnvTestConfig {
+                capture_snapshot_at_drop: false,
+            });
+            env.mock_all_auths();
+            env.host().set_diagnostic_level(Default::default()).unwrap();
+            env.ledger().set_timestamp(T0);
+            let usdx = env.register_stellar_asset_contract_v2(Address::generate(&env));
+            let rwa = env.register_stellar_asset_contract_v2(Address::generate(&env));
+            let issuer = rwa.issuer();
+            issuer.set_flag(IssuerFlags::RequiredFlag);
+            issuer.set_flag(IssuerFlags::RevocableFlag);
+            issuer.set_flag(IssuerFlags::ClawbackEnabledFlag);
+            let (usdx, rwa) = (usdx.address(), rwa.address());
+            let contract = env.register(
+                OptionsContract,
+                (usdx.clone(), soroban_sdk::vec![&env, rwa.clone()]),
+            );
+            let c = OptionsContractClient::new(&env, &contract);
+            let parties: [Address; B_ACTORS + 1] = std::array::from_fn(|i| {
+                if i == B_CONTRACT {
+                    contract.clone()
+                } else {
+                    Address::generate(&env)
+                }
+            });
+            let mut bal = [[0i128; B_ACTORS + 1]; 2];
+            StellarAssetClient::new(&env, &rwa).set_authorized(&contract, &true);
+            for i in 0..B_ACTORS {
+                StellarAssetClient::new(&env, &usdx).mint(&parties[i], &B_FUND);
+                bal[0][i] = B_FUND;
+                if i != B_OUTSIDER {
+                    let s = StellarAssetClient::new(&env, &rwa);
+                    s.set_authorized(&parties[i], &true);
+                    s.mint(&parties[i], &B_FUND);
+                    bal[1][i] = B_FUND;
+                }
+            }
+            BWorld {
+                env,
+                c,
+                usdx,
+                rwa,
+                parties,
+                now: T0,
+                bids: Vec::new(),
+                opts: Vec::new(),
+                bal,
+            }
+        }
+
+        fn mv(&mut self, tok: usize, from: usize, to: usize, amt: i128) {
+            self.bal[tok][from] -= amt;
+            self.bal[tok][to] += amt;
+        }
+
+        fn sel(n: usize, s: u8) -> u32 {
+            // one past the end now and then, for NotFound
+            (s as usize % (n + 1)) as u32
+        }
+
+        /// Runs one operation; returns a description of the outcome for the trace.
+        fn step(&mut self, op: &BOp) -> Result<String, String> {
+            let p = self.parties.clone();
+            match op.clone() {
+                BOp::Advance(secs) => {
+                    self.now += secs;
+                    self.env.ledger().set_timestamp(self.now);
+                    Ok("advance".into())
+                }
+                BOp::CreateBid {
+                    buyer,
+                    call,
+                    qty,
+                    strike,
+                    premium,
+                    days,
+                } => {
+                    let expiry = self.now + days * B_DAY;
+                    let kind = if call {
+                        OptionType::Call
+                    } else {
+                        OptionType::Put
+                    };
+                    let r = self.c.try_create_bid(
+                        &p[buyer], &kind, &self.rwa, &self.usdx, &qty, &strike, &premium, &expiry,
+                    );
+                    let want = if buyer == B_OUTSIDER {
+                        Err(Error::NotEligible)
+                    } else {
+                        Ok(self.bids.len() as u32)
+                    };
+                    check(&r, want, "create_bid")?;
+                    if want.is_ok() {
+                        self.mv(0, buyer, B_CONTRACT, premium);
+                        self.bids.push(MBid {
+                            buyer,
+                            call,
+                            qty,
+                            strike,
+                            premium,
+                            expiry,
+                            state: BidState::Open,
+                            option_id: None,
+                        });
+                    }
+                    Ok(std::format!("create_bid -> {want:?}"))
+                }
+                BOp::CancelBid(s, who) => {
+                    let id = Self::sel(self.bids.len(), s);
+                    let b = self.bids.get(id as usize).cloned();
+                    let caller = who.unwrap_or_else(|| b.as_ref().map_or(0, |b| b.buyer));
+                    let want = match &b {
+                        None => Err(Error::NotFound),
+                        Some(b) if b.state != BidState::Open => Err(Error::BidNotOpen),
+                        Some(b) if b.buyer != caller => Err(Error::NotBidder),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_cancel_bid(&p[caller], &id);
+                    check(&r, want, "cancel_bid")?;
+                    if want.is_ok() {
+                        let b = b.unwrap();
+                        self.mv(0, B_CONTRACT, b.buyer, b.premium);
+                        self.bids[id as usize].state = BidState::Cancelled;
+                    }
+                    Ok(std::format!("cancel_bid {id} -> {want:?}"))
+                }
+                BOp::FillBid(s, writer) => {
+                    let id = Self::sel(self.bids.len(), s);
+                    let b = self.bids.get(id as usize).cloned();
+                    let new_id = self.opts.len() as u32;
+                    let want = match &b {
+                        None => Err(Error::NotFound),
+                        Some(b) if b.state != BidState::Open => Err(Error::BidNotOpen),
+                        Some(b) if self.now >= b.expiry => Err(Error::Expired),
+                        Some(b) if b.buyer == writer => Err(Error::SelfTrade),
+                        Some(_) if writer == B_OUTSIDER => Err(Error::NotEligible),
+                        Some(_) => Ok(new_id),
+                    };
+                    let count0 = self.c.option_count();
+                    let wopen0: Vec<u32> = (0..B_ACTORS)
+                        .map(|i| self.c.writer_open_count(&p[i]))
+                        .collect();
+                    let r = self.c.try_fill_bid(&p[writer], &id);
+                    check(&r, want, "fill_bid")?;
+                    if want.is_ok() {
+                        let b = b.unwrap();
+                        // BINV4: exactly one new option, Active, held by the buyer
+                        let count1 = self.c.option_count();
+                        if count1 != count0 + 1 {
+                            return Err(std::format!("fill created {} options", count1 - count0));
+                        }
+                        let o = self.c.get_option(&new_id);
+                        if o.state != State::Active
+                            || o.holder != Some(p[b.buyer].clone())
+                            || o.writer != p[writer]
+                        {
+                            return Err(std::format!("fill produced {o:?}"));
+                        }
+                        let wopen1: Vec<u32> = (0..B_ACTORS)
+                            .map(|i| self.c.writer_open_count(&p[i]))
+                            .collect();
+                        if wopen0 != wopen1 {
+                            return Err("fill changed writer_open_count".into());
+                        }
+                        if b.call {
+                            self.mv(1, writer, B_CONTRACT, b.qty);
+                        } else {
+                            self.mv(0, writer, B_CONTRACT, b.strike);
+                        }
+                        self.mv(0, B_CONTRACT, writer, b.premium);
+                        self.opts.push(MOpt {
+                            writer,
+                            holder: Some(b.buyer),
+                            call: b.call,
+                            qty: b.qty,
+                            strike: b.strike,
+                            premium: b.premium,
+                            expiry: b.expiry,
+                            state: State::Active,
+                        });
+                        let mb = &mut self.bids[id as usize];
+                        mb.state = BidState::Filled;
+                        mb.option_id = Some(new_id);
+                    }
+                    Ok(std::format!("fill_bid {id} by {writer} -> {want:?}"))
+                }
+                BOp::PruneBids(pruner, sels) => {
+                    let ids: Vec<u32> = sels
+                        .iter()
+                        .map(|&s| Self::sel(self.bids.len(), s))
+                        .collect();
+                    let unknown = ids.iter().any(|&i| i as usize >= self.bids.len());
+                    let mut hit = Vec::new();
+                    if !unknown {
+                        for &i in &ids {
+                            let b = &self.bids[i as usize];
+                            if b.state == BidState::Open
+                                && self.now >= b.expiry
+                                && !hit.contains(&i)
+                            {
+                                hit.push(i);
+                            }
+                        }
+                    }
+                    let want = if unknown {
+                        Err(Error::NotFound)
+                    } else {
+                        Ok(hit.len() as u32)
+                    };
+                    let mut v = soroban_sdk::Vec::new(&self.env);
+                    for &i in &ids {
+                        v.push_back(i);
+                    }
+                    let r = self.c.try_prune_bids(&p[pruner], &v);
+                    check(&r, want, "prune_bids")?;
+                    if want.is_ok() {
+                        for i in hit {
+                            let b = self.bids[i as usize].clone();
+                            self.mv(0, B_CONTRACT, b.buyer, b.premium);
+                            self.bids[i as usize].state = BidState::Expired;
+                        }
+                    }
+                    Ok(std::format!("prune_bids {ids:?} -> {want:?}"))
+                }
+                BOp::CreateOffer(writer, call, days) => {
+                    let expiry = self.now + days * B_DAY;
+                    let kind = if call {
+                        OptionType::Call
+                    } else {
+                        OptionType::Put
+                    };
+                    let (qty, strike, premium) = (UNIT, 10 * UNIT, UNIT);
+                    let r = self.c.try_create_offer(
+                        &p[writer], &self.rwa, &kind, &qty, &strike, &premium, &expiry,
+                    );
+                    let want = if writer == B_OUTSIDER {
+                        Err(Error::NotEligible)
+                    } else {
+                        Ok(self.opts.len() as u32)
+                    };
+                    check(&r, want, "create_offer")?;
+                    if want.is_ok() {
+                        if call {
+                            self.mv(1, writer, B_CONTRACT, qty);
+                        } else {
+                            self.mv(0, writer, B_CONTRACT, strike);
+                        }
+                        self.opts.push(MOpt {
+                            writer,
+                            holder: None,
+                            call,
+                            qty,
+                            strike,
+                            premium,
+                            expiry,
+                            state: State::Offered,
+                        });
+                    }
+                    Ok(std::format!("create_offer -> {want:?}"))
+                }
+                BOp::Exercise(s, who) => {
+                    let id = Self::sel(self.opts.len(), s);
+                    let o = self.opts.get(id as usize).cloned();
+                    let caller = who
+                        .or_else(|| o.as_ref().and_then(|o| o.holder))
+                        .unwrap_or(0);
+                    let want = match &o {
+                        None => Err(Error::NotFound),
+                        Some(o) if o.holder != Some(caller) => Err(Error::NotHolder),
+                        Some(o) if o.state != State::Active => Err(Error::WrongState),
+                        Some(o) if self.now >= o.expiry => Err(Error::Expired),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_exercise(&p[caller], &id);
+                    check(&r, want, "exercise")?;
+                    if want.is_ok() {
+                        let o = o.unwrap();
+                        if o.call {
+                            self.mv(0, caller, B_CONTRACT, o.strike);
+                            self.mv(1, B_CONTRACT, caller, o.qty);
+                        } else {
+                            self.mv(1, caller, B_CONTRACT, o.qty);
+                            self.mv(0, B_CONTRACT, caller, o.strike);
+                        }
+                        self.opts[id as usize].state = State::Exercised;
+                    }
+                    Ok(std::format!("exercise {id} -> {want:?}"))
+                }
+                BOp::Claim(s) => {
+                    let id = (s as usize % self.opts.len().max(1)) as u32;
+                    let o = self.opts.get(id as usize).cloned();
+                    let writer = o.as_ref().map_or(0, |o| o.writer);
+                    let want = match &o {
+                        None => Err(Error::NotFound),
+                        Some(o) if o.state != State::Exercised => Err(Error::WrongState),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_claim_delivery(&p[writer], &id);
+                    check(&r, want, "claim_delivery")?;
+                    if want.is_ok() {
+                        let o = o.unwrap();
+                        if o.call {
+                            self.mv(0, B_CONTRACT, writer, o.strike);
+                        } else {
+                            self.mv(1, B_CONTRACT, writer, o.qty);
+                        }
+                        self.opts[id as usize].state = State::Settled;
+                    }
+                    Ok(std::format!("claim {id} -> {want:?}"))
+                }
+                BOp::Reclaim(s) => {
+                    let id = (s as usize % self.opts.len().max(1)) as u32;
+                    let o = self.opts.get(id as usize).cloned();
+                    let writer = o.as_ref().map_or(0, |o| o.writer);
+                    let want = match &o {
+                        None => Err(Error::NotFound),
+                        Some(o) if !matches!(o.state, State::Offered | State::Active) => {
+                            Err(Error::WrongState)
+                        }
+                        Some(o) if self.now < o.expiry => Err(Error::NotExpired),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_reclaim(&p[writer], &id);
+                    check(&r, want, "reclaim")?;
+                    if want.is_ok() {
+                        let o = o.unwrap();
+                        if o.call {
+                            self.mv(1, B_CONTRACT, writer, o.qty);
+                        } else {
+                            self.mv(0, B_CONTRACT, writer, o.strike);
+                        }
+                        self.opts[id as usize].state = State::Expired;
+                    }
+                    Ok(std::format!("reclaim {id} -> {want:?}"))
+                }
+            }
+        }
+
+        /// BINV1..BINV5 against the model.
+        fn check_state(&self, prev_bids: &[MBid]) -> Result<(), String> {
+            let p = &self.parties;
+            let toks = [&self.usdx, &self.rwa];
+            // BINV1
+            for t in 0..2 {
+                for i in 0..=B_ACTORS {
+                    let got = TokenClient::new(&self.env, toks[t]).balance(&p[i]);
+                    if got != self.bal[t][i] {
+                        return Err(std::format!(
+                            "BINV1 balance tok {t} party {i}: {got} != {}",
+                            self.bal[t][i]
+                        ));
+                    }
+                }
+            }
+            // BINV2
+            let mut res = [0i128; 2];
+            for o in &self.opts {
+                match (o.state, o.call) {
+                    (State::Offered | State::Active, false) => res[0] += o.strike,
+                    (State::Offered | State::Active, true) => res[1] += o.qty,
+                    (State::Exercised, true) => res[0] += o.strike,
+                    (State::Exercised, false) => res[1] += o.qty,
+                    _ => {}
+                }
+            }
+            for b in &self.bids {
+                if b.state == BidState::Open {
+                    res[0] += b.premium;
+                }
+            }
+            for t in 0..2 {
+                let oc = self.c.open_collateral(toks[t]);
+                if oc != res[t] {
+                    return Err(std::format!(
+                        "BINV2 open_collateral tok {t}: {oc} != {}",
+                        res[t]
+                    ));
+                }
+                if self.bal[t][B_CONTRACT] != res[t] {
+                    return Err(std::format!(
+                        "BINV2 escrow balance tok {t}: {} != reserve {}",
+                        self.bal[t][B_CONTRACT],
+                        res[t]
+                    ));
+                }
+            }
+            // BINV3
+            let n = self.c.bid_count();
+            if n as usize != self.bids.len() {
+                return Err(std::format!("BINV3 bid_count {n} != {}", self.bids.len()));
+            }
+            let mut got: Vec<Bid> = Vec::new();
+            while (got.len() as u32) < n {
+                let page = self.c.get_bids(&(got.len() as u32), &7);
+                if page.is_empty() || page.len() > 7 {
+                    return Err("BINV3 get_bids paging".into());
+                }
+                got.extend(page.iter());
+            }
+            if !self.c.get_bids(&n, &50).is_empty() {
+                return Err("BINV3 get_bids past the end".into());
+            }
+            for (i, (g, m)) in got.iter().zip(&self.bids).enumerate() {
+                let want = Bid {
+                    id: i as u32,
+                    buyer: p[m.buyer].clone(),
+                    kind: if m.call {
+                        OptionType::Call
+                    } else {
+                        OptionType::Put
+                    },
+                    underlying: self.rwa.clone(),
+                    quote: self.usdx.clone(),
+                    qty: m.qty,
+                    strike_total: m.strike,
+                    premium_total: m.premium,
+                    expiry: m.expiry,
+                    state: m.state,
+                    option_id: m.option_id,
+                };
+                if *g != want {
+                    return Err(std::format!("BINV3 bid {i}: {g:?} != {want:?}"));
+                }
+                if (m.state == BidState::Filled) != m.option_id.is_some() {
+                    return Err(std::format!("BINV3 bid {i} option_id vs state"));
+                }
+                if let Some(prev) = prev_bids.get(i) {
+                    if prev.state != BidState::Open && m.state != prev.state {
+                        return Err(std::format!("BINV3 bid {i} left a terminal state"));
+                    }
+                }
+            }
+            let open: Vec<u32> = self
+                .bids
+                .iter()
+                .enumerate()
+                .filter(|(_, b)| b.state == BidState::Open)
+                .map(|(i, _)| i as u32)
+                .collect();
+            let mut book = Vec::new();
+            loop {
+                let page = self
+                    .c
+                    .list_open_bids_for(&self.rwa, &(book.len() as u32), &3);
+                if page.is_empty() {
+                    break;
+                }
+                book.extend(page.iter());
+            }
+            if book != open {
+                return Err(std::format!("BINV3 bid book {book:?} != {open:?}"));
+            }
+            for i in 0..B_ACTORS {
+                let want = self
+                    .bids
+                    .iter()
+                    .filter(|b| b.state == BidState::Open && b.buyer == i)
+                    .count() as u32;
+                let got = self.c.buyer_open_count(&p[i]);
+                if got != want {
+                    return Err(std::format!("BINV3 buyer_open_count {i}: {got} != {want}"));
+                }
+            }
+            // BINV4/5: options
+            if self.c.option_count() as usize != self.opts.len() {
+                return Err("BINV4 option_count".into());
+            }
+            for (i, m) in self.opts.iter().enumerate() {
+                let o = self.c.get_option(&(i as u32));
+                if o.state != m.state
+                    || o.writer != p[m.writer]
+                    || o.holder != m.holder.map(|h| p[h].clone())
+                    || o.qty != m.qty
+                    || o.strike_total != m.strike
+                    || o.premium_total != m.premium
+                    || o.expiry != m.expiry
+                    || (o.option_type == OptionType::Call) != m.call
+                {
+                    return Err(std::format!("BINV4 option {i}: {o:?} != {m:?}"));
+                }
+            }
+            let offered: Vec<u32> = self
+                .opts
+                .iter()
+                .enumerate()
+                .filter(|(_, o)| o.state == State::Offered)
+                .map(|(i, _)| i as u32)
+                .collect();
+            let ob: Vec<u32> = self.c.list_open_for(&self.rwa, &0, &50).iter().collect();
+            if ob != offered {
+                return Err(std::format!("BINV5 open book {ob:?} != {offered:?}"));
+            }
+            for i in 0..B_ACTORS {
+                let want = self
+                    .opts
+                    .iter()
+                    .filter(|o| o.state == State::Offered && o.writer == i)
+                    .count() as u32;
+                if self.c.writer_open_count(&p[i]) != want {
+                    return Err(std::format!("BINV5 writer_open_count {i}"));
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn check<T: PartialEq + Debug, C: Debug>(
+        r: &Result<Result<T, C>, Result<Error, InvokeError>>,
+        want: Result<T, Error>,
+        call: &str,
+    ) -> Result<(), String> {
+        let ok = match (r, &want) {
+            (Ok(Ok(g)), Ok(w)) => g == w,
+            (Err(Ok(g)), Err(w)) => g == w,
+            _ => false,
+        };
+        if ok {
+            Ok(())
+        } else {
+            Err(std::format!("{call}: got {r:?}, predicted {want:?}"))
+        }
+    }
+
+    fn bop() -> impl Strategy<Value = BOp> {
+        let actor = 0..B_ACTORS;
+        prop_oneof![
+            6 => (
+                prop_oneof![9 => 0..4usize, 1 => Just(B_OUTSIDER)],
+                any::<bool>(),
+                1..=10i128,
+                1..=100i128,
+                1..=10i128,
+                1..=20u64,
+            )
+                .prop_map(|(buyer, call, q, s, pr, days)| BOp::CreateBid {
+                    buyer,
+                    call,
+                    qty: q * UNIT,
+                    strike: s * UNIT,
+                    premium: pr * UNIT,
+                    days,
+                }),
+            3 => (any::<u8>(), prop_oneof![3 => Just(None), 1 => (0..B_ACTORS).prop_map(Some)])
+                .prop_map(|(s, w)| BOp::CancelBid(s, w)),
+            6 => (any::<u8>(), actor.clone()).prop_map(|(s, w)| BOp::FillBid(s, w)),
+            4 => (actor.clone(), prop::collection::vec(any::<u8>(), 0..5))
+                .prop_map(|(p, v)| BOp::PruneBids(p, v)),
+            2 => (actor, any::<bool>(), 1..=20u64).prop_map(|(w, c, d)| BOp::CreateOffer(w, c, d)),
+            3 => (any::<u8>(), prop_oneof![4 => Just(None), 1 => (0..B_ACTORS).prop_map(Some)])
+                .prop_map(|(s, w)| BOp::Exercise(s, w)),
+            2 => any::<u8>().prop_map(BOp::Claim),
+            2 => any::<u8>().prop_map(BOp::Reclaim),
+            3 => (0..=6 * B_DAY).prop_map(BOp::Advance),
+        ]
+    }
+
+    #[test]
+    fn bid_invariants_hold_for_random_operation_sequences() {
+        let cases = std::env::var("PROPTEST_CASES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(128u32); // about 15 s here
+        let cfg = ProptestConfig {
+            cases,
+            failure_persistence: None,
+            ..ProptestConfig::default()
+        };
+        let mut runner = proptest::test_runner::TestRunner::new(cfg);
+        let seen: RefCell<BTreeMap<String, u64>> = RefCell::new(BTreeMap::new());
+        let result = runner.run(&prop::collection::vec(bop(), 1..=40), |ops| {
+            let mut w = BWorld::new();
+            let mut trace = String::new();
+            for op in &ops {
+                let prev = w.bids.clone();
+                let r = w.step(op).and_then(|d| {
+                    let _ = writeln!(trace, "{op:?} => {d}");
+                    let call = d.split_whitespace().next().unwrap_or("").to_string();
+                    let out = d.split("-> ").nth(1).unwrap_or("");
+                    let norm = if call == "prune_bids" && out.starts_with("Ok") {
+                        if out == "Ok(0)" {
+                            "Ok(0)"
+                        } else {
+                            "Ok(>=1)"
+                        }
+                    } else if out.starts_with("Ok") {
+                        "Ok"
+                    } else {
+                        out
+                    };
+                    *seen
+                        .borrow_mut()
+                        .entry(std::format!("{call} {norm}"))
+                        .or_default() += 1;
+                    w.check_state(&prev).map(|_| ())
+                });
+                if let Err(e) = r {
+                    return Err(TestCaseError::fail(std::format!(
+                        "{e}\nafter {op:?}\ntrace:\n{trace}"
+                    )));
+                }
+            }
+            Ok(())
+        });
+        if let Err(e) = result {
+            panic!("{e}");
+        }
+        let seen = seen.into_inner();
+        std::println!("bid invariants: {seen:?}");
+        if cases >= 32 {
+            for row in [
+                "create_bid Ok",
+                "create_bid Err(NotEligible)",
+                "cancel_bid Ok",
+                "cancel_bid Err(NotBidder)",
+                "cancel_bid Err(BidNotOpen)",
+                "cancel_bid Err(NotFound)",
+                "fill_bid Ok",
+                "fill_bid Err(SelfTrade)",
+                "fill_bid Err(Expired)",
+                "fill_bid Err(BidNotOpen)",
+                "fill_bid Err(NotEligible)",
+                "fill_bid Err(NotFound)",
+                "prune_bids Ok(>=1)",
+                "prune_bids Ok(0)",
+                "prune_bids Err(NotFound)",
+                "exercise Ok",
+                "claim Ok",
+                "reclaim Ok",
+            ] {
+                assert!(seen.contains_key(row), "coverage: `{row}` never happened");
+            }
+        }
+    }
 }

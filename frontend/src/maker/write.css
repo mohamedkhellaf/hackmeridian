@@ -41,9 +41,9 @@
 .wr-input select {
   flex: 1;
   min-width: 0;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
+  height: var(--control-h);
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--r);
   background: var(--bg);
   color: var(--text);
@@ -54,7 +54,8 @@
 .wr-input input:focus,
 .wr-input select:focus {
   border-color: var(--accent);
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
 }
 .wr-input input[type='datetime-local'] {
   color-scheme: dark;
@@ -87,6 +88,22 @@
   color: var(--danger);
 }
 
+/* Inside a dialog: fields in a 2-column grid, then the summary as a full-width list, one line per row. */
+.wr--stack {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.wr--stack .wr-summary {
+  padding-left: 0;
+  padding-top: 16px;
+  border-left: 0;
+  border-top: 1px solid var(--border);
+}
+.wr--stack .ui-kv dd,
+.wr--stack .ui-kv dt {
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .wr {
     grid-template-columns: minmax(0, 1fr);
@@ -104,7 +121,7 @@
   }
   .wr-input input,
   .wr-input select {
-    height: 36px;
+    height: 44px;
     font-size: 16px;
   }
 }

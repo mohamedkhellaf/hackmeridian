@@ -36,10 +36,14 @@ DRY_RUN=1 scripts/deploy/deploy.sh              # print every command; send and 
 scripts/deploy/bindings.sh                      # TypeScript client for OPTIONS_ID (or alias "options")
 scripts/deploy/smoke-testnet.sh                 # end-to-end smoke run on TESTNET (real txs; --p0-only to skip P0+)
 scripts/deploy/smoke-testnet.sh --no-v13        # same, without V1.3 / V1.3.1 (contract v1.3 or older)
+scripts/deploy/smoke-testnet.sh --no-v14        # same, without V1.4 resale (contract v1.3.1 or older)
+scripts/deploy/smoke-testnet.sh --no-v15        # same, without V1.5 funded bids (contract v1.4 or older)
+scripts/deploy/smoke-testnet.sh --v15-only      # PRE + V1.5 only (contract v1.5)
 scripts/deploy/smoke-testnet.sh --full          # V1.3 also fills maker2 to the 50-offer per-writer cap (see below)
 scripts/deploy/deploy.sh --throwaway            # second instance for destructive demos; OPTIONS_ID untouched
 scripts/deploy/issuer-demo-testnet.sh           # issuer freeze / de-authorize / clawback failure modes (real txs)
 scripts/deploy/extend-ttl.sh                    # TTL keeper: extend_ttl over every non-terminal option
+scripts/deploy/seed-demo-bids.sh --contract <C-id> --hours 72   # v1.5: two open investor bids on RWA + extend_bid_ttl
 ```
 
 Transaction hashes are printed as `TX <STEP> <hash>` and appended to `scripts/out/tx-log.tsv`.
@@ -47,12 +51,47 @@ Transaction hashes are printed as `TX <STEP> <hash>` and appended to `scripts/ou
 ## Smoke run sections
 
 `smoke-testnet.sh` runs PRE (config, eligibility), P0 (RWA PUT lifecycle, expected contract errors, expiry/reclaim,
-maker competition), P0+ (covered CALL, BOND PUT), V1.2 (holder transfer, `get_options` paging), V1.3 and V1.3.1.
+maker competition), P0+ (covered CALL, BOND PUT), V1.2 (holder transfer, `get_options` paging), V1.3, V1.3.1,
+V1.4 (resale) and V1.5 (funded bids).
 Expected failures are simulated only (`--send=no`, no fee) and pass only with the exact error code. `DRY_RUN` is
 refused: every step is a real testnet transaction. `--p0-only` stops after P0; `--no-v13` skips V1.3 and V1.3.1. The
 V1.3 section uses the v1.3.1 `prune_expired(pruner, ids)` signature, so it needs a v1.3.1 contract: against a v1.2
 contract (no `asset_count`) or a v1.3 contract (no `list_open_for`, no `pruner` argument) the V1.3-0 probe fails and
 the rest of both sections is reported as not reached.
+
+### V1.5 (funded bids, needs contract v1.5; `docs/contract-abi.md` §15)
+
+The investor posts funded bids on RWA (premium escrowed in the contract); maker2 fills one. Runs after V1.4; skip it
+with `--no-v15`, or run PRE + V1.5 only with `--v15-only` (used for the v1.5 deployment after a full run).
+
+| Check | What happens | Pass condition |
+|---|---|---|
+| `V15_INTERFACE` | `bid_count()` | readable (else the contract is older than v1.5) |
+| `BID_SHORT_CREATE` | investor PUT bid expiring in 45 s, created first so it expires while the rest runs | tx |
+| `BID_PUT_CREATE*`, `BID_PUT_OPEN`, `BID_PUT_IN_BOOK`, `BID_BUYER_OPEN_COUNT` | investor `create_bid(Put, RWA, 5, strike 50, premium 1 USDx, 1 h)` | `bid_created` event, state `Open`, in `list_open_bids_for(RWA)`, `buyer_open_count` +2, investor −1 USDx, contract and `open_collateral(USDx)` +1 USDx |
+| `FAIL_BID_CANCEL_NOT_BIDDER` / `FAIL_BID_SELF_FILL` / `FAIL_BID_FILL_NOT_ELIGIBLE` | maker2 cancels / investor fills its own bid / outsider fills | #123 / #111 / #104 |
+| `BID_FILL*` | maker2 `fill_bid` | `bid_filled` and `option_bought` events; bid `Filled` with `option_id`; option `Active`, holder investor, writer maker2; bid gone from the book; maker2 −50 +1 USDx, contract and `open_collateral(USDx)` +49 USDx |
+| `FAIL_BID_DOUBLE_FILL` / `FAIL_BID_CANCEL_FILLED` | maker1 fills again / investor cancels the filled bid | #122 / #122 |
+| `BID_EXERCISE*`, `BID_CLAIM*` | investor (the bidder) exercises, maker2 claims | ABI §2 deltas |
+| `BID_CALL_CREATE*`, `BID_CANCEL*`, `FAIL_BID_CANCEL_AGAIN` | investor CALL bid, then `cancel_bid`, then cancels again | escrow in, `bid_cancelled` event, state `Cancelled`, premium back / #122 |
+| `BID_PRUNE_LIVE_*` | `prune_bids` simulated on the short bid before expiry | returns 0 (SKIP if it already expired) |
+| `FAIL_BID_FILL_EXPIRED` | maker1 fills the short bid after expiry | #109 |
+| `BID_PRUNE*`, `BID_PRUNE_AGAIN_*`, `BID_BUYER_OPEN_AFTER` | maker2 `prune_bids(pruner=maker2, [short])` | returns 1, `bid_pruned` event, state `Expired`, investor +1 USDx (maker2 gets nothing); a second prune returns 0; `buyer_open_count` back to its start value |
+
+### V1.4 (on-chain resale, needs contract v1.4; `docs/contract-abi.md` §14)
+
+One RWA PUT (maker1 writes, investor buys), resold on chain. Runs after V1.3.1; skip it with `--no-v14`.
+
+| Check | What happens | Pass condition |
+|---|---|---|
+| `RESALE_CREATE`, `RESALE_BUY_PRIMARY` | maker1 PUT (5 RWA, strike 50 USDx), investor buys | `Active`, holder investor |
+| `FAIL_RESALE_LIST_OFFERED` / `FAIL_RESALE_NO_ASK` / `FAIL_RESALE_LIST_NOT_HOLDER` / `FAIL_RESALE_LIST_ZERO` | list an `Offered` option / buy before any ask / maker2 lists investor's option / ask 0 | #106 / #120 / #108 / #102 |
+| `RESALE_LIST`, `RESALE_LIST_EVENT`, `RESALE_GET_ASK`, `RESALE_LIST_ASKS`, `RESALE_LIST_BAL` | investor `list_for_sale(ask 2 USDx)` | `ask_listed` event, `get_ask` = ask, `list_asks(id, 1)` = `[{id, investor, ask}]`, no balance moves |
+| `FAIL_RESALE_SELF` / `FAIL_RESALE_WRITER` / `FAIL_RESALE_NOT_ELIGIBLE` / `FAIL_RESALE_PRICE_MOVED` | buy_resale by the holder / the writer / the outsider / maker2 with `max_total = ask - 1` | #111 / #111 / #104 / #121 |
+| `RESALE_BUY`, `RESALE_BUY_EVENT`, `RESALE_BUY_STATE`, `RESALE_BUY_BAL`, `RESALE_ASK_GONE` | maker2 `buy_resale(max_total = ask)` | `resale_bought` event, holder maker2, maker2 −ask USDx, investor +ask USDx, nothing else moves, ask gone |
+| `FAIL_RESALE_AGAIN` / `FAIL_RESALE_OLD_HOLDER` | second buy of the same ask / old holder exercises | #120 / #108 |
+| `RESALE_RELIST`, `FAIL_RESALE_CANCEL_NOT_HOLDER`, `RESALE_CANCEL*`, `FAIL_RESALE_CANCEL_AGAIN`, `FAIL_RESALE_AFTER_CANCEL` | maker2 lists, investor tries to cancel, maker2 cancels, cancels again, investor buys | tx / #108 / `ask_cancelled` and ask gone / #120 / #120 |
+| `RESALE_EXERCISE*`, `RESALE_CLAIM*` | maker2 (new holder) exercises, maker1 claims | ABI §2 deltas |
 
 ### V1.3 (needs contract v1.3.1 and the EQTY asset from `02-assets.sh`)
 
@@ -211,6 +250,7 @@ scripts/deploy/deploy-pro.sh                     # identities (friendbot), stell
 DRY_RUN=1 scripts/deploy/deploy-pro.sh           # print every command; send and write nothing
 python3 scripts/deploy/pro-snapshot.py --series-id 0 --strike 110 --expiry <unix> --spot 100 --seq 1   # publish_risk snap JSON
 scripts/deploy/pro-demo.sh [--expiry-minutes 15] [--settlement-price 175]   # evidence run, ~20 min, real txs
+scripts/deploy/pro-refresh-risk.sh [--spot 110]   # fresh publish_risk on the live demo series 1 (run every few minutes while recording)
 ```
 
 `deploy-pro.sh` writes `PRO_ID`, `PRO_DEPLOY_TX`, `PRO_WASM_SHA256` and the `PRO_*` public keys to
@@ -218,4 +258,4 @@ scripts/deploy/pro-demo.sh [--expiry-minutes 15] [--settlement-price 175]   # ev
 records list_series, publish_risk, deposit, buy, exercise, publish_risk at the higher price, liquidation to the vault,
 publish_settlement, settle, settle_vault and claim as `| op | tx hash |` rows in that file. Step-by-step instructions,
 the exact sequence and amounts, and troubleshooting (friendbot, trustlines, `StaleSnapshot`, `SettlementWindowClosed`)
-are in `docs/pro-testnet-runbook.md`.
+are in `docs/pro-testnet-runbook.md`; keeping the UI demo series fresh is its section 6.

@@ -72,7 +72,7 @@ describe('actions', () => {
 
 describe('premiumOf', () => {
   it('is signed by role', () => {
-    expect(premiumOf(opt({ writer: OTHER, holder: ME, state: 'active' }), 'holder')).toEqual({ text: '−2.00 USDx', tone: 'neg' })
+    expect(premiumOf(opt({ writer: OTHER, holder: ME, state: 'active' }), 'holder')).toEqual({ text: '2.00 USDx original premium (paid to the writer)', tone: 'muted' })
     expect(premiumOf(opt({ holder: OTHER, state: 'active' }), 'writer')).toEqual({ text: '+2.00 USDx', tone: 'pos' })
     expect(premiumOf(opt(), 'writer')).toEqual({ text: '2.00 USDx ask', tone: 'ask' })
     expect(premiumOf(opt({ state: 'expired' }), 'writer')).toEqual({ text: '–', tone: 'muted' })

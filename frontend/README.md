@@ -1,4 +1,4 @@
-# Strata frontend
+# StellSec frontend
 
 Vite + React 19 + TypeScript app for collateralized options on tokenized Stellar assets (Testnet).
 
@@ -23,11 +23,11 @@ VITE_OPTIONS_CONTRACT_ID=C...
 - **Unset (mock mode):** an in-memory `MockOptionsClient` with fictional assets and options. A banner says so; state resets on reload.
 - **Set (real mode):** `SorobanOptionsClient` talks to the contract on Testnet through Stellar RPC, signing with Freighter (set Freighter to Testnet). The Issuer tab operates the asset issuer account.
 
-Current Testnet deployment: v1.3.1, `CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE`. The same build also runs against v1.3 (`CAMY4ZKY…2KRJ`) and v1.2 (`CAJ2WJP4…GBAX`): v1.3 functions (`list_assets`, `asset_count`, `writer_open_count`, `list_asset`, `prune_expired`) are feature-detected from the contract spec, and without them the client falls back to `config().underlyings`. On v1.3+ the asset list comes from `list_assets` (assets such as EQTY can be listed at runtime), the write form shows the per-writer cap (N/50 open offers) and enforces the 2 year max tenor. Contract errors are decoded by numeric code (`src/stellar/errors.ts`, 101-119), so a redeploy that renumbers or appends codes needs that table updated.
+Current Testnet deployment: options v1.5, `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6` (covered puts and calls, resale, funded buyer bids); margin contract v0.3.2, `CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`. The same build also runs against v1.3 (`CAMY4ZKY…2KRJ`) and v1.2 (`CAJ2WJP4…GBAX`): v1.3 functions (`list_assets`, `asset_count`, `writer_open_count`, `list_asset`, `prune_expired`) are feature-detected from the contract spec, and without them the client falls back to `config().underlyings`. On v1.3+ the asset list comes from `list_assets` (assets such as EQTY can be listed at runtime), the write form shows the per-writer cap (N/50 open offers) and enforces the 2 year max tenor. Contract errors are decoded by numeric code (`src/stellar/errors.ts`, 101-119), so a redeploy that renumbers or appends codes needs that table updated.
 
 Restart `npm run dev` after changing the env file.
 
-## Strata Pro (experimental)
+## StellSec Pro (experimental)
 
 Off by default. Build or run with `VITE_ENABLE_PRO=1` to mount the Pro section (`#/pro/...`, code in `src/pro/`, lazy chunk; a default build contains none of it). It renders inside the main shell: a `Pro` link at the end of the navigation, the five screens (Margin, Trade, Positions, Liquidations, Vault) behind a segmented control.
 Until the Pro contract passes its gate it runs on `packages/risk/fixtures/pro_v0.json` through `FixtureProClient`, and the Pro shell shows one banner: "Simulated on fixtures. No contract is called."

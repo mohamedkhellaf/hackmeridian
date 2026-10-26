@@ -35,19 +35,24 @@ export async function switchTo(page: Page, address: string | null) {
   await connect(page)
 }
 
-export type NavName = 'Markets' | 'Protect' | 'Write' | 'Positions' | 'Locked reserves' | 'Issuer'
+export type NavName = 'Markets' | 'Positions' | 'Locked reserves' | 'Issuer'
 
-// Sidebar label -> hash route. Labels changed in the fix round; routes did not.
+// Nav label -> hash route. Labels changed in the fix round; routes did not.
 export const ROUTE_OF: Record<NavName, string> = {
   Markets: 'markets',
-  Protect: 'protect',
-  Write: 'write',
   Positions: 'portfolio',
   'Locked reserves': 'reserves',
   Issuer: 'issuer',
 }
 
-// Sidebar navigation (hash routes: #/markets, #/protect, #/write, #/portfolio, #/reserves, #/issuer).
+// Markets: pick a series in the chain, then open its Buy or Sell dialog on a tab.
+export async function openTrade(page: Page, series: RegExp, side: 'Buy' | 'Sell', tab?: string) {
+  await page.getByRole('button', { name: series }).first().click()
+  await page.getByRole('region', { name: 'Book' }).getByRole('button', { name: side, exact: true }).click()
+  if (tab) await page.getByRole('radio', { name: tab }).click()
+}
+
+// Top bar navigation (hash routes: #/markets, #/write, #/portfolio, #/reserves, #/issuer).
 // The Positions link may carry a count ("Positions 1"), so the name is matched as a prefix.
 export async function goTo(page: Page, name: NavName) {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: new RegExp(`^${name}`) }).click()

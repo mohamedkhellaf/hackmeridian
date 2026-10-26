@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Evidence run for the EXPERIMENTAL Strata Pro contract on Stellar TESTNET (brief docs/pro-v0-brief-dev2.md §8).
+# Evidence run for the EXPERIMENTAL StellSec Pro contract on Stellar TESTNET (brief docs/pro-v0-brief-dev2.md §8).
 # Real transactions (test XLM fees, fictional USDx). Every tx hash is printed as "TX <STEP> <hash>", appended to
 # scripts/out/tx-log.tsv and to the "| op | tx hash |" table in docs/pro-testnet-evidence.md.
 #
@@ -93,7 +93,7 @@ SPOT_GAP=160
 mkdir -p "$OUT_DIR"
 DEMO_LOG="$OUT_DIR/pro-demo-$(date -u +%Y%m%dT%H%M%SZ).log"
 exec > >(tee -a "$DEMO_LOG") 2>&1
-log "Strata Pro evidence run on TESTNET; contract $PRO; log $DEMO_LOG"
+log "StellSec Pro evidence run on TESTNET; contract $PRO; log $DEMO_LOG"
 
 # ---------- helpers ----------
 step() { printf '\n===== %s =====\n' "$*"; }
@@ -151,7 +151,7 @@ finish_evidence() {
   ((${#EVIDENCE_ROWS[@]} > 0)) || return 0
   if [[ ! -f "$EVIDENCE_MD" ]]; then
     cat >"$EVIDENCE_MD" <<'EOH'
-# Strata Pro (experimental): testnet evidence
+# StellSec Pro (experimental): testnet evidence
 
 Stellar **TESTNET ONLY**. Fictional assets (`USDx` quote token, fictional `EQTY` underlying label; cash-settled, no
 underlying token exists). The risk publisher and the settlement price are **team-operated** (`strata-pro-publisher`),

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Dialog, Mono } from '../ui'
+import { Button, Dialog, Icon, Mono } from '../ui'
+import type { IconName } from '../ui'
 import { shortAddress } from '../options/format'
+import { useNarrow } from '../market/ticketSlot'
 import { hrefFor, NAV } from './routes'
 import type { NavItem, Route } from './routes'
 import type { NetworkStatus } from './useNetworkStatus'
@@ -10,24 +12,36 @@ import './layout.css'
 export const DEMO_TEXT = 'Stellar Testnet. Fictional assets and makers. No real funds.'
 export const MOCK_TEXT = 'Mock data, not read from a chain.'
 
-function NavLinks({ current, badge, className }: { current: Route; badge?: number; className: string }) {
-  return NAV.map((item: NavItem) => {
-    const on = item.route === current
-    const count = item.route === 'portfolio' && badge ? badge : 0
-    return (
-      <a key={item.route} href={hrefFor(item.route)} className={on ? `${className} is-on` : className} aria-current={on ? 'page' : undefined}>
-        {item.label}
-        {count ? (
-          <>
-            {' '}
-            <span className="nav-count" title="Actions waiting">
-              {count}
-            </span>
-          </>
-        ) : null}
-      </a>
-    )
-  })
+/** Routes that get a tab on phones. The rest open from More. */
+const TAB_ROUTES: Route[] = ['markets', 'portfolio', 'reserves']
+
+const ICONS: Record<Route, IconName> = {
+  markets: 'markets',
+  write: 'write',
+  portfolio: 'portfolio',
+  reserves: 'reserves',
+  issuer: 'issuer',
+  pro: 'pro',
+}
+
+function countLabel(n: number) {
+  return n === 1 ? '1 position needs action' : `${n} positions need action`
+}
+
+function NavLink({ item, current, badge, className, onClick }: { item: NavItem; current: Route; badge?: number; className: string; onClick?: () => void }) {
+  const on = item.route === current
+  const count = item.route === 'portfolio' && badge ? badge : 0
+  return (
+    <a href={hrefFor(item.route)} className={on ? `${className} is-on` : className} aria-current={on ? 'page' : undefined} onClick={onClick} data-tip={item.label}>
+      <Icon name={ICONS[item.route]} size={18} className="nav-icon" />
+      <span className="nav-label">{item.label}</span>
+      {count ? (
+        <span className="nav-count" aria-label={countLabel(count)}>
+          {count}
+        </span>
+      ) : null}
+    </a>
+  )
 }
 
 /**
@@ -54,7 +68,7 @@ export function WalletChip({
   const [copied, setCopied] = useState(false)
   if (!address) {
     return (
-      <Button variant="primary" onClick={onConnect}>
+      <Button variant="primary" onClick={onConnect} title="Connect a Stellar wallet (Freighter)">
         Connect wallet
       </Button>
     )
@@ -133,56 +147,74 @@ export interface AppShellProps {
   children: ReactNode
 }
 
-/** Desktop: sidebar, top bar with the wallet control, content, footer. Phones (<= 768px): compact top bar and a bottom tab bar. */
+/** Desktop (>= 1024px): 240px left sidebar (wordmark, nav, wallet), content, footer. 769-1023px: 72px icon rail. Phones (<= 768px): wordmark and wallet on top, four tabs and More at the bottom. */
 export function AppShell({ route, portfolioBadge, contractId, network, wallet, children }: AppShellProps) {
+  const [moreOpen, setMoreOpen] = useState(false)
   const tabbarRef = useRef<HTMLElement>(null)
-  // When the tab bar scrolls (narrow phones), keep the current tab in view.
   useEffect(() => {
-    tabbarRef.current?.querySelector<HTMLElement>('.tab.is-on')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+    tabbarRef.current?.querySelector<HTMLElement>('.is-on')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
   }, [route])
+  const narrow = useNarrow()
+  const tabItems = NAV.filter((n) => TAB_ROUTES.includes(n.route))
+  const moreItems = NAV.filter((n) => !TAB_ROUTES.includes(n.route))
+  const moreOn = moreItems.some((n) => n.route === route)
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="sidebar-inner">
-          <a href={hrefFor('markets')} className="brand">
-            Strata
-          </a>
-          <nav className="sidebar-nav" aria-label="Main">
-            <NavLinks current={route} badge={portfolioBadge} className="nav-link" />
-          </nav>
-        </div>
+        <a href={hrefFor('markets')} className="brand">
+          <img className="brand-mark" src="/logo-64.png" srcSet="/logo-64.png 1x, /logo-128.png 2x" width="28" height="28" alt="" />
+          <span className="brand-name">StellSec</span>
+        </a>
+        <nav className="topnav" aria-label="Main">
+          {NAV.map((item) => (
+            <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="nav-link" />
+          ))}
+        </nav>
+        {narrow && <div className="sidebar-wallet">{wallet}</div>}
       </aside>
-
-      <div className="shell-main">
-        <header className="topbar">
-          <a href={hrefFor('markets')} className="brand topbar-brand">
-            Strata
-          </a>
-          <div className="topbar-wallet">{wallet}</div>
-        </header>
+      <div className="main-col">
+        {!narrow && <div className="topbar">{wallet}</div>}
         <main className="content">{children}</main>
         <footer className="shell-footer">
-          <span>
-            {DEMO_TEXT}{' '}
-            {contractId ? (
-              <>
-                Contract{' '}
-                <a className="ui-mono" href={`https://stellar.expert/explorer/testnet/contract/${contractId}`} target="_blank" rel="noreferrer" title={contractId}>
-                  {shortAddress(contractId)}
-                </a>
-                {network?.rpc === 'degraded' && <span className="footer-warn"> RPC not responding.</span>}
-              </>
-            ) : (
-              MOCK_TEXT
-            )}
-          </span>
-          {contractId && network?.ledger != null && <span className="ui-mono footer-ledger">Ledger {network.ledger.toLocaleString('en-US')}</span>}
+          <div className="shell-footer-inner">
+            <span>
+              {DEMO_TEXT}{' '}
+              {contractId ? (
+                <>
+                  Contract{' '}
+                  <a className="ui-mono" href={`https://stellar.expert/explorer/testnet/contract/${contractId}`} target="_blank" rel="noreferrer" title={contractId}>
+                    {shortAddress(contractId)}
+                  </a>
+                  {network?.rpc === 'degraded' && <span className="footer-warn"> RPC not responding.</span>}
+                </>
+              ) : (
+                MOCK_TEXT
+              )}
+            </span>
+            {contractId && network?.ledger != null && <span className="ui-mono footer-ledger">Ledger {network.ledger.toLocaleString('en-US')}</span>}
+          </div>
         </footer>
       </div>
 
       <nav className="tabbar" aria-label="Main" ref={tabbarRef}>
-        <NavLinks current={route} badge={portfolioBadge} className="tab" />
+        {tabItems.map((item) => (
+          <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="tab" />
+        ))}
+        <button type="button" className={moreOn ? 'tab is-on' : 'tab'} aria-haspopup="dialog" onClick={() => setMoreOpen(true)}>
+          <Icon name="more" size={18} className="nav-icon" />
+          <span className="nav-label">More</span>
+        </button>
       </nav>
+
+      {moreOpen && (
+        <Dialog title="More" width={360} onClose={() => setMoreOpen(false)}>
+          <nav className="more-nav" aria-label="More pages">
+            {moreItems.map((item) => (
+              <NavLink key={item.route} item={item} current={route} className="more-link" onClick={() => setMoreOpen(false)} />
+            ))}
+          </nav>
+        </Dialog>
+      )}
     </div>
   )
 }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
+export type Route = 'markets' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
 
-/** Strata Pro is mounted only when the build sets VITE_ENABLE_PRO=1. */
+/** The margin section (code name `pro`) is mounted only when the build sets VITE_ENABLE_PRO=1. */
 export const PRO_ENABLED = import.meta.env.VITE_ENABLE_PRO === '1'
 
 export interface NavItem {
@@ -10,22 +10,20 @@ export interface NavItem {
   label: string
 }
 
-/** Sidebar and phone tab bar, same routes. */
+/** Top bar links; on phones four become tabs and the rest sit under More. */
 export const NAV: NavItem[] = [
   { route: 'markets', label: 'Markets' },
-  { route: 'protect', label: 'Protect' },
-  { route: 'write', label: 'Write' },
   { route: 'portfolio', label: 'Positions' },
   { route: 'reserves', label: 'Locked reserves' },
   { route: 'issuer', label: 'Issuer' },
-  ...(PRO_ENABLED ? [{ route: 'pro' as const, label: 'Pro' }] : []),
+  ...(PRO_ENABLED ? [{ route: 'pro' as const, label: 'Margin' }] : []),
 ]
 
 const ROUTES: Route[] = NAV.map((n) => n.route)
 
 export const hrefFor = (r: Route) => `#/${r}`
 
-/** Parses `#/portfolio` (or `#portfolio`). Anything unknown falls back to markets. */
+/** Parses `#/portfolio` (or `#portfolio`). Anything unknown, and the retired `#/write`, falls back to markets. */
 export function parseRoute(hash: string): Route {
   const name = hash.replace(/^#\/?/, '').split(/[/?]/)[0]
   return (ROUTES as string[]).includes(name) ? (name as Route) : 'markets'

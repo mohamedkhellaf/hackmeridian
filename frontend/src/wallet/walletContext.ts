@@ -11,7 +11,7 @@ export interface WalletState {
   /** Ready-made banner text for wrongNetwork, naming the connected wallet. */
   networkMessage: string | null
   error: string | null
-  /** Opens Strata's connect dialog (or connects instantly under the e2e mock). */
+  /** Opens StellSec's connect dialog (or connects instantly under the e2e mock). */
   connect: () => Promise<void>
   disconnect: () => void
   sign: (xdr: string) => Promise<string>

@@ -56,20 +56,20 @@
 
 .is-select,
 .is-input {
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
+  height: var(--control-h);
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--r);
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
 }
 .is-select {
   min-width: 96px;
 }
 .is-select:focus-visible,
 .is-input:focus-visible {
-  outline: 1px solid var(--accent);
+  outline: 2px solid var(--accent);
   outline-offset: 0;
   border-color: var(--accent);
 }
@@ -152,5 +152,13 @@
   .is-table td.is-row-actions {
     padding-top: 6px;
     padding-bottom: 6px;
+  }
+}
+
+@media (max-width: 768px) {
+  .is-input,
+  .is-select {
+    height: 44px;
+    font-size: 16px;
   }
 }

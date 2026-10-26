@@ -33,6 +33,14 @@ export interface OptionOffer {
   state: OptionState
 }
 
+// Resale ask (contract v1.4): the current holder of an Active option offers it for `askTotal` quote units.
+// The price is set by the holder; it is not a market quote.
+export interface Ask {
+  id: bigint
+  holder: string
+  askTotal: bigint
+}
+
 export interface TxResult {
   hash: string
 }

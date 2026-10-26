@@ -39,7 +39,7 @@ export function ConnectWalletDialog({ dialog }: { dialog: DialogState }) {
       ) : (
         <p className="cw-muted">No wallets found.</p>
       )}
-      <p className="cw-muted">Set the wallet to Testnet. Strata never asks for your secret key or recovery phrase.</p>
+      <p className="cw-muted">Set the wallet to Testnet. StellSec never asks for your secret key or recovery phrase.</p>
     </Dialog>
   )
 }

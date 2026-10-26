@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11; v1.3 (permissionless listing, per-writer cap, prune_expired, tenor cap, backstop) decided 22:10, see §12; v1.3.1 corrections (pruner argument, transfer guards, per-asset open books, keeper coverage) decided 2026-10-26 00:20, see §13.** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11; v1.3 (permissionless listing, per-writer cap, prune_expired, tenor cap, backstop) decided 22:10, see §12; v1.3.1 corrections (pruner argument, transfer guards, per-asset open books, keeper coverage) decided 2026-10-26 00:20, see §13; v1.4 on-chain resale (`list_for_sale`, `cancel_sale`, `buy_resale` with a `max_total` cap, `get_ask`, `list_asks`, errors 120–121) decided 2026-10-26 07:40, see §14.** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -350,6 +350,13 @@ pub struct OfferPruned      { #[topic] pub id: u32, pub pruner: Address }   // v
   writer could fill the book with dust offers (finding F-1). v1.3 alone does **not** close it: with permissionless
   listing, sybil writers on a self-listed unflagged asset can fill the global list for free (F-1R). v1.3.1 (§13) moves
   the book to per-asset lists capped at `MAX_OPEN_PER_ASSET = 500`, so dust can only crowd out its own asset's book.
+- **Bid-book capacity (v1.5, accepted limitation).** Each underlying's open bid book holds at most
+  `MAX_OPEN_BIDS_PER_ASSET = 500` bids and each buyer at most `MAX_OPEN_BIDS_PER_BUYER = 50`. Ten accounts eligible
+  on an asset, each posting 50 dust bids (premium 1 unit, expiry up to 2 years out), fill that asset's bid book until
+  they cancel or the bids expire and are pruned; new bids on that asset then fail with `BidBookFull` (124). The cost
+  is 500 transactions plus 500 units of quote escrowed, and on an issuer-gated asset (RWA, BOND, EQTY) every one of
+  those accounts must be authorized by the issuer. Like F-1R, it can only crowd out that one asset's bid book: offers,
+  other assets' bid books and existing bids are unaffected. There is no minimum premium and no admin to purge bids.
 
 ## 7. PROVISIONAL decisions and blocker questions for Dev 1 (`PRODUCT_SPEC.md` absent at lock time)
 
@@ -378,11 +385,20 @@ enum Key {
     AssetAt(u32),       // persistent: Address, v1.3 registry index for paging
     AssetCount,         // instance: u32, v1.3
     WriterOpen(Address),// persistent: u32, v1.3 count of this writer's Offered options
+    Ask(u32),           // persistent: i128, v1.4 resale ask of an Active option
+    Bid(u32),           // persistent: Bid, v1.5
+    BidCount,           // instance: u32, v1.5 next bid id (written by the first create_bid)
+    BidsFor(Address),   // persistent: Vec<u32>, v1.5 per-asset open bid book
+    BuyerOpen(Address), // persistent: u32, v1.5 count of this buyer's Open bids
 }
+// Instance entry: Quote, Underlyings, Next, AssetCount (4 keys) until the first bid; v1.5 adds BidCount (5 keys).
+// Nothing keyed by an address or id is ever stored in the instance.
 const MAX_OPEN_PER_ASSET: u32 = 500;   // v1.3.1 cap per underlying's open book (v1.3 and before: global MAX_OPEN = 1000)
 const MAX_PAGE: u32 = 50;          // get_options page cap (v1.2)
 const MAX_OPEN_PER_WRITER: u32 = 50;   // v1.3
 const MAX_TENOR: u64 = 63_072_000;     // v1.3, 2 years in seconds
+const MAX_OPEN_BIDS_PER_ASSET: u32 = 500; // v1.5 cap per underlying's open bid book
+const MAX_OPEN_BIDS_PER_BUYER: u32 = 50;  // v1.5 cap per buyer
 const DAY_LEDGERS: u32 = 17_280;
 const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
@@ -510,3 +526,158 @@ position token, impairment/refund, margin.
 
 No new error codes. Signature changes: `prune_expired` (new first argument), `list_open_for` added. Everything else is
 unchanged. Deployment of v1.3.1 replaces the v1.3 id in the Deployed contracts table.
+
+## 14. v1.4: on-chain secondary market (resale of an `Active` option; deployed 2026-10-26 07:56 UTC as `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`)
+
+The holder of an `Active` option can post a price for the whole position; any other eligible account can take it.
+The buyer pays the quote token straight to the seller and becomes the holder in one invocation. Collateral, reserved
+totals, open books and the writer are never touched. v1.4 = v1.3.1 + the items below; nothing else changed.
+
+**Functions**
+
+| Function | Auth | Check order (first failure wins) | Effect |
+|---|---|---|---|
+| `list_for_sale(holder: Address, id: u32, ask_total: i128) -> Result<(), Error>` | `holder` | `InvalidArgs` (holder is the contract) → `NotFound` (101) → `WrongState` (106, not `Active`) → `NotHolder` (108) → `Expired` (109, `now >= expiry`) → `InvalidArgs` (102, `ask_total <= 0`) | sets or overwrites `Ask(id) = ask_total`; event `AskListed` |
+| `cancel_sale(holder: Address, id: u32) -> Result<(), Error>` | `holder` | `NotFound` → `NotHolder` → `NoAsk` (120) | removes `Ask(id)`; event `AskCancelled` |
+| `buy_resale(buyer: Address, id: u32, max_total: i128) -> Result<(), Error>` | `buyer` (its signed tree also carries the quote `transfer(buyer, seller, ask_total)`) | `InvalidArgs` (buyer is the contract) → `NoAsk` → `NotFound` → `WrongState` → `Expired` → `SelfTrade` (111, buyer is the current holder **or the writer**) → `NotEligible` (104, buyer on the underlying) → `ContractNotAuthorized` (105) → `CollateralShortfall` (115, quote or underlying, as `transfer`) → `PriceMoved` (121, `ask_total > max_total`) | quote `transfer(buyer → current holder, ask_total)`; `holder = buyer`; removes `Ask(id)`; event `ResaleBought` |
+| `get_ask(id: u32) -> Option<i128>` | view | never fails | the ask in quote units, or `None` |
+| `list_asks(from: u32, limit: u32) -> Vec<Ask>` | view | never fails | scans option ids `from .. from + min(limit, MAX_PAGE = 50)` (stops at `option_count()`) and returns the ones with an ask, in id order, with the option's current holder |
+
+`#[contracttype] struct Ask { id: u32, holder: Address, ask_total: i128 }`. Because `list_asks` scans ids, a page can
+hold fewer rows than `limit`, or none at all while later ids still carry asks. **Clients must step the cursor by
+`from += min(limit, 50)`** (as the frontend does) and stop at `option_count()`, never by the number of rows returned
+and never on an empty page. It may include
+asks on options past expiry (until the writer reclaims); clients filter by `expiry` (`buy_resale` returns `Expired`).
+
+**Errors** (appended; nothing renumbered): `NoAsk = 120` (no ask on this id: never listed, cancelled, already bought, or
+cleared by `exercise` / `transfer` / `reclaim`), `PriceMoved = 121` (the current ask is above the buyer's `max_total`).
+
+**Events** (default topic = snake_case name, then `id`): `ask_listed { id, holder, ask_total }`,
+`ask_cancelled { id }`, `resale_bought { id, seller, buyer, ask_total }`. The SAC also emits its own `transfer` event
+for the payment.
+
+Event semantics for indexers: `ask_cancelled` is emitted **only** by `cancel_sale`. The other paths that remove an ask
+do it silently, and their own event implies the removal: `option_exercised` (ask gone, option `Exercised`),
+`option_transferred` (ask gone, new holder has none) and `option_reclaimed` of an `Active` option (ask gone, option
+`Expired`); `resale_bought` also removes it. `resale_bought` itself changes the holder from `seller` to `buyer`; no
+`option_transferred` is emitted for a resale. An indexer that tracks asks and holders must therefore apply all six
+events (`ask_listed`, `ask_cancelled`, `resale_bought`, `option_exercised`, `option_transferred`, `option_reclaimed`),
+or simply re-read `get_ask` / `list_asks`.
+
+**Storage and TTL**: persistent `Key::Ask(id) -> i128`, written with the §8 TTL (`extend_ttl(entry, 7 days, 30 days)`)
+and the option entry is bumped on `list_for_sale`. `extend_ttl(ids)` also extends `Ask(id)` when present, for `Active`
+ids only (an ask exists only on an `Active` option; this keeps the footprint of `Offered` ids exactly as in v1.3.1 and
+keeps the keeper batch at ≥ 50 ids). The instance entry does not grow.
+
+**Ask lifecycle**: an ask exists only while the option is `Active` and held by the account that posted it. It is
+removed by `cancel_sale`, `buy_resale`, `exercise` (→ `Exercised`), `transfer` (the old holder's price never follows
+the option to a new holder) and `reclaim` of an `Active` option (→ `Expired`). `cancel_offer` and `prune_expired` only
+touch `Offered` options, which never have an ask.
+
+**Decisions**
+
+1. **Writer buy-back is excluded** in v1.4: `buy_resale` by the writer returns `SelfTrade`, like `buy` and `transfer`.
+   A writer closing its short by buying the option back needs its own settlement rule (release collateral instead of
+   holding both sides) and is out of scope.
+2. **Price cap (`max_total`)**: added after an independent review. Between the buyer's read/simulation and its
+   submission the seller can re-list at a higher ask; the cap makes the buyer's limit explicit in the call arguments,
+   whatever the wallet's auth semantics. The buyer pays the current ask, which is never above `max_total`.
+   Clients pass the ask they showed the user.
+3. **Edge semantics after expiry**: `cancel_sale` has no time check, so a holder can withdraw an ask after expiry
+   (holder + ask only). `buy_resale` on an expired, not yet reclaimed option returns `Expired` (109), not `NoAsk`
+   (the ask is checked first and still exists). `list_for_sale` after expiry returns `Expired`.
+4. **Same incoming-participant guards as `transfer`**: the buyer must be authorized on the underlying, the escrow must
+   still be authorized on it, and there must be no pooled deficit on the quote or the underlying (an issuer clawback);
+   otherwise the position is not sold to a new participant.
+5. **No escrow of the price**: the quote goes buyer → seller directly in the same invocation; the contract never holds
+   it. If the payment fails (buyer lacks quote, seller has no trustline or is frozen on the quote) the whole call reverts.
+6. **No fee, no partial sale**: the ask is for the whole position; one ask per option.
+
+Unchanged: every v1.3.1 function, error, event and constant. The ABI of §2–§5 is extended, not changed, except that
+the three listed paths now also delete `Ask(id)`.
+
+## 15. v1.5: buyer side of the market (funded bids any writer can fill; deployed 2026-10-26 08:50 UTC as `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`)
+
+A buyer states the option it wants and escrows the premium in the contract. Any eligible writer fills the bid in one
+invocation: it locks the collateral exactly as `create_offer` would, receives the escrowed premium, and the option is
+created directly `Active` with the bidder as holder. v1.5 = v1.4 + the items below; nothing else changed.
+
+**Types**
+
+```rust
+#[contracttype] enum BidState { Open, Filled, Cancelled, Expired }
+#[contracttype] struct Bid {
+    id: u32, buyer: Address, kind: OptionType, underlying: Address, quote: Address,
+    qty: i128, strike_total: i128, premium_total: i128, expiry: u64,
+    state: BidState, option_id: Option<u32>,
+}
+```
+
+`kind` uses the existing `OptionType` enum (`Put` / `Call`). Bids have their **own id space** (`bid_count()`), separate
+from option ids. Lifecycle: `Open → Filled` (`fill_bid`), `Open → Cancelled` (`cancel_bid`), `Open → Expired`
+(`prune_bids` after expiry). No other transition; bids are never deleted.
+
+**Functions**
+
+| Function | Auth | Check order (first failure wins) | Effect |
+|---|---|---|---|
+| `create_bid(buyer, kind, underlying, quote, qty, strike_total, premium_total, expiry) -> Result<u32, Error>` | `buyer` (its tree also carries the quote `transfer(buyer, contract, premium_total)`) | `InvalidArgs` (buyer is the contract) → `AssetNotAllowed` (103: `quote` ≠ configured quote, or `underlying` not listed) → `InvalidArgs` (102: `qty`, `strike_total` or `premium_total` ≤ 0, or `expiry <= now`) → `TenorOutOfRange` (119: `expiry > now + 2 years`) → `NotEligible` (104: buyer not authorized on the underlying) → `BidBookFull` (124: 500 open bids on this underlying) → `BuyerOpenLimit` (125: 50 open bids for this buyer) | quote `transfer(buyer → contract, premium_total)`; `Reserved(quote) += premium_total`; bid `Open`, appended to `BidsFor(underlying)`, `BuyerOpen(buyer) += 1`; event `BidCreated`; returns the bid id |
+| `cancel_bid(buyer, id) -> Result<(), Error>` | `buyer` | `NotFound` (101) → `BidNotOpen` (122) → `NotBidder` (123) | quote `transfer(contract → buyer, premium_total)`; `Reserved(quote) −= premium_total`; state `Cancelled`; removed from the books; event `BidCancelled`. Allowed before and after expiry |
+| `fill_bid(writer, id) -> Result<u32, Error>` | `writer` (its tree also carries the collateral `transfer(writer, contract, …)`) | `InvalidArgs` (writer is the contract) → `NotFound` → `BidNotOpen` → `Expired` (109, `now >= expiry`) → `SelfTrade` (111, writer is the buyer) → `NotEligible` (writer on the underlying **and** the quote, as `create_offer`; buyer still on the underlying, as `buy`) → `ContractNotAuthorized` (105) → `CollateralShortfall` (115, quote or underlying) | collateral `transfer(writer → contract)` (PUT: `strike_total` quote; CALL: `qty` underlying) and `Reserved += collateral`; quote `transfer(contract → writer, premium_total)` and `Reserved(quote) −= premium_total`; new option (next option id) stored `Active`, `holder = buyer`, `writer = writer`, same terms as the bid; bid `Filled`, `option_id = Some(new id)`, removed from the books; events `OptionBought { id: new option id, holder: buyer, premium_total }` then `BidFilled`; returns the option id |
+| `prune_bids(pruner, ids: Vec<u32>) -> Result<u32, Error>` | `pruner` (accountability only; anyone may prune) | `InvalidArgs` (pruner is the contract); per id: `NotFound` reverts the whole call; skipped unless `Open` and `now >= expiry` | premium back to the **buyer** (`try_transfer`; a failing refund only skips that id); `Reserved(quote) −= premium_total`; state `Expired`; removed from the books; event `BidPruned { id, pruner }` per bid; returns the number pruned |
+| `extend_bid_ttl(ids: Vec<u32>) -> Result<(), Error>` | none | `NotFound` for an unknown id reverts | extends each `Bid(id)` and, when present, `BidsFor(underlying)`, `BuyerOpen(buyer)`, `Reserved(quote)` and the underlying's `Listed`; then the instance and the code |
+| `get_bid(id) -> Result<Bid, Error>` | view | `NotFound` | the stored bid |
+| `get_bids(from, limit) -> Vec<Bid>` | view | never fails | ids `from ..`, stopping at `bid_count()` and after `min(limit, 50)` entries (same rule as `get_options`; step `from += returned.len()`) |
+| `bid_count() -> u32` | view | never fails | bids ever created |
+| `list_open_bids_for(asset, from, limit) -> Vec<u32>` | view | never fails | the asset's `Open` bid ids, oldest first, paged like `list_open_for` (may include bids past expiry; clients filter by `expiry`) |
+| `buyer_open_count(buyer) -> u32` | view | never fails | the buyer's `Open` bids |
+
+**`prune_bids` batch size: at most 40 ids per call.** Each pruned bid publishes a `bid_pruned` event; above about 42
+pruned bids in one call the events exceed the network's per-transaction event size limit (16,384 bytes) and the
+whole call fails, so nothing is pruned. The contract does not enforce a cap (v1.5 was already deployed when this was
+found); clients and keepers must send batches of ≤ 40 ids. `seed-demo-bids.sh` and the smoke run send 1–2 ids.
+
+**Errors** (appended; nothing renumbered): `BidNotOpen = 122`, `NotBidder = 123`, `BidBookFull = 124`,
+`BuyerOpenLimit = 125`. **Constants**: `MAX_OPEN_BIDS_PER_ASSET = 500`, `MAX_OPEN_BIDS_PER_BUYER = 50`.
+
+**Events** (default topic = snake_case name, then the `#[topic]` field): `bid_created { id, buyer, kind, underlying,
+qty, strike_total, premium_total, expiry }`, `bid_cancelled { id }`, `bid_filled { bid_id, option_id, writer }`,
+`bid_pruned { id, pruner }`. A fill also emits the existing `option_bought { id, holder, premium_total }` for the new
+option (before `bid_filled`), so an indexer that builds `Active` options from `option_bought` keeps working; there is
+no `offer_created` for a filled bid (the option was never `Offered`).
+
+**Id spaces**: bid ids (`bid_count()`) and option ids (`option_count()`) are two separate counters, **both starting at
+0**, so bid #3 and option #3 are unrelated. A filled bid links them through `Bid.option_id` and the event
+`bid_filled { bid_id, option_id, writer }`. **Indexers**: an option created by `fill_bid` appears with an
+`option_bought` event but no earlier `offer_created`; read its terms with `get_option(option_id)`, or from the
+bid's `bid_created` event joined with `bid_filled` (same terms; the writer comes from `bid_filled`).
+
+**Accounting invariant**: `open_collateral(quote)` = `strike_total` of `Offered`/`Active` PUTs + `strike_total` of
+`Exercised` CALLs (unclaimed proceeds) + `premium_total` of `Open` bids. `open_collateral(underlying)` = `qty` of
+`Offered`/`Active` CALLs + `qty` of `Exercised` PUTs. A fill moves the premium out of the reserve and the collateral
+in, in the same invocation; nothing is counted twice. `check_collateral` therefore also covers escrowed premiums: a
+clawback that leaves the quote balance below this total blocks `create_offer`, `buy`, `transfer`, `buy_resale` and
+`fill_bid` (not `create_bid`, `cancel_bid` or `prune_bids`, which only add or return a buyer's own escrow).
+
+**Storage and TTL**: persistent `Key::Bid(id)`, `Key::BidsFor(asset) -> Vec<u32>`, `Key::BuyerOpen(addr) -> u32`
+(written with the §8 TTL); instance `Key::BidCount` (the instance holds five keys once a bid exists:
+`Quote`, `Underlyings`, `Next`, `AssetCount`, `BidCount`). A filled option is a normal `Opt(id)` entry, kept alive by
+`extend_ttl`; bids by `extend_bid_ttl`.
+
+**Decisions**
+
+1. **The premium is escrowed, not paid on creation**: it reaches the writer only at `fill_bid`, and goes back to the
+   buyer on `cancel_bid` or `prune_bids`. Once filled, the premium policy is the same as `buy` (earned at purchase,
+   never refunded).
+2. **A filled option is outside the open books**: it never enters `OpenFor(asset)` and does not count toward
+   `writer_open_count` / `MAX_OPEN_PER_WRITER` (it is already `Active`). From then on it is an ordinary option:
+   exercise, transfer, resale, reclaim and claim work unchanged.
+3. **Whole fills only**: no partial fill; one bid creates at most one option.
+4. **Self-fill is refused** (`SelfTrade`); the fill also re-checks that the buyer is still authorized on the
+   underlying (an issuer may have de-authorized it since `create_bid`), so an option is never created for a holder
+   who could not settle it.
+5. **Only the buyer cancels**, before or after expiry; **anyone prunes** an expired open bid, and the refund always
+   goes to the buyer.
+6. **Dust bids** can fill one asset's bid book (accepted limitation, see §6 "Bid-book capacity").
+
+Unchanged: every v1.4 function, error, event and constant.

@@ -1,4 +1,4 @@
-/* Markets page and Buy dialog. Tokens only (see src/index.css). Rules: frontend/STYLE.md. */
+/* Markets: option chain, offers list and buy ticket. Tokens only (see src/index.css). Rules: frontend/STYLE.md. */
 
 .mk-page {
   display: flex;
@@ -11,90 +11,99 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.mk-select {
-  height: 30px;
-  padding: 0 8px;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-}
-.mk-select:focus {
-  outline: none;
-  border-color: var(--accent);
+.mk-page .ui-seg-item {
+  white-space: nowrap;
 }
 
 .mk-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 32px;
   align-items: start;
 }
 .mk-main {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
-@media (max-width: 1100px) {
+@media (max-width: 768px) {
   .mk-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .mk-collateral {
-    max-width: 420px;
-  }
 }
 
-.mk-table .ui-table {
-  min-width: 720px;
+/* Option chain: calls | strike | puts. Prices are the controls. */
+.ch th,
+.ch td {
+  white-space: nowrap;
+}
+.ch td {
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.ch .ch-strike {
+  width: 1%;
+  padding: 0 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.ch-none {
+  color: var(--muted);
+  padding: 0 8px;
+}
+.ch-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.ch-price:hover {
+  background: var(--surface-hover);
+}
+.ch-price:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ch-price.is-on {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.ch-makers {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Offers list under the chain. Bold marks the best quote. */
+.mk-list-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
 }
 .mk-table td,
 .mk-table th {
   white-space: nowrap;
 }
-.mk-countdown {
-  margin-left: 6px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
+.mk-table tr.is-best td.mk-prem {
+  font-weight: 600;
+}
+.mk-table tr.is-picked td {
+  background: var(--surface);
 }
 .mk-expiry {
   font-variant-numeric: tabular-nums;
-}
-/* A competing maker on the series of the row above. */
-.mk-cont .mk-asset,
-.mk-cont .mk-kind {
-  color: var(--muted);
-}
-@media (max-width: 640px) {
-  .mk-table .ui-table {
-    min-width: 0;
-  }
-  .mk-table .ui-table th,
-  .mk-table .ui-table td {
-    padding-left: 4px;
-    padding-right: 4px;
-  }
-  .mk-table .ui-table th:first-child,
-  .mk-table .ui-table td:first-child {
-    padding-left: 0;
-  }
-  .mk-table .ui-table th:last-child,
-  .mk-table .ui-table td:last-child {
-    padding-right: 0;
-  }
-  /* The flush card keeps its inner gutter. */
-  .mk-collateral .ui-table th:first-child,
-  .mk-collateral .ui-table td:first-child {
-    padding-left: 12px;
-  }
-  .mk-collateral .ui-table th:last-child,
-  .mk-collateral .ui-table td:last-child {
-    padding-right: 12px;
-  }
-  .mk-table th {
-    white-space: normal;
-  }
-  .mk-countdown {
-    display: block;
-    margin-left: 0;
-  }
 }
 .mk-action {
   text-align: right;
@@ -112,9 +121,6 @@
   font-size: 13px;
   color: var(--muted);
 }
-.mk-pad {
-  padding: 12px;
-}
 .mk-sr {
   position: absolute;
   width: 1px;
@@ -123,16 +129,91 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+@media (max-width: 640px) {
+  .ch .ch-strike {
+    padding: 0 10px;
+  }
+  .ch-price {
+    padding: 0 4px;
+  }
+  .ch th {
+    white-space: normal;
+  }
+  .mk-table .ui-table th,
+  .mk-table .ui-table td {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}
 
-/* Buy dialog */
+/* Ticket column: sticky on wide screens, empty until an offer is picked. */
+.tk-col {
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+}
+.tk-empty {
+  margin: 0;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}
+.tk {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.tk-title {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.tk-body {
+  padding: 12px 16px 0;
+}
+.ui-dialog .tk-body {
+  padding: 0;
+}
+.tk .ui-kv dd.num,
 .ui-dialog .ui-kv dd.num {
   font-variant-numeric: tabular-nums;
 }
+.tk-settle {
+  margin: 12px 0;
+  font-size: 13px;
+}
+.tk-checks {
+  margin-top: 0;
+}
+.tk-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 12px -16px 0;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.ui-dialog .tk-actions {
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  background: var(--bg);
+}
+
 .mk-muted {
   color: var(--muted);
 }
 .mk-note {
   display: block;
+  margin: 2px 0 0;
   font-size: 12px;
   color: var(--muted);
 }
@@ -144,7 +225,8 @@
   font-size: 13px;
 }
 .mk-page .rs-short-note,
-.ui-dialog .ui-banner {
+.ui-dialog .ui-banner,
+.tk .ui-banner {
   margin: 0 0 12px;
 }
 .mk-agree {
@@ -161,21 +243,26 @@
 .mk-done {
   margin: 0 0 12px;
   font-size: 14px;
+  font-weight: 600;
 }
-.mk-asset {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  cursor: pointer;
+.mk-table .ui-mono {
+  font-weight: 400;
 }
-.mk-asset:hover {
-  text-decoration: underline;
+
+/* Two-sided book of one series: bids left, offers right; stacked on narrow screens. */
+.mk-book-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.mk-book-actions { display: flex; gap: 8px; }
+.mk-book-note { margin: 4px 0 12px; }
+.mk-book-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.mk-book-cols.is-one { grid-template-columns: 1fr; }
+.mk-book-side { min-width: 0; }
+.mk-book-side h3 { margin: 0 0 8px; font-size: 14px; }
+@media (max-width: 900px) {
+  .mk-book-cols { grid-template-columns: 1fr; }
 }
-.mk-asset:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+@media (max-width: 480px) {
+  .mk-book-actions { width: 100%; }
+  .mk-book-actions > * { flex: 1; }
 }
 
 /* Plain-language line under the Markets header. */
@@ -188,16 +275,4 @@
 .mk-intro b {
   color: var(--text);
   font-weight: 600;
-}
-.mk-card-note {
-  margin: 0;
-  padding-bottom: 0;
-}
-.mk-kind-hint {
-  margin-left: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.mk-cont .mk-kind-hint {
-  visibility: hidden;
 }

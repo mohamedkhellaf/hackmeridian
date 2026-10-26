@@ -4,20 +4,45 @@ import { config } from './config'
 import { BuyDialog } from './market/BuyDialog'
 import { AppShell, WalletChip } from './layout/AppShell'
 import { useHashRoute } from './layout/routes'
+import type { Route } from './layout/routes'
 import { useNetworkStatus } from './layout/useNetworkStatus'
 import { useStrata } from './state/useStrata'
-import { Banner, NoticeToast } from './ui'
+import { Banner, NoticeToast, TableSkeleton, ViewSkeleton } from './ui'
 import { BalancesBar } from './wallet/BalancesBar'
 import { IssuerView } from './views/IssuerView'
 import { MarketsView } from './views/MarketsView'
 import { PortfolioView } from './views/PortfolioView'
-import { ProtectView } from './views/ProtectView'
+import { SellPanel } from './resale/SellPanel'
+import { MyRequests } from './requests/MyRequests'
 import { ReservesView } from './views/ReservesView'
-import { WriteView } from './views/WriteView'
 import './App.css'
 
-// Strata Pro (experimental): a lazy chunk that exists only when the build sets VITE_ENABLE_PRO=1.
+// StellSec Pro (experimental): a lazy chunk that exists only when the build sets VITE_ENABLE_PRO=1.
 const ProApp = import.meta.env.VITE_ENABLE_PRO === '1' ? lazy(() => import('./pro/ProApp')) : null
+
+const ROUTE_TITLES: Partial<Record<Route, string>> = { markets: 'Markets', portfolio: 'Positions', reserves: 'Locked reserves', issuer: 'Issuer' }
+
+/** One skeleton per view, shaped like its real content, until the first data round completes. */
+function LoadingView({ route, error, onRetry }: { route: Route; error: string | null; onRetry: () => void }) {
+  const title = ROUTE_TITLES[route]!
+  const body =
+    route === 'markets' ? (
+      <div className="mk-layout">
+        <div className="mk-main">
+          <TableSkeleton columns={3} rows={7} />
+          <TableSkeleton columns={7} rows={3} />
+        </div>
+        <div className="tk-col" />
+      </div>
+    ) : (
+      <TableSkeleton columns={route === 'portfolio' ? 9 : route === 'issuer' ? 4 : 6} rows={5} />
+    )
+  return (
+    <ViewSkeleton title={title} error={error} onRetry={onRetry}>
+      {body}
+    </ViewSkeleton>
+  )
+}
 
 function App() {
   const s = useStrata()
@@ -57,30 +82,62 @@ function App() {
         {wallet.wrongNetwork && <Banner tone="danger">{wallet.networkMessage ?? 'Wallet is not on Testnet. Switch network in the wallet.'}</Banner>}
         {wallet.error && <Banner tone="danger">{wallet.error}</Banner>}
 
-        {route === 'markets' && (
+        {!s.ready && ROUTE_TITLES[route] && <LoadingView route={route} error={s.status === 'error' ? s.loadError : null} onRetry={() => void s.retry()} />}
+        {s.ready && route === 'markets' && (
           <MarketsView
             offers={s.market}
             me={me}
             busy={s.busy}
             busyId={s.busyId}
             onBuy={s.setBuying}
+            onConnect={() => void wallet.connect()}
             collateral={s.collateral}
             health={s.health}
             mock={s.isMock}
+            options={s.options}
+            asks={s.asks}
+            bids={s.bids}
+            assets={s.assets}
+            client={s.client}
+            actionFor={s.actionFor}
+            bidBusyId={s.bidBusyId}
+            onCreateBid={s.createBid}
+            onFillBid={s.fillBid}
+            onCancelBid={s.cancelBid}
+            onBuyResale={s.buyResale}
+            onWriteOffer={s.writeOffer}
+            onOutcomeShown={s.dismissNotice}
           />
         )}
-        {route === 'protect' && (
-          <ProtectView assets={s.assets} offers={s.market} me={me} balances={s.balances.balances} mock={s.isMock} busy={s.busy} onBuy={s.setBuying} />
+        {s.ready && route === 'portfolio' && (
+          <PortfolioView
+            me={me}
+            rows={s.positions}
+            actionFor={s.actionFor}
+            health={s.health}
+            resale={
+              <>
+                <MyRequests me={me} bids={s.bids} busy={s.busy} busyId={s.busyId} bidBusyId={s.bidBusyId} onCancel={s.cancelBid} />
+                <SellPanel
+                  me={me}
+                  rows={s.positions}
+                  asks={s.asks}
+                  busy={s.busy}
+                  busyId={s.busyId}
+                  onList={s.listForSale}
+                  onCancel={s.cancelSale}
+                />
+              </>
+            }
+          />
         )}
-        {route === 'write' && <WriteView assets={s.assets} client={s.client} me={me} busy={s.busy} onSubmit={s.writeOffer} />}
-        {route === 'portfolio' && <PortfolioView me={me} rows={s.positions} actionFor={s.actionFor} health={s.health} />}
-        {route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
+        {s.ready && route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
         {route === 'pro' && ProApp && (
           <Suspense fallback={null}>
             <ProApp />
           </Suspense>
         )}
-        {route === 'issuer' && (
+        {s.ready && route === 'issuer' && (
           <IssuerView address={wallet.address} sign={wallet.sign} optionsContractId={config.optionsContractId} tokens={s.assets?.underlyings} mock={s.isMock} />
         )}
       </AppShell>

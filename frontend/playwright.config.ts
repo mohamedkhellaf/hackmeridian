@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 5174
+const PORT = Number(process.env.PW_PORT ?? 5174)
 
 export default defineConfig({
   testDir: './e2e',
@@ -15,7 +15,7 @@ export default defineConfig({
     command: `npx vite --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     // Empty contract id keeps the app on the in-memory mock client.
-    env: { VITE_E2E: '1', VITE_OPTIONS_CONTRACT_ID: '', VITE_ENABLE_PRO: '1' },
+    env: { VITE_E2E: '1', VITE_OPTIONS_CONTRACT_ID: '', VITE_ENABLE_PRO: '1', VITE_PRO_CONTRACT_ID: '' },
     reuseExistingServer: !process.env.CI,
   },
 })

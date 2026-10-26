@@ -1,31 +1,47 @@
-/* Strata tokens and base styles. Dark only. Rules: frontend/STYLE.md. */
+/* StellSec tokens and base styles. Dark only. Rules: frontend/STYLE.md. */
 :root {
-  --bg: #0f1115;
-  --surface: #15181d;
-  --surface-hover: #1a1e24;
-  --border: #262b33;
-  --row-line: #1f242b;
-  --text: #e6e8eb;
-  --text-2: #aeb4bd;
-  --muted: #7d8590;
-  --accent: #6ea8e8;
-  --accent-fg: #0f1115;
-  --danger: #e5726a;
-  --warn: #d9a44a;
+  /* Dark navy-graphite. Contrast on --bg: text 16:1, text-2 7.6:1, muted 6.3:1, accent 6.5:1. On --raised muted is 5.4:1. */
+  --bg: #0c0e14;
+  --surface: #141722;
+  --raised: #1b1f2d;
+  --surface-hover: #222739;
+  --border: #262b3b;
+  --border-strong: #343a4f;
+  --row-line: #262b3b;
+  --text: #eef0f6;
+  --text-2: #a5abbd;
+  --muted: #8d93a8;
+  --accent: #7f8cff;
+  /* Dark ink on the brand gradient: 6.2:1 at the blue end, 5.4:1 at the violet end. White would be 3.1:1. */
+  --accent-fg: #0c0e14;
+  --grad-brand: linear-gradient(135deg, #6e8bff 0%, #9b6bff 100%);
+  --danger: #f07178;
+  --warn: #f2b55b;
   /* Chart fills only. */
   --profit: #5fb87a;
-  --loss: #e5726a;
+  --loss: #f07178;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
 
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-sans: 'Public Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --r: 4px;
+  --r: 10px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+  --gutter: 24px;
+  --control-h: 36px;
 
-  font: 14px/1.5 var(--font-sans);
+  font: 400 14px/1.5 var(--font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--text);
   background: var(--bg);
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 768px) {
+  :root {
+    --gutter: 16px;
+  }
 }
 
 * {
@@ -34,7 +50,11 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* Ambient glow, fixed and faint. The only large gradient on the ground. */
+  background:
+    radial-gradient(1200px 500px at 20% -10%, rgba(110, 139, 255, 0.12), transparent),
+    radial-gradient(900px 420px at 90% -15%, rgba(155, 107, 255, 0.07), transparent), var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
 }
@@ -89,7 +109,7 @@ button {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

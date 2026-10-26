@@ -29,6 +29,12 @@ export const OPTIONS_ERRORS: Record<number, string> = {
   117: 'This asset is already listed.',
   118: 'This asset has no Stellar Asset Contract deployed yet, so it cannot be listed.',
   119: 'The expiry is too far out: offers can run for at most 2 years.',
+  120: 'This option is no longer for sale (bought, withdrawn, exercised or transferred).',
+  121: 'The seller changed the price. Review the new price before buying.',
+  122: 'This request is no longer open (filled, withdrawn or expired).',
+  123: 'Only the buyer who posted this request can do this.',
+  124: 'The request book is full: too many open requests. Try again once some are filled or cancelled.',
+  125: 'You already have 50 open requests on this asset.',
 }
 
 // Options codes (101+) and SAC codes (1-13) are disjoint, so a code identifies its source on its own.

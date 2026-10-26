@@ -1,4 +1,4 @@
-# packages/risk — Strata Pro margin engine (Dev 1)
+# packages/risk — StellSec Pro margin engine (Dev 1)
 
 Python 3 + numpy. Owner: Dev 1.
 

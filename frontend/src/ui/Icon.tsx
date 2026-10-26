@@ -2,6 +2,9 @@ import type { ReactNode, SVGProps } from 'react'
 
 export type IconName =
   | 'markets'
+  | 'protect'
+  | 'pro'
+  | 'more'
   | 'write'
   | 'portfolio'
   | 'reserves'
@@ -18,6 +21,15 @@ export type IconName =
 // 16x16 stroke paths taken from the approved mockups.
 const PATHS: Record<IconName, ReactNode> = {
   markets: <path d="M2 13l4-5 3 3 5-7" />,
+  protect: <path d="M2.5 8.5a5.5 5 0 0 1 11 0zM8 8.5V12.5a1.2 1.2 0 0 1-2.4 0" />,
+  pro: <path d="M3 13V8.5M8 13V3M13 13V6" />,
+  more: (
+    <>
+      <circle cx="3.5" cy="8" r="0.6" />
+      <circle cx="8" cy="8" r="0.6" />
+      <circle cx="12.5" cy="8" r="0.6" />
+    </>
+  ),
   write: <path d="M3 13h10M4 10l6.5-6.5 2 2L6 12H4z" />,
   portfolio: (
     <>

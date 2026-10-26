@@ -1,76 +1,89 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { expectOpenOffers, goTo, offerRows, openApp } from './helpers.ts'
 
-test('market lists the seeded offers in one table', async ({ page }) => {
+const chain = (page: Page) => page.getByRole('table', { name: 'Option chain' })
+const chainRows = (page: Page) => chain(page).locator('tbody tr')
+
+test('a loading skeleton precedes the data and no count or empty state shows meanwhile', async ({ page }) => {
+  // Slow the mock's 150 ms read so the loading state is observable.
+  await page.addInitScript(() => {
+    const st = window.setTimeout
+    window.setTimeout = ((f: TimerHandler, d?: number, ...a: unknown[]) => st(f, d === 150 ? 1500 : d, ...a)) as typeof window.setTimeout
+  })
+  await page.goto('/')
+  const loading = page.getByRole('status', { name: 'Loading Markets' })
+  await expect(loading).toBeVisible()
+  await expect(loading.getByText(/open offers?/)).toHaveCount(0)
+  await expect(page.getByRole('table', { name: 'Offers' })).toBeVisible()
+  await expect(loading).toHaveCount(0)
+})
+
+test('chain shows strikes with the best premium and maker count per side', async ({ page }) => {
   await openApp(page)
   await expectOpenOffers(page, 4)
-  const rows = offerRows(page)
-  await expect(rows).toHaveCount(4)
-  await expect(rows.filter({ hasText: 'FUND' }).filter({ hasText: 'Put' }).filter({ hasText: '10.00' })).toHaveCount(2)
-  await expect(rows.filter({ hasText: 'FUND' }).filter({ hasText: 'Call' }).filter({ hasText: '12.00' })).toHaveCount(1)
-  await expect(rows.filter({ hasText: 'BOND' }).filter({ hasText: 'Put' }).filter({ hasText: '98.00' })).toHaveCount(1)
+  // Opens on FUND, first expiry: one strike, a put quoted by two makers (best 0.36), no call.
+  await expect(chainRows(page)).toHaveCount(1)
+  const row = chainRows(page).first()
+  await expect(row.getByRole('cell').nth(1)).toHaveText('10.00')
+  await expect(row.getByRole('cell').nth(0)).toHaveText('—')
+  await expect(row.getByRole('button', { name: /^Put at 10\.00/ })).toContainText(/0\.36\s*\(2\)/)
+  // The list under the chain is that series, best first.
+  await expect(page.getByRole('heading', { name: 'FUND 10.00 put' })).toBeVisible()
+  await expect(offerRows(page)).toHaveCount(2)
+  await expect(offerRows(page).nth(0)).toContainText('GMAK…BBBB')
+  await expect(offerRows(page).nth(0)).toContainText('0.36')
+  await expect(offerRows(page).nth(0)).toContainText('1.80')
+  await expect(offerRows(page).nth(1)).toContainText('GMAK…AAAA')
+  await expect(offerRows(page).nth(1)).toContainText('0.40')
+  await expect(offerRows(page).nth(1)).toContainText('2.00')
 })
 
-test('two makers compete on the FUND put; the cheaper one is listed first', async ({ page }) => {
+test('expiry and asset controls rebuild the chain from real offers', async ({ page }) => {
   await openApp(page)
-  const fundPuts = offerRows(page).filter({ hasText: 'FUND' }).filter({ hasText: 'Put' })
-  await expect(fundPuts).toHaveCount(2)
-  // Same expiry and strike, so the sort falls through to premium per unit: maker B (0.36) before maker A (0.40).
-  await expect(fundPuts.nth(0)).toContainText('GMAK…BBBB')
-  await expect(fundPuts.nth(0)).toContainText('0.36')
-  await expect(fundPuts.nth(0)).toContainText('1.80')
-  await expect(fundPuts.nth(1)).toContainText('GMAK…AAAA')
-  await expect(fundPuts.nth(1)).toContainText('0.40')
-  await expect(fundPuts.nth(1)).toContainText('2.00')
-  // Rows are sorted by expiry: both 3-day FUND puts, then the 7-day FUND call, then the 14-day BOND put.
-  await expect(offerRows(page).nth(2)).toContainText('Call')
-  await expect(offerRows(page).nth(3)).toContainText('BOND')
-})
+  const expiry = page.getByRole('radiogroup', { name: 'Expiry' })
+  await expect(expiry.getByRole('radio')).toHaveCount(2)
+  await expiry.getByRole('radio').nth(1).click()
+  await expect(expiry.getByRole('radio').nth(1)).toHaveAttribute('aria-checked', 'true')
+  await expect(chainRows(page)).toHaveCount(1)
+  await expect(chainRows(page).first().getByRole('cell').nth(1)).toHaveText('12.00')
+  await expect(chainRows(page).first().getByRole('cell').nth(2)).toHaveText('—')
+  await expect(page.getByRole('button', { name: /^Call at 12\.00/ })).toContainText(/0\.50\s*\(1\)/)
+  await expect(offerRows(page)).toHaveCount(1)
+  await expect(offerRows(page)).toContainText('GMAK…AAAA')
 
-test('filters really filter the offers', async ({ page }) => {
-  await openApp(page)
-  const asset = page.getByRole('combobox', { name: 'Asset' })
-  const kind = page.getByRole('radiogroup', { name: 'Kind' })
-  const rows = offerRows(page)
-  await expect(rows).toHaveCount(4)
-  await asset.selectOption('BOND')
-  await expect(rows).toHaveCount(1)
-  await expect(rows).toContainText('BOND')
-  await expect(rows).toContainText('Put')
-  await asset.selectOption({ label: 'All assets' })
-  await kind.getByRole('radio', { name: 'Call', exact: true }).click()
-  await expect(kind.getByRole('radio', { name: 'Call', exact: true })).toHaveAttribute('aria-checked', 'true')
-  await expect(rows).toHaveCount(1)
-  await expect(rows).toContainText('FUND')
-  await expect(rows).toContainText('Call')
-  await kind.getByRole('radio', { name: 'Put', exact: true }).click()
-  await expect(rows).toHaveCount(3)
-  await kind.getByRole('radio', { name: 'Call', exact: true }).click()
-  await asset.selectOption('BOND')
-  await expect(page.getByText('No open offers match.')).toBeVisible()
-  await expect(rows).toHaveCount(0)
-  await kind.getByRole('radio', { name: 'All', exact: true }).click()
-  await asset.selectOption({ label: 'All assets' })
-  await expect(rows).toHaveCount(4)
-  // Filters never change the count of open offers.
+  await page.getByRole('combobox', { name: 'Asset' }).selectOption('BOND')
+  await expect(expiry.getByRole('radio')).toHaveCount(1)
+  await expect(chainRows(page).first().getByRole('cell').nth(1)).toHaveText('98.00')
+  await expect(page.getByRole('heading', { name: 'BOND 98.00 put' })).toBeVisible()
+  await expect(offerRows(page)).toHaveCount(1)
+  // The count of open offers never depends on the view.
   await expectOpenOffers(page, 4)
 })
 
-test('buy is disabled until a wallet is connected', async ({ page }) => {
+test('picking a price shows every maker for that series', async ({ page }) => {
   await openApp(page)
-  const buys = page.getByRole('button', { name: /^Buy / })
-  await expect(buys).toHaveCount(4)
-  for (const b of await buys.all()) await expect(b).toBeDisabled()
+  const expiry = page.getByRole('radiogroup', { name: 'Expiry' })
+  await expiry.getByRole('radio').nth(1).click()
+  await expect(page.getByRole('heading', { name: 'FUND 12.00 call' })).toBeVisible()
+  await expiry.getByRole('radio').nth(0).click()
+  await page.getByRole('button', { name: /^Put at 10\.00/ }).click()
+  await expect(page.getByRole('button', { name: /^Put at 10\.00/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(offerRows(page)).toHaveCount(2)
 })
 
-test('collateral card on Markets shows owed and held per token', async ({ page }) => {
+test('the ticket starts empty; without a wallet it shows terms and Connect wallet', async ({ page }) => {
   await openApp(page)
-  const usdx = page.getByRole('table', { name: 'Locked reserves', exact: true }).getByRole('row', { name: /^USDx / })
-  const cells = usdx.getByRole('cell')
-  await expect(cells).toHaveCount(3)
-  const [owed, held] = [await cells.nth(1).innerText(), await cells.nth(2).innerText()]
-  expect(Number(owed.replace(/,/g, ''))).toBeGreaterThan(0)
-  expect(held).toBe(owed)
+  await expect(page.getByText('Select a price in the chain.')).toBeVisible()
+  await page.getByRole('button', { name: /^Buy put on 5.00 FUND from GMAK…BBBB/ }).click()
+  const ticket = page.getByRole('dialog', { name: 'Buy FUND put' })
+  await expect(ticket).toContainText('5.00 FUND')
+  await expect(ticket).toContainText('At exercise you deliver 5.00 FUND and receive 50.00 USDx.')
+  await expect(ticket.getByRole('button', { name: 'Connect wallet' })).toBeVisible()
+  await expect(ticket.getByRole('button', { name: /^Buy for/ })).toHaveCount(0)
+  // Connecting from the ticket opens the live ticket for the same offer.
+  await ticket.getByRole('button', { name: 'Connect wallet' }).click()
+  await expect(page.getByRole('button', { name: 'Wallet menu' })).toBeVisible()
+  await expect(ticket.getByRole('button', { name: 'Buy for 1.80 USDx' })).toBeDisabled()
 })
 
 test('hash routes drive the sidebar and every view renders', async ({ page }) => {
@@ -79,8 +92,6 @@ test('hash routes drive the sidebar and every view renders', async ({ page }) =>
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Locked reserves', exact: true })).toHaveAttribute('aria-current', 'page')
   for (const [link, title] of [
     ['Positions', 'Positions'],
-    ['Write', 'Write'],
-    ['Protect', 'Protect'],
     ['Issuer', 'Issuer'],
     ['Markets', 'Markets'],
   ] as const) {

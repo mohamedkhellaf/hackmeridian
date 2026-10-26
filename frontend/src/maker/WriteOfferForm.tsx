@@ -31,19 +31,25 @@ export function WriteOfferForm({
   me,
   disabled,
   onSubmit,
+  initial,
+  plain,
 }: {
+  /** Prefill from a series. */
+  initial?: Partial<{ kind: OptionKind; underlyingId: string; qty: string; strike: string; premium: string; expiryMs: number }>
+  /** Without the card frame (inside a dialog). */
+  plain?: boolean
   assets: SupportedAssets
   client: OptionsClient
   me: string | null
   disabled: boolean
   onSubmit: (offer: NewOffer) => Promise<boolean>
 }) {
-  const [kind, setKind] = useState<OptionKind>('put')
-  const [underlyingId, setUnderlyingId] = useState(assets.underlyings[0]?.contractId ?? '')
-  const [qty, setQty] = useState('5')
-  const [strike, setStrike] = useState('10')
-  const [premium, setPremium] = useState('2')
-  const [expiry, setExpiry] = useState(() => toLocalInput(nowMs() + DEFAULT_TENOR_MS))
+  const [kind, setKind] = useState<OptionKind>(initial?.kind ?? 'put')
+  const [underlyingId, setUnderlyingId] = useState(initial?.underlyingId ?? assets.underlyings[0]?.contractId ?? '')
+  const [qty, setQty] = useState(initial?.qty ?? '5')
+  const [strike, setStrike] = useState(initial?.strike ?? '10')
+  const [premium, setPremium] = useState(initial?.premium ?? '2')
+  const [expiry, setExpiry] = useState(() => toLocalInput(initial?.expiryMs ?? nowMs() + DEFAULT_TENOR_MS))
   const [submitting, setSubmitting] = useState(false)
 
   const eligKey = me ? `${underlyingId}:${me}` : null
@@ -117,9 +123,8 @@ export function WriteOfferForm({
     if (ok) setExpiry(toLocalInput(nowMs() + DEFAULT_TENOR_MS))
   }
 
-  return (
-    <Card>
-      <form className="wr" onSubmit={(e) => void submit(e)}>
+  const form = (
+      <form className={plain ? "wr wr--stack" : "wr"} onSubmit={(e) => void submit(e)}>
         <div className="wr-fields">
           <div className="wr-field">
             <span className="wr-label">Kind</span>
@@ -220,6 +225,6 @@ export function WriteOfferForm({
           </Button>
         </div>
       </form>
-    </Card>
   )
+  return plain ? form : <Card>{form}</Card>
 }

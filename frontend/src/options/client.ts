@@ -1,4 +1,5 @@
-import type { CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets, TxResult } from './types'
+import type { Bid, NewBid } from '../requests/types'
+import type { Ask, CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets, TxResult } from './types'
 
 // The UI only talks to this interface. MockOptionsClient and SorobanOptionsClient implement it
 // (docs/contract-abi.md); createOptionsClient() in index.ts picks one.
@@ -21,4 +22,23 @@ export interface OptionsClient {
   cancelOffer(id: bigint, writer: string): Promise<TxResult>
   // Writer pulls the proceeds of an exercised option; exercised -> settled.
   claimDelivery(id: bigint, writer: string): Promise<TxResult>
+  // Resale (contract v1.4). listAsks returns null when the contract has no resale functions (before v1.4).
+  listAsks(): Promise<Ask[] | null>
+  getAsk(id: bigint): Promise<bigint | null>
+  // Holder lists an Active, unexpired option for `askTotal` quote units (overwrites an existing ask).
+  listForSale(id: bigint, holder: string, askTotal: bigint): Promise<TxResult>
+  cancelSale(id: bigint, holder: string): Promise<TxResult>
+  // Buyer pays ask_total in the option's quote token to the current holder and becomes the holder, atomically.
+  // `maxTotal` is the ask the buyer saw; a higher on-chain ask fails with PriceMoved (121).
+  buyResale(id: bigint, buyer: string, maxTotal: bigint): Promise<TxResult>
+  // Buyer requests (contract v1.5 bids). listBids returns null when the contract has no bids (before v1.5).
+  listBids(): Promise<Bid[] | null>
+  getBid(id: bigint): Promise<Bid>
+  // Open requests by this buyer; null before v1.5.
+  buyerOpenCount(buyer: string): Promise<number | null>
+  // Buyer escrows `totalPremium` (quote token) in the contract; refunded on cancel or expiry.
+  createBid(bid: NewBid, buyer: string): Promise<TxResult & { id: bigint }>
+  cancelBid(id: bigint, buyer: string): Promise<TxResult>
+  // Writer locks the collateral and receives the escrowed premium; the option is Active with holder = buyer.
+  fillBid(id: bigint, writer: string): Promise<TxResult & { optionId: bigint }>
 }

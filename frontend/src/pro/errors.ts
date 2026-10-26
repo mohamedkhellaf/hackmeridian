@@ -1,4 +1,4 @@
-// Strata Pro contract errors 201..226 (docs/pro-v0-brief-dev2.md, packages/risk fixtures `errors`) in plain words.
+// StellSec Pro contract errors 201..226 (docs/pro-v0-brief-dev2.md, packages/risk fixtures `errors`) in plain words.
 
 export interface ProErrorInfo {
   code: number

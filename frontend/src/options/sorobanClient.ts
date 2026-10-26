@@ -4,10 +4,13 @@ import { server } from '../stellar/rpc'
 import { baseClientOptions, clientSigning, signAndSend } from '../stellar/signer'
 import type { WalletSigner } from '../stellar/signer'
 import { readBalance } from '../stellar/tokens'
-import { collateralLines, expiryToU64, idToU32, assertI128, kindToAbi, optionFromAbi } from './abi'
-import type { AbiConfig, AbiOptionData, AbiOptionType } from './abi'
+import { askFromAbi, askTotalFromAbi, collateralLines, expiryToU64, idToU32, assertI128, kindToAbi, optionFromAbi } from './abi'
+import type { AbiAsk, AbiConfig, AbiOptionData, AbiOptionType } from './abi'
 import type { OptionsClient } from './client'
-import type { CollateralHealth, NewOffer, OptionOffer, SupportedAssets, TokenInfo, TxResult } from './types'
+import { bidFromAbi } from '../requests/abi'
+import type { AbiBid } from '../requests/abi'
+import type { Bid, NewBid } from '../requests/types'
+import type { Ask, CollateralHealth, NewOffer, OptionOffer, SupportedAssets, TokenInfo, TxResult } from './types'
 
 // Hand-written typed view of the `options` contract (docs/contract-abi.md section 3), shaped like the
 // code `stellar contract bindings typescript` generates: named-argument objects, AssembledTransaction
@@ -55,10 +58,52 @@ interface OptionsContract {
   prune_expired?: (a: { pruner?: string; ids: number[] }, o?: Opt) => Tx<MaybeResult<number>>
   // v1.3.1+
   list_open_for?: (a: { asset: string; from: number; limit: number }, o?: Opt) => Tx<number[]>
+  // v1.4 resale
+  list_for_sale?: (a: { holder: string; id: number; ask_total: bigint }, o?: Opt) => Tx<MaybeResult<null>>
+  cancel_sale?: (a: { holder: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
+  buy_resale?: (a: { buyer: string; id: number; max_total: bigint }, o?: Opt) => Tx<MaybeResult<null>>
+  get_ask?: (a: { id: number }, o?: Opt) => Tx<bigint | null | undefined>
+  list_asks?: (a: { from: number; limit: number }, o?: Opt) => Tx<AbiAsk[]>
+  // v1.5 buyer requests (bids)
+  create_bid?: (
+    a: {
+      buyer: string
+      kind: AbiOptionType
+      underlying: string
+      quote: string
+      qty: bigint
+      strike_total: bigint
+      premium_total: bigint
+      expiry: bigint
+    },
+    o?: Opt,
+  ) => Tx<MaybeResult<number>>
+  cancel_bid?: (a: { buyer: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
+  fill_bid?: (a: { writer: string; id: number }, o?: Opt) => Tx<MaybeResult<number>>
+  prune_bids?: (a: { pruner: string; ids: number[] }, o?: Opt) => Tx<MaybeResult<number>>
+  get_bid?: (a: { id: number }, o?: Opt) => Tx<MaybeResult<AbiBid>>
+  get_bids?: (a: { from: number; limit: number }, o?: Opt) => Tx<AbiBid[]>
+  bid_count?: (o?: Opt) => Tx<number>
+  list_open_bids_for?: (a: { asset: string; from: number; limit: number }, o?: Opt) => Tx<number[]>
+  buyer_open_count?: (a: { buyer: string }, o?: Opt) => Tx<number>
 }
 
 type Bound = contract.Client & OptionsContract
-type V13Fn = 'asset_count' | 'list_assets' | 'is_listed' | 'writer_open_count' | 'list_asset' | 'prune_expired' | 'list_open_for'
+type V13Fn =
+  | 'asset_count'
+  | 'list_assets'
+  | 'is_listed'
+  | 'writer_open_count'
+  | 'list_asset'
+  | 'prune_expired'
+  | 'list_open_for'
+  | 'list_for_sale'
+  | 'cancel_sale'
+  | 'buy_resale'
+  | 'get_ask'
+  | 'list_asks'
+  | 'bid_count'
+  | 'buyer_open_count'
 
 // The generated client only has methods for functions in the deployed contract's spec, so presence of the
 // method is the feature flag: the same build runs against v1.2 and v1.3(.1).
@@ -291,6 +336,45 @@ export class SorobanOptionsClient implements OptionsClient {
     return this.simple((c, n) => c.claim_delivery({ writer, id: n }), id)
   }
 
+  // v1.4 resale. Feature-detected: on an older contract listAsks is null and the UI hides resale.
+  listAsks(): Promise<Ask[] | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'list_asks')) return null
+      const count = await this.read((x) => x.option_count())
+      const out: Ask[] = []
+      // list_asks scans ids from..from+limit and returns only those with an ask, so advance by PAGE, not by length.
+      for (let from = 0; from < count; from += PAGE) {
+        const page = await this.read((x) => x.list_asks!({ from, limit: PAGE }))
+        out.push(...page.map(askFromAbi))
+      }
+      return out
+    })
+  }
+  getAsk(id: bigint): Promise<bigint | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'get_ask')) return null
+      return askTotalFromAbi(await this.read((x) => x.get_ask!({ id: idToU32(id) })))
+    })
+  }
+  // The SDK only binds functions in the deployed spec; a pre-v1.4 contract has no resale functions.
+  private resaleWrite(call: (c: Bound, id: number) => Tx<MaybeResult<null>>, id: bigint): Promise<TxResult> {
+    return this.simple((c, n) => {
+      if (!has(c, 'list_for_sale')) throw new Error('This contract version has no resale (needs v1.4).')
+      return call(c, n)
+    }, id)
+  }
+  listForSale(id: bigint, holder: string, askTotal: bigint) {
+    return this.resaleWrite((c, n) => c.list_for_sale!({ holder, id: n, ask_total: assertI128(askTotal) }), id)
+  }
+  cancelSale(id: bigint, holder: string) {
+    return this.resaleWrite((c, n) => c.cancel_sale!({ holder, id: n }), id)
+  }
+  buyResale(id: bigint, buyer: string, maxTotal: bigint) {
+    return this.resaleWrite((c, n) => c.buy_resale!({ buyer, id: n, max_total: assertI128(maxTotal) }), id)
+  }
+
   // v1.2 capabilities, client only (no UI yet). transfer moves no tokens: payment is settled off-chain.
   transferHolder(id: bigint, holder: string, to: string) {
     return this.simple((c, n) => c.transfer({ holder, to, id: n }), id)
@@ -330,6 +414,83 @@ export class SorobanOptionsClient implements OptionsClient {
       const { hash, result } = await this.write((c) => c.extend_ttl({ ids: ids.map(idToU32) }))
       unwrap(result)
       return { hash }
+    })
+  }
+  // v1.5 buyer requests (bids). Feature-detected on `bid_count`: null on an older contract, and the UI hides requests.
+  listBids(): Promise<Bid[] | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'bid_count')) return null
+      const [count, tokens] = await Promise.all([this.read((x) => x.bid_count!()), this.tokenMap()])
+      const now = nowSec()
+      const raws: AbiBid[] = []
+      // get_bids returns at most min(limit, 50) bids from `from`; step by the page size until bid_count.
+      for (let from = 0; from < count; from += PAGE) {
+        const page = await this.read((x) => x.get_bids!({ from, limit: PAGE }))
+        raws.push(...page)
+      }
+      return raws.map((r) => bidFromAbi(r, tokens, now))
+    })
+  }
+  private async bidClient(): Promise<Bound> {
+    const c = await this.client()
+    if (!has(c, 'bid_count')) throw new Error('This contract version has no requests (needs v1.5).')
+    return c
+  }
+  getBid(id: bigint): Promise<Bid> {
+    return this.guard(async () => {
+      await this.bidClient()
+      const [raw, tokens] = await Promise.all([this.read((x) => x.get_bid!({ id: idToU32(id) })), this.tokenMap()])
+      return bidFromAbi(unwrap(raw), tokens, nowSec())
+    })
+  }
+  buyerOpenCount(buyer: string): Promise<number | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'buyer_open_count')) return null
+      return this.read((x) => x.buyer_open_count!({ buyer }))
+    })
+  }
+  createBid(bid: NewBid, buyer: string): Promise<TxResult & { id: bigint }> {
+    return this.guard(async () => {
+      await this.bidClient()
+      const cfg = await this.config()
+      const { hash, result } = await this.write((c) =>
+        c.create_bid!({
+          buyer,
+          kind: kindToAbi(bid.kind),
+          underlying: bid.underlying.contractId,
+          quote: cfg.quote,
+          qty: assertI128(bid.underlyingQty),
+          strike_total: assertI128(bid.totalStrike),
+          premium_total: assertI128(bid.totalPremium),
+          expiry: expiryToU64(bid.expiry),
+        }),
+      )
+      return { hash, id: BigInt(unwrap(result)) }
+    })
+  }
+  cancelBid(id: bigint, buyer: string): Promise<TxResult> {
+    return this.guard(async () => {
+      await this.bidClient()
+      const { hash, result } = await this.write((c) => c.cancel_bid!({ buyer, id: idToU32(id) }))
+      unwrap(result)
+      return { hash }
+    })
+  }
+  fillBid(id: bigint, writer: string): Promise<TxResult & { optionId: bigint }> {
+    return this.guard(async () => {
+      await this.bidClient()
+      const { hash, result } = await this.write((c) => c.fill_bid!({ writer, id: idToU32(id) }))
+      return { hash, optionId: BigInt(unwrap(result)) }
+    })
+  }
+  // Client only (no UI yet): anyone may prune expired Open requests, which refunds the escrowed premium.
+  pruneBids(ids: bigint[], pruner: string): Promise<TxResult & { pruned: number }> {
+    return this.guard(async () => {
+      await this.bidClient()
+      const { hash, result } = await this.write((c) => c.prune_bids!({ pruner, ids: ids.map(idToU32) }))
+      return { hash, pruned: Number(unwrap(result)) }
     })
   }
 }
