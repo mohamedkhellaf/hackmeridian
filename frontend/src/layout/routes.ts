@@ -1,31 +1,27 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { IconName } from '../ui'
 
 export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
 
-/** Strata Pro (experimental) is mounted only when the build sets VITE_ENABLE_PRO=1. */
+/** Strata Pro is mounted only when the build sets VITE_ENABLE_PRO=1. */
 export const PRO_ENABLED = import.meta.env.VITE_ENABLE_PRO === '1'
 
 export interface NavItem {
   route: Route
   label: string
-  icon: IconName
 }
 
-export const NAV_TRADE: NavItem[] = [
-  { route: 'markets', label: 'Markets', icon: 'markets' },
-  { route: 'protect', label: 'Protect', icon: 'reserves' },
-  { route: 'write', label: 'Write', icon: 'write' },
-  { route: 'portfolio', label: 'Portfolio', icon: 'portfolio' },
+/** Sidebar and phone tab bar, same routes. */
+export const NAV: NavItem[] = [
+  { route: 'markets', label: 'Markets' },
+  { route: 'protect', label: 'Protect' },
+  { route: 'write', label: 'Write' },
+  { route: 'portfolio', label: 'Positions' },
+  { route: 'reserves', label: 'Collateral' },
+  { route: 'issuer', label: 'Issuer' },
+  ...(PRO_ENABLED ? [{ route: 'pro' as const, label: 'Pro' }] : []),
 ]
-export const NAV_TRANSPARENCY: NavItem[] = [
-  { route: 'reserves', label: 'Reserves', icon: 'reserves' },
-  { route: 'issuer', label: 'Issuer', icon: 'issuer' },
-]
-/** Bottom tab bar on phones. Issuer is reached from the top bar. */
-export const NAV_TABS: NavItem[] = [...NAV_TRADE, NAV_TRANSPARENCY[0]]
 
-const ROUTES: Route[] = ['markets', 'protect', 'write', 'portfolio', 'reserves', 'issuer', ...(PRO_ENABLED ? (['pro'] as const) : [])]
+const ROUTES: Route[] = NAV.map((n) => n.route)
 
 export const hrefFor = (r: Route) => `#/${r}`
 

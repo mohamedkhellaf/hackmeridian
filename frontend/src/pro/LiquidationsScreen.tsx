@@ -1,8 +1,8 @@
-import { Banner, Button, Card, PageHeader, Tag } from '../ui'
-import { DASH, lots, usdx } from './format'
-import { Unknown, Who } from './parts'
+import { Button, Card } from '../ui'
+import { proErrorName } from './errors'
+import { lots } from './format'
+import { Unknown, Usdx, Who } from './parts'
 import { usePro } from './proCtx'
-import { VAULT } from './types'
 
 export function LiquidationsScreen() {
   const { client, model, me, run } = usePro()
@@ -11,26 +11,17 @@ export function LiquidationsScreen() {
 
   return (
     <>
-      <PageHeader
-        title="Liquidations"
-        subtitle="An account whose NLV falls below its maintenance margin (MM) can be taken over. Anyone can trigger a takeover to the vault; a solvent maker can take it over privately."
-      />
-
-      <Banner tone="warn" title="Takeover price and deficit">
-        The taker pays the takeover price from the writer's cash. If the writer's cash cannot cover it, the shortfall is a recorded deficit: the vault absorbs it and the writer owes it back to the vault.
-      </Banner>
-
-      <Card title="Accounts" subtitle="Margin figures come from get_requirement; a dash means the source has no current value." flush>
+      <Card title="Accounts" flush>
         <div className="ui-table-wrap">
           <table className="ui-table">
             <thead>
               <tr>
-                <th className="ui-left">Account</th>
-                <th>Short calls</th>
-                <th>NLV</th>
-                <th>MM</th>
-                <th>Distance</th>
-                <th>Status</th>
+                <th>Account</th>
+                <th className="hide-sm">Short calls</th>
+                <th className="num hide-sm">NLV (USDx)</th>
+                <th className="num hide-sm">MM (USDx)</th>
+                <th className="num">Distance (USDx)</th>
+                <th className="hide-sm">Margin</th>
                 <th>
                   <span className="pro-sr">Actions</span>
                 </th>
@@ -39,29 +30,25 @@ export function LiquidationsScreen() {
             <tbody>
               {writers.length === 0 && (
                 <tr>
-                  <td className="ui-left" colSpan={7}>
-                    No margin accounts at this point of the simulation.
-                  </td>
+                  <td colSpan={7}>No margin accounts.</td>
                 </tr>
               )}
               {writers.map((a) => {
                 const below = a.cushion != null && a.cushion < 0n
                 const hasShorts = a.shorts.length > 0
                 return (
-                  <tr key={a.id} className={below ? 'is-risk' : undefined}>
-                    <td className="ui-left ui-strong">
+                  <tr key={a.id}>
+                    <td>
                       <Who id={a.id} />
                     </td>
-                    <td>{hasShorts ? a.shorts.map((s) => `${lots(s.qty)} lots (#${s.seriesId})`).join(', ') : 'None'}</td>
-                    <td>{a.requirement ? usdx(a.requirement.nlv) : <Unknown />}</td>
-                    <td>{a.requirement ? usdx(a.requirement.mm) : <Unknown />}</td>
-                    <td>{a.cushion != null ? usdx(a.cushion) : <Unknown />}</td>
-                    <td>
-                      {a.cushion == null ? <Tag>No value</Tag> : <Tag tone={below ? 'warn' : 'ok'}>{below ? 'Below maintenance' : 'Healthy'}</Tag>}
-                    </td>
+                    <td className="hide-sm">{hasShorts ? a.shorts.map((s) => `${lots(s.qty)} lots, series ${s.seriesId}`).join('; ') : 'None'}</td>
+                    <td className="num hide-sm">{a.requirement ? <Usdx v={a.requirement.nlv} /> : <Unknown />}</td>
+                    <td className="num hide-sm">{a.requirement ? <Usdx v={a.requirement.mm} /> : <Unknown />}</td>
+                    <td className={below ? 'num pro-bad' : 'num'}>{a.cushion != null ? <Usdx v={a.cushion} /> : <Unknown />}</td>
+                    <td className={below ? 'pro-warn hide-sm' : 'hide-sm'}>{a.cushion == null ? <Unknown /> : below ? 'Below maintenance' : 'Above maintenance'}</td>
                     <td>
                       <div className="pro-actions">
-                        <Button size="sm" variant={below ? 'primary' : 'secondary'} disabled={!hasShorts} onClick={() => void run('Take over to the vault', client.liquidate(me, a.id, null), 'Taken over to the vault.')}>
+                        <Button size="sm" variant={below ? 'primary' : 'secondary'} disabled={!hasShorts} onClick={() => void run('Take over to the vault', client.liquidate(me, a.id, null), 'Taken over by the vault')}>
                           Take over to the vault
                         </Button>
                         <Button
@@ -69,7 +56,7 @@ export function LiquidationsScreen() {
                           variant="secondary"
                           disabled={!hasShorts || a.id === me}
                           title={a.id === me ? 'You cannot take over your own account' : undefined}
-                          onClick={() => void run('Private takeover', client.liquidate(me, a.id, me), 'Taken over privately.')}
+                          onClick={() => void run('Private takeover', client.liquidate(me, a.id, me), 'Taken over privately')}
                         >
                           Private takeover
                         </Button>
@@ -83,40 +70,50 @@ export function LiquidationsScreen() {
         </div>
       </Card>
 
-      <Card title="Takeovers so far" subtitle="Takeover price, what the writer's cash paid, and any deficit." flush>
+      <Card title="Takeovers" flush>
         <div className="ui-table-wrap">
           <table className="ui-table">
             <thead>
               <tr>
-                <th className="ui-left">Step</th>
+                <th className="num hide-sm">Step</th>
                 <th>Writer</th>
                 <th>Taker</th>
-                <th>Takeover price</th>
-                <th>Paid</th>
-                <th>Deficit</th>
+                <th className="num">Price (USDx)</th>
+                <th className="num">Paid (USDx)</th>
+                <th className="num">Deficit (USDx)</th>
               </tr>
             </thead>
             <tbody>
               {takeovers.length === 0 && (
                 <tr>
-                  <td className="ui-left" colSpan={6}>
-                    No takeover yet at this point of the simulation.
-                  </td>
+                  <td colSpan={6}>No takeovers.</td>
                 </tr>
               )}
               {takeovers.map((h) => (
                 <tr key={h.index}>
-                  <td className="ui-left">#{h.index + 1}</td>
-                  <td>{String(h.args[1])}</td>
-                  <td>{h.args[2] === VAULT ? <Tag tone="call">Vault</Tag> : String(h.args[2])}</td>
+                  <td className="num hide-sm">{h.index + 1}</td>
+                  <td>
+                    <Who id={String(h.args[1])} />
+                  </td>
+                  <td>
+                    <Who id={String(h.args[2])} />
+                  </td>
                   {h.ok && h.result ? (
                     <>
-                      <td>{usdx(h.result.x)}</td>
-                      <td>{usdx(h.result.paid)}</td>
-                      <td className={h.result.deficit > 0n ? 'pro-bad' : undefined}>{usdx(h.result.deficit)}</td>
+                      <td className="num">
+                        <Usdx v={h.result.x} />
+                      </td>
+                      <td className="num">
+                        <Usdx v={h.result.paid} />
+                      </td>
+                      <td className={h.result.deficit > 0n ? 'num pro-bad' : 'num'}>
+                        <Usdx v={h.result.deficit} />
+                      </td>
                     </>
                   ) : (
-                    <td colSpan={3}>Refused (error {h.code ?? DASH})</td>
+                    <td colSpan={3} className="pro-warn">
+                      Refused: {proErrorName(h.code ?? 0)} ({h.code ?? 0})
+                    </td>
                   )}
                 </tr>
               ))}

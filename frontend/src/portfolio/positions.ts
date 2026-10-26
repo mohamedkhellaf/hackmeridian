@@ -101,7 +101,7 @@ export function premiumOf(o: OptionOffer, role: Role): PremiumCell {
   if (role === 'holder') return { text: `−${amt}`, tone: 'neg' }
   if (o.holder) return { text: `+${amt}`, tone: 'pos' }
   if (o.state === 'offered') return { text: `${amt} ask`, tone: 'ask' }
-  return { text: '—', tone: 'muted' }
+  return { text: '–', tone: 'muted' }
 }
 
 /** Second line under the option name: counterparty or listing context. */

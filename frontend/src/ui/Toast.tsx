@@ -6,14 +6,21 @@ import { Icon } from './Icon'
 export type Notice = { kind: 'ok'; text: string; hash: string; mock: boolean } | { kind: 'err'; text: string }
 
 /**
- * Transaction toast. Success shows the label, the tx hash (stellar.expert link, or "(mock)" for the in-memory client)
- * and auto-dismisses after 20s. Errors stay until dismissed. Meaning is always in the text, not just the colour.
+ * One-line transaction notice. Success shows the label and the tx hash (stellar.expert link, or "(mock)" for the
+ * in-memory client) and dismisses after 6s. Errors stay until dismissed. Any notice clears on route change.
+ * It sits below dialogs (z-index), bottom right on desktop and under the top bar on phones.
  */
 export function NoticeToast({ notice, onDismiss }: { notice: Notice | null; onDismiss: () => void }) {
   useEffect(() => {
     if (notice?.kind !== 'ok') return
-    const t = window.setTimeout(onDismiss, 20000)
+    const t = window.setTimeout(onDismiss, 6000)
     return () => window.clearTimeout(t)
+  }, [notice, onDismiss])
+
+  useEffect(() => {
+    if (!notice) return
+    window.addEventListener('hashchange', onDismiss)
+    return () => window.removeEventListener('hashchange', onDismiss)
   }, [notice, onDismiss])
 
   if (!notice) return null
@@ -21,11 +28,10 @@ export function NoticeToast({ notice, onDismiss }: { notice: Notice | null; onDi
   return (
     <div className="ui-toast-region">
       <div className={`ui-toast ui-toast--${ok ? 'ok' : 'err'}`} role={ok ? 'status' : 'alert'}>
-        <Icon name={ok ? 'check' : 'alert'} size={16} className="ui-toast-icon" />
         <div className="ui-toast-body">
           {ok ? (
             <>
-              <strong>{notice.text}</strong>
+              <strong>{notice.text}</strong>{' '}
               <span className="ui-toast-tx">
                 tx{' '}
                 {notice.mock ? (
@@ -39,8 +45,7 @@ export function NoticeToast({ notice, onDismiss }: { notice: Notice | null; onDi
             </>
           ) : (
             <>
-              <strong>Transaction failed</strong>
-              <span className="ui-toast-msg">{notice.text}</span>
+              <strong>Transaction failed.</strong> <span className="ui-toast-msg">{notice.text}</span>
             </>
           )}
         </div>

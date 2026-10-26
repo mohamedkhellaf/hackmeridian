@@ -1,3 +1,5 @@
-export const PRO_BANNER_TESTNET = 'Testnet only. Partial margin: payouts can be reduced; any deficit is shown.'
-export const PRO_BANNER_PUBLISHER = "Prices and the settlement price are set by the team's publisher."
-export const PRO_SIMULATED = 'Simulated, not on-chain'
+/** The one Pro disclosure (STYLE.md section 5), shown once at the top of the Pro shell. */
+export const PRO_SIMULATED = 'Simulated on fixtures. No contract is called.'
+
+/** Inline error under a USDx amount field. */
+export const AMOUNT_HINT = 'Enter a number with at most 7 decimals.'

@@ -1,33 +1,12 @@
 import { useState } from 'react'
 import { parseAmount } from '../options/format'
-import { Banner, Button, Card, Dialog, Mono, PageHeader, Tag } from '../ui'
-import { DASH, lots, usdx } from './format'
+import { Button, Card, Dialog, Tag } from '../ui'
+import { countdown, DASH, lots, perLot, usdx, when, whenShort } from './format'
 import { ageText, seriesStatus, snapshotAge } from './helpers'
-import { Field, Unknown, Who } from './parts'
+import { Field, Unknown, Usdx, Who } from './parts'
 import { usePro } from './proCtx'
 import type { OfferView } from './types'
 import { USDX_DECIMALS } from './types'
-import { when } from './format'
-
-/** Payout order, shown before every buy and next to every open offer. */
-function Waterfall() {
-  return (
-    <ol className="pro-waterfall" aria-label="Who pays you">
-      <li>
-        <strong>1. Writer margin</strong>
-        <span>The writer's margin pays first.</span>
-      </li>
-      <li>
-        <strong>2. Backstop vault</strong>
-        <span>If margin falls short, the LP-funded vault pays pro rata within the series, at settlement.</span>
-      </li>
-      <li className="is-risk">
-        <strong>3. Deficit</strong>
-        <span>Anything still unpaid is recorded as a deficit and cuts your payout. It is shown at claim.</span>
-      </li>
-    </ol>
-  )
-}
 
 function BuyDialog({ offer, onClose }: { offer: OfferView; onClose: () => void }) {
   const { client, model, me, run } = usePro()
@@ -35,7 +14,7 @@ function BuyDialog({ offer, onClose }: { offer: OfferView; onClose: () => void }
   const series = model.series.find((s) => s.id === offer.seriesId)
   return (
     <Dialog
-      title="Review purchase"
+      title="Buy EQTY call"
       onClose={onClose}
       footer={
         <>
@@ -46,25 +25,77 @@ function BuyDialog({ offer, onClose }: { offer: OfferView; onClose: () => void }
             variant="primary"
             disabled={!understood}
             onClick={() => {
-              void run('Buy', client.buy(me, offer.id), 'Call bought.').then(onClose)
+              void run('Buy', client.buy(me, offer.id), 'Bought').then(onClose)
             }}
           >
-            Buy call
+            Buy for {usdx(offer.premium)} USDx
           </Button>
         </>
       }
     >
       <div className="pro-dialog">
-        <p>
-          You buy {lots(offer.qty)} lots of a call (strike {usdx(series?.strike, 2)}) for {usdx(offer.premium)} USDx. The writer's margin is checked now, at buy.
-        </p>
-        <Banner tone="warn" title="Partially collateralized">
-          This call is only partially collateralized. It is paid from the writer's margin, then from the vault, and a deficit is possible.
-        </Banner>
-        <Waterfall />
+        <dl className="ui-kv">
+          <div>
+            <dt>Offer</dt>
+            <dd>{offer.id}</dd>
+          </div>
+          <div>
+            <dt>Series</dt>
+            <dd>{offer.seriesId}</dd>
+          </div>
+          <div>
+            <dt>Strike</dt>
+            <dd>{usdx(series?.strike)} USDx</dd>
+          </div>
+          <div>
+            <dt>Expiry</dt>
+            <dd>
+              {series ? (
+                <>
+                  {when(series.expiry)}
+                  {model.now < series.expiry && <span className="pro-cd"> {countdown(series.expiry, model.now)}</span>}
+                </>
+              ) : (
+                DASH
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Qty</dt>
+            <dd>{lots(offer.qty)} lots</dd>
+          </div>
+          <div>
+            <dt>Premium</dt>
+            <dd>{usdx(offer.premium)} USDx</dd>
+          </div>
+          <div>
+            <dt>Writer</dt>
+            <dd>
+              <Who id={offer.writer} />
+            </dd>
+          </div>
+          <div>
+            <dt>Collateral</dt>
+            <dd>Partial, writer margin checked at buy</dd>
+          </div>
+        </dl>
+        <dl className="ui-kv" aria-label="Who pays you">
+          <div>
+            <dt>Paid first by</dt>
+            <dd>Writer margin</dd>
+          </div>
+          <div>
+            <dt>Then</dt>
+            <dd>Vault, pro rata at settlement</dd>
+          </div>
+          <div>
+            <dt>Unpaid</dt>
+            <dd>Deficit, cuts your payout</dd>
+          </div>
+        </dl>
         <label className="pro-check">
           <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} />
-          <span>I understand this call is partially collateralized and my payout can be reduced.</span>
+          <span>I understand my payout can be reduced.</span>
         </label>
       </div>
     </Dialog>
@@ -89,48 +120,54 @@ export function TradeScreen() {
 
   return (
     <>
-      <PageHeader title="Trade calls" subtitle="American calls on one underlying, cash-settled in USDx. Writers sell without holding the underlying." />
-
-      <Card title="Series" subtitle="Prices come from the latest snapshot posted by the team's publisher." flush>
+      <Card title="Series" flush>
         <div className="ui-table-wrap">
           <table className="ui-table">
             <thead>
               <tr>
-                <th className="ui-left">Series</th>
-                <th>Strike</th>
-                <th>Expiry</th>
-                <th>Spot</th>
-                <th>Mark</th>
-                <th>Snapshot</th>
-                <th>Open interest</th>
-                <th>Status</th>
+                <th className="num">Series</th>
+                <th className="hide-sm">Kind</th>
+                <th className="num">Strike (USDx)</th>
+                <th>Expiry (UTC)</th>
+                <th className="num">Mark per lot</th>
+                <th className="num hide-sm">Open lots</th>
+                <th className="num hide-sm">Spot</th>
+                <th className="num hide-sm">Snapshot</th>
+                <th className="num hide-sm">Age</th>
+                <th className="num hide-sm">Settlement</th>
+                <th>State</th>
               </tr>
             </thead>
             <tbody>
               {model.series.length === 0 && (
                 <tr>
-                  <td className="ui-left" colSpan={8}>
-                    No series listed yet at this point of the simulation.
-                  </td>
+                  <td colSpan={11}>No series listed.</td>
                 </tr>
               )}
               {model.series.map((s) => {
                 const st = seriesStatus(s, model.now)
-                const age = snapshotAge(model, s)
                 return (
                   <tr key={s.id}>
-                    <td className="ui-left ui-strong">#{s.id} EQTY call</td>
-                    <td>{usdx(s.strike, 2)}</td>
-                    <td>{when(s.expiry)}</td>
-                    <td>{s.snapshot ? usdx(s.snapshot.spot, 2) : DASH}</td>
-                    <td>{s.snapshot ? usdx(s.snapshot.mark) : DASH}</td>
-                    <td>
-                      {s.snapshot ? `#${s.snapshot.seq}` : DASH}
-                      <span className="ui-sub">{ageText(age)} old</span>
+                    <td className="num">{s.id}</td>
+                    <td className="hide-sm">EQTY call</td>
+                    <td className="num">{usdx(s.strike)}</td>
+                    <td className="pro-exp">
+                      <span>{whenShort(s.expiry)}</span>
+                      {model.now < s.expiry && (
+                        <>
+                          {' '}
+                          <span className="pro-cd">{countdown(s.expiry, model.now)}</span>
+                        </>
+                      )}
                     </td>
-                    <td>{lots(s.oi)} lots</td>
+                    <td className="num">{s.snapshot ? perLot(s.snapshot.mark) : DASH}</td>
+                    <td className="num hide-sm">{lots(s.oi)}</td>
+                    <td className="num hide-sm">{s.snapshot ? usdx(s.snapshot.spot) : DASH}</td>
+                    <td className="num hide-sm">{s.snapshot ? s.snapshot.seq : DASH}</td>
+                    <td className="num hide-sm">{ageText(snapshotAge(model, s))}</td>
+                    <td className="num hide-sm">{s.settlementPrice != null ? usdx(s.settlementPrice) : DASH}</td>
                     <td>
-                      <Tag tone={st.tone === 'call' ? 'call' : st.tone}>{st.label}</Tag>
+                      <Tag tone={st.warn ? 'warn' : 'neutral'}>{st.label}</Tag>
                     </td>
                   </tr>
                 )
@@ -140,17 +177,17 @@ export function TradeScreen() {
         </div>
       </Card>
 
-      <Card title="Open offers" subtitle="Offers are unfunded quotes: the writer's margin is checked when someone buys." flush>
+      <Card title="Open offers" flush>
         <div className="ui-table-wrap">
           <table className="ui-table">
             <thead>
               <tr>
-                <th className="ui-left">Offer</th>
-                <th>Writer</th>
-                <th>Series</th>
-                <th>Quantity</th>
-                <th>Premium</th>
-                <th>
+                <th className="num hide-sm">Offer</th>
+                <th className="num">Series</th>
+                <th className="num">Qty (lots)</th>
+                <th className="num">Premium (USDx)</th>
+                <th className="hide-sm">Writer</th>
+                <th className="num">
                   <span className="pro-sr">Action</span>
                 </th>
               </tr>
@@ -158,22 +195,22 @@ export function TradeScreen() {
             <tbody>
               {open.length === 0 && (
                 <tr>
-                  <td className="ui-left" colSpan={6}>
-                    No open offers at this point of the simulation.
-                  </td>
+                  <td colSpan={6}>No open offers.</td>
                 </tr>
               )}
               {open.map((o) => (
                 <tr key={o.id}>
-                  <td className="ui-left ui-strong">#{o.id}</td>
-                  <td>
+                  <td className="num hide-sm">{o.id}</td>
+                  <td className="num">{o.seriesId}</td>
+                  <td className="num">{lots(o.qty)}</td>
+                  <td className="num">
+                    <Usdx v={o.premium} />
+                  </td>
+                  <td className="hide-sm">
                     <Who id={o.writer} />
                   </td>
-                  <td>#{o.seriesId}</td>
-                  <td>{lots(o.qty)} lots</td>
-                  <td>{usdx(o.premium)} USDx</td>
-                  <td>
-                    <Button size="sm" variant="primary" onClick={() => setBuying(o)}>
+                  <td className="num">
+                    <Button size="sm" variant="secondary" onClick={() => setBuying(o)}>
                       Buy
                     </Button>
                   </td>
@@ -184,62 +221,54 @@ export function TradeScreen() {
         </div>
       </Card>
 
-      <div className="pro-grid">
-        <Card title="Write an uncovered call" subtitle="You sell without holding the underlying. Nothing moves when you publish the quote.">
-          {live.length === 0 ? (
-            <p className="pro-hint">No live series at this point of the simulation.</p>
-          ) : (
+      <Card title="Write call">
+        {live.length === 0 ? (
+          <p className="pro-muted">No live series.</p>
+        ) : (
+          <div className="pro-write">
             <div className="pro-form">
               <Field label="Series">
-                <select className="pro-input" value={sid ?? ''} onChange={(e) => setSeriesId(Number(e.target.value))}>
+                <select value={sid ?? ''} onChange={(e) => setSeriesId(Number(e.target.value))}>
                   {live.map((s) => (
                     <option key={s.id} value={s.id}>
-                      #{s.id} · strike {usdx(s.strike, 2)}
+                      {s.id}, strike {usdx(s.strike)}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Quantity (lots)">
-                <input className="pro-input" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
+              <Field label="Qty" unit="lots">
+                <input inputMode="numeric" aria-label="Qty (lots)" value={qty} onChange={(e) => setQty(e.target.value)} />
               </Field>
-              <Field
-                label="Total premium (USDx)"
-                hint={
-                  <>
-                    Latest mark per lot: {chosen?.snapshot ? usdx(chosen.snapshot.mark) : DASH} USDx. A premium below quantity × mark is refused at buy (PremiumBelowMark).
-                  </>
-                }
-              >
-                <input className="pro-input" inputMode="decimal" value={premium} onChange={(e) => setPremium(e.target.value)} placeholder="0.00" />
+              <Field label="Premium, total" unit="USDx">
+                <input inputMode="decimal" aria-label="Premium, total (USDx)" value={premium} onChange={(e) => setPremium(e.target.value)} placeholder="0.00" />
               </Field>
-              <dl className="pro-dl" aria-label="Margin after fill">
-                <dt>IM after fill (get_requirement)</dt>
-                <dd>{preview ? `${usdx(preview.im)} USDx` : <Unknown why="No fixture value for this order" />}</dd>
-                <dt>NLV after fill</dt>
-                <dd>{preview ? `${usdx(preview.nlv)} USDx` : <Unknown />}</dd>
-              </dl>
-              {!preview && params && <span className="pro-hint">The simulation has no scripted margin value for exactly this order. Try the happy_path_otm scenario at step 5.</span>}
-              <Banner tone="info">
-                The offer is an unfunded quote. At buy, the contract needs your NLV to be at least your IM, otherwise the buy is refused (InsufficientMargin).
-              </Banner>
-              <Button
-                variant="primary"
-                disabled={!params}
-                onClick={() => params && void run('Publish quote', client.createOffer(params), 'Quote published (no funds moved).')}
-              >
-                Publish unfunded quote
-              </Button>
             </div>
-          )}
-        </Card>
-
-        <Card title="How a purchase is paid" subtitle="Read before you buy.">
-          <Waterfall />
-          <p className="pro-hint">
-            Acting as <Mono>{me}</Mono>. Early exercise and settlement are on the Positions screen.
-          </p>
-        </Card>
-      </div>
+            <div className="pro-form">
+              <dl className="ui-kv" aria-label="Margin after fill">
+                <div>
+                  <dt>Mark per lot</dt>
+                  <dd>{chosen?.snapshot ? `${perLot(chosen.snapshot.mark)} USDx` : DASH}</dd>
+                </div>
+                <div>
+                  <dt>IM after fill</dt>
+                  <dd>{preview ? `${usdx(preview.im)} USDx` : <Unknown why="No fixture value for this order" />}</dd>
+                </div>
+                <div>
+                  <dt>NLV after fill</dt>
+                  <dd>{preview ? `${usdx(preview.nlv)} USDx` : <Unknown />}</dd>
+                </div>
+              </dl>
+              <p className="pro-muted">A premium below qty times mark is refused at buy. The buy also needs your NLV at or above IM.</p>
+              {!preview && params && <p className="pro-muted">No fixture value for this order. Try happy_path_otm at step 5.</p>}
+              <div className="pro-actions">
+                <Button variant="primary" disabled={!params} onClick={() => params && void run('Write call', client.createOffer(params), 'Offer written')}>
+                  Write call
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {buying && <BuyDialog offer={buying} onClose={() => setBuying(null)} />}
     </>

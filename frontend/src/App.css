@@ -1,47 +1,24 @@
-/* Top-bar balances (BalancesBar). Shell: layout/layout.css, primitives: ui/ui.css, screens: their own css. */
-/* Balances (top bar) */
+/* Balances in the wallet menu (BalancesBar): plain `code amount` rows. */
 .balances-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 24px;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
+  margin: 0;
+  font-size: 13px;
 }
 .balances-bar[aria-busy='true'] {
   opacity: 0.7;
 }
 .balances-bar .balance {
-  color: var(--text-2);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--row-line);
 }
-.balances-bar .balance strong {
+.balances-bar .balance:last-child {
+  border-bottom: 0;
+}
+.balances-bar .balance-code {
   color: var(--muted);
-  font-weight: 400;
-  margin-left: 2px;
-  margin-right: 0;
-  order: 2;
 }
-.balances-bar .balance em {
-  color: var(--muted);
-  font-style: normal;
-  font-size: 12px;
-}
-.balances-bar button {
-  padding: 3px 10px;
-  font-size: 12.5px;
-  background: transparent;
-  color: var(--text-2);
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-}
-.balances-bar button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.balances-bar .balance {
-  display: inline-flex;
-  gap: 6px;
+.balances-bar .balance-amount {
+  font-variant-numeric: tabular-nums;
 }
