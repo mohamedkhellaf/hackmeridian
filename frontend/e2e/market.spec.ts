@@ -14,7 +14,7 @@ test('chain shows strikes with the best premium and maker count per side', async
   await expect(row.getByRole('cell').nth(0)).toHaveText('—')
   await expect(row.getByRole('button', { name: /^Put at 10\.00/ })).toContainText(/0\.36\s*\(2\)/)
   // The list under the chain is that series, best first.
-  await expect(page.getByRole('heading', { name: 'Offers at FUND 10.00 put' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'FUND 10.00 put' })).toBeVisible()
   await expect(offerRows(page)).toHaveCount(2)
   await expect(offerRows(page).nth(0)).toContainText('GMAK…BBBB')
   await expect(offerRows(page).nth(0)).toContainText('0.36')
@@ -40,7 +40,7 @@ test('expiry and asset controls rebuild the chain from real offers', async ({ pa
   await page.getByRole('combobox', { name: 'Asset' }).selectOption('BOND')
   await expect(expiry.getByRole('radio')).toHaveCount(1)
   await expect(chainRows(page).first().getByRole('cell').nth(1)).toHaveText('98.00')
-  await expect(page.getByRole('heading', { name: 'Offers at BOND 98.00 put' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'BOND 98.00 put' })).toBeVisible()
   await expect(offerRows(page)).toHaveCount(1)
   // The count of open offers never depends on the view.
   await expectOpenOffers(page, 4)
@@ -50,7 +50,7 @@ test('picking a price shows every maker for that series', async ({ page }) => {
   await openApp(page)
   const expiry = page.getByRole('radiogroup', { name: 'Expiry' })
   await expiry.getByRole('radio').nth(1).click()
-  await expect(page.getByRole('heading', { name: 'Offers at FUND 12.00 call' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'FUND 12.00 call' })).toBeVisible()
   await expiry.getByRole('radio').nth(0).click()
   await page.getByRole('button', { name: /^Put at 10\.00/ }).click()
   await expect(page.getByRole('button', { name: /^Put at 10\.00/ })).toHaveAttribute('aria-pressed', 'true')
@@ -78,7 +78,6 @@ test('hash routes drive the sidebar and every view renders', async ({ page }) =>
   await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Collateral', exact: true })).toHaveAttribute('aria-current', 'page')
   for (const [link, title] of [
     ['Positions', 'Positions'],
-    ['Write', 'Write'],
     ['Protect', 'Protect'],
     ['Issuer', 'Issuer'],
     ['Markets', 'Markets'],

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { explorerTx } from '../config'
 import '../market/market.css'
 import { formatCountdown, formatExpiryShort } from '../market/series'
@@ -29,8 +30,10 @@ function TxLink({ hash, mock }: { hash: string; mock: boolean }) {
 }
 
 /** Maker confirms filling a buyer's request: shows the collateral locked, the premium received and the checks. */
-function FillDialog({
+export function FillDialog({
   bid: b,
+  title: titleProp,
+  header,
   client,
   me,
   busy,
@@ -39,6 +42,9 @@ function FillDialog({
   onOutcomeShown,
 }: {
   bid: Bid
+  title?: string
+  /** Rendered above the terms (the Sell dialog's tabs). */
+  header?: ReactNode
   client: OptionsClient
   me: string
   busy: boolean
@@ -86,7 +92,7 @@ function FillDialog({
   const short = bal !== null && bal < coll.amount
   const self = b.buyer === me
   const blocked = self || stateCheck === 'fail' || eligCheck === 'fail' || short
-  const title = `Fill ${u.code} ${b.kind} request`
+  const title = titleProp ?? `Fill ${u.code} ${b.kind} request`
 
   const close = () => {
     if (!submitting) onClose()
@@ -157,6 +163,10 @@ function FillDialog({
         </>
       }
     >
+      {header}
+      <p className="rq-copy" data-testid="fill-line">
+        You lock {amt(coll.amount, coll.token)} and receive {amt(b.totalPremium, q)} now.
+      </p>
       <p className="rq-copy">
         <strong>You become the writer. The collateral stays locked until exercise or expiry.</strong>
       </p>
