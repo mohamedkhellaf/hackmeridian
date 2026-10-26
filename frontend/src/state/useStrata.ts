@@ -9,7 +9,9 @@ import type { Notice } from '../ui'
 import { useBalances } from '../wallet/useBalances'
 import { useFreighter } from '../wallet/useFreighter'
 
-export type TxOutcome = { ok: true; hash: string; mock: boolean } | { ok: false; error: string }
+import { runTx } from './runTx'
+import type { TxOutcome } from './runTx'
+export type { TxOutcome } from './runTx'
 
 export type PositionAction =NonNullable<Parameters<typeof OptionRow>[0]['action']>
 
@@ -60,24 +62,20 @@ export function useStrata() {
     void refresh()
   }, [refresh])
 
-  // Runs a transaction, sets the toast and refreshes state. Returns the hash on success.
+  // Runs a transaction, sets the toast and refreshes state (runTx: a failed refresh never fails a confirmed tx).
   const runDetailed = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>): Promise<TxOutcome> => {
     setBusyId(id)
-    setNotice(null)
-    let ok = false
     try {
-      const { hash } = await fn()
-      ok = true
-      setNotice({ kind: 'ok', text: label, hash, mock: client.isMock })
-      return { ok: true, hash, mock: client.isMock }
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e)
-      setNotice({ kind: 'err', text: error })
-      return { ok: false, error }
+      return await runTx(label, client.isMock, fn, {
+        setNotice,
+        refresh: async () => {
+          setBusyId(null)
+          await refresh()
+        },
+        onSuccess: () => void refreshBalances(),
+      })
     } finally {
       setBusyId(null)
-      await refresh()
-      if (ok) void refreshBalances()
     }
   }
 
@@ -106,7 +104,9 @@ export function useStrata() {
   const listForSale = (o: OptionOffer, askTotal: bigint) =>
     runDetailed(o.id, 'Listed for sale', () => client.listForSale(o.id, me!, askTotal))
   const cancelSale = (o: OptionOffer) => runDetailed(o.id, 'Sale cancelled', () => client.cancelSale(o.id, me!))
-  const buyResale = (o: OptionOffer) => runDetailed(o.id, 'Bought from holder', () => client.buyResale(o.id, me!))
+  // `maxTotal` is the ask the buyer reviewed; the contract refuses a higher price (PriceMoved 121).
+  const buyResale = (o: OptionOffer, maxTotal: bigint) =>
+    runDetailed(o.id, 'Bought from holder', () => client.buyResale(o.id, me!, maxTotal))
 
   /** The next action the connected wallet can take on a position, if any. */
   const actionFor = (o: OptionOffer): PositionAction | undefined => {

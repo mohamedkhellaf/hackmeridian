@@ -96,13 +96,18 @@ export function BuyDialog({
   const confirm = async () => {
     setSubmitting(true)
     setError(null)
-    const res = await onConfirm()
-    setSubmitting(false)
-    if (res?.ok) {
-      setDone({ hash: res.hash, mock: res.mock })
-      // The confirmed step already shows the tx, so the app drops its duplicate toast (phones and desktop).
-      onOutcomeShown?.()
-    } else setError(res?.error ?? 'The purchase could not be submitted.')
+    try {
+      const res = await onConfirm()
+      if (res?.ok) {
+        setDone({ hash: res.hash, mock: res.mock })
+        // The confirmed step already shows the tx, so the app drops its duplicate toast (phones and desktop).
+        onOutcomeShown?.()
+      } else setError(res?.error ?? 'The purchase could not be submitted.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const goPortfolio = () => {
