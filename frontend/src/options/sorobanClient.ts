@@ -45,9 +45,24 @@ interface OptionsContract {
   cancel_offer: (a: { writer: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
   reclaim: (a: { writer: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
   claim_delivery: (a: { writer: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
+  // v1.3+. Absent on a v1.2 contract: feature-detect with `has` before calling.
+  asset_count?: (o?: Opt) => Tx<number>
+  list_assets?: (a: { from: number; limit: number }, o?: Opt) => Tx<string[]>
+  is_listed?: (a: { token: string }, o?: Opt) => Tx<boolean>
+  writer_open_count?: (a: { writer: string }, o?: Opt) => Tx<number>
+  list_asset?: (a: { lister: string; code: string; issuer: string }, o?: Opt) => Tx<MaybeResult<string>>
+  // v1.3 takes only `ids`; v1.3.1 adds a leading `pruner` (require_auth). Returns the number pruned.
+  prune_expired?: (a: { pruner?: string; ids: number[] }, o?: Opt) => Tx<MaybeResult<number>>
+  // v1.3.1+
+  list_open_for?: (a: { asset: string; from: number; limit: number }, o?: Opt) => Tx<number[]>
 }
 
 type Bound = contract.Client & OptionsContract
+type V13Fn = 'asset_count' | 'list_assets' | 'is_listed' | 'writer_open_count' | 'list_asset' | 'prune_expired' | 'list_open_for'
+
+// The generated client only has methods for functions in the deployed contract's spec, so presence of the
+// method is the feature flag: the same build runs against v1.2 and v1.3(.1).
+const has = (c: Bound, fn: V13Fn): boolean => typeof c[fn] === 'function'
 
 // Generated bindings wrap `Result<T, Error>` in Ok/Err; plain values pass through.
 export function unwrap<T>(r: MaybeResult<T>): T {
@@ -75,7 +90,7 @@ const nowSec = () => Math.floor(Date.now() / 1000)
 export class SorobanOptionsClient implements OptionsClient {
   readonly isMock = false
   private bound: { key: string; p: Promise<Bound> } | null = null
-  private tokens: Promise<Map<string, TokenInfo>> | null = null
+  private tokenCache = new Map<string, Promise<TokenInfo>>()
   private cfg: Promise<AbiConfig> | null = null
 
   private readonly contractId: string
@@ -131,32 +146,58 @@ export class SorobanOptionsClient implements OptionsClient {
     return this.cfg
   }
 
-  // SAC symbol()/decimals() are immutable, so cache them for the session.
-  private tokenMap(): Promise<Map<string, TokenInfo>> {
-    this.tokens ??= (async () => {
-      const cfg = await this.config()
-      const ids = [cfg.quote, ...cfg.underlyings]
-      const infos = await Promise.all(
-        ids.map(async (contractId): Promise<TokenInfo> => {
-          const [code, decimals] = await Promise.all([
-            server.queryContract<string>(contractId, 'symbol'),
-            server.queryContract<number>(contractId, 'decimals'),
-          ])
-          return { contractId, code: String(code.result), decimals: Number(decimals.result) }
-        }),
-      )
-      return new Map(infos.map((t) => [t.contractId, t]))
-    })().catch((e: unknown) => {
-      this.tokens = null
-      throw e
-    })
-    return this.tokens
+  // SAC symbol()/decimals() are immutable, so cache them per token for the session.
+  private tokenInfo(contractId: string): Promise<TokenInfo> {
+    let p = this.tokenCache.get(contractId)
+    if (!p) {
+      p = Promise.all([
+        server.queryContract<string>(contractId, 'symbol'),
+        server.queryContract<number>(contractId, 'decimals'),
+      ]).then(([code, decimals]) => ({ contractId, code: String(code.result), decimals: Number(decimals.result) }))
+      const mine = p
+      mine.catch(() => {
+        if (this.tokenCache.get(contractId) === mine) this.tokenCache.delete(contractId)
+      })
+      this.tokenCache.set(contractId, p)
+    }
+    return p
+  }
+
+  // Underlying token ids. v1.3+: the live registry from list_assets (assets can be listed at runtime, so this is
+  // not cached). v1.2: the constructor-time list from config().
+  private async underlyingIds(): Promise<string[]> {
+    const c = await this.client()
+    if (!has(c, 'asset_count') || !has(c, 'list_assets')) return (await this.config()).underlyings
+    const count = await this.read((x) => x.asset_count!())
+    const ids: string[] = []
+    while (ids.length < count) {
+      const page = await this.read((x) => x.list_assets!({ from: ids.length, limit: PAGE }))
+      if (page.length === 0) break
+      ids.push(...page)
+    }
+    return ids.length > 0 ? ids : (await this.config()).underlyings
+  }
+
+  private async tokenMap(): Promise<Map<string, TokenInfo>> {
+    const [cfg, ids] = await Promise.all([this.config(), this.underlyingIds()])
+    const infos = await Promise.all([...new Set([cfg.quote, ...ids])].map((id) => this.tokenInfo(id)))
+    return new Map(infos.map((t) => [t.contractId, t]))
   }
 
   supportedAssets(): Promise<SupportedAssets> {
     return this.guard(async () => {
-      const [cfg, tokens] = await Promise.all([this.config(), this.tokenMap()])
-      return { quote: tokens.get(cfg.quote)!, underlyings: cfg.underlyings.map((u) => tokens.get(u)!) }
+      const [cfg, ids] = await Promise.all([this.config(), this.underlyingIds()])
+      const [quote, underlyings] = await Promise.all([this.tokenInfo(cfg.quote), Promise.all(ids.map((id) => this.tokenInfo(id)))])
+      return { quote, underlyings }
+    })
+  }
+
+  // v1.3+: number of open (Offered) offers by this writer, capped at MAX_OPEN_PER_WRITER. null on a v1.2 contract.
+  writerOpenCount(writer: string): Promise<number | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'writer_open_count')) return null
+      return this.read((x) => x.writer_open_count!({ writer }))
     })
   }
 
@@ -256,6 +297,33 @@ export class SorobanOptionsClient implements OptionsClient {
   }
   openIds(): Promise<bigint[]> {
     return this.guard(async () => (await this.read((c) => c.list_open())).map(BigInt))
+  }
+  // v1.3 capabilities, client only (no UI yet). list_asset is permissionless: it derives the canonical SAC of a
+  // classic asset on chain (the issuer must still authorize the escrow). Returns the SAC address.
+  listAsset(lister: string, code: string, issuer: string): Promise<TxResult & { sac: string }> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'list_asset')) throw new Error('This contract version cannot list assets (needs v1.3).')
+      const { hash, result } = await this.write((x) => x.list_asset!({ lister, code, issuer }))
+      return { hash, sac: unwrap(result) }
+    })
+  }
+  isListed(token: string): Promise<boolean | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      return has(c, 'is_listed') ? this.read((x) => x.is_listed!({ token })) : null
+    })
+  }
+  // Anyone may prune expired offers. v1.3.1 takes a `pruner` (require_auth); v1.3 takes ids only.
+  pruneExpired(ids: bigint[], pruner: string): Promise<TxResult & { pruned: number }> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'prune_expired')) throw new Error('This contract version cannot prune offers (needs v1.3).')
+      const withPruner = c.spec.getFunc('prune_expired').inputs.length > 1
+      const nums = ids.map(idToU32)
+      const { hash, result } = await this.write((x) => x.prune_expired!(withPruner ? { pruner, ids: nums } : { ids: nums }))
+      return { hash, pruned: Number(unwrap(result)) }
+    })
   }
   extendTtl(ids: bigint[]) {
     return this.guard(async () => {

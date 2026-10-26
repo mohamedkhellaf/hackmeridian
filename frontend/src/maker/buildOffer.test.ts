@@ -68,6 +68,13 @@ describe('buildOffer', () => {
     expect(err(buildOffer(assets, form({ premium: '1.00000001' })))).toMatch(/Premium/)
   })
 
+  it('rejects expiry beyond the 2 year tenor cap', () => {
+    const far = new Date(NOW.getTime() + 2 * 365 * 86400_000 + 3600_000).toISOString()
+    expect(err(buildOffer(assets, form({ expiry: far })))).toMatch(/2 years/)
+    const ok = new Date(NOW.getTime() + 700 * 86400_000).toISOString()
+    expect(err(buildOffer(assets, form({ expiry: ok })))).toBeNull()
+  })
+
   it('supports calls', () => {
     const d = buildOffer(assets, form({ kind: 'call' }))
     expect('offer' in d && d.offer.kind).toBe('call')

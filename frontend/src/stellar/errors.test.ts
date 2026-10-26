@@ -26,3 +26,12 @@ describe('describeError', () => {
     expect(describeError(new Error('Error(Contract, #99)'))).toBe('Contract error #99.')
   })
 })
+
+describe('v1.3 codes', () => {
+  it('maps 116-119', () => {
+    for (let c = 116; c <= 119; c++) {
+      expect(OPTIONS_ERRORS[c]).toBeTruthy()
+      expect(describeError(new Error(`Error(Contract, #${c})`))).toBe(OPTIONS_ERRORS[c])
+    }
+  })
+})

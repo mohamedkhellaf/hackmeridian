@@ -49,7 +49,7 @@ const STATUS_TEXT: Record<TrustStatus, string> = {
 }
 
 export function IssuerConsole({ address, sign, optionsContractId }: Props) {
-  const [code, setCode] = useState('FUND')
+  const [code, setCode] = useState('RWA')
   const [target, setTarget] = useState('')
   const [amount, setAmount] = useState('')
   const [flagState, setFlagState] = useState<{ address: string; flags?: IssuerFlags; error?: string } | null>(null)

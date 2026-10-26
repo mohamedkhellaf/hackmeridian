@@ -1,4 +1,5 @@
 import { parseAmount } from '../options/format'
+import { MAX_TENOR_SECONDS } from '../options/types'
 import type { NewOffer, OptionKind, SupportedAssets } from '../options/types'
 
 export type Draft = { offer: NewOffer } | { error: string }
@@ -21,5 +22,6 @@ export function buildOffer(
   if (scaled % base !== 0n) return { error: 'Strike × quantity is not an exact amount; adjust one of them' }
   const expiry = Math.floor(new Date(f.expiry).getTime() / 1000)
   if (!Number.isFinite(expiry) || expiry <= Date.now() / 1000 + 60) return { error: 'Expiry must be in the future' }
+  if (expiry > Date.now() / 1000 + MAX_TENOR_SECONDS - 60) return { error: 'Expiry must be within 2 years' }
   return { offer: { kind: f.kind, underlying, underlyingQty: qty, totalStrike: scaled / base, totalPremium: premium, expiry } }
 }
