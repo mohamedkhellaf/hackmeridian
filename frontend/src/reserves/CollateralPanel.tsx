@@ -1,6 +1,7 @@
 import type { CollateralHealth, CollateralLine, TokenInfo } from '../options/types'
-import { AssetBadge, Banner, Card, Mono, StrataBar, Tag } from '../ui'
+import { AssetBadge, Card, shortContractId, Mono, StrataBar, Tag } from '../ui'
 import { backingFor, formatFixed, formatTenths, lineTotal, stellarExpertContract } from './reserves'
+import { ShortfallBanner } from './ShortfallWarning'
 import './reserves.css'
 
 // Proof that every option is fully backed: what the contract owes vs what it holds, per token.
@@ -33,7 +34,7 @@ function TokenCard({ line, health, real }: { line: CollateralLine; health?: Coll
         <AssetBadge code={t.code} />
         <div className="rs-title">
           <span className="rs-code">{t.code}</span>
-          <Mono className="rs-sub">{t.contractId.length > 12 ? `${t.contractId.slice(0, 4)}…${t.contractId.slice(-4)}` : t.contractId}</Mono>
+          <Mono className="rs-sub">{shortContractId(t.contractId)}</Mono>
         </div>
         {b.status === 'short' && <Tag tone="warn">Short {fmt(b.shortfall)}</Tag>}
         {b.status === 'backed' && <Tag tone="ok">Fully backed</Tag>}
@@ -94,9 +95,8 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 function ShortfallNote({ token, real }: { token: TokenInfo; real: boolean }) {
   return (
-    <Banner tone="warn" title={`The contract holds less ${token.code} than it owes. `}>
-      This happens when the issuer claws back tokens from the contract. Affected exercises and claims will fail until the balance is restored.
-      {real && (
+    <ShortfallBanner token={token}>
+      {real && !token.contractId.startsWith('C_MOCK_') && (
         <>
           {' '}
           <a href={stellarExpertContract(token.contractId)} target="_blank" rel="noreferrer">
@@ -104,6 +104,6 @@ function ShortfallNote({ token, real }: { token: TokenInfo; real: boolean }) {
           </a>
         </>
       )}
-    </Banner>
+    </ShortfallBanner>
   )
 }

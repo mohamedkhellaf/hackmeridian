@@ -109,7 +109,7 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, collateral, healt
             </Chip>
             <span className="mk-sorted">Sorted by expiry</span>
           </div>
-          <MarketSeries offers={shown} me={me} busy={busy} busyId={busyId} onBuy={onBuy} />
+          <MarketSeries offers={shown} health={health} me={me} busy={busy} busyId={busyId} onBuy={onBuy} />
         </div>
         <aside className="mk-rail" aria-label="Reserves and settlement">
           <div className="mk-rail-block">

@@ -78,12 +78,12 @@ function App() {
           />
         )}
         {route === 'write' && <WriteView assets={s.assets} client={s.client} me={me} busy={s.busy} onSubmit={s.writeOffer} />}
-        {route === 'portfolio' && <PortfolioView me={me} rows={s.positions} actionFor={s.actionFor} />}
+        {route === 'portfolio' && <PortfolioView me={me} rows={s.positions} actionFor={s.actionFor} health={s.health} />}
         {route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
         {route === 'issuer' && <IssuerView address={wallet.address} sign={wallet.sign} optionsContractId={config.optionsContractId} />}
       </AppShell>
 
-      {s.buying && me && <BuyDialog offer={s.buying} client={s.client} me={me} onCancel={() => s.setBuying(null)} onConfirm={s.confirmBuy} onOutcomeShown={s.dismissNotice} />}
+      {s.buying && me && <BuyDialog offer={s.buying} client={s.client} me={me} health={s.health} onCancel={() => s.setBuying(null)} onConfirm={s.confirmBuy} onOutcomeShown={s.dismissNotice} />}
 
       <NoticeToast notice={s.notice} onDismiss={s.dismissNotice} />
     </>

@@ -20,6 +20,7 @@ test('writer claims delivery after a second account buys and exercises', async (
   await expect(toast(page)).toContainText('Purchase confirmed')
   await goTo(page, 'Portfolio')
   await page.getByRole('button', { name: 'Exercise' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Sign and exercise' }).click()
   await expect(toast(page)).toContainText('Exercise confirmed')
 
   // A claims delivery.

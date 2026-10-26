@@ -87,7 +87,7 @@ export function ReservesView({ collateral, health, contractId }: ReservesViewPro
               <a href={stellarExpertContract(contractId)} target="_blank" rel="noreferrer">
                 Options contract ↗
               </a>
-              {tokens.map((t) => (
+              {tokens.filter((t) => !t.contractId.startsWith('C_MOCK_')).map((t) => (
                 <a key={t.contractId} href={stellarExpertContract(t.contractId)} target="_blank" rel="noreferrer">
                   {t.code} asset contract ↗
                 </a>

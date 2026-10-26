@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { config, explorerTx } from '../config'
 import type { OptionsClient } from '../options/client'
-import type { OptionOffer } from '../options/types'
+import type { CollateralHealth, OptionOffer } from '../options/types'
 import { requiredCollateral } from '../options/types'
 import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
+import { PayoffChart } from '../payoff/PayoffChart'
+import { fmtNum, fmtSigned, riskLines, strikeOf, legOf } from '../payoff/buyerPayoff'
+import { shortfallFor } from '../reserves/reserves'
+import { ShortfallBanner } from '../reserves/ShortfallWarning'
 import type { TxOutcome } from '../state/useStrata'
 import { Button, Dialog, Icon, Mono, PayoffSketch, Sediment, Tag } from '../ui'
 import './market.css'
@@ -28,6 +32,7 @@ export function BuyDialog({
   offer,
   client,
   me,
+  health = [],
   onConfirm,
   onCancel,
   onOutcomeShown,
@@ -35,6 +40,8 @@ export function BuyDialog({
   offer: OptionOffer
   client: OptionsClient
   me: string | null
+  /** Reserved vs held per token; a token with held < reserved shows the clawback shortfall warning. */
+  health?: CollateralHealth[]
   /** Runs the purchase; resolves with the outcome (the hook keeps this dialog mounted). */
   onConfirm: () => Promise<TxOutcome | null>
   onCancel: () => void
@@ -48,6 +55,11 @@ export function BuyDialog({
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ hash: string; mock: boolean } | null>(null)
   const agreeRef = useRef<HTMLInputElement>(null)
+  // "Assumed price": a what-if input, never a market price (the contract has no oracle). Defaults to the strike.
+  const strikeNum = strikeOf(legOf(offer))
+  const [assumedText, setAssumedText] = useState(() => String(Number(strikeNum.toFixed(4))))
+  const parsed = Number(assumedText)
+  const assumed = Number.isFinite(parsed) && parsed > 0 ? parsed : strikeNum
 
   // Re-fetch the offer when the dialog opens: it may have been bought or may have expired meanwhile.
   useEffect(() => {
@@ -82,6 +94,8 @@ export function BuyDialog({
   const locked = `${formatDisplay(col.amount, col.token.decimals)} ${col.token.code} locked`
   const kindWord = offer.kind === 'put' ? 'sell' : 'buy'
   const blocked = openCheck === 'fail' || eligCheck === 'fail'
+  const short = shortfallFor(offer, health)
+  const risk = riskLines(offer, assumed)
   const where = client.isMock ? 'in the mock contract' : 'on-chain'
 
   const close = () => {
@@ -213,6 +227,66 @@ export function BuyDialog({
           For the right to {kindWord} <b>{qty}</b> for <b>{strike}</b> at any time until expiry.
         </span>
       </div>
+
+      {short.map((t) => (
+        <ShortfallBanner key={t.contractId} token={t} />
+      ))}
+
+      <section className="po-section" aria-label="Payoff and risk">
+        <span className="mk-label">If you hold to expiry</span>
+        <div className="po-controls">
+          <label className="mk-label" htmlFor="assumed-price">
+            Assumed price ({q.code} per {u.code})
+          </label>
+          <div className="po-controls-row">
+            <input
+              type="range"
+              aria-label="Assumed price slider"
+              min={strikeNum * 0.5}
+              max={strikeNum * 1.5}
+              step={strikeNum / 200}
+              value={Math.min(Math.max(assumed, strikeNum * 0.5), strikeNum * 1.5)}
+              onChange={(e) => setAssumedText(String(Number(Number(e.target.value).toFixed(4))))}
+            />
+            <input
+              id="assumed-price"
+              className="po-num"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="any"
+              value={assumedText}
+              onChange={(e) => setAssumedText(e.target.value)}
+            />
+          </div>
+          <span className="po-hint">A what-if value you choose, starting at the strike. The contract has no oracle: this is not a market price.</span>
+        </div>
+        <PayoffChart offer={offer} assumed={assumed} />
+        <dl className="mk-rows po-risk">
+          <div>
+            <dt>Premium (max loss)</dt>
+            <dd>
+              {fmtNum(risk.maxLoss)} {q.code} · {fmtNum(risk.premiumPerUnit)} / {u.code}
+            </dd>
+          </div>
+          <div>
+            <dt>Break-even</dt>
+            <dd>
+              {fmtNum(risk.breakeven)} {q.code} / {u.code}
+            </dd>
+          </div>
+          <div>
+            <dt>Max gain</dt>
+            <dd>{risk.maxGain === null ? 'Unlimited' : `${fmtNum(risk.maxGain)} ${q.code}`}</dd>
+          </div>
+          <div>
+            <dt>P&amp;L at assumed price {fmtNum(assumed)} (hypothetical)</dt>
+            <dd className={risk.pnlAtAssumed >= 0 ? 'po-pos' : 'po-neg'} data-testid="pnl-at-assumed">
+              {fmtSigned(risk.pnlAtAssumed)} {q.code}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       <dl className="mk-rows">
         <div>

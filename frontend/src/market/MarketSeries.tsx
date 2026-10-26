@@ -1,4 +1,6 @@
-import type { OptionOffer } from '../options/types'
+import type { CollateralHealth, OptionOffer } from '../options/types'
+import { shortfallFor } from '../reserves/reserves'
+import { ShortfallNotice } from '../reserves/ShortfallWarning'
 import { requiredCollateral } from '../options/types'
 import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
 import { Button, Mono, PayoffSketch, Sediment, Tag } from '../ui'
@@ -27,12 +29,15 @@ function lockedAmount(o: OptionOffer): string {
 
 export function MarketSeries({
   offers,
+  health = [],
   me,
   busy,
   busyId,
   onBuy,
 }: {
   offers: OptionOffer[]
+  /** Reserved vs held per token: options on a clawed-back token show the shortfall warning. */
+  health?: CollateralHealth[]
   me: string | null
   busy: boolean
   busyId: bigint | null
@@ -79,6 +84,7 @@ export function MarketSeries({
                   </span>
                 </p>
                 <p className="mk-count">{n > 1 ? `${n} makers competing` : '1 maker'}</p>
+                <ShortfallNotice tokens={shortfallFor(first, health)} />
               </div>
               <PayoffSketch kind={first.kind} strikeLabel={strike} asset={first.underlying.code} className="mk-payoff" />
             </header>
