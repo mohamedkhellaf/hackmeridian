@@ -1,6 +1,6 @@
 # StellSec Pro v0.3.2 — build brief for Dev 2
 
-Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **full on-chain attempt on Testnet**, decided by Dev 1 after PR #30 merged. Dev 2 builds `contracts/pro/` to this brief, with no "European only" cut. Go/no-go at 09:30 Lisbon under the gate in `AGENTS.md`; if it fails, Pro stays "specified and simulated" and the submission uses the Covered MVP. Dev 2 keeps the veto on unsafe behavior.
+Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **built, gate passed, deployed on Testnet** (`contracts/pro/` PR #54, deployment and evidence run PR #69, `docs/pro-testnet-evidence.md`). The full on-chain attempt was decided by Dev 1 after PR #30 merged. Dev 2 builds `contracts/pro/` to this brief, with no "European only" cut. Go/no-go at 09:30 Lisbon under the gate in `AGENTS.md`; if it fails, Pro stays "specified and simulated" and the submission uses the Covered MVP. Dev 2 keeps the veto on unsafe behavior.
 
 **The executable spec is `packages/risk/pro_v0_model.py` (v0.3.2).** Every function below exists there with the same checks, in the same order, with the same errors. The brief and the model must agree. If Dev 2 finds that a behavior is unsafe or unbuildable on-chain, Dev 2 may deviate. Dev 1 then updates the model and the fixtures to match before the contract merges. The model never overrides on-chain safety. Background and calibration: `docs/pro-architecture.md`.
 

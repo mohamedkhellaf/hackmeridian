@@ -2,7 +2,7 @@
 
 Python 3 + numpy. Owner: Dev 1.
 
-**Status: on-chain attempt in progress.** Dev 2 is building `contracts/pro/` on its own branch and Dev 3 a flagged Pro UI; neither is on `main` until the Pro gate in `AGENTS.md` passes (go/no-go 09:30 Lisbon). Until then, what exists on `main` is the spec, this integer reference model, the float engine and the deterministic fixtures the contract must replay, and Pro is described as "specified and simulated".
+**Status: on chain.** `contracts/pro/` (on `main` since PR #54) replays every step of `fixtures/pro_v0.json` and is deployed on Testnet with an evidence run whose amounts match this model (`docs/pro-testnet-evidence.md`). The app's Margin section runs against it. This directory holds the spec, the integer reference model, the float engine and the deterministic fixtures; if contract and model disagree, the model and fixtures are updated before merge (`AGENTS.md`, Margin model).
 
 | File | Role |
 |---|---|

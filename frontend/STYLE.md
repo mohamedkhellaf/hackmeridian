@@ -8,7 +8,7 @@ Every PR that touches `frontend/` is checked against this file. Research behind 
 
 - **Public Sans** (400, 500, 600, 700) for everything. **IBM Plex Mono** (400, 500) only for addresses, contract IDs and transaction hashes. Nothing else is loaded.
 - Scale, rem-based in spirit: h1 22px/600, section heading 15px/600, body 14px, table 13.5px, small and captions 12.5px. Sentence case everywhere.
-- Headings are plain nouns: `Markets`, `Write`, `Positions`, `Collateral`, `Issuer`. No heading carries a paragraph under it.
+- Headings are plain nouns: `Markets`, `Positions`, `Locked reserves`, `Issuer`, `Margin`. No heading carries a paragraph under it.
 - No uppercase or tracked labels. Table headers and form labels are 12.5px, weight 500, muted, normal letter spacing.
 - Tabular figures on every number (`font-variant-numeric: tabular-nums` is set on the root), right aligned in tables, fixed decimals per asset. The unit goes once in the column header or once after the number, never both.
 - Body copy, where it exists at all, is left aligned and under 80 characters a line.
@@ -41,9 +41,9 @@ Dark navy-graphite with one brand gradient. Tokens live in `src/index.css`; keep
 
 ## 3. Layout and components
 
-- **Shell (1024px and up).** A fixed 240px left sidebar on `--surface`: the `StellSec` wordmark with the gradient mark, then `Markets`, `Protect`, `Write`, `Positions`, `Collateral`, `Issuer` (and `Pro` when the flag is on) as 40px rows with a stroke icon and label, and the wallet button at the bottom. The active row has a soft gradient tint and a 2px gradient edge. The `Positions` row carries the action counter on its right. Content is at most 1280px wide with 24px gutters (16px on phones). A one-line footer under the content carries the testnet and mock disclosure.
+- **Shell (1024px and up).** A fixed 240px left sidebar on `--surface`: the `StellSec` wordmark with the gradient mark, then `Markets`, `Positions`, `Locked reserves`, `Issuer` (and `Margin` when the flag is on) as 40px rows with a stroke icon and label, and the wallet button at the bottom. The active row has a soft gradient tint and a 2px gradient edge. The `Positions` row carries the action counter on its right. Content is at most 1280px wide with 24px gutters (16px on phones). A one-line footer under the content carries the testnet and mock disclosure.
 - **Icon rail (769 to 1023px).** The sidebar collapses to 72px: icons only, label as tooltip and accessible name, counter over the icon.
-- **Phones (768px and below).** The sidebar becomes a top bar with wordmark and wallet. A floating rounded bottom tab bar has four tabs (`Markets`, `Protect`, `Positions`, `Collateral`) and `More`, which opens a sheet with `Write`, `Issuer` and `Pro`. The counter is a small pill over the icon. Touch targets are at least 44px.
+- **Phones (768px and below).** The sidebar becomes a top bar with wordmark and wallet. A floating rounded bottom tab bar has three tabs (`Markets`, `Positions`, `Locked reserves`) and `More`, which opens a sheet with `Issuer` and `Margin`. The counter is a small pill over the icon. Touch targets are at least 44px.
 - **Counter.** Pill, 20px high, 11.5px/600 tabular, gradient with `--accent-fg` ink, `aria-label` such as `1 position needs action`. It counts what the existing logic counts and nothing else.
 - Each page starts with an h1 and, at most, one row of actions or a filter row. No hero, no eyebrow, no lede, no stat cards, no illustration panel.
 - Tables over cards, and every table sits in a rounded 12px surface container. Rows 36 to 38px with a hairline divider. A card is used only for one discrete object: an offer detail, an order review, a form. No nested bordered boxes.

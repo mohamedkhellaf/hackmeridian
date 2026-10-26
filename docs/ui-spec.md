@@ -1,6 +1,6 @@
 # UI spec: trading screen, payoff and disclosures (Dev 1 → Dev 3)
 
-**Owner of the promise:** Dev 1. **Owner of the code:** Dev 3 (`frontend/`). **Date:** 2026-10-26. **Scope:** the Covered regime (`contracts/options`). StellSec Pro has no on-chain UI (no-go, PR #30).
+**Owner of the promise:** Dev 1. **Owner of the code:** Dev 3 (`frontend/`). **Date:** 2026-10-26. **Scope:** the Covered regime (`contracts/options`), as of the morning of 26 October. Since then the Pro gate passed and the Margin section runs on its own contract (`#/pro`); the Write screen was folded into Markets → Sell (PR #79), Protect was removed (PR #87), and Reserves is now called Locked reserves (PR #90). Read the screen names below with those renames in mind.
 
 This is a **delta** on what the frontend already has: Markets (series with competing makers), Buy dialog, Portfolio, Write, Reserves (with a shortfall banner) and Issuer. It follows the patterns retail option apps use (option chain → order ticket with payoff chart → positions with an exercise action). Nothing here changes the contract or its economics. If an item conflicts with `PRODUCT_SPEC.md`, the spec wins.
 
@@ -107,7 +107,7 @@ For Active options the user holds: "In the money at assumed price {p}" when intr
 ## 8. Copy rules
 
 - Never write "guaranteed", "insured", "safe" or "risk-free". "Fully collateralized" is allowed for Covered, always next to the issuer notice.
-- Use "covered up to" for `fullCoverPrice` if Pro numbers are ever shown; Pro is "specified and simulated".
+- Use "covered up to" for `fullCoverPrice` if Margin numbers are shown next to covered ones; Margin is a separate experimental contract on Testnet, never described as fully collateralized.
 - Prices per unit, totals underneath, numbers right-aligned in tabular figures; green and red only for profit and loss.
 - Asset names are labels of fictional Testnet assets: keep the existing "Fictional Testnet asset" caption.
 
