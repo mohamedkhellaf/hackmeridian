@@ -11,7 +11,7 @@ test('holder lists an option for sale, another account buys it, the holder chang
   await buy.getByRole('checkbox', { name: 'I understand the terms above.' }).check()
   await buy.getByRole('button', { name: 'Buy for 1.80 USDx' }).click()
   await expect(buy).toContainText('Bought. Position 1')
-  await buy.getByRole('button', { name: 'Back to markets' }).click()
+  await buy.getByRole('button', { name: 'Done' }).click()
 
   // Markets shows an empty Resale section.
   const resale = page.getByRole('region', { name: 'Resale' })
