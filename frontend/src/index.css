@@ -1,31 +1,41 @@
 /* Strata tokens and base styles. Dark only. Rules: frontend/STYLE.md. */
 :root {
-  --bg: #0f1115;
-  --surface: #15181d;
-  --surface-hover: #1a1e24;
-  --border: #262b33;
-  --row-line: #1f242b;
-  --text: #e6e8eb;
-  --text-2: #aeb4bd;
-  --muted: #7d8590;
-  --accent: #6ea8e8;
-  --accent-fg: #0f1115;
-  --danger: #e5726a;
-  --warn: #d9a44a;
+  /* Neutral dark. Contrast on --bg: text 15:1, text-2 6.9:1, muted 5.2:1, accent 6.2:1. */
+  --bg: #18181a;
+  --surface: #1f1f22;
+  --surface-hover: #262629;
+  --border: #2c2c30;
+  --border-strong: #3a3a40;
+  --row-line: #2c2c30;
+  --text: #ededed;
+  --text-2: #a1a1a6;
+  --muted: #8a8a92;
+  --accent: #7c93f0;
+  --accent-fg: #111114;
+  --danger: #e5736a;
+  --warn: #d9a85b;
   /* Chart fills only. */
   --profit: #5fb87a;
-  --loss: #e5726a;
+  --loss: #e5736a;
 
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-sans: 'Public Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --r: 4px;
+  --r: 6px;
+  --gutter: 24px;
+  --control-h: 36px;
 
-  font: 14px/1.5 var(--font-sans);
+  font: 400 14px/1.5 var(--font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--text);
   background: var(--bg);
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
+}
+@media (max-width: 768px) {
+  :root {
+    --gutter: 16px;
+  }
 }
 
 * {
@@ -89,7 +99,7 @@ button {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

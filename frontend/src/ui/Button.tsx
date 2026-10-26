@@ -9,6 +9,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean
   /** Shows a spinner, sets aria-busy and disables the button. Keep the label text meaningful. */
   loading?: boolean
+  /** Why the button is disabled. Shown as the tooltip, e.g. "Connect wallet to buy". */
+  reason?: string
 }
 
 export function Button({
@@ -16,6 +18,7 @@ export function Button({
   size = 'md',
   fullWidth,
   loading,
+  reason,
   className,
   disabled,
   type = 'button',
@@ -24,7 +27,7 @@ export function Button({
 }: ButtonProps) {
   const cls = ['ui-btn', `ui-btn--${variant}`, `ui-btn--${size}`, fullWidth && 'ui-btn--full', className].filter(Boolean).join(' ')
   return (
-    <button type={type} className={cls} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+    <button type={type} className={cls} disabled={disabled || loading} aria-busy={loading || undefined} title={disabled && reason ? reason : undefined} {...rest}>
       {loading && <span className="ui-spinner" aria-hidden="true" />}
       {children}
     </button>
