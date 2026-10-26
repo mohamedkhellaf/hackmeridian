@@ -319,7 +319,7 @@ export class SorobanOptionsClient implements OptionsClient {
     return this.guard(async () => {
       const c = await this.client()
       if (!has(c, 'prune_expired')) throw new Error('This contract version cannot prune offers (needs v1.3).')
-      const withPruner = c.spec.getFunc('prune_expired').inputs().length > 1
+      const withPruner = c.spec.getFunc('prune_expired').inputs.length > 1
       const nums = ids.map(idToU32)
       const { hash, result } = await this.write((x) => x.prune_expired!(withPruner ? { pruner, ids: nums } : { ids: nums }))
       return { hash, pruned: Number(unwrap(result)) }

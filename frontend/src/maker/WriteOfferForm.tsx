@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { OptionsClient } from '../options/client'
 import { formatExpiry } from '../options/format'
-import { requiredCollateral } from '../options/types'
+import { MAX_OPEN_PER_WRITER, requiredCollateral } from '../options/types'
 import type { NewOffer, OptionKind, OptionOffer, SupportedAssets } from '../options/types'
 import { money, moneyWith, nowMs } from '../portfolio/positions'
 import { AssetBadge, Button, Chip, Icon, PayoffSketch } from '../ui'
@@ -85,6 +85,23 @@ export function WriteOfferForm({
     }
   }, [client])
 
+  // v1.3+: per-writer cap on open offers. null = unknown or a contract without the cap (v1.2).
+  const [openCount, setOpenCount] = useState<{ me: string; n: number } | null>(null)
+  const [openTick, setOpenTick] = useState(0)
+  useEffect(() => {
+    if (!me) return
+    let live = true
+    client
+      .writerOpenCount(me)
+      .then((n) => live && setOpenCount(n === null ? null : { me, n }))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [client, me, openTick])
+  const opened = me && openCount?.me === me ? openCount.n : null
+  const atCap = opened !== null && opened >= MAX_OPEN_PER_WRITER
+
   const tokens = useMemo(() => [assets.quote, ...assets.underlyings], [assets])
   const { balances } = useBalances(me, tokens)
 
@@ -110,6 +127,7 @@ export function WriteOfferForm({
     setSubmitting(true)
     const ok = await onSubmit(offer)
     setSubmitting(false)
+    setOpenTick((t) => t + 1)
     if (ok) {
       setAnchor(nowMs())
       setCustom(toLocalInput(nowMs() + 3 * DAY * 1000))
@@ -286,6 +304,12 @@ export function WriteOfferForm({
               {me ? `Checking authorization for ${underlyingCode}…` : `Connect a wallet to check authorization for ${underlyingCode}`}
             </li>
           )}
+          {opened !== null && (
+            <li className={atCap ? 'wr-check is-bad' : 'wr-check'} role={atCap ? 'alert' : undefined}>
+              <Icon name={atCap ? 'alert' : 'check'} size={16} />
+              {opened}/{MAX_OPEN_PER_WRITER} open offers{atCap ? '. Cancel one or wait for it to sell or expire before publishing another.' : ''}
+            </li>
+          )}
           {'error' in draft ? (
             <li className="wr-check is-bad">
               <Icon name="alert" size={16} />
@@ -299,7 +323,7 @@ export function WriteOfferForm({
           )}
         </ul>
 
-        <Button type="submit" variant="primary" size="lg" fullWidth loading={submitting} disabled={disabled || !offer}>
+        <Button type="submit" variant="primary" size="lg" fullWidth loading={submitting} disabled={disabled || !offer || atCap}>
           {submitting ? 'Locking collateral…' : collateral ? `Lock ${moneyWith(collateral.amount, collateral.token)} and publish` : 'Lock collateral and publish'}
         </Button>
         <p className="wr-help">
