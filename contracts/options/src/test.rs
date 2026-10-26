@@ -5541,7 +5541,10 @@ fn resale_new_holder_exercises_old_holder_cannot() {
     t.c.list_for_sale(&t.holder, &id, &ASK);
     t.c.buy_resale(&t.maker2, &id);
     assert_err(t.c.try_exercise(&t.holder, &id), Error::NotHolder);
-    assert_err(t.c.try_list_for_sale(&t.holder, &id, &ASK), Error::NotHolder);
+    assert_err(
+        t.c.try_list_for_sale(&t.holder, &id, &ASK),
+        Error::NotHolder,
+    );
     let b0 = t.bals(&t.maker2);
     t.c.exercise(&t.maker2, &id);
     assert_eq!(t.state(id), State::Exercised);

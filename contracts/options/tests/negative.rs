@@ -6,7 +6,7 @@
 //! list, every per-asset open book, `option_count`, every stored `OptionData`, every tracked
 //! party's `writer_open_count` and the asset registry) and that no contract event was emitted.
 //!
-//! Contract errors are `options::Error`, codes 101–119 (renumbered in v1.1, 116–119 appended in
+//! Contract errors are `options::Error`, codes 101–120 (120 `NoAsk` appended in v1.4) (renumbered in v1.1, 116–119 appended in
 //! v1.3), and are matched by variant name, never by number. v1.2 adds `transfer(holder, to, id)`,
 //! `get_options(from, limit)` and the `OptionTransferred` event: sections 16 and 17 cover them,
 //! and sections 1, 2, 3, 12 and 15 include `transfer` in their existing checks.
@@ -30,6 +30,12 @@
 //! the persistent `Reserved(token)` entries (§13.8: the instance entry never grows with listings,
 //! and every path that touches a reserve keeps it alive) and section 18 the `list_asset` check
 //! order (§13.4: `AlreadyListed` without probing the SAC).
+//!
+//! v1.4 (ABI §14) adds the on-chain secondary market: `list_for_sale(holder, id, ask_total)`,
+//! `cancel_sale(holder, id)`, `buy_resale(buyer, id)`, views `get_ask`/`list_asks`, events
+//! `AskListed`/`AskCancelled`/`ResaleBought` and error `NoAsk` (120). Every snapshot also holds
+//! every open ask and checks that an ask exists only on an `Active` option and names its current
+//! holder; section 25 covers the misuse paths.
 //! Every snapshot also checks the open-book invariant: each asset's book is exactly its
 //! `Offered` ids in id order, and `list_open()` is the registry-order concatenation, truncated.
 //!
@@ -171,6 +177,8 @@ struct Snap {
     writer_open: std::vec::Vec<u32>,
     /// v1.3: the asset registry in listing order (`list_assets`, all pages).
     assets: std::vec::Vec<Address>,
+    /// v1.4: every open resale ask `(id, holder, ask_total)` (`list_asks`, all scan windows).
+    asks: std::vec::Vec<(u32, Address, i128)>,
 }
 
 fn setup() -> T {
@@ -314,9 +322,26 @@ impl T {
                 .map(|a| self.c.writer_open_count(a))
                 .collect(),
             assets: self.assets(),
+            asks: self.asks(count),
         };
         snap.assert_open_books();
+        snap.assert_asks();
         snap
+    }
+
+    /// v1.4: every open ask, scanning `list_asks` in windows of `MAX_PAGE` ids up to `count`.
+    fn asks(&self, count: u32) -> std::vec::Vec<(u32, Address, i128)> {
+        let mut out = std::vec::Vec::new();
+        let mut from = 0u32;
+        while from < count {
+            for a in self.c.list_asks(&from, &u32::MAX).iter() {
+                assert!(a.id >= from && a.id < from + MAX_PAGE, "list_asks window");
+                assert_eq!(self.c.get_ask(&a.id), Some(a.ask_total), "get_ask");
+                out.push((a.id, a.holder, a.ask_total));
+            }
+            from += MAX_PAGE;
+        }
+        out
     }
 
     /// v1.3.1: one asset's complete open book, paged through `list_open_for` with
@@ -1008,6 +1033,22 @@ fn rejected_as<R: Debug>(
 }
 
 impl Snap {
+    /// v1.4 ask invariant, checked on every snapshot: an ask exists only on an `Active` option,
+    /// names its current holder and is positive.
+    #[track_caller]
+    fn assert_asks(&self) {
+        for (id, holder, ask) in &self.asks {
+            let o = self
+                .options
+                .iter()
+                .find(|o| o.id == *id)
+                .expect("ask on a stored option");
+            assert_eq!(o.state, State::Active, "ask on non-Active option {id}");
+            assert_eq!(o.holder.as_ref(), Some(holder), "ask holder of {id}");
+            assert!(*ask > 0, "ask_total of {id}");
+        }
+    }
+
     /// Expected-state helper: `who`'s balance of token index `tok` ([USDx, RWA, BOND]) += delta.
     fn add(&mut self, who: &Address, tok: usize, delta: i128) {
         let row = self
@@ -6705,4 +6746,466 @@ fn books24_list_open_stays_within_limits_whatever_the_registry_size() {
     let open = t.c.list_open();
     assert!(t.exceeded_ledger().is_empty(), "{:?}", t.exceeded_ledger());
     assert_eq!(open, vec![env, id]);
+}
+
+// =============================================================================================
+// 25. v1.4 secondary market: list_for_sale / cancel_sale / buy_resale
+// =============================================================================================
+
+const ASK: i128 = 30_000_000; // 3 USDx
+
+/// A PUT on RWA written by `writer`, bought by `holder` (Active), with `holder`'s ask posted.
+fn listed_put(t: &T) -> u32 {
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    id
+}
+
+/// Auth tree of `buy_resale(buyer, id)`: the root plus the buyer's quote payment to the seller.
+fn resale_tree<'a>(
+    t: &'a T,
+    buyer: &Address,
+    id: u32,
+    pay: &'a [MockAuthInvoke<'a>],
+) -> MockAuthInvoke<'a> {
+    MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "buy_resale",
+        args: (buyer, id).into_val(&t.env),
+        sub_invokes: pay,
+    }
+}
+
+/// list_for_sale / cancel_sale / buy_resale signed by anyone but the named party are rejected by
+/// the host's auth check, with no event and no state change; a signed tree for another id or
+/// another function does not replay.
+#[test]
+fn resale25_unauthorized_list_cancel_and_buy_are_auth_failures() {
+    let t = setup();
+    let env = &t.env;
+    let (h, m) = (&t.holder, &t.maker2);
+    let id = listed_put(&t);
+    let other = t.put(&t.writer);
+    t.c.buy(h, &other);
+
+    // list_for_sale(holder, id, ask)
+    let list = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "list_for_sale",
+        args: (h, id, ASK).into_val(env),
+        sub_invokes: &[],
+    };
+    let list_other = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "list_for_sale",
+        args: (h, other, ASK).into_val(env),
+        sub_invokes: &[],
+    };
+    let list_cheaper = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "list_for_sale",
+        args: (h, id, ASK / 2).into_val(env),
+        sub_invokes: &[],
+    };
+    assert_auth_cases(
+        &t,
+        "list_for_sale",
+        &(h, id, ASK * 2).into_val(env),
+        &[
+            (
+                "writer signs",
+                std::vec![MockAuth {
+                    address: &t.writer,
+                    invoke: &list
+                }],
+            ),
+            (
+                "maker2 signs",
+                std::vec![MockAuth {
+                    address: m,
+                    invoke: &list
+                }],
+            ),
+            (
+                "holder's tree for another id",
+                std::vec![MockAuth {
+                    address: h,
+                    invoke: &list_other
+                }],
+            ),
+            (
+                "holder's tree for another price",
+                std::vec![MockAuth {
+                    address: h,
+                    invoke: &list_cheaper
+                }],
+            ),
+            ("nobody signs", std::vec![]),
+        ],
+    );
+
+    // cancel_sale(holder, id)
+    let cancel = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "cancel_sale",
+        args: (h, id).into_val(env),
+        sub_invokes: &[],
+    };
+    assert_auth_cases(
+        &t,
+        "cancel_sale",
+        &(h, id).into_val(env),
+        &[
+            (
+                "writer signs",
+                std::vec![MockAuth {
+                    address: &t.writer,
+                    invoke: &cancel
+                }],
+            ),
+            (
+                "maker2 signs",
+                std::vec![MockAuth {
+                    address: m,
+                    invoke: &cancel
+                }],
+            ),
+            (
+                "holder's list tree replayed",
+                std::vec![MockAuth {
+                    address: h,
+                    invoke: &list
+                }],
+            ),
+            ("nobody signs", std::vec![]),
+        ],
+    );
+
+    // buy_resale(buyer, id): only the buyer can spend the buyer's quote
+    let pay = [transfer(&t, &t.usdx, (m, h, ASK).into_val(env))];
+    let buy = resale_tree(&t, m, id, &pay);
+    let buy_other = resale_tree(&t, m, other, &[]);
+    assert_auth_cases(
+        &t,
+        "buy_resale",
+        &(m, id).into_val(env),
+        &[
+            (
+                "seller signs the buyer's tree",
+                std::vec![MockAuth {
+                    address: h,
+                    invoke: &buy
+                }],
+            ),
+            (
+                "writer signs the buyer's tree",
+                std::vec![MockAuth {
+                    address: &t.writer,
+                    invoke: &buy
+                }],
+            ),
+            (
+                "buyer's tree for another id",
+                std::vec![MockAuth {
+                    address: m,
+                    invoke: &buy_other
+                }],
+            ),
+            (
+                "buyer signs the root without the payment",
+                std::vec![MockAuth {
+                    address: m,
+                    invoke: &resale_tree(&t, m, id, &[])
+                }],
+            ),
+            ("nobody signs", std::vec![]),
+        ],
+    );
+
+    // the correctly signed tree works and moves exactly the ask
+    env.mock_auths(&[MockAuth {
+        address: m,
+        invoke: &buy,
+    }]);
+    let mut want = t.snap();
+    t.c.buy_resale(m, &id);
+    env.mock_all_auths();
+    want.add(m, 0, -ASK);
+    want.add(h, 0, ASK);
+    want.options.iter_mut().find(|o| o.id == id).unwrap().holder = Some(m.clone());
+    want.asks.retain(|a| a.0 != id);
+    assert_eq!(t.snap(), want);
+}
+
+/// list_for_sale rejects every misuse with its typed error, in the ABI §14 check order.
+#[test]
+fn resale25_list_for_sale_rejections() {
+    let t = setup();
+    let (w, h, m) = (&t.writer, &t.holder, &t.maker2);
+    let offered = t.put(w);
+    let active = t.put(w);
+    t.c.buy(h, &active);
+    let exercised = t.call(m);
+    t.c.buy(h, &exercised);
+    t.c.exercise(h, &exercised);
+    let before = t.snap();
+
+    rejected(
+        &t,
+        t.c.try_list_for_sale(h, &99, &ASK),
+        Error::NotFound,
+        &before,
+    );
+    // Offered: WrongState comes before ownership (there is no holder yet)
+    rejected(
+        &t,
+        t.c.try_list_for_sale(h, &offered, &ASK),
+        Error::WrongState,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_list_for_sale(w, &offered, &ASK),
+        Error::WrongState,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_list_for_sale(h, &exercised, &ASK),
+        Error::WrongState,
+        &before,
+    );
+    // not the holder: the writer, another party
+    rejected(
+        &t,
+        t.c.try_list_for_sale(w, &active, &ASK),
+        Error::NotHolder,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_list_for_sale(m, &active, &ASK),
+        Error::NotHolder,
+        &before,
+    );
+    // amounts
+    for bad in [0, -1, i128::MIN] {
+        rejected(
+            &t,
+            t.c.try_list_for_sale(h, &active, &bad),
+            Error::InvalidArgs,
+            &before,
+        );
+    }
+    // the contract is never a party
+    rejected(
+        &t,
+        t.c.try_list_for_sale(&t.contract, &active, &ASK),
+        Error::InvalidArgs,
+        &before,
+    );
+    // expiry is exclusive: at `expiry` the option can no longer be listed
+    t.at(EXPIRY);
+    let expired = t.snap();
+    rejected(
+        &t,
+        t.c.try_list_for_sale(h, &active, &ASK),
+        Error::Expired,
+        &expired,
+    );
+    // amount check comes after the time check
+    rejected(
+        &t,
+        t.c.try_list_for_sale(h, &active, &0),
+        Error::Expired,
+        &expired,
+    );
+    t.at(EXPIRY - 1);
+    t.c.list_for_sale(h, &active, &i128::MAX);
+    assert_eq!(t.c.get_ask(&active), Some(i128::MAX));
+}
+
+/// cancel_sale: unknown id, non-holder, no ask.
+#[test]
+fn resale25_cancel_sale_rejections() {
+    let t = setup();
+    let (w, h, m) = (&t.writer, &t.holder, &t.maker2);
+    let id = listed_put(&t);
+    let bare = t.put(w);
+    t.c.buy(h, &bare);
+    let before = t.snap();
+    rejected(&t, t.c.try_cancel_sale(h, &99), Error::NotFound, &before);
+    rejected(&t, t.c.try_cancel_sale(w, &id), Error::NotHolder, &before);
+    rejected(&t, t.c.try_cancel_sale(m, &id), Error::NotHolder, &before);
+    rejected(&t, t.c.try_cancel_sale(h, &bare), Error::NoAsk, &before);
+    t.c.cancel_sale(h, &id);
+    t.assert_one_event("ask_cancelled", id);
+    let after = t.snap();
+    rejected(&t, t.c.try_cancel_sale(h, &id), Error::NoAsk, &after);
+}
+
+/// buy_resale: no ask, expired, self-trade (holder and writer), ineligible buyer, escrow no
+/// longer authorized, and the contract as buyer.
+#[test]
+fn resale25_buy_resale_rejections() {
+    let t = setup();
+    let (w, h, m) = (&t.writer, &t.holder, &t.maker2);
+    let id = listed_put(&t);
+    let bare = t.put(w);
+    t.c.buy(h, &bare);
+    let before = t.snap();
+    rejected(&t, t.c.try_buy_resale(m, &99), Error::NoAsk, &before);
+    rejected(&t, t.c.try_buy_resale(m, &bare), Error::NoAsk, &before);
+    rejected(&t, t.c.try_buy_resale(h, &id), Error::SelfTrade, &before);
+    // writer buy-back is out of scope for v1.4
+    rejected(&t, t.c.try_buy_resale(w, &id), Error::SelfTrade, &before);
+    rejected(
+        &t,
+        t.c.try_buy_resale(&t.outsider, &id),
+        Error::NotEligible,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_buy_resale(&t.contract, &id),
+        Error::InvalidArgs,
+        &before,
+    );
+
+    // the issuer de-authorizes the escrow on RWA: no new holder can take the position
+    t.sac(&t.rwa).set_authorized(&t.contract, &false);
+    let deauth = t.snap();
+    rejected(
+        &t,
+        t.c.try_buy_resale(m, &id),
+        Error::ContractNotAuthorized,
+        &deauth,
+    );
+    t.sac(&t.rwa).set_authorized(&t.contract, &true);
+
+    // expiry is exclusive and comes before self-trade and eligibility
+    t.at(EXPIRY);
+    let expired = t.snap();
+    for buyer in [m, h, w, &t.outsider] {
+        rejected(&t, t.c.try_buy_resale(buyer, &id), Error::Expired, &expired);
+    }
+    t.at(EXPIRY - 1);
+    t.c.buy_resale(m, &id);
+    t.assert_one_event("resale_bought", id);
+}
+
+/// A pooled deficit (issuer clawback from the escrow) blocks resale exactly like `transfer`.
+#[test]
+fn resale25_buy_resale_blocked_by_collateral_shortfall() {
+    let t = setup();
+    let (h, m) = (&t.holder, &t.maker2);
+    let id = listed_put(&t);
+    let call = t.call(m);
+    t.c.buy(h, &call);
+    t.c.list_for_sale(h, &call, &ASK);
+    // the RWA issuer claws back one unit of the CALL collateral from the escrow
+    t.sac(&t.rwa).clawback(&t.contract, &1);
+    let before = t.snap();
+    for x in [id, call] {
+        rejected(
+            &t,
+            t.c.try_buy_resale(&t.holder2, &x),
+            Error::CollateralShortfall,
+            &before,
+        );
+    }
+    // the issuer repairs the escrow: resale works again
+    t.sac(&t.rwa).mint(&t.contract, &1);
+    t.c.buy_resale(&t.holder2, &id);
+    assert_eq!(t.c.get_option(&id).holder, Some(t.holder2.clone()));
+}
+
+/// The second taker of the same ask gets `NoAsk`; nothing moves.
+#[test]
+fn resale25_double_buy_resale_second_is_no_ask() {
+    let t = setup();
+    let id = listed_put(&t);
+    t.c.buy_resale(&t.maker2, &id);
+    let before = t.snap();
+    rejected(
+        &t,
+        t.c.try_buy_resale(&t.holder2, &id),
+        Error::NoAsk,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_buy_resale(&t.maker2, &id),
+        Error::NoAsk,
+        &before,
+    );
+    // the old holder cannot act on the option any more
+    rejected(
+        &t,
+        t.c.try_list_for_sale(&t.holder, &id, &ASK),
+        Error::NotHolder,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_cancel_sale(&t.holder, &id),
+        Error::NotHolder,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_exercise(&t.holder, &id),
+        Error::NotHolder,
+        &before,
+    );
+}
+
+/// A buyer who cannot pay the ask fails inside the quote SAC; holder, ask and balances are
+/// unchanged.
+#[test]
+fn resale25_buyer_without_quote_fails_in_the_sac_atomically() {
+    let t = setup();
+    let id = listed_put(&t);
+    // authorized on RWA, but no USDx at all
+    let poor = Address::generate(&t.env);
+    t.sac(&t.rwa).set_authorized(&poor, &true);
+    t.extra.borrow_mut().push(poor.clone());
+    let before = t.snap();
+    sac_rejected(&t, t.c.try_buy_resale(&poor, &id), SAC_BALANCE, &before);
+    // some USDx, but less than the ask
+    t.sac(&t.usdx).mint(&poor, &(ASK - 1));
+    let before = t.snap();
+    sac_rejected(&t, t.c.try_buy_resale(&poor, &id), SAC_BALANCE, &before);
+    assert_eq!(t.c.get_ask(&id), Some(ASK));
+    assert_eq!(t.c.get_option(&id).holder, Some(t.holder.clone()));
+}
+
+/// Terminal and hand-over transitions clear the ask; it never survives them.
+#[test]
+fn resale25_ask_never_survives_exercise_transfer_or_reclaim() {
+    let t = setup();
+    let (w, h, m) = (&t.writer, &t.holder, &t.maker2);
+    let a = listed_put(&t);
+    let b = listed_put(&t);
+    let c = listed_put(&t);
+    t.c.exercise(h, &a);
+    t.c.transfer(h, m, &b);
+    t.at(EXPIRY);
+    t.c.reclaim(w, &c);
+    let after = t.snap();
+    assert!(after.asks.is_empty(), "{:?}", after.asks);
+    for id in [a, b, c] {
+        assert_eq!(t.c.get_ask(&id), None);
+    }
+    t.at(EXPIRY - 1);
+    let s = t.snap();
+    rejected(&t, t.c.try_buy_resale(&t.holder2, &b), Error::NoAsk, &s);
+    rejected(&t, t.c.try_list_for_sale(h, &b, &ASK), Error::NotHolder, &s);
+    rejected(
+        &t,
+        t.c.try_list_for_sale(h, &a, &ASK),
+        Error::WrongState,
+        &s,
+    );
 }
