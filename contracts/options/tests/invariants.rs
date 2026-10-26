@@ -5814,3 +5814,728 @@ fn list_open_window_is_the_first_max_page_registry_assets() {
     assert_eq!(book(&assets[51]), [0]);
     assert_eq!(c.list_open().iter().collect::<Vec<u32>>(), [1, 2]);
 }
+
+// ---------------------------------------------------------------------------------------------
+// v1.5 buyer side: a separate property test for funded bids (create_bid, cancel_bid, fill_bid,
+// prune_bids) interleaved with the option lifecycle of the options they create (exercise,
+// claim_delivery, reclaim) and with ordinary offers (create_offer). Its own small reference model
+// predicts every outcome exactly (amounts are bounded so no SAC balance failure can occur) and
+// tracks every balance; after each step the whole observable state is compared with the model:
+//
+// - BINV1 balances: every actor's and the escrow's USDx and RWA balance equals the model.
+// - BINV2 reserves: open_collateral(USDx) = strike of Offered/Active PUTs + strike of Exercised
+//   CALLs (unclaimed proceeds) + premium of Open bids; open_collateral(RWA) = qty of
+//   Offered/Active CALLs + qty of Exercised PUTs; nothing counted twice; and the escrow's SAC
+//   balance equals each reserve (no clawback here).
+// - BINV3 bids: get_bids (paged) equals the model; list_open_bids_for(RWA) is exactly the Open
+//   bids in id order; buyer_open_count of every actor is its number of Open bids; a bid that left
+//   Open never returns to it; only Filled bids carry an option id.
+// - BINV4 fill: a successful fill creates exactly one option (option_count + 1), Active, holder =
+//   bid buyer, writer = filler, terms = bid terms, and it is in no open book.
+// - BINV5 offers: list_open_for(RWA) is exactly the Offered options; writer_open_count is the
+//   number of each writer's Offered options (fills never change it).
+// ---------------------------------------------------------------------------------------------
+
+mod bids {
+    use super::*;
+    use options::{Bid, BidState};
+
+    const B_ACTORS: usize = 5; // 0..=3 authorized on RWA, 4 = outsider
+    const B_OUTSIDER: usize = 4;
+    const B_CONTRACT: usize = 5;
+    const B_FUND: i128 = 100_000 * UNIT;
+    const B_DAY: u64 = 86_400;
+
+    #[derive(Clone, Debug)]
+    pub enum BOp {
+        CreateBid {
+            buyer: usize,
+            call: bool,
+            qty: i128,
+            strike: i128,
+            premium: i128,
+            days: u64,
+        },
+        CancelBid(u8, Option<usize>),
+        FillBid(u8, usize),
+        PruneBids(usize, Vec<u8>),
+        CreateOffer(usize, bool, u64),
+        Exercise(u8, Option<usize>),
+        Claim(u8),
+        Reclaim(u8),
+        Advance(u64),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct MBid {
+        buyer: usize,
+        call: bool,
+        qty: i128,
+        strike: i128,
+        premium: i128,
+        expiry: u64,
+        state: BidState,
+        option_id: Option<u32>,
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct MOpt {
+        writer: usize,
+        holder: Option<usize>,
+        call: bool,
+        qty: i128,
+        strike: i128,
+        premium: i128,
+        expiry: u64,
+        state: State,
+    }
+
+    struct BWorld {
+        env: Env,
+        c: OptionsContractClient<'static>,
+        usdx: Address,
+        rwa: Address,
+        parties: [Address; B_ACTORS + 1],
+        now: u64,
+        bids: Vec<MBid>,
+        opts: Vec<MOpt>,
+        /// [token: 0 = USDx, 1 = RWA][party]
+        bal: [[i128; B_ACTORS + 1]; 2],
+    }
+
+    impl BWorld {
+        fn new() -> BWorld {
+            let env = Env::new_with_config(EnvTestConfig {
+                capture_snapshot_at_drop: false,
+            });
+            env.mock_all_auths();
+            env.host().set_diagnostic_level(Default::default()).unwrap();
+            env.ledger().set_timestamp(T0);
+            let usdx = env.register_stellar_asset_contract_v2(Address::generate(&env));
+            let rwa = env.register_stellar_asset_contract_v2(Address::generate(&env));
+            let issuer = rwa.issuer();
+            issuer.set_flag(IssuerFlags::RequiredFlag);
+            issuer.set_flag(IssuerFlags::RevocableFlag);
+            issuer.set_flag(IssuerFlags::ClawbackEnabledFlag);
+            let (usdx, rwa) = (usdx.address(), rwa.address());
+            let contract = env.register(
+                OptionsContract,
+                (usdx.clone(), soroban_sdk::vec![&env, rwa.clone()]),
+            );
+            let c = OptionsContractClient::new(&env, &contract);
+            let parties: [Address; B_ACTORS + 1] = std::array::from_fn(|i| {
+                if i == B_CONTRACT {
+                    contract.clone()
+                } else {
+                    Address::generate(&env)
+                }
+            });
+            let mut bal = [[0i128; B_ACTORS + 1]; 2];
+            StellarAssetClient::new(&env, &rwa).set_authorized(&contract, &true);
+            for i in 0..B_ACTORS {
+                StellarAssetClient::new(&env, &usdx).mint(&parties[i], &B_FUND);
+                bal[0][i] = B_FUND;
+                if i != B_OUTSIDER {
+                    let s = StellarAssetClient::new(&env, &rwa);
+                    s.set_authorized(&parties[i], &true);
+                    s.mint(&parties[i], &B_FUND);
+                    bal[1][i] = B_FUND;
+                }
+            }
+            BWorld {
+                env,
+                c,
+                usdx,
+                rwa,
+                parties,
+                now: T0,
+                bids: Vec::new(),
+                opts: Vec::new(),
+                bal,
+            }
+        }
+
+        fn mv(&mut self, tok: usize, from: usize, to: usize, amt: i128) {
+            self.bal[tok][from] -= amt;
+            self.bal[tok][to] += amt;
+        }
+
+        fn sel(n: usize, s: u8) -> u32 {
+            // one past the end now and then, for NotFound
+            (s as usize % (n + 1)) as u32
+        }
+
+        /// Runs one operation; returns a description of the outcome for the trace.
+        fn step(&mut self, op: &BOp) -> Result<String, String> {
+            let p = self.parties.clone();
+            match op.clone() {
+                BOp::Advance(secs) => {
+                    self.now += secs;
+                    self.env.ledger().set_timestamp(self.now);
+                    Ok("advance".into())
+                }
+                BOp::CreateBid {
+                    buyer,
+                    call,
+                    qty,
+                    strike,
+                    premium,
+                    days,
+                } => {
+                    let expiry = self.now + days * B_DAY;
+                    let kind = if call {
+                        OptionType::Call
+                    } else {
+                        OptionType::Put
+                    };
+                    let r = self.c.try_create_bid(
+                        &p[buyer], &kind, &self.rwa, &self.usdx, &qty, &strike, &premium, &expiry,
+                    );
+                    let want = if buyer == B_OUTSIDER {
+                        Err(Error::NotEligible)
+                    } else {
+                        Ok(self.bids.len() as u32)
+                    };
+                    check(&r, want, "create_bid")?;
+                    if want.is_ok() {
+                        self.mv(0, buyer, B_CONTRACT, premium);
+                        self.bids.push(MBid {
+                            buyer,
+                            call,
+                            qty,
+                            strike,
+                            premium,
+                            expiry,
+                            state: BidState::Open,
+                            option_id: None,
+                        });
+                    }
+                    Ok(std::format!("create_bid -> {want:?}"))
+                }
+                BOp::CancelBid(s, who) => {
+                    let id = Self::sel(self.bids.len(), s);
+                    let b = self.bids.get(id as usize).cloned();
+                    let caller = who.unwrap_or_else(|| b.as_ref().map_or(0, |b| b.buyer));
+                    let want = match &b {
+                        None => Err(Error::NotFound),
+                        Some(b) if b.state != BidState::Open => Err(Error::BidNotOpen),
+                        Some(b) if b.buyer != caller => Err(Error::NotBidder),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_cancel_bid(&p[caller], &id);
+                    check(&r, want, "cancel_bid")?;
+                    if want.is_ok() {
+                        let b = b.unwrap();
+                        self.mv(0, B_CONTRACT, b.buyer, b.premium);
+                        self.bids[id as usize].state = BidState::Cancelled;
+                    }
+                    Ok(std::format!("cancel_bid {id} -> {want:?}"))
+                }
+                BOp::FillBid(s, writer) => {
+                    let id = Self::sel(self.bids.len(), s);
+                    let b = self.bids.get(id as usize).cloned();
+                    let new_id = self.opts.len() as u32;
+                    let want = match &b {
+                        None => Err(Error::NotFound),
+                        Some(b) if b.state != BidState::Open => Err(Error::BidNotOpen),
+                        Some(b) if self.now >= b.expiry => Err(Error::Expired),
+                        Some(b) if b.buyer == writer => Err(Error::SelfTrade),
+                        Some(_) if writer == B_OUTSIDER => Err(Error::NotEligible),
+                        Some(_) => Ok(new_id),
+                    };
+                    let count0 = self.c.option_count();
+                    let wopen0: Vec<u32> = (0..B_ACTORS)
+                        .map(|i| self.c.writer_open_count(&p[i]))
+                        .collect();
+                    let r = self.c.try_fill_bid(&p[writer], &id);
+                    check(&r, want, "fill_bid")?;
+                    if want.is_ok() {
+                        let b = b.unwrap();
+                        // BINV4: exactly one new option, Active, held by the buyer
+                        let count1 = self.c.option_count();
+                        if count1 != count0 + 1 {
+                            return Err(std::format!("fill created {} options", count1 - count0));
+                        }
+                        let o = self.c.get_option(&new_id);
+                        if o.state != State::Active
+                            || o.holder != Some(p[b.buyer].clone())
+                            || o.writer != p[writer]
+                        {
+                            return Err(std::format!("fill produced {o:?}"));
+                        }
+                        let wopen1: Vec<u32> = (0..B_ACTORS)
+                            .map(|i| self.c.writer_open_count(&p[i]))
+                            .collect();
+                        if wopen0 != wopen1 {
+                            return Err("fill changed writer_open_count".into());
+                        }
+                        if b.call {
+                            self.mv(1, writer, B_CONTRACT, b.qty);
+                        } else {
+                            self.mv(0, writer, B_CONTRACT, b.strike);
+                        }
+                        self.mv(0, B_CONTRACT, writer, b.premium);
+                        self.opts.push(MOpt {
+                            writer,
+                            holder: Some(b.buyer),
+                            call: b.call,
+                            qty: b.qty,
+                            strike: b.strike,
+                            premium: b.premium,
+                            expiry: b.expiry,
+                            state: State::Active,
+                        });
+                        let mb = &mut self.bids[id as usize];
+                        mb.state = BidState::Filled;
+                        mb.option_id = Some(new_id);
+                    }
+                    Ok(std::format!("fill_bid {id} by {writer} -> {want:?}"))
+                }
+                BOp::PruneBids(pruner, sels) => {
+                    let ids: Vec<u32> = sels
+                        .iter()
+                        .map(|&s| Self::sel(self.bids.len(), s))
+                        .collect();
+                    let unknown = ids.iter().any(|&i| i as usize >= self.bids.len());
+                    let mut hit = Vec::new();
+                    if !unknown {
+                        for &i in &ids {
+                            let b = &self.bids[i as usize];
+                            if b.state == BidState::Open
+                                && self.now >= b.expiry
+                                && !hit.contains(&i)
+                            {
+                                hit.push(i);
+                            }
+                        }
+                    }
+                    let want = if unknown {
+                        Err(Error::NotFound)
+                    } else {
+                        Ok(hit.len() as u32)
+                    };
+                    let mut v = soroban_sdk::Vec::new(&self.env);
+                    for &i in &ids {
+                        v.push_back(i);
+                    }
+                    let r = self.c.try_prune_bids(&p[pruner], &v);
+                    check(&r, want, "prune_bids")?;
+                    if want.is_ok() {
+                        for i in hit {
+                            let b = self.bids[i as usize].clone();
+                            self.mv(0, B_CONTRACT, b.buyer, b.premium);
+                            self.bids[i as usize].state = BidState::Expired;
+                        }
+                    }
+                    Ok(std::format!("prune_bids {ids:?} -> {want:?}"))
+                }
+                BOp::CreateOffer(writer, call, days) => {
+                    let expiry = self.now + days * B_DAY;
+                    let kind = if call {
+                        OptionType::Call
+                    } else {
+                        OptionType::Put
+                    };
+                    let (qty, strike, premium) = (UNIT, 10 * UNIT, UNIT);
+                    let r = self.c.try_create_offer(
+                        &p[writer], &self.rwa, &kind, &qty, &strike, &premium, &expiry,
+                    );
+                    let want = if writer == B_OUTSIDER {
+                        Err(Error::NotEligible)
+                    } else {
+                        Ok(self.opts.len() as u32)
+                    };
+                    check(&r, want, "create_offer")?;
+                    if want.is_ok() {
+                        if call {
+                            self.mv(1, writer, B_CONTRACT, qty);
+                        } else {
+                            self.mv(0, writer, B_CONTRACT, strike);
+                        }
+                        self.opts.push(MOpt {
+                            writer,
+                            holder: None,
+                            call,
+                            qty,
+                            strike,
+                            premium,
+                            expiry,
+                            state: State::Offered,
+                        });
+                    }
+                    Ok(std::format!("create_offer -> {want:?}"))
+                }
+                BOp::Exercise(s, who) => {
+                    let id = Self::sel(self.opts.len(), s);
+                    let o = self.opts.get(id as usize).cloned();
+                    let caller = who
+                        .or_else(|| o.as_ref().and_then(|o| o.holder))
+                        .unwrap_or(0);
+                    let want = match &o {
+                        None => Err(Error::NotFound),
+                        Some(o) if o.holder != Some(caller) => Err(Error::NotHolder),
+                        Some(o) if o.state != State::Active => Err(Error::WrongState),
+                        Some(o) if self.now >= o.expiry => Err(Error::Expired),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_exercise(&p[caller], &id);
+                    check(&r, want, "exercise")?;
+                    if want.is_ok() {
+                        let o = o.unwrap();
+                        if o.call {
+                            self.mv(0, caller, B_CONTRACT, o.strike);
+                            self.mv(1, B_CONTRACT, caller, o.qty);
+                        } else {
+                            self.mv(1, caller, B_CONTRACT, o.qty);
+                            self.mv(0, B_CONTRACT, caller, o.strike);
+                        }
+                        self.opts[id as usize].state = State::Exercised;
+                    }
+                    Ok(std::format!("exercise {id} -> {want:?}"))
+                }
+                BOp::Claim(s) => {
+                    let id = (s as usize % self.opts.len().max(1)) as u32;
+                    let o = self.opts.get(id as usize).cloned();
+                    let writer = o.as_ref().map_or(0, |o| o.writer);
+                    let want = match &o {
+                        None => Err(Error::NotFound),
+                        Some(o) if o.state != State::Exercised => Err(Error::WrongState),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_claim_delivery(&p[writer], &id);
+                    check(&r, want, "claim_delivery")?;
+                    if want.is_ok() {
+                        let o = o.unwrap();
+                        if o.call {
+                            self.mv(0, B_CONTRACT, writer, o.strike);
+                        } else {
+                            self.mv(1, B_CONTRACT, writer, o.qty);
+                        }
+                        self.opts[id as usize].state = State::Settled;
+                    }
+                    Ok(std::format!("claim {id} -> {want:?}"))
+                }
+                BOp::Reclaim(s) => {
+                    let id = (s as usize % self.opts.len().max(1)) as u32;
+                    let o = self.opts.get(id as usize).cloned();
+                    let writer = o.as_ref().map_or(0, |o| o.writer);
+                    let want = match &o {
+                        None => Err(Error::NotFound),
+                        Some(o) if !matches!(o.state, State::Offered | State::Active) => {
+                            Err(Error::WrongState)
+                        }
+                        Some(o) if self.now < o.expiry => Err(Error::NotExpired),
+                        Some(_) => Ok(()),
+                    };
+                    let r = self.c.try_reclaim(&p[writer], &id);
+                    check(&r, want, "reclaim")?;
+                    if want.is_ok() {
+                        let o = o.unwrap();
+                        if o.call {
+                            self.mv(1, B_CONTRACT, writer, o.qty);
+                        } else {
+                            self.mv(0, B_CONTRACT, writer, o.strike);
+                        }
+                        self.opts[id as usize].state = State::Expired;
+                    }
+                    Ok(std::format!("reclaim {id} -> {want:?}"))
+                }
+            }
+        }
+
+        /// BINV1..BINV5 against the model.
+        fn check_state(&self, prev_bids: &[MBid]) -> Result<(), String> {
+            let p = &self.parties;
+            let toks = [&self.usdx, &self.rwa];
+            // BINV1
+            for t in 0..2 {
+                for i in 0..=B_ACTORS {
+                    let got = TokenClient::new(&self.env, toks[t]).balance(&p[i]);
+                    if got != self.bal[t][i] {
+                        return Err(std::format!(
+                            "BINV1 balance tok {t} party {i}: {got} != {}",
+                            self.bal[t][i]
+                        ));
+                    }
+                }
+            }
+            // BINV2
+            let mut res = [0i128; 2];
+            for o in &self.opts {
+                match (o.state, o.call) {
+                    (State::Offered | State::Active, false) => res[0] += o.strike,
+                    (State::Offered | State::Active, true) => res[1] += o.qty,
+                    (State::Exercised, true) => res[0] += o.strike,
+                    (State::Exercised, false) => res[1] += o.qty,
+                    _ => {}
+                }
+            }
+            for b in &self.bids {
+                if b.state == BidState::Open {
+                    res[0] += b.premium;
+                }
+            }
+            for t in 0..2 {
+                let oc = self.c.open_collateral(toks[t]);
+                if oc != res[t] {
+                    return Err(std::format!(
+                        "BINV2 open_collateral tok {t}: {oc} != {}",
+                        res[t]
+                    ));
+                }
+                if self.bal[t][B_CONTRACT] != res[t] {
+                    return Err(std::format!(
+                        "BINV2 escrow balance tok {t}: {} != reserve {}",
+                        self.bal[t][B_CONTRACT],
+                        res[t]
+                    ));
+                }
+            }
+            // BINV3
+            let n = self.c.bid_count();
+            if n as usize != self.bids.len() {
+                return Err(std::format!("BINV3 bid_count {n} != {}", self.bids.len()));
+            }
+            let mut got: Vec<Bid> = Vec::new();
+            while (got.len() as u32) < n {
+                let page = self.c.get_bids(&(got.len() as u32), &7);
+                if page.is_empty() || page.len() > 7 {
+                    return Err("BINV3 get_bids paging".into());
+                }
+                got.extend(page.iter());
+            }
+            if !self.c.get_bids(&n, &50).is_empty() {
+                return Err("BINV3 get_bids past the end".into());
+            }
+            for (i, (g, m)) in got.iter().zip(&self.bids).enumerate() {
+                let want = Bid {
+                    id: i as u32,
+                    buyer: p[m.buyer].clone(),
+                    kind: if m.call {
+                        OptionType::Call
+                    } else {
+                        OptionType::Put
+                    },
+                    underlying: self.rwa.clone(),
+                    quote: self.usdx.clone(),
+                    qty: m.qty,
+                    strike_total: m.strike,
+                    premium_total: m.premium,
+                    expiry: m.expiry,
+                    state: m.state,
+                    option_id: m.option_id,
+                };
+                if *g != want {
+                    return Err(std::format!("BINV3 bid {i}: {g:?} != {want:?}"));
+                }
+                if (m.state == BidState::Filled) != m.option_id.is_some() {
+                    return Err(std::format!("BINV3 bid {i} option_id vs state"));
+                }
+                if let Some(prev) = prev_bids.get(i) {
+                    if prev.state != BidState::Open && m.state != prev.state {
+                        return Err(std::format!("BINV3 bid {i} left a terminal state"));
+                    }
+                }
+            }
+            let open: Vec<u32> = self
+                .bids
+                .iter()
+                .enumerate()
+                .filter(|(_, b)| b.state == BidState::Open)
+                .map(|(i, _)| i as u32)
+                .collect();
+            let mut book = Vec::new();
+            loop {
+                let page = self
+                    .c
+                    .list_open_bids_for(&self.rwa, &(book.len() as u32), &3);
+                if page.is_empty() {
+                    break;
+                }
+                book.extend(page.iter());
+            }
+            if book != open {
+                return Err(std::format!("BINV3 bid book {book:?} != {open:?}"));
+            }
+            for i in 0..B_ACTORS {
+                let want = self
+                    .bids
+                    .iter()
+                    .filter(|b| b.state == BidState::Open && b.buyer == i)
+                    .count() as u32;
+                let got = self.c.buyer_open_count(&p[i]);
+                if got != want {
+                    return Err(std::format!("BINV3 buyer_open_count {i}: {got} != {want}"));
+                }
+            }
+            // BINV4/5: options
+            if self.c.option_count() as usize != self.opts.len() {
+                return Err("BINV4 option_count".into());
+            }
+            for (i, m) in self.opts.iter().enumerate() {
+                let o = self.c.get_option(&(i as u32));
+                if o.state != m.state
+                    || o.writer != p[m.writer]
+                    || o.holder != m.holder.map(|h| p[h].clone())
+                    || o.qty != m.qty
+                    || o.strike_total != m.strike
+                    || o.premium_total != m.premium
+                    || o.expiry != m.expiry
+                    || (o.option_type == OptionType::Call) != m.call
+                {
+                    return Err(std::format!("BINV4 option {i}: {o:?} != {m:?}"));
+                }
+            }
+            let offered: Vec<u32> = self
+                .opts
+                .iter()
+                .enumerate()
+                .filter(|(_, o)| o.state == State::Offered)
+                .map(|(i, _)| i as u32)
+                .collect();
+            let ob: Vec<u32> = self.c.list_open_for(&self.rwa, &0, &50).iter().collect();
+            if ob != offered {
+                return Err(std::format!("BINV5 open book {ob:?} != {offered:?}"));
+            }
+            for i in 0..B_ACTORS {
+                let want = self
+                    .opts
+                    .iter()
+                    .filter(|o| o.state == State::Offered && o.writer == i)
+                    .count() as u32;
+                if self.c.writer_open_count(&p[i]) != want {
+                    return Err(std::format!("BINV5 writer_open_count {i}"));
+                }
+            }
+            Ok(())
+        }
+    }
+
+    fn check<T: PartialEq + Debug, C: Debug>(
+        r: &Result<Result<T, C>, Result<Error, InvokeError>>,
+        want: Result<T, Error>,
+        call: &str,
+    ) -> Result<(), String> {
+        let ok = match (r, &want) {
+            (Ok(Ok(g)), Ok(w)) => g == w,
+            (Err(Ok(g)), Err(w)) => g == w,
+            _ => false,
+        };
+        if ok {
+            Ok(())
+        } else {
+            Err(std::format!("{call}: got {r:?}, predicted {want:?}"))
+        }
+    }
+
+    fn bop() -> impl Strategy<Value = BOp> {
+        let actor = 0..B_ACTORS;
+        prop_oneof![
+            6 => (
+                prop_oneof![9 => 0..4usize, 1 => Just(B_OUTSIDER)],
+                any::<bool>(),
+                1..=10i128,
+                1..=100i128,
+                1..=10i128,
+                1..=20u64,
+            )
+                .prop_map(|(buyer, call, q, s, pr, days)| BOp::CreateBid {
+                    buyer,
+                    call,
+                    qty: q * UNIT,
+                    strike: s * UNIT,
+                    premium: pr * UNIT,
+                    days,
+                }),
+            3 => (any::<u8>(), prop_oneof![3 => Just(None), 1 => (0..B_ACTORS).prop_map(Some)])
+                .prop_map(|(s, w)| BOp::CancelBid(s, w)),
+            6 => (any::<u8>(), actor.clone()).prop_map(|(s, w)| BOp::FillBid(s, w)),
+            4 => (actor.clone(), prop::collection::vec(any::<u8>(), 0..5))
+                .prop_map(|(p, v)| BOp::PruneBids(p, v)),
+            2 => (actor, any::<bool>(), 1..=20u64).prop_map(|(w, c, d)| BOp::CreateOffer(w, c, d)),
+            3 => (any::<u8>(), prop_oneof![4 => Just(None), 1 => (0..B_ACTORS).prop_map(Some)])
+                .prop_map(|(s, w)| BOp::Exercise(s, w)),
+            2 => any::<u8>().prop_map(BOp::Claim),
+            2 => any::<u8>().prop_map(BOp::Reclaim),
+            3 => (0..=6 * B_DAY).prop_map(BOp::Advance),
+        ]
+    }
+
+    #[test]
+    fn bid_invariants_hold_for_random_operation_sequences() {
+        let cases = std::env::var("PROPTEST_CASES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(128u32); // about 15 s here
+        let cfg = ProptestConfig {
+            cases,
+            failure_persistence: None,
+            ..ProptestConfig::default()
+        };
+        let mut runner = proptest::test_runner::TestRunner::new(cfg);
+        let seen: RefCell<BTreeMap<String, u64>> = RefCell::new(BTreeMap::new());
+        let result = runner.run(&prop::collection::vec(bop(), 1..=40), |ops| {
+            let mut w = BWorld::new();
+            let mut trace = String::new();
+            for op in &ops {
+                let prev = w.bids.clone();
+                let r = w.step(op).and_then(|d| {
+                    let _ = writeln!(trace, "{op:?} => {d}");
+                    let call = d.split_whitespace().next().unwrap_or("").to_string();
+                    let out = d.split("-> ").nth(1).unwrap_or("");
+                    let norm = if call == "prune_bids" && out.starts_with("Ok") {
+                        if out == "Ok(0)" {
+                            "Ok(0)"
+                        } else {
+                            "Ok(>=1)"
+                        }
+                    } else if out.starts_with("Ok") {
+                        "Ok"
+                    } else {
+                        out
+                    };
+                    *seen
+                        .borrow_mut()
+                        .entry(std::format!("{call} {norm}"))
+                        .or_default() += 1;
+                    w.check_state(&prev).map(|_| ())
+                });
+                if let Err(e) = r {
+                    return Err(TestCaseError::fail(std::format!(
+                        "{e}\nafter {op:?}\ntrace:\n{trace}"
+                    )));
+                }
+            }
+            Ok(())
+        });
+        if let Err(e) = result {
+            panic!("{e}");
+        }
+        let seen = seen.into_inner();
+        std::println!("bid invariants: {seen:?}");
+        if cases >= 32 {
+            for row in [
+                "create_bid Ok",
+                "create_bid Err(NotEligible)",
+                "cancel_bid Ok",
+                "cancel_bid Err(NotBidder)",
+                "cancel_bid Err(BidNotOpen)",
+                "cancel_bid Err(NotFound)",
+                "fill_bid Ok",
+                "fill_bid Err(SelfTrade)",
+                "fill_bid Err(Expired)",
+                "fill_bid Err(BidNotOpen)",
+                "fill_bid Err(NotEligible)",
+                "fill_bid Err(NotFound)",
+                "prune_bids Ok(>=1)",
+                "prune_bids Ok(0)",
+                "prune_bids Err(NotFound)",
+                "exercise Ok",
+                "claim Ok",
+                "reclaim Ok",
+            ] {
+                assert!(seen.contains_key(row), "coverage: `{row}` never happened");
+            }
+        }
+    }
+}
