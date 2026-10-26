@@ -92,7 +92,7 @@ Full Testnet reproduction: `scripts/setup-testnet/` (issuers, flags, trustlines)
 
 ## App
 
-Markets: every series, competing makers, best price, and resale asks with Buy. Protect: pick what you hold, see the puts that cover it. Write: maker form with the collateral to be locked and the remaining open-offer allowance. Portfolio: exercise, claim, reclaim, cancel, transfer, sell and cancel sale, with countdowns. Reserves: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
+Markets: every series, competing makers, best price, and resale asks with Buy. Protect: pick what you hold, see the puts that cover it. Write: maker form with the collateral to be locked and the remaining open-offer allowance. Portfolio: exercise, claim, reclaim, cancel, sell and cancel sale, with countdowns (free `transfer` is a contract call, not yet in the app). Reserves: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
 
 ## Contract
 
@@ -141,7 +141,7 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 
 ## Built at the event
 
-Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale). Six app screens on the live contract, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 61 commits, 30 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
+Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale). Six app screens on the live contract, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 77 commits, 62 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
 
 ## Next
 
