@@ -11,6 +11,9 @@ export type IconName =
   | 'check'
   | 'alert'
   | 'external'
+  | 'refresh'
+  | 'copy'
+  | 'chevron'
 
 // 16x16 stroke paths taken from the approved mockups.
 const PATHS: Record<IconName, ReactNode> = {
@@ -49,6 +52,19 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   external: <path d="M6 3.5H3.5v9h9V10M9 3h4v4M13 3L7.5 8.5" />,
+  refresh: (
+    <>
+      <path d="M13 8a5 5 0 1 1-1.6-3.7" />
+      <path d="M13 2.5v3h-3" />
+    </>
+  ),
+  chevron: <path d="M4.5 6.5L8 10l3.5-3.5" />,
+  copy: (
+    <>
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+      <path d="M10.5 5.5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />
+    </>
+  ),
 }
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

@@ -30,6 +30,7 @@ export function BuyDialog({
   me,
   onConfirm,
   onCancel,
+  onOutcomeShown,
 }: {
   offer: OptionOffer
   client: OptionsClient
@@ -37,6 +38,8 @@ export function BuyDialog({
   /** Runs the purchase; resolves with the outcome (the hook keeps this dialog mounted). */
   onConfirm: () => Promise<TxOutcome | null>
   onCancel: () => void
+  /** Called when this dialog displays the successful outcome itself (bottom sheet), so the app can drop the duplicate toast. */
+  onOutcomeShown?: () => void
 }) {
   const [openCheck, setOpenCheck] = useState<CheckState>('pending')
   const [eligCheck, setEligCheck] = useState<CheckState>(me ? 'pending' : 'unknown')
@@ -90,8 +93,11 @@ export function BuyDialog({
     setError(null)
     const res = await onConfirm()
     setSubmitting(false)
-    if (res?.ok) setDone({ hash: res.hash, mock: res.mock })
-    else setError(res?.error ?? 'The purchase could not be submitted.')
+    if (res?.ok) {
+      setDone({ hash: res.hash, mock: res.mock })
+      // On phones the confirmation is a bottom sheet that already shows the tx; the toast would overlap it.
+      if (window.matchMedia('(max-width: 640px)').matches) onOutcomeShown?.()
+    } else setError(res?.error ?? 'The purchase could not be submitted.')
   }
 
   const goPortfolio = () => {
