@@ -7,7 +7,7 @@ HackMeridian 2026, Lisbon · Genesis path · Stellar Unlocked track · Testnet o
 | | |
 |---|---|
 | App | https://hackmeridian-psi.vercel.app |
-| Contract (options v1.3.1) | [`CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE`](https://stellar.expert/explorer/testnet/contract/CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE) |
+| Contract (options v1.4) | [`<V1_4_ID>`](https://stellar.expert/explorer/testnet/contract/<V1_4_ID>) |
 | Spec · ABI · evidence | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) · [docs/contract-abi.md](docs/contract-abi.md) · [docs/contract-testnet-evidence.md](docs/contract-testnet-evidence.md) |
 | Demo video · deck | added at submission |
 
@@ -21,6 +21,7 @@ A market maker writes a put or a call on an eligible asset and locks the full co
 
 - Eligibility is the asset's own `AUTH_REQUIRED` trustline authorization, read from the Stellar Asset Contract. The issuer keeps every power; the contract checks them, it does not replace them.
 - Anyone can list a classic asset by `(code, issuer)`. The contract derives the canonical SAC. The issuer still decides who may hold it, including the escrow.
+- A holder can list an active option for resale at a price they set. An eligible buyer pays that price to the holder and becomes the holder in one transaction. Strike, expiry, quantity and the writer's collateral do not change.
 - No admin, no oracle, no margin, no upgrade path.
 
 This works for any Stellar asset whose issuer permits it, not for every token. Freeze and clawback remain the issuer's powers and can block settlement (see [Limits](#limits)).
@@ -43,11 +44,12 @@ Every transaction we claim is listed in [docs/contract-testnet-evidence.md](docs
 
 | Claim | Testnet tx |
 |---|---|
-| v1.3.1 deployed; `contracts/options` on `main` builds byte-identical to the on-chain wasm (`acecb2f2…354b`) | [`21ac14af…`](https://stellar.expert/explorer/testnet/tx/21ac14af7a16be02e9e1e87922b47a78f3593ad4a96f564f43d81ce22a53c9ec) |
+| v1.4 deployed | [`<V1_4_DEPLOY_TX>`](https://stellar.expert/explorer/testnet/tx/<V1_4_DEPLOY_TX>) |
 | Asset listed at runtime (EQTY), escrow authorized by its issuer, then a put created, bought, exercised and claimed | [`89147386…`](https://stellar.expert/explorer/testnet/tx/891473865d9330d7881b9208e02388166afe8e7cf13344853180ae5547de0512), [`26158344…`](https://stellar.expert/explorer/testnet/tx/261583446ee575fd29dc2b1a9b43eb08da0701fff78996f74e025a19c5714147) |
 | Issuer claws back collateral from the escrow; RWA offers refused while the token is short, BOND unaffected; issuer repays | [`f45330be…`](https://stellar.expert/explorer/testnet/tx/f45330bed06985a957993ab49a8e81d1a276dc7e8444498fa5a57eaf5b5dcbeb), [`c6ef0692…`](https://stellar.expert/explorer/testnet/tx/c6ef06926cb5d47366ac16a89da0e9b87151c61e85aafe80a62ca4feae66432a) |
 | Third party prunes an expired unsold offer, collateral returns to the writer | [`da477e8c…`](https://stellar.expert/explorer/testnet/tx/da477e8cc5d490bdfb8f88f90c65e3ae0121073668a9ce53908a31fc7622ac7d) |
 | Holder transfers an active option | [`c4a60668…`](https://stellar.expert/explorer/testnet/tx/c4a60668b296e7c643d9aca1cee7e54d1b3e864de2604caef9a880ccd73c0c67) |
+| Holder lists an option for resale, another eligible account buys it; holder changes, collateral untouched | [`<RESALE_TX>`](https://stellar.expert/explorer/testnet/tx/<RESALE_TX>) |
 
 Tests: 120 unit, 17 property-based invariants (collateral conservation, no double use, per-token reserves), 65 negative (replay, double exercise, unauthorized cancel, withdrawn collateral, caps, tenor). Frontend: Vitest unit tests and a Playwright suite with a test-only wallet. All run in CI.
 
@@ -55,13 +57,13 @@ Tests: 120 unit, 17 property-based invariants (collateral conservation, no doubl
 
 | | ID |
 |---|---|
-| options v1.3.1 | `CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE` |
+| options v1.4 | `<V1_4_ID>` |
 | RWA SAC | `CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U` |
 | BOND SAC | `CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP` |
 | EQTY SAC (listed with `list_asset`) | `CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU` |
 | USDx SAC | `CAKXMQVKSW2AEKF5DSMDPHJAYGNVOQANHXLI64QJS2H3GOCXRW2GCICU` |
 
-Earlier versions v1 to v1.3: [AGENTS.md](AGENTS.md#deployed-contracts-testnet-only).
+Earlier versions v1 to v1.3.1: [AGENTS.md](AGENTS.md#deployed-contracts-testnet-only).
 
 ## Try it
 
@@ -74,10 +76,10 @@ Locally:
 ```sh
 rustup target add wasm32v1-none
 stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian
-sha256sum target/wasm32v1-none/release/options.wasm      # acecb2f278e2…
+sha256sum target/wasm32v1-none/release/options.wasm      # compare with the deployed wasm hash
 cargo test -p options
 
-cd frontend && npm install && cp .env.example .env         # VITE_OPTIONS_CONTRACT_ID=CBASUA3L…MJUEE
+cd frontend && npm install && cp .env.example .env         # VITE_OPTIONS_CONTRACT_ID=<V1_4_ID>
 npm run dev                                                 # npm test · npm run e2e · npm run build
 ```
 
@@ -85,7 +87,7 @@ Full Testnet reproduction: `scripts/setup-testnet/` (issuers, flags, trustlines)
 
 ## App
 
-Markets: every series, competing makers, best price. Protect: pick what you hold, see the puts that cover it. Write: maker form with the collateral to be locked and the remaining open-offer allowance. Portfolio: exercise, claim, reclaim, cancel, transfer, with countdowns. Reserves: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
+Markets: every series, competing makers, best price, and resale asks with Buy. Protect: pick what you hold, see the puts that cover it. Write: maker form with the collateral to be locked and the remaining open-offer allowance. Portfolio: exercise, claim, reclaim, cancel, transfer, sell and cancel sale, with countdowns. Reserves: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
 
 ## Contract
 
@@ -96,6 +98,7 @@ stateDiagram-v2
   Offered --> Cancelled: cancel_offer
   Offered --> Expired: reclaim / prune_expired (anyone)
   Active --> Active: transfer (eligible holder)
+  Active --> Active: buy_resale (ask paid to holder)
   Active --> Exercised: exercise (atomic)
   Active --> Expired: reclaim after expiry
   Exercised --> Settled: claim_delivery
@@ -110,13 +113,15 @@ stateDiagram-v2
 | `cancel_offer` · `reclaim` | writer | Collateral back before sale, or after expiry. |
 | `prune_expired(pruner, ids)` | anyone | Returns expired unsold collateral to writers, frees the book. |
 | `transfer(holder, to, id)` | holder | Hands an active option to an eligible address. |
+| `list_for_sale(holder, id, ask_total)` · `cancel_sale(holder, id)` | holder | Sets or removes a resale ask, in the quote token. One ask per option. |
+| `buy_resale(buyer, id)` | buyer | Pays `ask_total` to the holder; buyer becomes holder. Buyer must be eligible and not the holder or the writer. The option itself is unchanged. |
 | `list_asset(lister, code, issuer)` | anyone | Adds the canonical SAC of a classic asset to the registry. |
 | `extend_ttl(ids)` | anyone | Bumps storage rent. |
-| `get_option`, `get_options`, `list_open`, `list_open_for`, `open_collateral`, `is_eligible`, `list_assets`, `writer_open_count`, `config`, … | read | What the app shows. |
+| `get_option`, `get_options`, `get_ask`, `list_asks`, `list_open`, `list_open_for`, `open_collateral`, `is_eligible`, `list_assets`, `writer_open_count`, `config`, … | read | What the app shows. |
 
-Limits: 500 open offers per asset, 50 per writer, expiry within 2 years. Errors 101–119, decoded in the app: `NotFound` 101, `InvalidArgs` 102, `AssetNotAllowed` 103, `NotEligible` 104, `ContractNotAuthorized` 105, `WrongState` 106, `NotWriter` 107, `NotHolder` 108, `Expired` 109, `NotExpired` 110, `SelfTrade` 111, `Overflow` 112, `InvalidConfig` 113, `OpenListFull` 114, `CollateralShortfall` 115, `WriterOpenLimit` 116, `AlreadyListed` 117, `AssetNotDeployed` 118, `TenorOutOfRange` 119.
+Limits: 500 open offers per asset, 50 per writer, expiry within 2 years. Errors 101–120, decoded in the app: `NotFound` 101, `InvalidArgs` 102, `AssetNotAllowed` 103, `NotEligible` 104, `ContractNotAuthorized` 105, `WrongState` 106, `NotWriter` 107, `NotHolder` 108, `Expired` 109, `NotExpired` 110, `SelfTrade` 111, `Overflow` 112, `InvalidConfig` 113, `OpenListFull` 114, `CollateralShortfall` 115, `WriterOpenLimit` 116, `AlreadyListed` 117, `AssetNotDeployed` 118, `TenorOutOfRange` 119, `NoAsk` 120. An ask is removed on exercise, transfer, expiry, cancel or purchase.
 
-Decisions and their reasons are in [PRODUCT_SPEC.md](PRODUCT_SPEC.md): premium paid at purchase, never refunded (D1); no self-purchase (D2); 2-year tenor (D4); no impaired state, no refund after issuer action (D6); free transfer to eligible addresses only (D7).
+Decisions and their reasons are in [PRODUCT_SPEC.md](PRODUCT_SPEC.md): premium paid at purchase, never refunded (D1); no self-purchase (D2); 2-year tenor (D4); no impaired state, no refund after issuer action (D6); free transfer to eligible addresses only (D7); resale at a holder-set price, option unchanged (D8).
 
 Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 19, Vite, stellar-sdk, Stellar Wallets Kit, Stellar RPC and Horizon · Vitest, Playwright · GitHub Actions · Vercel.
 
@@ -125,16 +130,17 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 - Issuer action is not insured. A freeze, de-authorization of the escrow or clawback after a sale can make an option unexercisable. The premium is not refunded.
 - After a clawback the escrow is short. It holds one balance per token, so remaining payouts are first come, first served. While a token is short, new offers, purchases and transfers on it fail with `CollateralShortfall`; other tokens continue. Reserves shows the shortfall.
 - Quotes are indicative until an on-chain funded offer is confirmed. The demo makers are our own Testnet accounts. There is no order book depth and no pricing model.
+- Resale prices are set by holders: one ask per option, no matching, no writer buy-back.
 - Soroban storage expires; `extend_ttl` is public and a keeper script runs it.
 - Testnet, fictional assets, unaudited.
 
 ## Built at the event
 
-Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Four contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune). Six app screens on the live contract, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 61 commits, 30 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
+Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after a committee process and a Testnet spike ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)). Five contract iterations deployed and recorded: v1 (puts, calls, two assets), v1.1 (hardening), v1.2 (transfer, paged reads, invariant and negative suites), v1.3 / v1.3.1 (listing, per-asset books, writer cap, tenor, prune), v1.4 (resale). Six app screens on the live contract, issuer scenarios recorded on chain, spec, locked ABI, payoff package. 61 commits, 30 merged PRs. AI coding agents did much of the typing in bounded lanes; humans owned financial semantics, contract safety and UX, and every merged claim is backed by a test or a transaction ([AGENTS.md](AGENTS.md)).
 
 ## Next
 
-- Position tokens, so options can serve as collateral elsewhere.
+- Position tokens. Resale exists on-chain; a token would make options tradable on the Stellar DEX and usable as collateral elsewhere.
 - Strata Pro: cash-settled calls with partial margin. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, passes its negative suite), previewed on fixtures behind a build flag. Not deployed: it needs an oracle and a liquidation design we would not put on chain unreviewed. It shares nothing with the options contract.
 - Issuer onboarding for real tokenized assets. The contract already respects their rules; the rest is legal and operational.
 - An RFQ layer for makers; the on-chain funded offer stays the only executable quote.

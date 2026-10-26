@@ -2,7 +2,7 @@
 
 **Draft for Dev 1 review.** Dev 1 owns the final narrative (AGENTS.md). Nothing here changes what the instrument promises. Every spoken line maps to evidence in the claims table (section 3). Amounts match `scripts/deploy/seed-demo-offers.sh`. Replace them if the recording uses different values.
 
-**Contract version caveat.** `main` carries options **v1.3.1** (`CBASUA3L…JUEE`, PR #55; source builds byte-identical to the deployed wasm). At the time of writing the live app (https://hackmeridian-psi.vercel.app/) is still built against **v1.2** (`CAJ2WJP4…GBAX`); permissionless listing (`list_asset`) and the EQTY asset exist only on v1.3.1, so the app's `VITE_OPTIONS_CONTRACT_ID` must be switched before recording. Lines marked **[v1.3.1]** are true on that deployment. They need one of two things: the app is switched to v1.3.1 before recording, or that scene shows the recorded v1.3.1 transaction on stellar.expert and says so.
+**Contract version caveat.** `main` carries options **v1.3.1** (`CBASUA3L…JUEE`, PR #55; source builds byte-identical to the deployed wasm). At the time of writing the live app (https://hackmeridian-psi.vercel.app/) is still built against **v1.2** (`CAJ2WJP4…GBAX`); permissionless listing (`list_asset`) and the EQTY asset exist only on v1.3.1, so the app's `VITE_OPTIONS_CONTRACT_ID` must be switched before recording. Lines marked **[v1.3.1]** are true on that deployment. They need one of two things: the app is switched to v1.3.1 before recording, or that scene shows the recorded v1.3.1 transaction on stellar.expert and says so. Scene 5c (resale) needs contract **v1.4** (`<V1_4_ID>`) in the app; marked **[v1.4]**. Drop it if the app is not on v1.4.
 
 ---
 
@@ -20,7 +20,7 @@ If v1.3.1 is live in the app, a third sentence can be added where the form allow
 
 ---
 
-## 2. Video voice-over (3:00 max, 376 words; 390 with the optional 5b line)
+## 2. Video voice-over (3:00 max, 376 words; 390 with the optional 5b line; 24 more with the optional 5c line)
 
 Pace: about 140 words per minute, with room for pauses and transaction waits. **Bold** = stress. `/` = short pause.
 
@@ -32,15 +32,18 @@ Pace: about 140 words per minute, with room for pauses and transaction waits. **
 | 4 | 0:50–1:02 | Wallet: Maker B. Same put, premium 0.8 USDx. Sign. Back to Markets: two quotes on one series. | "A second maker posts the same put for **less**: zero point eight USDx instead of one. / Both offers are funded on-chain. These are real offers, not a mock order book." |
 | 5 | 1:02–1:20 | Wallet: Investor. Markets → buy the 0.8 offer. Buy dialog: premium, eligibility, payoff sketch. Sign. Portfolio: `active`. | "Our investor holds RWA and wants protection. / They buy the **cheaper** put. The premium goes straight to the maker. / The investor now has the right to sell five RWA for fifty USDx, **any time before expiry**." |
 | 5b | (optional, in 5) | Only if the buy dialog shows the "Assumed price" payoff chart (PR #37). | "The chart uses a price **you** type in. It's hypothetical; there's no oracle." |
-| 6 | 1:20–1:45 | Portfolio → Exercise → sign. Click the tx link → stellar.expert: RWA investor → contract, USDx contract → investor, one transaction. | "Say RWA falls. The investor exercises. / In **one transaction**, five RWA go into the contract and fifty USDx come back to the investor. Here it is on stellar.expert. / If any leg fails, **the whole thing reverts**. That's delivery-versus-payment, enforced by the contract." |
-| 7 | 1:45–1:55 | Wallet: **Maker B** (writer of the bought offer). Portfolio → Claim delivery → sign → `settled`. | "The writer then claims the five RWA from the contract, / and the option is **settled**." |
-| 8 | 1:55–2:08 | **Reserves** page: Owed vs Held per token, "Read at … ledger …", contract links. | "Anyone can check the backing. / The Reserves page reads two numbers straight from the chain: what the contract **owes**, and what it **actually holds**." |
-| 9 | 2:08–2:30 | Wallet: RWA issuer. **Issuer console** → freeze the investor on RWA. Wallet: Investor → Exercise on the pre-staged active option → error banner. | "Now the **honest** part. RWA is a regulated asset, and its issuer keeps its powers. / When the issuer **freezes** this holder, exercise fails, and **nothing moves**. / Strata respects issuer rules. It doesn't override them, and it's **not** a guarantee against issuer action." |
-| 10 | 2:30–2:42 | **[v1.3.1]** EQTY listing: app if switched, otherwise stellar.expert tx `94f1f28c…75b4` then the EQTY exercise `f2ad8d0e…10a5`. | "New assets don't need our permission. / Anyone can list a Stellar asset with **one call**. Here's EQTY, a fictional equity token: listed, authorized by its issuer, and a put on it **settled**." |
-| 11 | 2:42–2:52 | Simple card: three icons (asset + issuer flags, atomic tx, fee). | "Why Stellar? Assets are native, with **issuer controls built in**. / Soroban gives us atomic settlement. / And an exercise costs **less than a hundredth of an XLM** in fees." |
+| 5c | (optional) 1:20–1:30 | **[v1.4]** Wallet: Investor. Portfolio → **Sell** on a second, pre-staged put, ask 2 USDx → sign. Wallet: Investor 2. Markets → Resale → **Buy** → sign. Portfolio: Investor 2 is the holder. Cut the waits. | "Holders aren't locked in. / Here the investor sells a second put at a price **they** set. The buyer pays them; the collateral doesn't move." |
+| 6 | 1:30–1:53 | Portfolio → Exercise → sign. Click the tx link → stellar.expert: RWA investor → contract, USDx contract → investor, one transaction. | "Say RWA falls. The investor exercises. / In **one transaction**, five RWA go into the contract and fifty USDx come back to the investor. Here it is on stellar.expert. / If any leg fails, **the whole thing reverts**. That's delivery-versus-payment, enforced by the contract." |
+| 7 | 1:53–2:02 | Wallet: **Maker B** (writer of the bought offer). Portfolio → Claim delivery → sign → `settled`. | "The writer then claims the five RWA from the contract, / and the option is **settled**." |
+| 8 | 2:02–2:13 | **Reserves** page: Owed vs Held per token, "Read at … ledger …", contract links. | "Anyone can check the backing. / The Reserves page reads two numbers straight from the chain: what the contract **owes**, and what it **actually holds**." |
+| 9 | 2:13–2:33 | Wallet: RWA issuer. **Issuer console** → freeze the investor on RWA. Wallet: Investor → Exercise on the pre-staged active option → error banner. | "Now the **honest** part. RWA is a regulated asset, and its issuer keeps its powers. / When the issuer **freezes** this holder, exercise fails, and **nothing moves**. / Strata respects issuer rules. It doesn't override them, and it's **not** a guarantee against issuer action." |
+| 10 | 2:33–2:43 | **[v1.3.1]** EQTY listing: app if switched, otherwise stellar.expert tx `94f1f28c…75b4` then the EQTY exercise `f2ad8d0e…10a5`. | "New assets don't need our permission. / Anyone can list a Stellar asset with **one call**. Here's EQTY, a fictional equity token: listed, authorized by its issuer, and a put on it **settled**." |
+| 11 | 2:43–2:52 | Simple card: three icons (asset + issuer flags, atomic tx, fee). | "Why Stellar? Assets are native, with **issuer controls built in**. / Soroban gives us atomic settlement. / And an exercise costs **less than a hundredth of an XLM** in fees." |
 | 12 | 2:52–3:00 | Closing card: Strata, live URL, repo URL, footer disclaimer. | "Testnet, fictional assets, unaudited code. Real assets need their issuer on board. / **Strata**: protection for any **eligible** Stellar asset." |
 
 **If scene 10 cannot be shown** (app on v1.2 and no time to cut in the stellar.expert clip), replace it with: "Each asset is listed once, and its issuer decides who may hold it." That line is true on v1.2 (constructor allowlist plus issuer authorization). Give the freed seconds to scene 6.
+
+**If scene 5c is dropped**, scene 6 starts at 1:20 and the 10 seconds go back to scenes 6 to 11 (their pre-5c lengths: 25, 10, 13, 22, 12, 10 s).
 
 **Scene 7 correction for `docs/demo-script.md`:** the investor buys Maker B's cheaper offer, so the writer who claims is **Maker B**, not Maker A. The current demo script says Maker A in scene 6. Either switch to Maker B there, or have the investor buy Maker A's offer and change the scene 4 line to "they buy one". Buying the cheaper one is the stronger story.
 
@@ -64,6 +67,7 @@ Contract IDs: v1.2 `CAJ2WJP4CUM2GGRB2A5P2M2H5GI45CTZSECV7SL3RTQMGYEKZ7ZDGBAX` (A
 | Writer claims the delivered RWA; option settled | `claim_delivery`, v1.2 tx `e487b120…22bf` | Verified; recording tx TODO |
 | Reserves page reads owed vs held from the chain | `open_collateral(token)` vs SAC `balance(contract)` (ABI §3 views); `frontend/src/views/ReservesView.tsx` ("Both are public reads") | Verified in code |
 | Issuer freeze → exercise fails, nothing moves | ABI §6; PRODUCT_SPEC §8. v1.1 run (A1): freeze `b102fb5c…f109`, then exercise rejected with SAC #11. v1.3.1 A1: freeze `3f0d711d…f462`. A rejected exercise fails in simulation, so no fee is spent and nothing is sent | Verified on chain (v1.1 and v1.3.1); recording TODO |
+| A holder sells at a price they set; the buyer pays them; the collateral doesn't move **[v1.4]** | `list_for_sale` / `buy_resale` on `<V1_4_ID>`; PRODUCT_SPEC D8 (the option, its strike, expiry and the writer's collateral are unchanged). Resale tx `<RESALE_TX>` | Verified on v1.4 once the hash is filled |
 | Not a guarantee against issuer action | PRODUCT_SPEC §8 (required wording) | Required disclosure |
 | Anyone can list a Stellar asset with one call **[v1.3.1]** | `list_asset` (ABI §12 on the v1.3.1 branch); the SAC address is derived on chain, so custom tokens can't be listed. v1.3.1 tx `94f1f28cbef1ec1e6318782976b58605d0b41f6ff74396753b294906148675b4`, sent by maker1 (not an admin) | Verified on v1.3.1 only |
 | EQTY: listed, authorized by its issuer, a put settled **[v1.3.1]** | Issuer authorizes `891473865d…0512`; EQTY PUT #8 create / buy / exercise / claim `26158344…4147` / `ac3ce920…d718` / `f2ad8d0e…10a5` / `d7f84cdf…d1fe` | Verified on v1.3.1 only |
@@ -73,7 +77,7 @@ Contract IDs: v1.2 `CAJ2WJP4CUM2GGRB2A5P2M2H5GI45CTZSECV7SL3RTQMGYEKZ7ZDGBAX` (A
 | Unaudited code | PRODUCT_SPEC §8 ("the contract is not audited") | Required disclosure |
 | "Any eligible Stellar asset" | Honest claim, AGENTS.md / PRODUCT_SPEC §1: supported (listed) **and** eligible (issuer allows escrow and counterparties). Never "every token" | Wording locked |
 
-**Words that must not appear** (AGENTS.md, demo script): mainnet, production, launch date, "real" RWAs or funds, "every token", "guaranteed", "trustless" without qualification, "audited", "secure", "refund", "impaired", any liquidity, volume or user numbers, "first options on Stellar" (Lusty exists), "impossible before" / "new capability".
+**Words that must not appear** (AGENTS.md, demo script): mainnet, production, launch date, "real" RWAs or funds, "every token", "guaranteed", "trustless" without qualification, "audited", "secure", "refund", "impaired", any liquidity, volume or user numbers, "market price" or "order book" for a resale ask (it is a price set by one holder), "first options on Stellar" (Lusty exists), "impossible before" / "new capability".
 
 ---
 
@@ -111,7 +115,7 @@ Use the frontend style in `frontend/STYLE.md` throughout (IBM Plex Sans, Plex Mo
 | 6 | **How it works** | One Soroban escrow contract, no admin, no upgrade. Assets are SACs over classic assets; eligibility = the issuer's own trustline authorization. Lifecycle: Offered → Active → Exercised → Settled (or Cancelled / Expired). | Diagram: Maker and Investor wallets ↔ options contract ↔ RWA / BOND / EQTY SACs and USDx SAC; issuer above the RWA SAC with an "authorize / freeze / clawback" arrow |
 | 7 | **Why Stellar** | Issuer flags (auth required, revocable, clawback) are native and respected end to end. Soroban gives atomic delivery-versus-payment. Exercise fee on Testnet: about 0.005–0.008 XLM. [v1.3.1] Any classic asset can be listed by deriving its SAC address on chain. | Three tiles; a stellar.expert fee line in Plex Mono |
 | 8 | **What's real, what isn't** | Real: deployed Testnet contract, signed txs, 171 contract tests on the v1.3 tree (unit, property-based, negative), smoke and issuer-demo scripts. Fictional: RWA, BOND, EQTY, USDx; demo makers are our own accounts. Not audited; Testnet only. | Two columns, "Real" and "Fictional", with tx hashes under "Real" |
-| 9 | **Limits and roadmap** | Issuer action can block settlement; the premium is not refunded; a clawback is absorbed first come, first served. Next: paid secondary market or position token, per-offer quote tokens, keeper service, issuer pilots (with permission). Strata Pro (cash-settled, margined) is specified but not on chain. | Limitation table (freeze holder / freeze writer / de-authorize escrow / clawback) beside a roadmap line |
+| 9 | **Limits and roadmap** | Issuer action can block settlement; the premium is not refunded; a clawback is absorbed first come, first served. Next: position token (holder-priced resale is on chain in v1.4), per-offer quote tokens, keeper service, issuer pilots (with permission). Strata Pro (cash-settled, margined) is specified but not on chain. | Limitation table (freeze holder / freeze writer / de-authorize escrow / clawback) beside a roadmap line |
 | 10 | **Team and ask** | Dev 1: product and quant. Dev 2: contracts. Dev 3: frontend and Stellar integration. Ask: an introduction to a Stellar asset issuer willing to pilot on Testnet, and feedback from market makers. | Three name cards (names TBD); live URL and QR code |
 
 ---
@@ -161,7 +165,7 @@ An open offer isn't treated as executable until the client simulates `buy` again
   - Scene 8: hover Owed, then Held.
   - Scene 9: hold the error banner for about two seconds before speaking the "Strata respects issuer rules" line.
 - **Keep the "Testnet / fictional" label visible:** the footer disclaimer in scenes 1 and 12. The mock-data banner must never appear in a live take.
-- **If over time, cut in this order:** 5b (chart) → scene 11 fee line → scene 2's last sentence (scene 12 repeats it) → scene 10 (use the one-line fallback). **Never cut** scene 9 (the honesty beat) or the scene 12 disclaimer.
+- **If over time, cut in this order:** 5c (resale) → 5b (chart) → scene 11 fee line → scene 2's last sentence (scene 12 repeats it) → scene 10 (use the one-line fallback). **Never cut** scene 9 (the honesty beat) or the scene 12 disclaimer.
 - **Suggested edits to `docs/demo-script.md`** (Dev 3 / Dev 1 to apply):
   1. Rename FUND to **RWA**. The deployed assets are RWA, BOND, EQTY and USDx, and `frontend/src/issuer/IssuerConsole.tsx` still defaults the asset code to `FUND`. Change it or retype it on camera.
   2. Claim delivery by **Maker B** (the writer of the cheaper offer), not Maker A.
