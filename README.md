@@ -94,7 +94,7 @@ Full Testnet reproduction: `scripts/setup-testnet/` (issuers, flags, trustlines)
 
 ## App
 
-Markets: every series, competing makers, best price, and resale asks with Buy. Protect: pick what you hold, see the puts that cover it. Write: maker form with the collateral to be locked and the remaining open-offer allowance. Portfolio: exercise, claim, reclaim, cancel, sell and cancel sale, with countdowns (free `transfer` is a contract call, not yet in the app). Reserves: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
+Markets: one book per series. Bids from buyers on the left, offers from makers and resale asks on the right, best price on top; prices are limits set by users. Two actions per series: **Buy** (take the best offer, or post a bid at your price with the premium escrowed) and **Sell** (fill the best bid, or post an offer at your price with the collateral locked). Posting an offer asks for the collateral mode, Full collateral by default or Margin, and Margin opens a risk warning that must be acknowledged. Protect: pick what you hold, see the puts that cover it. Portfolio: exercise, claim, reclaim, cancel, list for resale, cancel sale, open requests, with countdowns. Reserves: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Margin section: the uncovered-call book on its own contract. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
 
 ## Contract
 

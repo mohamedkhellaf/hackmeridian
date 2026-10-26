@@ -28,7 +28,7 @@ Pace: about 140 words per minute, with room for pauses and transaction waits. **
 |---|---|---|---|
 | 1 | 0:00–0:16 | Markets page, the offers table. No wallet yet. | "Stellar already carries tokenized funds, bonds and stocks. / But most of them come with **no risk tools**. If you hold one, you can't easily buy **protection** against it falling, / or earn a premium on what you hold." |
 | 2 | 0:16–0:30 | Stay on Markets; open "How settlement works". | "This is **StellSec**: fully collateralized options for eligible tokenized assets on Stellar. / Puts and calls, **physically settled**, and every one is backed **in full** before anyone can buy it. Everything you'll see runs on **Testnet**, with fictional assets." |
-| 3 | 0:30–0:50 | Wallet: Maker A. **Write**: PUT on RWA, qty 5, total strike 50 USDx, premium 1 USDx. Sign. StrataBar shows the locked layer. | "A market maker writes a put on **RWA**, a fictional fund token: / five RWA, fifty USDx total strike. When they sign, the **full fifty USDx** moves into the contract. / No margin. No leverage." |
+| 3 | 0:30–0:50 | Wallet: Maker A. **Markets → Sell → Post an offer**: PUT on RWA, qty 5, total strike 50 USDx, premium 1 USDx. Sign. StrataBar shows the locked layer. | "A market maker writes a put on **RWA**, a fictional fund token: / five RWA, fifty USDx total strike. When they sign, the **full fifty USDx** moves into the contract. / No margin. No leverage." |
 | 4 | 0:50–1:02 | Wallet: Maker B. Same put, premium 0.8 USDx. Sign. Back to Markets: two quotes on one series. | "A second maker posts the same put for **less**: zero point eight USDx instead of one. / Both offers are funded on-chain. These are real offers, not a mock order book." |
 | 5 | 1:02–1:20 | Wallet: Investor. Markets → buy the 0.8 offer. Buy dialog: premium, eligibility, payoff sketch. Sign. Portfolio: `active`. | "Our investor holds RWA and wants protection. / They buy the **cheaper** put. The premium goes straight to the maker. / The investor now has the right to sell five RWA for fifty USDx, **any time before expiry**." |
 | 5b | (optional, in 5) | Only if the buy dialog shows the "Assumed price" payoff chart (PR #37). | "The chart uses a price **you** type in. It's hypothetical; there's no oracle." |
@@ -169,7 +169,7 @@ An open offer isn't treated as executable until the client simulates `buy` again
 - **Suggested edits to `docs/demo-script.md`** (Dev 3 / Dev 1 to apply):
   1. Rename FUND to **RWA**. The deployed assets are RWA, BOND, EQTY and USDx, and `frontend/src/issuer/IssuerConsole.tsx` still defaults the asset code to `FUND`. Change it or retype it on camera.
   2. Claim delivery by **Maker B** (the writer of the cheaper offer), not Maker A.
-  3. Move the collateral beat from the Write tab to the **Reserves** page.
+  3. Move the collateral beat from the Sell dialog on Markets to the **Reserves** page.
   4. Add the EQTY listing scene (2:30–2:42), conditional on v1.3.1.
   5. Update `frontend/src/demo/scenes.ts` titles and start times to match section 2.
 
