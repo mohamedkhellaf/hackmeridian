@@ -2,6 +2,8 @@ import type { OptionsClient } from './client'
 import { collateralLines, reservedOf } from './abi'
 import { OPTIONS_ERRORS } from '../stellar/errors'
 import { MAX_OPEN_PER_WRITER, MAX_TENOR_SECONDS } from './types'
+import { MAX_OPEN_BIDS_PER_BUYER } from '../requests/types'
+import type { Bid, NewBid } from '../requests/types'
 import type { Ask, CollateralHealth, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
 
 // In-memory stand-in for the options contract. Fictional assets and accounts,
@@ -35,6 +37,9 @@ export class MockOptionsClient implements OptionsClient {
   private options = seed()
   // Resale asks by option id (contract v1.4 semantics; the mock moves no tokens).
   private asks = new Map<bigint, { holder: string; askTotal: bigint }>()
+  // Buyer requests (contract v1.5 semantics; the mock moves no tokens). Stored state is open/filled/cancelled;
+  // 'expired' is derived on read like options.
+  private bids: Bid[] = []
 
   private find(id: bigint): OptionOffer {
     const o = this.options.find((x) => x.id === id)
@@ -210,5 +215,82 @@ export class MockOptionsClient implements OptionsClient {
       o.holder = buyer
       this.asks.delete(id)
     })
+  }
+  private findBid(id: bigint): Bid {
+    const b = this.bids.find((x) => x.id === id)
+    if (!b) throw new Error('Request not found.')
+    return b
+  }
+
+  private bidWithExpiry(b: Bid): Bid {
+    return b.state === 'open' && b.expiry <= now() ? { ...b, state: 'expired' } : { ...b }
+  }
+
+  private openBidsOf(buyer: string, underlying?: string): number {
+    return this.bids.filter((b) => b.buyer === buyer && b.state === 'open' && b.expiry > now() && (!underlying || b.underlying.contractId === underlying)).length
+  }
+
+  async listBids(): Promise<Bid[]> {
+    await delay(100)
+    return this.bids.map((b) => this.bidWithExpiry(b))
+  }
+
+  async getBid(id: bigint) {
+    return this.bidWithExpiry(this.findBid(id))
+  }
+
+  async buyerOpenCount(buyer: string) {
+    return this.openBidsOf(buyer)
+  }
+
+  async createBid(bid: NewBid, buyer: string) {
+    let id = 0n
+    const res = await this.tx(() => {
+      if (bid.underlyingQty <= 0n || bid.totalStrike <= 0n || bid.totalPremium <= 0n || bid.expiry <= now()) throw new Error(OPTIONS_ERRORS[102])
+      if (bid.expiry > now() + MAX_TENOR_SECONDS) throw new Error(OPTIONS_ERRORS[119])
+      if (![FUND, BOND].some((t) => t.contractId === bid.underlying.contractId)) throw new Error(OPTIONS_ERRORS[103])
+      if (this.openBidsOf(buyer, bid.underlying.contractId) >= MAX_OPEN_BIDS_PER_BUYER) throw new Error(OPTIONS_ERRORS[125])
+      id = BigInt(this.bids.length)
+      this.bids.push({ ...bid, id, buyer, quote: USDX, state: 'open', optionId: null })
+    })
+    return { ...res, id }
+  }
+
+  // Allowed after expiry (refunds the escrowed premium).
+  cancelBid(id: bigint, buyer: string) {
+    return this.tx(() => {
+      const b = this.findBid(id)
+      if (b.buyer !== buyer) throw new Error(OPTIONS_ERRORS[123])
+      if (b.state !== 'open') throw new Error(OPTIONS_ERRORS[122])
+      b.state = 'cancelled'
+    })
+  }
+
+  // Check order: NotFound -> BidNotOpen (122) -> Expired (109) -> SelfTrade (111).
+  async fillBid(id: bigint, writer: string) {
+    let optionId = 0n
+    const res = await this.tx(() => {
+      const b = this.findBid(id)
+      if (b.state !== 'open') throw new Error(OPTIONS_ERRORS[122])
+      if (b.expiry <= now()) throw new Error(OPTIONS_ERRORS[109])
+      if (b.buyer === writer) throw new Error(OPTIONS_ERRORS[111])
+      optionId = BigInt(this.options.length)
+      this.options.push({
+        id: optionId,
+        kind: b.kind,
+        underlying: b.underlying,
+        quote: b.quote,
+        underlyingQty: b.underlyingQty,
+        totalStrike: b.totalStrike,
+        totalPremium: b.totalPremium,
+        expiry: b.expiry,
+        writer,
+        holder: b.buyer,
+        state: 'active',
+      })
+      b.state = 'filled'
+      b.optionId = optionId
+    })
+    return { ...res, optionId }
   }
 }

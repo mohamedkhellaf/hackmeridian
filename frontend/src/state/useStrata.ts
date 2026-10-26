@@ -5,6 +5,7 @@ import { MockOptionsClient } from '../options/mockClient'
 import type { OptionsClient } from '../options/client'
 import type { Ask, CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets } from '../options/types'
 import type { OptionRow } from '../market/OptionsTable'
+import type { Bid, NewBid } from '../requests/types'
 import type { Notice } from '../ui'
 import { useBalances } from '../wallet/useBalances'
 import { useFreighter } from '../wallet/useFreighter'
@@ -32,6 +33,8 @@ export function useStrata() {
   const [options, setOptions] = useState<OptionOffer[]>([])
   // Resale asks; null when the contract has no resale (before v1.4) or the read failed.
   const [asks, setAsks] = useState<Ask[] | null>(null)
+  // Buyer requests (bids); null when the contract has no bids (before v1.5) or the read failed.
+  const [bids, setBids] = useState<Bid[] | null>(null)
   const [assets, setAssets] = useState<SupportedAssets | null>(null)
   const [collateral, setCollateral] = useState<CollateralLine[]>([])
   const [health, setHealth] = useState<CollateralHealth[]>([])
@@ -44,15 +47,17 @@ export function useStrata() {
   const refreshBalances = balances.refresh
 
   const refresh = useCallback(async () => {
-    const [opts, assets, lines, hl, ak] = await Promise.all([
+    const [opts, assets, lines, hl, ak, bd] = await Promise.all([
       client.listOptions(),
       client.supportedAssets(),
       client.openCollateral(),
       client.collateralHealth().catch(() => [] as CollateralHealth[]),
       client.listAsks().catch(() => null),
+      client.listBids().catch(() => null),
     ])
     setOptions(opts)
     setAsks(ak)
+    setBids(bd)
     setAssets(assets)
     setCollateral(lines)
     setHealth(hl)
@@ -108,6 +113,13 @@ export function useStrata() {
   const buyResale = (o: OptionOffer, maxTotal: bigint) =>
     runDetailed(o.id, 'Bought from holder', () => client.buyResale(o.id, me!, maxTotal))
 
+  // Buyer requests (contract v1.5). Each resolves with the outcome so the request dialogs can show their own result.
+  // Bid ids and option ids are separate sequences, so the busy marker uses a negative id for bids.
+  const bidBusyId = (id: bigint) => -2n - id
+  const createBid = (bid: NewBid) => runDetailed(-1n, 'Request posted', () => client.createBid(bid, me!))
+  const cancelBid = (b: Bid) => runDetailed(bidBusyId(b.id), 'Request cancelled', () => client.cancelBid(b.id, me!))
+  const fillBid = (b: Bid) => runDetailed(bidBusyId(b.id), 'Request filled', () => client.fillBid(b.id, me!))
+
   /** The next action the connected wallet can take on a position, if any. */
   const actionFor = (o: OptionOffer): PositionAction | undefined => {
     if (!me) return undefined
@@ -155,6 +167,11 @@ export function useStrata() {
     listForSale,
     cancelSale,
     buyResale,
+    bids,
+    bidBusyId,
+    createBid,
+    cancelBid,
+    fillBid,
     market,
     positions,
     assets,

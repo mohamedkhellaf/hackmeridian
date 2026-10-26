@@ -1,0 +1,26 @@
+/* Buyer requests (contract v1.5 bids): Markets "Requests" table, request and fill dialogs, Positions "My requests". */
+.rq-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rq-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.rq-lead,
+.rq-escrow {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rq-escrow {
+  margin-top: 8px;
+  color: inherit;
+}
+.rq-copy {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
