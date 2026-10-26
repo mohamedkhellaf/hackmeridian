@@ -35,7 +35,8 @@ legacy rules it no longer uses.
 
 - `AppShell` renders demo banner, sidebar, top bar, content slot, footer disclaimer and the mobile tab bar.
   Props: `route`, `portfolioBadge`, `mock`, `contractId`, `balances` (slot), `wallet` (slot), `children`.
-- `WalletChip` is the default `wallet` slot (Connect wallet button, or address pill + Disconnect).
+- `WalletChip` is the default `wallet` slot: a Connect wallet button, or a pill (dot + short address) that opens the wallet menu (`Dialog`: wallet name, full address + copy, balances in real mode only, Refresh, Disconnect). Balances (`BalancesBar`, `variant="inline"|"list"`) are hidden in mock mode; on phones the top bar is one row and balances live in the menu.
+- `BuyDialog` takes `onOutcomeShown`: on phones the confirmed sheet calls it so `App` drops the duplicate success toast.
 - Routing: `useHashRoute()` returns `[route, navigate]`; routes `markets | write | portfolio | reserves | issuer`
   (`#/markets`, default). Unknown hashes fall back to markets. No router dependency.
 - Breakpoints: <= 768px sidebar hidden and bottom tab bar (Markets, Write, Portfolio, Reserves; Issuer is the person icon

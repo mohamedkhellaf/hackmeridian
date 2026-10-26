@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, Icon, Mono, StatusDot } from '../ui'
+import { Button, Dialog, Icon, Mono, StatusDot } from '../ui'
 import { shortAddress } from '../options/format'
 import { hrefFor, NAV_TABS, NAV_TRADE, NAV_TRANSPARENCY } from './routes'
 import type { NavItem, Route } from './routes'
@@ -33,18 +34,28 @@ function NavLink({ item, current, badge }: { item: NavItem; current: Route; badg
   )
 }
 
-/** Wallet chip: green dot + wallet name and short address + Disconnect, or a primary Connect button. */
+/**
+ * Wallet chip: a Connect button when disconnected, otherwise a pill (green dot + short address) that opens the
+ * wallet menu: wallet name, full address with copy, balances (real mode only), Refresh and Disconnect.
+ */
 export function WalletChip({
   address,
   walletName,
   onConnect,
   onDisconnect,
+  balances,
+  onRefresh,
 }: {
   address: string | null
   walletName?: string | null
   onConnect: () => void
   onDisconnect: () => void
+  /** Balances list for the menu; omit in mock mode. */
+  balances?: ReactNode
+  onRefresh?: () => void
 }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   if (!address) {
     return (
       <Button variant="primary" onClick={onConnect}>
@@ -52,16 +63,66 @@ export function WalletChip({
       </Button>
     )
   }
+  const copy = () => {
+    void navigator.clipboard?.writeText(address).then(
+      () => {
+        setCopied(true)
+        window.setTimeout(() => setCopied(false), 1500)
+      },
+      () => undefined,
+    )
+  }
   return (
-    <div className="wallet-chip">
-      <span className="wallet-pill" title={address}>
+    <>
+      <button type="button" className="wallet-pill" aria-label="Wallet menu" aria-haspopup="dialog" title={address} onClick={() => setOpen(true)}>
         <StatusDot tone="ok" />
-        <Mono>{walletName ? `${walletName} · ${shortAddress(address)}` : shortAddress(address)}</Mono>
-      </span>
-      <Button variant="ghost" size="sm" onClick={onDisconnect}>
-        Disconnect
-      </Button>
-    </div>
+        <Mono>
+          {walletName && <span className="wallet-pill-name">{walletName} · </span>}
+          {shortAddress(address)}
+        </Mono>
+        <Icon name="chevron" size={14} className="wallet-caret" />
+      </button>
+      {open && (
+        <Dialog title="Wallet" width={400} onClose={() => setOpen(false)}>
+          <div className="wm">
+            <div className="wm-section">
+              <span className="ui-label">Connected wallet</span>
+              <span className="wm-name">
+                <StatusDot tone="ok" />
+                {walletName ?? 'Wallet'}
+              </span>
+              <div className="wm-addr">
+                <Mono>{address}</Mono>
+                <button type="button" className="wm-copy" onClick={copy} aria-label="Copy address">
+                  <Icon name={copied ? 'check' : 'copy'} size={14} />
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+            {balances && (
+              <div className="wm-section">
+                <span className="ui-label">Balances</span>
+                {balances}
+                {onRefresh && (
+                  <Button variant="secondary" size="sm" onClick={onRefresh}>
+                    <Icon name="refresh" size={14} /> Refresh
+                  </Button>
+                )}
+              </div>
+            )}
+            <Button
+              variant="danger"
+              onClick={() => {
+                setOpen(false)
+                onDisconnect()
+              }}
+            >
+              Disconnect
+            </Button>
+          </div>
+        </Dialog>
+      )}
+    </>
   )
 }
 
@@ -130,6 +191,8 @@ export function AppShell({ route, portfolioBadge, mock, contractId, balances, wa
           <header className="topbar">
             <a href={hrefFor('markets')} className="topbar-logo" aria-label="Strata home">
               <LogoMark size={22} />
+              <span className="brand-name">Strata</span>
+              <span className="net-pill">Testnet</span>
             </a>
             <div className="topbar-balances">{balances}</div>
             <a href={hrefFor('issuer')} className={route === 'issuer' ? 'topbar-issuer is-on' : 'topbar-issuer'} aria-label="Issuer console">

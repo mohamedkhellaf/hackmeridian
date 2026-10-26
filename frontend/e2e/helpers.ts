@@ -10,13 +10,20 @@ export async function openApp(page: Page) {
 
 export async function connect(page: Page) {
   await page.getByRole('button', { name: 'Connect wallet' }).click()
-  await expect(page.getByRole('button', { name: 'Disconnect' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Wallet menu' })).toBeVisible()
+}
+
+// Disconnect lives in the wallet menu (the wallet pill in the top bar opens it).
+export async function disconnect(page: Page) {
+  await page.getByRole('button', { name: 'Wallet menu' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Disconnect' }).click()
+  await expect(page.getByRole('button', { name: 'Connect wallet' })).toBeVisible()
 }
 
 // The mock state lives in memory, so switching identity must not reload the page: the test wallet
 // reads `?as=` at connect time, so we rewrite the URL (keeping the hash route) and reconnect.
 export async function switchTo(page: Page, address: string | null) {
-  await page.getByRole('button', { name: 'Disconnect' }).click()
+  await disconnect(page)
   await page.evaluate((a) => history.replaceState(null, '', (a ? `/?as=${a}` : '/') + window.location.hash), address)
   await connect(page)
 }

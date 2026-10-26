@@ -297,3 +297,142 @@
     font-size: 10px;
   }
 }
+
+/* Balances group (real mode only) */
+.balances-bar .balances-refresh {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.balances-bar .balances-refresh:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.balance-na {
+  color: var(--muted);
+  cursor: help;
+}
+.balances-bar--list {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  font-size: 14px;
+}
+.balances-bar--list .balance {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Wallet button + menu */
+button.wallet-pill {
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+button.wallet-pill:hover {
+  background: var(--surface-hover);
+}
+.wallet-pill .wallet-caret {
+  color: var(--muted);
+}
+.wm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.wm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wm-addr {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.wm-addr .ui-mono {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.wm-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.wm-copy:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.wm-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+@media (max-width: 768px) {
+  /* One row: logo + name (+ Testnet) left, issuer + compact wallet button right. */
+  .topbar {
+    flex-wrap: nowrap;
+  }
+  .topbar-logo {
+    gap: 8px;
+    text-decoration: none;
+    color: var(--text-strong);
+    min-width: 0;
+  }
+  .topbar-logo .brand-name {
+    font-size: 16px;
+  }
+  .topbar-logo .net-pill {
+    margin-left: 0;
+  }
+  .topbar-balances {
+    display: none;
+  }
+  .topbar-issuer {
+    order: 2;
+    flex: none;
+  }
+  .topbar-wallet {
+    order: 3;
+    flex: none;
+  }
+  .wallet-pill {
+    padding: 0 12px;
+    min-height: 44px;
+  }
+  .wallet-pill-name {
+    display: none;
+  }
+  .topbar-wallet .ui-btn {
+    min-height: 44px;
+  }
+}
+@media (max-width: 400px) {
+  .topbar-logo .net-pill {
+    display: none;
+  }
+}
