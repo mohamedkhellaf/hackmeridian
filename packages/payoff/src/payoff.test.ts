@@ -3,6 +3,7 @@ import {
   cashSecuredPut,
   collar,
   coveredCall,
+  fullCoverPrice,
   guaranteedCoverPrice,
   longCall,
   longPut,
@@ -142,7 +143,11 @@ describe('pro', () => {
     expect(proHolderPayout(10, 100, 90, 300, 100)).toMatchObject({ due: 0, paid: 0, deficit: 0 })
   })
 
-  it('guaranteed cover price', () => {
-    expect(guaranteedCoverPrice(10, 100, 300, 100)).toBe(140)
+  it('full cover price', () => {
+    expect(fullCoverPrice(10, 100, 300, 100)).toBe(140)
+  })
+
+  it('keeps guaranteedCoverPrice as a deprecated alias', () => {
+    expect(guaranteedCoverPrice).toBe(fullCoverPrice)
   })
 })
