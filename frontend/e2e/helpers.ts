@@ -29,7 +29,7 @@ export async function switchTo(page: Page, address: string | null) {
 }
 
 // Sidebar navigation (hash routes: #/markets, #/write, #/portfolio, #/reserves, #/issuer).
-export async function goTo(page: Page, name: 'Markets' | 'Write' | 'Portfolio' | 'Reserves' | 'Issuer') {
+export async function goTo(page: Page, name: 'Markets' | 'Protect' | 'Write' | 'Portfolio' | 'Reserves' | 'Issuer') {
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: new RegExp(`^${name}`) }).click()
   await expect(page).toHaveURL(new RegExp(`#/${name.toLowerCase()}$`))
 }

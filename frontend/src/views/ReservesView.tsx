@@ -1,17 +1,21 @@
 import { CollateralPanel } from '../reserves/CollateralPanel'
+import { RatioCards } from '../reserves/RatioCards'
+import { Footnotes } from '../reserves/Footnotes'
 import { useReadAt } from '../reserves/useReadAt'
 import { stellarExpertContract } from '../reserves/reserves'
 import type { CollateralHealth, CollateralLine } from '../options/types'
-import { Card, Mono, PageHero, StatusDot } from '../ui'
+import { Button, Card, Mono, PageHero, StatusDot } from '../ui'
 import { backingFor } from '../reserves/reserves'
 
 export interface ReservesViewProps {
   collateral: CollateralLine[]
   health: CollateralHealth[]
   contractId?: string
+  /** Re-read everything. Defaults to reloading the page (the route is kept in the URL hash). */
+  onRefresh?: () => void
 }
 
-export function ReservesView({ collateral, health, contractId }: ReservesViewProps) {
+export function ReservesView({ collateral, health, contractId, onRefresh }: ReservesViewProps) {
   const { readAt, ledger } = useReadAt(collateral, health, !!contractId)
   const tokens = collateral.map((l) => l.token)
   const backings = collateral.map((l) => backingFor(l, health.find((h) => h.token.contractId === l.token.contractId)))
@@ -59,14 +63,16 @@ export function ReservesView({ collateral, health, contractId }: ReservesViewPro
           <>
             <StatusDot tone="ok" />
             <span>
-              Read at <Mono>{readAt.toLocaleTimeString('en-GB')}</Mono>
-              {ledger !== null && (
+              As of {ledger !== null && (
                 <>
-                  {' '}
-                  · ledger <Mono>{ledger.toLocaleString('en-US')}</Mono>
+                  ledger <Mono>{ledger.toLocaleString('en-US')}</Mono> ·{' '}
                 </>
               )}
+              <Mono>{readAt.toISOString().slice(11, 19)} UTC</Mono>
             </span>
+            <Button size="sm" variant="ghost" onClick={onRefresh ?? (() => window.location.reload())}>
+              Refresh
+            </Button>
           </>
         ) : (
           <>
@@ -76,7 +82,11 @@ export function ReservesView({ collateral, health, contractId }: ReservesViewPro
         )}
       </p>
       <div className="rs-page">
+        <RatioCards lines={collateral} health={health} />
         <CollateralPanel lines={collateral} health={health} contractId={contractId} />
+        <Card title="Footnotes">
+          <Footnotes />
+        </Card>
         <Card title="How to verify this yourself">
           <p className="rs-verify">
             “Owed” is the contract's <Mono>open_collateral(token)</Mono>. “Held” is the token's <Mono>balance(contract)</Mono> on its Stellar

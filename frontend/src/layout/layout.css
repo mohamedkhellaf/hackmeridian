@@ -214,6 +214,30 @@
   margin-inline: auto;
 }
 
+/* Status bar (desktop) */
+.statusbar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 32px;
+  border-top: 1px solid var(--border);
+  background: var(--sidebar);
+  color: var(--muted);
+  font-size: 12px;
+  z-index: 10;
+}
+.statusbar-rpc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.statusbar .ui-mono {
+  font-size: 12px;
+}
+
 /* Tab bar (phones) */
 .tabbar {
   display: none;
@@ -272,6 +296,9 @@
   }
   h1 {
     font-size: 36px;
+  }
+  .statusbar {
+    display: none;
   }
   .shell-footer {
     padding: 8px 16px 96px;

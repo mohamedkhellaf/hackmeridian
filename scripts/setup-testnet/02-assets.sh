@@ -3,10 +3,13 @@
 #
 #   RWA:<strata-rwa-issuer>   underlying, regulated issuer (AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED)
 #   BOND:<strata-rwa-issuer>  underlying, same regulated issuer
+#   EQTY:<strata-rwa-issuer>  underlying (label: tokenized equity, fictional), same regulated issuer. Contract v1.3
+#                             demo asset: deliberately NOT in the options constructor; the smoke run lists it with
+#                             list_asset (contract-abi.md §12)
 #   USDx:<strata-usdx-issuer> quote token, separate issuer with no flags
 #
-# Holders: maker1, maker2, investor are authorized on RWA and BOND; strata-outsider has trustlines but is
-# deliberately NOT authorized on RWA/BOND (ineligible-buyer demo). Everyone gets USDx.
+# Holders: maker1, maker2, investor are authorized on RWA, BOND and EQTY; strata-outsider has trustlines but is
+# deliberately NOT authorized on RWA/BOND/EQTY (ineligible-buyer demo). Everyone gets USDx.
 #
 # Idempotent: flags, trustlines and authorizations that already exist are skipped. A balance below the target is
 # topped up to it; a balance at or above it is left alone (a rehearsal leaves some above target; nothing burns
@@ -19,7 +22,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../lib/common.sh"
 require_tools stellar curl jq
 
 USDX_AMOUNT=100000 # whole tokens, to maker1, maker2, investor, outsider
-UNDERLYING_AMOUNT=1000 # whole tokens of RWA and of BOND, to maker1, maker2, investor
+UNDERLYING_AMOUNT=1000 # whole tokens of RWA, of BOND and of EQTY, to maker1, maker2, investor
+UNDERLYINGS=(RWA BOND EQTY) # regulated underlyings, all issued by strata-rwa-issuer
 
 for id in "${ALL_IDENTITIES[@]}"; do
   stellar keys address "$id" >/dev/null 2>&1 || die "identity $id missing; run 01-identities.sh first"
@@ -37,17 +41,17 @@ declare -A IDENT=([MAKER1]="$ID_MAKER1" [MAKER2]="$ID_MAKER2" [INVESTOR]="$ID_IN
 for who in RWA_ISSUER USDX_ISSUER; do account_exists "${!who}" || die "$who ${!who} not on testnet; run 01-identities.sh"; done
 for who in "${!G[@]}"; do account_exists "${G[$who]}" || die "$who ${G[$who]} not on testnet; run 01-identities.sh"; done
 
-declare -A CODE=([RWA]=RWA [BOND]=BOND [USDX]=USDx)
-declare -A ISSUER=([RWA]="$RWA_ISSUER" [BOND]="$RWA_ISSUER" [USDX]="$USDX_ISSUER")
-declare -A ISSUER_ID=([RWA]="$ID_RWA_ISSUER" [BOND]="$ID_RWA_ISSUER" [USDX]="$ID_USDX_ISSUER")
+declare -A CODE=([RWA]=RWA [BOND]=BOND [EQTY]=EQTY [USDX]=USDx)
+declare -A ISSUER=([RWA]="$RWA_ISSUER" [BOND]="$RWA_ISSUER" [EQTY]="$RWA_ISSUER" [USDX]="$USDX_ISSUER")
+declare -A ISSUER_ID=([RWA]="$ID_RWA_ISSUER" [BOND]="$ID_RWA_ISSUER" [EQTY]="$ID_RWA_ISSUER" [USDX]="$ID_USDX_ISSUER")
 asset() { printf '%s:%s\n' "${CODE[$1]}" "${ISSUER[$1]}"; }
 
 env_set RWA_ISSUER "$RWA_ISSUER"
 env_set USDX_ISSUER "$USDX_ISSUER"
-for a in RWA BOND USDX; do env_set "${a}_ASSET" "$(asset "$a")"; done
+for a in "${UNDERLYINGS[@]}" USDX; do env_set "${a}_ASSET" "$(asset "$a")"; done
 env_set ASSET_DECIMALS 7
 
-# ---------- 1. Regulated issuer flags (must precede every RWA/BOND trustline) ----------
+# ---------- 1. Regulated issuer flags (must precede every RWA/BOND/EQTY trustline) ----------
 flags="$(horizon_account "$RWA_ISSUER" | jq -r '.flags | "\(.auth_required) \(.auth_revocable) \(.auth_clawback_enabled)"')"
 if [[ "$flags" == "true true true" ]]; then
   log "flags: $ID_RWA_ISSUER already has AUTH_REQUIRED, AUTH_REVOCABLE, AUTH_CLAWBACK_ENABLED"
@@ -65,7 +69,7 @@ usdx_flags="$(horizon_account "$USDX_ISSUER" | jq -r '[.flags | to_entries[] | s
 
 # ---------- 2. Trustlines ----------
 for who in MAKER1 MAKER2 INVESTOR OUTSIDER; do
-  for a in RWA BOND USDX; do
+  for a in "${UNDERLYINGS[@]}" USDX; do
     bal="$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" balance)" ||
       die "Horizon read failed for $who ${CODE[$a]}; re-run once Horizon responds"
     if [[ -n "$bal" ]]; then
@@ -77,8 +81,8 @@ for who in MAKER1 MAKER2 INVESTOR OUTSIDER; do
   done
 done
 
-# ---------- 3. Issuer authorization on RWA and BOND ----------
-for a in RWA BOND; do
+# ---------- 3. Issuer authorization on RWA, BOND and EQTY ----------
+for a in "${UNDERLYINGS[@]}"; do
   for who in MAKER1 MAKER2 INVESTOR; do
     auth="$(trustline_field "${G[$who]}" "${CODE[$a]}" "${ISSUER[$a]}" is_authorized)" ||
       die "Horizon read failed for $who ${CODE[$a]}; re-run once Horizon responds"
@@ -117,12 +121,13 @@ issue() { # issue <ASSET_KEY> <WHO> <whole tokens>
     --destination "${G[$who]}" --asset "$(asset "$a")" --amount "$diff"
 }
 for who in MAKER1 MAKER2 INVESTOR OUTSIDER; do issue USDX "$who" "$USDX_AMOUNT"; done
-for a in RWA BOND; do
+for a in "${UNDERLYINGS[@]}"; do
   for who in MAKER1 MAKER2 INVESTOR; do issue "$a" "$who" "$UNDERLYING_AMOUNT"; done
 done
 
 # ---------- 5. Stellar Asset Contracts ----------
-for a in RWA BOND USDX; do
+# The EQTY SAC must exist for list_asset (v1.3 returns AssetNotDeployed #118 otherwise); deploying a SAC grants nothing.
+for a in "${UNDERLYINGS[@]}" USDX; do
   sac="$(stellar contract id asset --asset "$(asset "$a")" --network "$NETWORK")"
   is_contract_id "$sac" || die "could not derive SAC id for $(asset "$a")"
   if contract_exists "$sac"; then
@@ -142,5 +147,5 @@ for a in RWA BOND USDX; do
 done
 
 log "assets ready; summary from $ENV_FILE:"
-grep -E '^(RWA|BOND|USDX)_(ASSET|SAC)=' "$ENV_FILE" >&2
+grep -E '^(RWA|BOND|EQTY|USDX)_(ASSET|SAC)=' "$ENV_FILE" >&2
 log "next: run scripts/setup-testnet/verify.sh, then scripts/deploy/deploy.sh once the options wasm exists"
