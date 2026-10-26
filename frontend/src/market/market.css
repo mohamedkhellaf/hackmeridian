@@ -96,7 +96,7 @@
 .mk-table th {
   white-space: nowrap;
 }
-.mk-table tr.is-best td:not(.mk-action) {
+.mk-table tr.is-best td.mk-prem {
   font-weight: 600;
 }
 .mk-table tr.is-picked td {
@@ -244,4 +244,7 @@
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
+}
+.mk-table .ui-mono {
+  font-weight: 400;
 }

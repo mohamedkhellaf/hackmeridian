@@ -264,7 +264,6 @@ export function ResaleMarket({
   return (
     <section className="rsl-section" aria-label="Resale">
       <h2>Resale</h2>
-      <p className="rsl-lead">Options listed by their current holders. Prices are set by the seller.</p>
       {rows.length === 0 ? (
         <p className="mk-empty">No options for sale.</p>
       ) : (

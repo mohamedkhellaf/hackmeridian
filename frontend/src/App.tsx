@@ -66,6 +66,7 @@ function App() {
             busy={s.busy}
             busyId={s.busyId}
             onBuy={s.setBuying}
+            onConnect={() => void wallet.connect()}
             collateral={s.collateral}
             health={s.health}
             mock={s.isMock}

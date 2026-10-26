@@ -111,9 +111,9 @@ p.pro-muted {
 .pro-input select {
   flex: 1;
   min-width: 0;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
+  height: var(--control-h);
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--r);
   background: var(--bg);
   color: var(--text);
@@ -123,7 +123,8 @@ p.pro-muted {
 .pro-input input:focus,
 .pro-input select:focus {
   border-color: var(--accent);
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
 }
 .pro-unit {
   flex: none;

@@ -139,7 +139,9 @@ export function PortfolioView({ me, rows, actionFor, health = [], resale }: Port
           )}
 
           {held.length === 0 && written.length === 0 ? (
-            <p className="pf-empty">{rows.length === 0 ? 'No positions.' : 'No open positions.'}</p>
+            <p className="pf-empty">
+              {rows.length === 0 ? 'No positions.' : 'No open positions.'} <a href="#/markets">Browse markets</a>.
+            </p>
           ) : (
             <>
               {held.length > 0 && (
