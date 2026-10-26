@@ -35,6 +35,7 @@ scripts/deploy/smoke-testnet.sh                 # end-to-end smoke run on TESTNE
 scripts/deploy/deploy.sh --throwaway            # second instance for destructive demos; OPTIONS_ID untouched
 scripts/deploy/issuer-demo-testnet.sh           # issuer freeze / de-authorize / clawback failure modes (real txs)
 scripts/deploy/extend-ttl.sh                    # TTL keeper: extend_ttl over every non-terminal option
+scripts/deploy/seed-demo-offers.sh --contract <C-id> [--hours 48]   # 4 funded demo offers (NOT idempotent)
 ```
 
 Transaction hashes are printed as `TX <STEP> <hash>` and appended to `scripts/out/tx-log.tsv`.
@@ -82,6 +83,35 @@ while someone is demoing on the same contract. `DRY_RUN` is not supported: the s
 > tokens back. Until then `create_offer`/`buy` on that token fail with `#115` for everyone, and existing positions
 > settle first-come-first-served, so the last claimant takes the loss. `issuer-demo-testnet.sh` only claws back
 > from a fresh throwaway instance and refuses if that id equals `OPTIONS_ID`.
+
+## Demo order book (`seed-demo-offers.sh`)
+
+```sh
+scripts/deploy/seed-demo-offers.sh --contract <C-id> [--hours 48]
+```
+
+`--contract` is required and must be a `C…` id; the script never takes it from `testnet.env`, so the book lands on
+the contract the frontend actually uses. It sends four real `create_offer` txs, all with expiry `now + hours*3600`:
+
+| | Writer | Type | Underlying | qty | strike_total | premium_total |
+|---|---|---|---|---|---|---|
+| a | `strata-maker1` | Put | RWA | 50000000 (5) | 500000000 (50 USDx) | 10000000 (1.0 USDx) |
+| b | `strata-maker2` | Put | RWA | 50000000 (5) | 500000000 (50 USDx) | 8000000 (0.8 USDx): competing quote on the same series as (a) |
+| c | `strata-maker1` | Call | RWA | 30000000 (3) | 300000000 (30 USDx) | 5000000 (0.5 USDx) |
+| d | `strata-maker2` | Put | BOND | 50000000 (5) | 500000000 (50 USDx) | 12000000 (1.2 USDx) |
+
+It first checks that the RWA and BOND SACs authorize the contract (otherwise run `03-authorize-contract.sh <id>`).
+It prints each new option id and tx hash, then `list_open` and `get_option` for every id, and exits 1 unless all
+four read back `Offered` with the expected terms. Output goes to `scripts/out/seed-<UTC time>.log`.
+
+**Not idempotent by design:** every run adds four new offers (ids continue from `option_count`) and locks more maker
+collateral. To withdraw an offer, its writer cancels it while it is still `Offered`; the script prints this command
+for each id it creates:
+
+```sh
+stellar contract invoke --id <C-id> --network testnet --source-account strata-maker1 \
+  -- cancel_offer --writer <MAKER1 G-address> --id <option id>
+```
 
 ## TTL keeper (`extend-ttl.sh`)
 
