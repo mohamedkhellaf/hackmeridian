@@ -20,32 +20,12 @@
 .brand:hover {
   text-decoration: none;
 }
-/* Logo mark: gradient tile with two stacked bars. */
+/* Logo mark: the StellSec app icon. */
 .brand-mark {
-  position: relative;
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
-  background: var(--grad-brand);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset;
-}
-.brand-mark::before,
-.brand-mark::after {
-  content: '';
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--accent-fg);
-}
-.brand-mark::before {
-  top: 8px;
-}
-.brand-mark::after {
-  top: 15px;
-  opacity: 0.6;
 }
 
 /* Sidebar */
@@ -156,6 +136,21 @@
 }
 .wallet-btn .ui-mono {
   color: var(--text);
+}
+
+/* Slim top bar with the wallet control, top right of the content area (desktop and tablet). */
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  max-width: 1280px;
+  height: 52px;
+  margin: 0 auto;
+  padding: 12px var(--gutter) 0;
+}
+.topbar + .content {
+  padding-top: 12px;
 }
 
 /* Content and footer share the 1280px column. */

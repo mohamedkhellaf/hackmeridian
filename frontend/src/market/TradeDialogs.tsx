@@ -126,7 +126,7 @@ export function TradeDialog({
   return (
     <Dialog
       title={title}
-      width={520}
+      width={560}
       onClose={onClose}
       footer={
         <>
@@ -166,8 +166,7 @@ export function TradeDialog({
           <div>
             <dt>Premium</dt>
             <dd className="num">
-              {amt(best.totalPremium, best.quote)} <span className="mk-muted">limit price set by the {best.source === 'resale' ? 'seller' : 'maker'}</span>
-            </dd>
+              {amt(best.totalPremium, best.quote)}            </dd>
           </div>
           <div>
             <dt>Expiry</dt>

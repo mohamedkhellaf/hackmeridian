@@ -83,7 +83,7 @@ export function BuyDialog({
     )
 
   return (
-    <Dialog title={title} width={520} onClose={close}>
+    <Dialog title={title} width={560} onClose={close}>
       {ticket(false)}
     </Dialog>
   )

@@ -10,15 +10,10 @@
   font-size: 14px;
   font-weight: 600;
 }
-.rq-lead,
 .rq-escrow {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0;
+  font-size: 12.5px;
   color: var(--muted);
-}
-.rq-escrow {
-  margin-top: 8px;
-  color: inherit;
 }
 .rq-copy {
   margin: 0 0 8px;

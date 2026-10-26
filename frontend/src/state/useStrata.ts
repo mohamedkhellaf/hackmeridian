@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { config } from '../config'
 import { createOptionsClient } from '../options'
 import { MockOptionsClient } from '../options/mockClient'
@@ -46,6 +46,12 @@ export function useStrata() {
   const balances = useBalances(wallet.address, balanceTokens)
   const refreshBalances = balances.refresh
 
+  // First-load status: `loading` until the first read round finishes, then `ready` (or `error` if that first round failed).
+  // Later refreshes never flip it back, so screens do not flash skeletons again.
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const readyRef = useRef(false)
+
   const refresh = useCallback(async () => {
     const [opts, assets, lines, hl, ak, bd] = await Promise.all([
       client.listOptions(),
@@ -63,9 +69,22 @@ export function useStrata() {
     setHealth(hl)
   }, [client])
 
-  useEffect(() => {
-    void refresh()
+  const load = useCallback(async () => {
+    try {
+      await refresh()
+      readyRef.current = true
+      setLoadError(null)
+      setStatus('ready')
+    } catch (e) {
+      if (readyRef.current) return
+      setLoadError(e instanceof Error ? e.message : 'Could not load data.')
+      setStatus('error')
+    }
   }, [refresh])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   // Runs a transaction, sets the toast and refreshes state (runTx: a failed refresh never fails a confirmed tx).
   const runDetailed = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>): Promise<TxOutcome> => {
@@ -162,6 +181,13 @@ export function useStrata() {
     me,
     client,
     isMock: client.isMock,
+    status,
+    ready: status === 'ready',
+    loadError,
+    retry: () => {
+      setStatus('loading')
+      return load()
+    },
     options,
     asks,
     listForSale,

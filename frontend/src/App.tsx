@@ -4,9 +4,10 @@ import { config } from './config'
 import { BuyDialog } from './market/BuyDialog'
 import { AppShell, WalletChip } from './layout/AppShell'
 import { useHashRoute } from './layout/routes'
+import type { Route } from './layout/routes'
 import { useNetworkStatus } from './layout/useNetworkStatus'
 import { useStrata } from './state/useStrata'
-import { Banner, NoticeToast } from './ui'
+import { Banner, NoticeToast, TableSkeleton, ViewSkeleton } from './ui'
 import { BalancesBar } from './wallet/BalancesBar'
 import { IssuerView } from './views/IssuerView'
 import { MarketsView } from './views/MarketsView'
@@ -18,6 +19,30 @@ import './App.css'
 
 // StellSec Pro (experimental): a lazy chunk that exists only when the build sets VITE_ENABLE_PRO=1.
 const ProApp = import.meta.env.VITE_ENABLE_PRO === '1' ? lazy(() => import('./pro/ProApp')) : null
+
+const ROUTE_TITLES: Partial<Record<Route, string>> = { markets: 'Markets', portfolio: 'Positions', reserves: 'Collateral', issuer: 'Issuer' }
+
+/** One skeleton per view, shaped like its real content, until the first data round completes. */
+function LoadingView({ route, error, onRetry }: { route: Route; error: string | null; onRetry: () => void }) {
+  const title = ROUTE_TITLES[route]!
+  const body =
+    route === 'markets' ? (
+      <div className="mk-layout">
+        <div className="mk-main">
+          <TableSkeleton columns={3} rows={7} />
+          <TableSkeleton columns={7} rows={3} />
+        </div>
+        <div className="tk-col" />
+      </div>
+    ) : (
+      <TableSkeleton columns={route === 'portfolio' ? 9 : route === 'issuer' ? 4 : 6} rows={5} />
+    )
+  return (
+    <ViewSkeleton title={title} error={error} onRetry={onRetry}>
+      {body}
+    </ViewSkeleton>
+  )
+}
 
 function App() {
   const s = useStrata()
@@ -57,7 +82,8 @@ function App() {
         {wallet.wrongNetwork && <Banner tone="danger">{wallet.networkMessage ?? 'Wallet is not on Testnet. Switch network in the wallet.'}</Banner>}
         {wallet.error && <Banner tone="danger">{wallet.error}</Banner>}
 
-        {route === 'markets' && (
+        {!s.ready && ROUTE_TITLES[route] && <LoadingView route={route} error={s.status === 'error' ? s.loadError : null} onRetry={() => void s.retry()} />}
+        {s.ready && route === 'markets' && (
           <MarketsView
             offers={s.market}
             me={me}
@@ -83,7 +109,7 @@ function App() {
             onOutcomeShown={s.dismissNotice}
           />
         )}
-        {route === 'portfolio' && (
+        {s.ready && route === 'portfolio' && (
           <PortfolioView
             me={me}
             rows={s.positions}
@@ -105,13 +131,13 @@ function App() {
             }
           />
         )}
-        {route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
+        {s.ready && route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
         {route === 'pro' && ProApp && (
           <Suspense fallback={null}>
             <ProApp />
           </Suspense>
         )}
-        {route === 'issuer' && (
+        {s.ready && route === 'issuer' && (
           <IssuerView address={wallet.address} sign={wallet.sign} optionsContractId={config.optionsContractId} tokens={s.assets?.underlyings} mock={s.isMock} />
         )}
       </AppShell>

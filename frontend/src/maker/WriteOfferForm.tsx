@@ -124,7 +124,7 @@ export function WriteOfferForm({
   }
 
   const form = (
-      <form className="wr" onSubmit={(e) => void submit(e)}>
+      <form className={plain ? "wr wr--stack" : "wr"} onSubmit={(e) => void submit(e)}>
         <div className="wr-fields">
           <div className="wr-field">
             <span className="wr-label">Kind</span>

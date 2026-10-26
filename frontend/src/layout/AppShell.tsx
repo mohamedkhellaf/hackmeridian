@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Button, Dialog, Icon, Mono } from '../ui'
 import type { IconName } from '../ui'
 import { shortAddress } from '../options/format'
+import { useNarrow } from '../market/ticketSlot'
 import { hrefFor, NAV } from './routes'
 import type { NavItem, Route } from './routes'
 import type { NetworkStatus } from './useNetworkStatus'
@@ -153,6 +154,7 @@ export function AppShell({ route, portfolioBadge, contractId, network, wallet, c
   useEffect(() => {
     tabbarRef.current?.querySelector<HTMLElement>('.is-on')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
   }, [route])
+  const narrow = useNarrow()
   const tabItems = NAV.filter((n) => TAB_ROUTES.includes(n.route))
   const moreItems = NAV.filter((n) => !TAB_ROUTES.includes(n.route))
   const moreOn = moreItems.some((n) => n.route === route)
@@ -160,7 +162,7 @@ export function AppShell({ route, portfolioBadge, contractId, network, wallet, c
     <div className="shell">
       <aside className="sidebar">
         <a href={hrefFor('markets')} className="brand">
-          <span className="brand-mark" aria-hidden="true" />
+          <img className="brand-mark" src="/logo-64.png" srcSet="/logo-64.png 1x, /logo-128.png 2x" width="28" height="28" alt="" />
           <span className="brand-name">StellSec</span>
         </a>
         <nav className="topnav" aria-label="Main">
@@ -168,9 +170,10 @@ export function AppShell({ route, portfolioBadge, contractId, network, wallet, c
             <NavLink key={item.route} item={item} current={route} badge={portfolioBadge} className="nav-link" />
           ))}
         </nav>
-        <div className="sidebar-wallet">{wallet}</div>
+        {narrow && <div className="sidebar-wallet">{wallet}</div>}
       </aside>
       <div className="main-col">
+        {!narrow && <div className="topbar">{wallet}</div>}
         <main className="content">{children}</main>
         <footer className="shell-footer">
           <div className="shell-footer-inner">
