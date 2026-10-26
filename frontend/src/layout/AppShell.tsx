@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, Dialog, Icon, Mono, StatusDot } from '../ui'
 import { shortAddress } from '../options/format'
-import { hrefFor, NAV_TABS, NAV_TRADE, NAV_TRANSPARENCY } from './routes'
+import { hrefFor, NAV_TABS, NAV_TRADE, NAV_TRANSPARENCY, PRO_ENABLED } from './routes'
 import type { NavItem, Route } from './routes'
 import './layout.css'
 
@@ -176,6 +176,7 @@ export function AppShell({ route, portfolioBadge, mock, contractId, backing, bal
             {NAV_TRANSPARENCY.map((i) => (
               <NavLink key={i.route} item={i} current={route} />
             ))}
+            {PRO_ENABLED && <NavLink item={{ route: 'pro', label: 'Pro (experimental)', icon: 'markets' }} current={route} />}
           </nav>
           <div className="contract-card">
             <span className="ui-label">Options contract</span>
@@ -209,16 +210,23 @@ export function AppShell({ route, portfolioBadge, mock, contractId, backing, bal
               <span className="net-pill">Testnet</span>
             </a>
             <div className="topbar-balances">{balances}</div>
+            {PRO_ENABLED && (
+              <a href={hrefFor('pro')} className={route === 'pro' ? 'topbar-issuer is-on' : 'topbar-issuer'} aria-label="Pro (experimental)">
+                Pro
+              </a>
+            )}
             <a href={hrefFor('issuer')} className={route === 'issuer' ? 'topbar-issuer is-on' : 'topbar-issuer'} aria-label="Issuer console">
               <Icon name="issuer" size={18} />
             </a>
             <div className="topbar-wallet">{wallet}</div>
           </header>
           <main className="content">{children}</main>
-          <footer className="shell-footer">
-            Physically settled, fully collateralized. Issuer controls (freeze, clawback) on regulated assets can block settlement. This is not a guarantee
-            against issuer action.
-          </footer>
+          {route !== 'pro' && (
+            <footer className="shell-footer">
+              Physically settled, fully collateralized. Issuer controls (freeze, clawback) on regulated assets can block settlement. This is not a guarantee
+              against issuer action.
+            </footer>
+          )}
         </div>
       </div>
 
