@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { Sediment } from './Sediment'
+import { Amount } from './Atoms'
 
 export interface PayoffSketchProps {
   kind: 'put' | 'call'
@@ -48,7 +49,9 @@ export function PayoffSketch({ kind, strikeLabel, asset, compact, className }: P
 export interface HeroStat {
   label: string
   /** Value node; use <Amount value unit /> for numbers with units. Rendered in Fraunces. */
-  value: ReactNode
+  value?: ReactNode
+  /** Multi-token stat: one {amount, unit} per line, smaller unit. Used instead of `value` when given. */
+  values?: { amount: ReactNode; unit?: ReactNode }[]
 }
 
 export interface PageHeroProps {
@@ -80,7 +83,11 @@ function HeroStatItem({ stat }: { stat: HeroStat }) {
       <span className="ui-label" id={id}>
         {stat.label}
       </span>
-      <span className="ui-hero-stat-value">{stat.value}</span>
+      <span className="ui-hero-stat-value">
+        {stat.values
+          ? stat.values.map((v, i) => <Amount key={i} value={v.amount} unit={v.unit} />)
+          : stat.value}
+      </span>
     </div>
   )
 }

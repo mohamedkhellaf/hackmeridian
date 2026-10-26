@@ -1,3 +1,4 @@
+import { shortContractId } from './format'
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
 
 export type TagTone = 'put' | 'call' | 'ok' | 'warn' | 'neutral'
@@ -78,13 +79,14 @@ function paletteFor(code: string): [string, string] {
 }
 
 /** Round badge with the asset's initials (FUND -> FD). Colour is stable per asset code. */
-export function AssetBadge({ code, size = 34 }: { code: string; size?: number }) {
+export function AssetBadge({ code, size = 34, contractId }: { code: string; size?: number; contractId?: string }) {
   const [bg, fg] = paletteFor(code)
   const letters = code.length <= 2 ? code : code[0] + code[code.length - 1]
   return (
     <span
       className="ui-asset-badge"
       aria-hidden="true"
+      title={contractId ? `${code} \u00b7 ${shortContractId(contractId)}` : undefined}
       style={{ width: size, height: size, background: bg, color: fg, fontSize: Math.round(size * 0.4), border: `1px solid ${fg}33` }}
     >
       {letters.toUpperCase()}
