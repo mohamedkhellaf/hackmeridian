@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Ask, OptionOffer, TokenInfo } from '../options/types'
-import { askPerUnit, canList, formatAskPerUnit, resaleRows, selfTradeReason } from './resale'
+import { askPerUnit, canList, formatAskPerUnit, resaleCheck, resaleRows, selfTradeReason } from './resale'
 
 const UNIT = 10_000_000n
 const USDX: TokenInfo = { contractId: 'CUSDX', code: 'USDx', decimals: 7 }
@@ -47,6 +47,23 @@ describe('resaleRows', () => {
   it('drops expired options and handles a contract without resale', () => {
     expect(resaleRows([opt()], [ask(1n)], T + 3600)).toEqual([])
     expect(resaleRows([opt()], null, T)).toEqual([])
+  })
+})
+
+describe('resaleCheck', () => {
+  const seen: Ask = { id: 1n, holder: 'GH', askTotal: 3n * UNIT }
+  it('ok when the same holder still asks the same price on a live option', () => {
+    expect(resaleCheck(opt(), 3n * UNIT, seen, T)).toBe('ok')
+  })
+  it('changed when re-priced', () => {
+    expect(resaleCheck(opt(), 4n * UNIT, seen, T)).toBe('changed')
+    expect(resaleCheck(opt(), 2n * UNIT, seen, T)).toBe('changed')
+  })
+  it('fail when the ask is gone, the holder changed, or the option is no longer live', () => {
+    expect(resaleCheck(opt(), null, seen, T)).toBe('fail')
+    expect(resaleCheck(opt({ holder: 'GB' }), 3n * UNIT, seen, T)).toBe('fail')
+    expect(resaleCheck(opt({ state: 'exercised' }), 3n * UNIT, seen, T)).toBe('fail')
+    expect(resaleCheck(opt(), 3n * UNIT, seen, T + 3600)).toBe('fail')
   })
 })
 

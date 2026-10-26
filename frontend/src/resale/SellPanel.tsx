@@ -38,10 +38,17 @@ function SellDialog({
     if (!valid) return
     setSubmitting(true)
     setError(null)
-    const res = await onConfirm(parsed)
-    setSubmitting(false)
-    if (res.ok) onClose()
-    else setError(res.error)
+    let closeAfter = false
+    try {
+      const res = await onConfirm(parsed)
+      if (res.ok) closeAfter = true
+      else setError(res.error)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSubmitting(false)
+    }
+    if (closeAfter) onClose()
   }
 
   return (
@@ -79,7 +86,7 @@ function SellDialog({
           </dd>
         </div>
         <div>
-          <dt>Written premium</dt>
+          <dt>Original premium (paid to the writer)</dt>
           <dd className="num">{amt(o.totalPremium, q)}</dd>
         </div>
         {current && (

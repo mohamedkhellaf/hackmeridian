@@ -18,7 +18,10 @@ const spec = new contract.Spec([
   xdr.ScSpecEntry.scSpecEntryUdtErrorEnumV0(
     new xdr.ScSpecUdtErrorEnumV0({
       doc: '', lib: '', name: 'Error',
-      cases: [new xdr.ScSpecUdtErrorEnumCaseV0({ doc: 'This option is not for sale.', name: 'NoAsk', value: 120 })],
+      cases: [
+        new xdr.ScSpecUdtErrorEnumCaseV0({ doc: 'This option is not for sale.', name: 'NoAsk', value: 120 }),
+        new xdr.ScSpecUdtErrorEnumCaseV0({ doc: 'The ask is above max_total.', name: 'PriceMoved', value: 121 }),
+      ],
     }),
   ),
   xdr.ScSpecEntry.scSpecEntryUdtStructV0(
@@ -33,7 +36,7 @@ const spec = new contract.Spec([
   ),
   fn('list_for_sale', [input('holder', T.scSpecTypeAddress()), input('id', T.scSpecTypeU32()), input('ask_total', T.scSpecTypeI128())], [resultVoid]),
   fn('cancel_sale', [input('holder', T.scSpecTypeAddress()), input('id', T.scSpecTypeU32())], [resultVoid]),
-  fn('buy_resale', [input('buyer', T.scSpecTypeAddress()), input('id', T.scSpecTypeU32())], [resultVoid]),
+  fn('buy_resale', [input('buyer', T.scSpecTypeAddress()), input('id', T.scSpecTypeU32()), input('max_total', T.scSpecTypeI128())], [resultVoid]),
   fn('get_ask', [input('id', T.scSpecTypeU32())], [T.scSpecTypeOption(new xdr.ScSpecTypeOption({ valueType: T.scSpecTypeI128() }))]),
   fn('list_asks', [input('from', T.scSpecTypeU32()), input('limit', T.scSpecTypeU32())], [T.scSpecTypeVec(new xdr.ScSpecTypeVec({ elementType: askType }))]),
 ])
@@ -50,10 +53,13 @@ describe('v1.4 resale ABI encoding', () => {
     expect(b64(ask)).toBe(b64(i128(25_000_000n)))
   })
 
-  it('cancel_sale and buy_resale take (address, u32)', () => {
+  it('cancel_sale(address, u32) and buy_resale(address, u32, max_total: i128)', () => {
     const want = [new Address(HOLDER).toScVal(), xdr.ScVal.scvU32(1)].map(b64)
     expect(spec.funcArgsToScVals('cancel_sale', { holder: HOLDER, id: 1 }).map(b64)).toEqual(want)
-    expect(spec.funcArgsToScVals('buy_resale', { buyer: HOLDER, id: 1 }).map(b64)).toEqual(want)
+    expect(spec.funcArgsToScVals('buy_resale', { buyer: HOLDER, id: 1, max_total: 25_000_000n }).map(b64)).toEqual([
+      ...want,
+      b64(i128(25_000_000n)),
+    ])
   })
 })
 
@@ -78,6 +84,10 @@ describe('v1.4 resale ABI decoding', () => {
       { id: 41n, holder: HOLDER, askTotal: 1n },
     ])
     expect(spec.funcResToNative('list_asks', spec.nativeToScVal([], vecType))).toEqual([])
+  })
+
+  it('PriceMoved (#121) decodes to the re-price message', () => {
+    expect(describeError(new Error('Error(Contract, #121)'))).toBe('The seller changed the price. Review the new price before buying.')
   })
 
   it('NoAsk (#120) decodes to the resale message', () => {

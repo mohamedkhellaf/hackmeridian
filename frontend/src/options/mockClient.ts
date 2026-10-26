@@ -38,7 +38,7 @@ export class MockOptionsClient implements OptionsClient {
 
   private find(id: bigint): OptionOffer {
     const o = this.options.find((x) => x.id === id)
-    if (!o) throw new Error('Option not found')
+    if (!o) throw new Error(OPTIONS_ERRORS[101])
     return o
   }
 
@@ -151,15 +151,13 @@ export class MockOptionsClient implements OptionsClient {
     })
   }
 
-  // An ask is live only while its option is Active, unexpired and still held by the lister.
+  // An ask is live (listed, buyable) only while its option is Active, unexpired and still held by the lister.
+  // Stale asks stay in the map so the holder can still cancel after expiry, as the contract allows.
   private liveAsk(id: bigint): { holder: string; askTotal: bigint } | null {
     const a = this.asks.get(id)
     if (!a) return null
     const o = this.options.find((x) => x.id === id)
-    if (!o || o.state !== 'active' || o.expiry <= now() || o.holder !== a.holder) {
-      this.asks.delete(id)
-      return null
-    }
+    if (!o || o.state !== 'active' || o.expiry <= now() || o.holder !== a.holder) return null
     return a
   }
 
@@ -177,32 +175,38 @@ export class MockOptionsClient implements OptionsClient {
     return this.liveAsk(id)?.askTotal ?? null
   }
 
+  // Check order matches the contract: NotFound -> WrongState -> NotHolder -> Expired -> InvalidArgs.
   listForSale(id: bigint, holder: string, askTotal: bigint) {
     return this.tx(() => {
       const o = this.find(id)
-      if (o.holder !== holder) throw new Error(OPTIONS_ERRORS[108])
       if (o.state !== 'active') throw new Error(OPTIONS_ERRORS[106])
+      if (o.holder !== holder) throw new Error(OPTIONS_ERRORS[108])
       if (o.expiry <= now()) throw new Error(OPTIONS_ERRORS[109])
       if (askTotal <= 0n) throw new Error(OPTIONS_ERRORS[102])
       this.asks.set(id, { holder, askTotal })
     })
   }
 
+  // Allowed after expiry (only removes the ask).
   cancelSale(id: bigint, holder: string) {
     return this.tx(() => {
       const o = this.find(id)
       if (o.holder !== holder) throw new Error(OPTIONS_ERRORS[108])
-      if (!this.liveAsk(id)) throw new Error(OPTIONS_ERRORS[120])
+      const a = this.asks.get(id)
+      if (!a || a.holder !== o.holder || o.state !== 'active') throw new Error(OPTIONS_ERRORS[120])
       this.asks.delete(id)
     })
   }
 
-  buyResale(id: bigint, buyer: string) {
+  // Pays at most `maxTotal`: a re-priced ask fails with PriceMoved (121) instead of charging more.
+  buyResale(id: bigint, buyer: string, maxTotal: bigint) {
     return this.tx(() => {
       const o = this.find(id)
+      if (o.state === 'active' && o.expiry <= now()) throw new Error(OPTIONS_ERRORS[109])
       const a = this.liveAsk(id)
       if (!a) throw new Error(OPTIONS_ERRORS[120])
       if (buyer === o.holder || buyer === o.writer) throw new Error(OPTIONS_ERRORS[111])
+      if (a.askTotal > maxTotal) throw new Error(OPTIONS_ERRORS[121])
       o.holder = buyer
       this.asks.delete(id)
     })

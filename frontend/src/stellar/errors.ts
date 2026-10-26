@@ -29,7 +29,8 @@ export const OPTIONS_ERRORS: Record<number, string> = {
   117: 'This asset is already listed.',
   118: 'This asset has no Stellar Asset Contract deployed yet, so it cannot be listed.',
   119: 'The expiry is too far out: offers can run for at most 2 years.',
-  120: 'This option is no longer for sale: someone else bought it or the seller took it off sale.',
+  120: 'This option is no longer for sale (bought, withdrawn, exercised or transferred).',
+  121: 'The seller changed the price. Review the new price before buying.',
 }
 
 // Options codes (101+) and SAC codes (1-13) are disjoint, so a code identifies its source on its own.

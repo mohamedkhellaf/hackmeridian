@@ -8,7 +8,7 @@ import type { Ask, OptionOffer } from '../options/types'
 import type { TxOutcome } from '../state/useStrata'
 import { Banner, Button, Dialog, Mono } from '../ui'
 import { useBalances } from '../wallet/useBalances'
-import { formatAskPerUnit, resaleRows, selfTradeReason } from './resale'
+import { formatAskPerUnit, resaleCheck, resaleRows, selfTradeReason } from './resale'
 import type { ResaleRow } from './resale'
 import '../market/market.css'
 import './resale.css'
@@ -21,6 +21,7 @@ function ResaleBuyDialog({
   row,
   client,
   me,
+  busy,
   onConfirm,
   onClose,
   onOutcomeShown,
@@ -28,6 +29,8 @@ function ResaleBuyDialog({
   row: ResaleRow
   client: OptionsClient
   me: string
+  /** Another transaction is in flight (global runner). */
+  busy: boolean
   onConfirm: () => Promise<TxOutcome>
   onClose: () => void
   onOutcomeShown?: () => void
@@ -42,21 +45,21 @@ function ResaleBuyDialog({
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ hash: string; mock: boolean } | null>(null)
 
-  // Re-read the ask on open: it may have been bought, cancelled or re-priced since the list was loaded.
+  // Re-read the option and its ask on open: it may have been bought, exercised, transferred, withdrawn or
+  // re-priced since the list was loaded.
   useEffect(() => {
     let live = true
-    client
-      .getAsk(o.id)
-      .then((a) => {
+    Promise.all([client.getOption(o.id), client.getAsk(o.id)])
+      .then(([fresh, a]) => {
         if (!live) return
         setLiveAsk(a)
-        setAskCheck(a === null ? 'fail' : a === ask.askTotal ? 'ok' : 'changed')
+        setAskCheck(resaleCheck(fresh, a, ask, nowSec()))
       })
       .catch(() => live && setAskCheck('unknown'))
     return () => {
       live = false
     }
-  }, [client, o.id, ask.askTotal])
+  }, [client, o.id, ask])
 
   useEffect(() => {
     let live = true
@@ -83,12 +86,17 @@ function ResaleBuyDialog({
   const confirm = async () => {
     setSubmitting(true)
     setError(null)
-    const res = await onConfirm()
-    setSubmitting(false)
-    if (res.ok) {
-      setDone({ hash: res.hash, mock: res.mock })
-      onOutcomeShown?.()
-    } else setError(res.error)
+    try {
+      const res = await onConfirm()
+      if (res.ok) {
+        setDone({ hash: res.hash, mock: res.mock })
+        onOutcomeShown?.()
+      } else setError(res.error)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (done) {
@@ -145,7 +153,7 @@ function ResaleBuyDialog({
           <Button variant="secondary" onClick={close} disabled={submitting} aria-label="Cancel resale purchase">
             Cancel
           </Button>
-          <Button variant="primary" loading={submitting} disabled={blocked} onClick={() => void confirm()}>
+          <Button variant="primary" loading={submitting} disabled={blocked || busy} onClick={() => void confirm()}>
             {submitting ? 'Confirm in wallet…' : `Pay ${amt(ask.askTotal, q)}`}
           </Button>
         </>
@@ -197,7 +205,7 @@ function ResaleBuyDialog({
           <dd className={askCheck === 'fail' || askCheck === 'changed' ? 'mk-bad' : undefined}>
             {askCheck === 'ok' && 'For sale'}
             {askCheck === 'pending' && 'Checking'}
-            {askCheck === 'fail' && 'No longer for sale: someone else bought it or the seller took it off sale.'}
+            {askCheck === 'fail' && 'No longer for sale (bought, withdrawn, exercised or transferred).'}
             {askCheck === 'changed' && liveAsk !== null && `The seller changed the price to ${amt(liveAsk, q)}. Close and reopen to review it.`}
             {askCheck === 'unknown' && 'Could not re-check. The contract rejects the purchase if it is gone.'}
           </dd>
@@ -242,7 +250,8 @@ export function ResaleMarket({
   me: string | null
   busy: boolean
   client: OptionsClient
-  onBuy: (o: OptionOffer) => Promise<TxOutcome>
+  /** Buys at most `maxTotal` (the ask shown); the contract refuses a higher price. */
+  onBuy: (o: OptionOffer, maxTotal: bigint) => Promise<TxOutcome>
   onOutcomeShown?: () => void
 }) {
   const [buying, setBuying] = useState<ResaleRow | null>(null)
@@ -331,7 +340,8 @@ export function ResaleMarket({
           row={buying}
           client={client}
           me={me}
-          onConfirm={() => onBuy(buying.option)}
+          busy={busy}
+          onConfirm={() => onBuy(buying.option, buying.ask.askTotal)}
           onClose={() => setBuying(null)}
           onOutcomeShown={onOutcomeShown}
         />

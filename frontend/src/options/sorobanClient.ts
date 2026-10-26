@@ -58,7 +58,7 @@ interface OptionsContract {
   // v1.4 resale
   list_for_sale?: (a: { holder: string; id: number; ask_total: bigint }, o?: Opt) => Tx<MaybeResult<null>>
   cancel_sale?: (a: { holder: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
-  buy_resale?: (a: { buyer: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
+  buy_resale?: (a: { buyer: string; id: number; max_total: bigint }, o?: Opt) => Tx<MaybeResult<null>>
   get_ask?: (a: { id: number }, o?: Opt) => Tx<bigint | null | undefined>
   list_asks?: (a: { from: number; limit: number }, o?: Opt) => Tx<AbiAsk[]>
 }
@@ -344,8 +344,8 @@ export class SorobanOptionsClient implements OptionsClient {
   cancelSale(id: bigint, holder: string) {
     return this.resaleWrite((c, n) => c.cancel_sale!({ holder, id: n }), id)
   }
-  buyResale(id: bigint, buyer: string) {
-    return this.resaleWrite((c, n) => c.buy_resale!({ buyer, id: n }), id)
+  buyResale(id: bigint, buyer: string, maxTotal: bigint) {
+    return this.resaleWrite((c, n) => c.buy_resale!({ buyer, id: n, max_total: assertI128(maxTotal) }), id)
   }
 
   // v1.2 capabilities, client only (no UI yet). transfer moves no tokens: payment is settled off-chain.

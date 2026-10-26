@@ -28,5 +28,6 @@ export interface OptionsClient {
   listForSale(id: bigint, holder: string, askTotal: bigint): Promise<TxResult>
   cancelSale(id: bigint, holder: string): Promise<TxResult>
   // Buyer pays ask_total in the option's quote token to the current holder and becomes the holder, atomically.
-  buyResale(id: bigint, buyer: string): Promise<TxResult>
+  // `maxTotal` is the ask the buyer saw; a higher on-chain ask fails with PriceMoved (121).
+  buyResale(id: bigint, buyer: string, maxTotal: bigint): Promise<TxResult>
 }

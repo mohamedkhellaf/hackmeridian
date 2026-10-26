@@ -39,6 +39,17 @@ export function resaleRows(options: OptionOffer[], asks: Ask[] | null, nowSec: n
   return rows.sort((a, b) => (a.option.id < b.option.id ? -1 : a.option.id > b.option.id ? 1 : 0))
 }
 
+export type ResaleCheck = 'ok' | 'fail' | 'changed'
+
+/**
+ * Pre-trade re-check of a listing against fresh chain reads. `fail`: the option is no longer Active and unexpired,
+ * changed hands, or has no ask. `changed`: still for sale by the same holder, at a different price than shown.
+ */
+export function resaleCheck(fresh: OptionOffer, liveAsk: bigint | null, seen: Ask, nowSec: number): ResaleCheck {
+  if (!isLive(fresh, nowSec) || fresh.holder !== seen.holder || liveAsk === null) return 'fail'
+  return liveAsk === seen.askTotal ? 'ok' : 'changed'
+}
+
 /** Why the connected wallet cannot buy this listing, or null. Mirrors the contract's SelfTrade (111) rule. */
 export function selfTradeReason(o: OptionOffer, ask: Ask, me: string | null): string | null {
   if (!me) return null
