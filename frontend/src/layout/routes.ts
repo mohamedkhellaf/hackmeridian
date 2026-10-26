@@ -10,7 +10,7 @@ export interface NavItem {
   label: string
 }
 
-/** Sidebar and phone tab bar, same routes. */
+/** Top bar links; on phones four become tabs and the rest sit under More. */
 export const NAV: NavItem[] = [
   { route: 'markets', label: 'Markets' },
   { route: 'protect', label: 'Protect' },
