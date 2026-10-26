@@ -1,0 +1,43 @@
+# Strata
+
+> Options on tokenized Stellar assets. A maker writes a put or a call on an eligible asset and locks the full collateral in a Soroban contract; an investor buys it; the holder can exercise any time before expiry, and the contract swaps tokens for payment in one transaction. Built at HackMeridian 2026 (Lisbon, Stellar Unlocked track). Stellar Testnet only, fictional assets, unaudited.
+
+The app at https://hackmeridian-psi.vercel.app reads live Testnet state without a wallet. Navigation uses hash routes: `#/markets`, `#/protect`, `#/write`, `#/portfolio`, `#/reserves`, `#/issuer`. Signing uses a Stellar wallet (Freighter, xBull, LOBSTR and others through Stellar Wallets Kit). Underlying assets require issuer authorization, so a new account can browse but needs onboarding to trade.
+
+## How it works
+
+- Covered (default): the writer locks the total strike (put) or the total underlying (call) before the sale. The holder's only remaining risk is issuer action.
+- Eligibility is the asset's own `AUTH_REQUIRED` trustline authorization, read from its Stellar Asset Contract (SAC). The issuer keeps freeze and clawback; the contract checks those rules, it does not override them.
+- Anyone can list a classic asset by code and issuer; the contract derives the canonical SAC.
+- A holder can list an active option for resale at a price they set. Strike, expiry, quantity and collateral do not change.
+- No admin, no oracle, no margin and no upgrade path in the options contract.
+- Premium is paid to the writer at purchase and is never refunded.
+
+## Contracts (Stellar Testnet)
+
+- [Options contract v1.4](https://stellar.expert/explorer/testnet/contract/CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK): `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`
+- [RWA SAC](https://stellar.expert/explorer/testnet/contract/CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U), [BOND SAC](https://stellar.expert/explorer/testnet/contract/CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP), [EQTY SAC](https://stellar.expert/explorer/testnet/contract/CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU) (listed at runtime), [USDx SAC](https://stellar.expert/explorer/testnet/contract/CAKXMQVKSW2AEKF5DSMDPHJAYGNVOQANHXLI64QJS2H3GOCXRW2GCICU) (quote token). RWA, BOND and EQTY have auth required, revocable and clawback enabled.
+- [Strata Pro v0.3.2](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) (experimental, separate contract): uncovered calls on partial margin, cash-settled in USDx, with a liquidity-provider vault. Prices are published by the team. Payouts can be reduced and any deficit is shown. Shares no storage or balance with the options contract.
+
+## Evidence (Testnet transactions)
+
+- [Exercise, fee 0.008 XLM](https://stellar.expert/explorer/testnet/tx/f2ad8d0e70ba15e5b487bd41b9d888a27fc8ba0d5551debe1fd4581560a210a5)
+- [v1.4 deploy](https://stellar.expert/explorer/testnet/tx/da27e9fd2afebaefc7385ce813406cebff3b7fa469f4a0fb2926c06743237fb8)
+- [EQTY listed at runtime](https://stellar.expert/explorer/testnet/tx/891473865d9330d7881b9208e02388166afe8e7cf13344853180ae5547de0512) and [a put on it created, bought, exercised and claimed](https://stellar.expert/explorer/testnet/tx/261583446ee575fd29dc2b1a9b43eb08da0701fff78996f74e025a19c5714147)
+- [Issuer clawback from the escrow](https://stellar.expert/explorer/testnet/tx/f45330bed06985a957993ab49a8e81d1a276dc7e8444498fa5a57eaf5b5dcbeb) and [repayment](https://stellar.expert/explorer/testnet/tx/c6ef06926cb5d47366ac16a89da0e9b87151c61e85aafe80a62ca4feae66432a)
+- [Third party prunes an expired unsold offer](https://stellar.expert/explorer/testnet/tx/da477e8cc5d490bdfb8f88f90c65e3ae0121073668a9ce53908a31fc7622ac7d)
+- [Holder transfers an active option](https://stellar.expert/explorer/testnet/tx/c4a60668b296e7c643d9aca1cee7e54d1b3e864de2604caef9a880ccd73c0c67)
+- [Option resold to another eligible account](https://stellar.expert/explorer/testnet/tx/a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949)
+- Strata Pro end to end: [margin and buys](https://stellar.expert/explorer/testnet/tx/3af75122179bb76f427c975f2a3331146e03cf9f777004fe1f19685c5a897725), [liquidation to the vault](https://stellar.expert/explorer/testnet/tx/83d65527ba83c7f34bc3a110e1ccf603ed04d57c01906a7ad64c28dfbaebd77e), [settlement and claim](https://stellar.expert/explorer/testnet/tx/a4cbd965c7b062050029a9922579bf505df2e1ee692011e05032c7255905c33c)
+
+## Limits
+
+- Issuer action is not insured. A freeze, de-authorization of the escrow or a clawback after a sale can make an option unexercisable, and the premium is not refunded.
+- After a clawback the escrow is short for that token: remaining payouts are first come, first served, and new offers, purchases and transfers on it fail until the balance is restored.
+- Demo makers are the team's own Testnet accounts. No order-book depth and no pricing model; payoff charts are hypothetical.
+- Testnet, fictional assets, unaudited.
+
+## Optional
+
+- Source code: github.com/mohamedkhellaf/hackmeridian (private during judging; access is shared with the submission).
+- Stack: Rust and soroban-sdk 28; TypeScript, React 19, Vite, stellar-sdk, Stellar Wallets Kit; Vitest and Playwright in CI; hosted on Vercel.
