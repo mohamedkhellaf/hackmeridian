@@ -37,8 +37,8 @@
 - **P1 — only after P0+ succeeds:** transfer of option ownership; position token if feasible; issuer freeze/clawback failure demo; financial strategy presets (protective put, covered call, collar) with **accurate payoff previews**; trustworthy impairment/refund logic if fully specified and tested.
 - **P2 — optional:** multi-leg on-chain execution and composed strategies, a more sophisticated RFQ backend, third asset class, Trustless Work integration. Do not claim that a multi-leg structured product is issued or guaranteed unless **all** legs are funded and settle consistently.
 - **06:00 Monday:** freeze features. Then integration fixes, tests, README, deck, demo recording and submission only. **Submit by 11:00**, leaving a one-hour buffer.
-- **Strata Pro track — never at the expense of P0/P0+:** spec, integer reference model and simulator (`packages/risk/`, `docs/pro-v0-brief-dev2.md`). After Dev 2's review of PR #30 the on-chain go/no-go is **no-go for the hackathon**: Pro ships as spec + simulator and every claim says "specified and simulated".
-- **Never in this hackathon:** Mainnet or real customer funds; real regulated-fund integrations without permission; margin, leverage, uncollateralized promises, unaudited claims of production security, hidden oracle assumptions. **Single exception, not active in this hackathon:** partial margin, and the leverage it implies (naked calls), inside `contracts/pro/` only, under the rules below and only once Dev 2 accepts it with tests and a recorded Testnet run; never present a Pro position as fully collateralized.
+- **Strata Pro track — never at the expense of P0/P0+:** spec, integer reference model and simulator (`packages/risk/`, `docs/pro-v0-brief-dev2.md`). After Dev 2's review of PR #30 the on-chain go/no-go was no-go; on 26 Oct ~05:00 Dev 2 gave an explicit **GO** for an on-chain build. `contracts/pro/` is built and replays the 16 fixture scenarios (691 steps) plus 24 negative/footprint tests. Until the Testnet evidence run is recorded in `docs/pro-testnet-evidence.md`, every public claim still says "specified, simulated and tested", not "live".
+- **Never in this hackathon:** Mainnet or real customer funds; real regulated-fund integrations without permission; margin, leverage, uncollateralized promises, unaudited claims of production security, hidden oracle assumptions. **Single exception, active only once the Testnet run is recorded:** partial margin, and the leverage it implies (naked calls), inside `contracts/pro/` only, under the rules below, accepted by Dev 2 with tests (`contracts/pro/tests/`) and the recorded Testnet run (`docs/pro-testnet-evidence.md`); never present a Pro position as fully collateralized.
 
 ## Contract and asset architecture
 
@@ -82,7 +82,7 @@
 ## Project layout
 
 - `Cargo.toml`, `contracts/options/src/`: Soroban Rust, `#![no_std]`, tests under contract crate.
-- `contracts/pro/`: planned experimental Strata Pro contract (Dev 2); not built, no-go for this hackathon. `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
+- `contracts/pro/`: experimental Strata Pro contract (Dev 2), soroban-sdk 28, `#![no_std]`; `tests/fixtures.rs` replays `packages/risk/fixtures/pro_v0.json`, `tests/negative.rs` holds the brief §7 negative and footprint tests; deploy with `scripts/deploy/deploy-pro.sh`, evidence run with `scripts/deploy/pro-demo.sh` (see `docs/pro-testnet-runbook.md`). `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
 - `scripts/`: Testnet asset creation/issuer permissions, deployment, funding demo accounts, repeatable integration steps.
 - `frontend/`: Vite + React + TypeScript, Stellar SDK and Freighter, app and transaction UI, generated bindings.
 - `packages/payoff/` and `packages/rfq/`: **planned** shared financial modules owned by Dev 1. If the existing monorepo structure differs, agree on paths once rather than having agents create competing package trees.
@@ -97,6 +97,7 @@
 | RWA SAC (fictional; `RWA:GCNW…FDGM`, auth required/revocable/clawback) | — | `CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U` | strata-rwa-issuer `GCNWQR5OA24X7LPTCXUEL4V4ZLSIFKUNIEZEO3UVCVXECPPGX7ERFDGM` |
 | BOND SAC (fictional; `BOND:GCNW…FDGM`, auth required/revocable/clawback) | — | `CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP` | strata-rwa-issuer `GCNWQR5OA24X7LPTCXUEL4V4ZLSIFKUNIEZEO3UVCVXECPPGX7ERFDGM` |
 | USDx SAC (fictional quote token; `USDx:GAE6…ARFS`, no flags) | — | `CAKXMQVKSW2AEKF5DSMDPHJAYGNVOQANHXLI64QJS2H3GOCXRW2GCICU` | strata-usdx-issuer `GAE6ONGU5S3JHDBR5Z3BUVXCL4WLEHQVLBDNTCKHKOYFBYBPBW4IARFS` |
+| pro v0.3.2 (EXPERIMENTAL; naked American calls, partial margin; quote = USDx SAC above; admin `strata-pro-admin`, publisher `strata-pro-publisher`; **not yet deployed**: fill in from `scripts/out/testnet.env` after `deploy-pro.sh`, same PR as the deploy) | pro | _pending_ | strata-deployer |
 
 ## Commands and references
 
