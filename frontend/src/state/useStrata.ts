@@ -82,8 +82,24 @@ export function useStrata() {
     }
   }, [refresh])
 
+  // Initial load, then poll every 10 s while the tab is visible and on focus, so other people's trades show
+  // without a reload. A failed poll is ignored; the next tick retries.
   useEffect(() => {
-    void load()
+    let active = true
+    const tick = () => {
+      if (!active || document.visibilityState === 'hidden') return
+      Promise.resolve(load()).catch(() => undefined)
+    }
+    tick()
+    const id = window.setInterval(tick, 10_000)
+    window.addEventListener('focus', tick)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      active = false
+      window.clearInterval(id)
+      window.removeEventListener('focus', tick)
+      document.removeEventListener('visibilitychange', tick)
+    }
   }, [load])
 
   // Runs a transaction, sets the toast and refreshes state (runTx: a failed refresh never fails a confirmed tx).
