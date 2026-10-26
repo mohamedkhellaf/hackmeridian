@@ -3,6 +3,7 @@ import { config } from './config'
 import { BuyDialog } from './market/BuyDialog'
 import { AppShell, WalletChip } from './layout/AppShell'
 import { useHashRoute } from './layout/routes'
+import { useReadAt } from './reserves/useReadAt'
 import { useStrata } from './state/useStrata'
 import { Banner, NoticeToast } from './ui'
 import { BalancesBar } from './wallet/BalancesBar'
@@ -17,6 +18,8 @@ function App() {
   const s = useStrata()
   const [route] = useHashRoute()
   const { wallet, me } = s
+  const { ledger } = useReadAt(s.collateral, s.health, !s.isMock)
+  const backing = !s.isMock && s.health.length > 0 ? { ok: s.health.every((h) => h.held >= h.reserved), ledger } : null
 
   // Real mode only: in mock mode the demo banner already says the data is fictional.
   const menuBalances =
@@ -37,6 +40,7 @@ function App() {
         portfolioBadge={s.actionsWaiting}
         mock={s.isMock}
         contractId={config.optionsContractId}
+        backing={backing}
         balances={
           !s.isMock && me && s.assets ? (
             <BalancesBar

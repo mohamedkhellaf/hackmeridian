@@ -4,20 +4,23 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 20px;
-  font-size: 13px;
+  gap: 4px 24px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
   font-variant-numeric: tabular-nums;
 }
 .balances-bar[aria-busy='true'] {
   opacity: 0.7;
 }
 .balances-bar .balance {
-  color: var(--text);
+  color: var(--text-2);
 }
 .balances-bar .balance strong {
   color: var(--muted);
   font-weight: 400;
-  margin-right: 6px;
+  margin-left: 2px;
+  margin-right: 0;
+  order: 2;
 }
 .balances-bar .balance em {
   color: var(--muted);
@@ -36,4 +39,9 @@
 .balances-bar button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.balances-bar .balance {
+  display: inline-flex;
+  gap: 6px;
 }
