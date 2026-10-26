@@ -720,8 +720,7 @@ On v1 only (53-test suite, PRs #16 and #18), not re-run since:
 ## What this does not show
 
 Issuer freeze, contract de-authorization and clawback ran on chain against v1.1 and v1.3.1 (sections above; clawback
-only on throwaway instances), not against v1.2 or v1.3 (the spike on 2026-10-25 also exercised them, see
-`research/decision/20_rwa_options_spike.md`). v1.2 adds code without changing the existing settlement paths:
+only on throwaway instances), not against v1.2 or v1.3 (the pre-hackathon Testnet spike on 2026-10-25 also exercised them). v1.2 adds code without changing the existing settlement paths:
 `git diff 784f280 35017e2 -- contracts/options/src/lib.rs` (v1.1 on `main` to v1.2 as merged in PR #29) adds
 `transfer`, `get_options`, `MAX_PAGE` and the event, and changes only comment lines otherwise (three removed). The
 build of that `lib.rs` is still the deployed v1.2 wasm `8778dc77…422f`: comments on private items are not embedded

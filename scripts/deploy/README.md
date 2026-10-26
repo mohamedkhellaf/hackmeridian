@@ -241,7 +241,7 @@ id.
 
 ## Pro (experimental)
 
-`contracts/pro` is the EXPERIMENTAL cash-settled margin layer (brief `docs/pro-v0-brief-dev2.md`). It is deployed
+`contracts/pro` is the EXPERIMENTAL cash-settled margin layer. It is deployed
 separately from `options`, with its own identities (`strata-pro-{admin,publisher,keeper,maker,holder,lp}`) and the
 existing USDx SAC as quote token. The publisher and the vault's seed capital are team-operated. TESTNET only.
 

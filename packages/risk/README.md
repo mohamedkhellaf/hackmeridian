@@ -13,4 +13,4 @@ Python 3 + numpy. Owner: Dev 1.
 | `fuzz_pro_model.py` | Random operation sequences with invariants checked after every step (`python fuzz_pro_model.py`, deterministic) |
 | `fixtures/pro_v0.json` | 16 scenarios / 691 steps a future contract must replay (necessary, not sufficient: see brief §7) |
 
-Parameters are illustrative, not calibrated on real market data. See `docs/pro-architecture.md` and `docs/pro-v0-brief-dev2.md`.
+Parameters are illustrative, not calibrated on real market data. The design notes and the build brief are kept by the team outside the public repository; `pro_v0_model.py` is the executable spec.

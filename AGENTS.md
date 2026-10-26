@@ -2,6 +2,8 @@
 
 <!-- Operational instructions for humans and coding agents. Keep accurate, short, and aligned with the running code. -->
 
+> Internal planning material referenced below (the Pro build brief and architecture notes, the UI spec, the demo script, the ideation record under `research/`) is kept by the team outside the public repository.
+
 ## Mission and constraints
 
 - **Product:** StellSec (working name; previously Backstop). Repository: `hackmeridian`.

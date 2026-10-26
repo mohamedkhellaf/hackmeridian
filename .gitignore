@@ -42,3 +42,11 @@ HANDOFF-*.md
 # Pitch and demo preparation stay local, not in the public repo
 docs/pitch-speech.md
 docs/demo-script.md
+
+# Internal planning material, kept local
+docs/ui-spec.md
+docs/pro-v0-brief-dev2.md
+docs/pro-architecture.md
+WINNING_IDEAS.md
+research/
+.claude/

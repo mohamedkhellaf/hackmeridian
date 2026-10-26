@@ -1,9 +1,0 @@
-14:28:13 A onTime before window                               {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_too_early"}}
-14:28:14 A late before window                                 {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_too_early"}}
-14:28:17 A early (payee fee-bump)                             {"ok":true,"hash":"71a2a1c40064204f6ef6e7e7b0c30f84ee9d824e62a141cbaeaeeda91c51e7ff"}
-14:28:17 A onTime after early cashed                          {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_too_early"}}
-14:28:22 B payer unrelated payment                            {"ok":true,"hash":"2423b43a9d37f074abba4a9febef5eef8c226fb9f72eaaadb06cfc9f107f13b5"}
-14:28:22 B plain cheque after payer activity                  {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_bad_seq"}}
-14:28:32 C payer unrelated payment x2                         [true,true]
-14:28:37 C minSeqNum cheque after payer activity              {"ok":true,"hash":"232891d731806332e54af81e4b0f74c8894190ea8bf318a8b41a8cf278c45e85"}
-14:28:37 C sibling after one cashed                           {"ok":false,"codes":{"transaction":"tx_fee_bump_inner_failed","inner_transaction":"tx_bad_seq"}}

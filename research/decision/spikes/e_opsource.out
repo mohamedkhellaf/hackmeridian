@@ -1,4 +1,0 @@
-13:16:37 parent before: seq / sequence_time / XLM       ["23116029383147522","1792934197","9949.9999700"]
-13:16:47 undo: tx src=guardian, op src=parent, guardian sig {"ok":true,"hash":"02e300ef69fa2812dee38cc20d2a3f353be87a50c0d7a4c08ccdb0644dbc409b"}
-13:16:47 parent after: seq / sequence_time / XLM        ["23116029383147522","1792934197","9999.9999700"]
-13:16:48 guardian payment op src=parent via own tx      {"ok":false,"codes":"{\"transaction\":\"tx_failed\",\"operations\":[\"op_bad_auth\"]}"}
