@@ -36,6 +36,14 @@
 //!   `buy_resale`). `buy_resale(buyer, id, max_total)` fails with `PriceMoved` if the ask is
 //!   above the buyer's cap. The writer cannot buy back its own option (`SelfTrade`). Views `get_ask`,
 //!   `list_asks` (scan of option ids, at most `MAX_PAGE` per call).
+//! - Buyer side (v1.5): a buyer posts a funded bid (`create_bid`: the premium is escrowed in the
+//!   contract and counted in `open_collateral(quote)`); any eligible writer fills it (`fill_bid`:
+//!   locks the collateral as `create_offer`, receives the escrowed premium, and the option is
+//!   created directly `Active` with the bidder as holder, outside the open books and the writer
+//!   cap). The buyer may `cancel_bid`; anyone may `prune_bids` an expired open bid (premium back
+//!   to the buyer). Bids have their own id space (`Key::Bid`, instance `BidCount`), per-asset
+//!   books (`Key::BidsFor`, `MAX_OPEN_BIDS_PER_ASSET`) and per-buyer counts (`Key::BuyerOpen`,
+//!   `MAX_OPEN_BIDS_PER_BUYER`).
 //! - No admin, no upgrade, no delisting; the quote token is fixed by the constructor.
 //! - Check order in every state-changing function:
 //!   auth -> NotFound -> ownership -> state -> time -> eligibility -> transfers -> storage -> event.
@@ -46,7 +54,7 @@
 //!   `WriterOpenLimit`) and the pooled-collateral check (`CollateralShortfall`).
 //!   Any failure reverts the whole invocation (the transaction is the atomicity boundary).
 //! - All amounts are exact `i128` token units; every addition/subtraction is checked.
-//! - Storage (v1.3.1): the instance entry holds only `Quote`, `Underlyings`, `Next` and
+//! - Storage (v1.3.1; v1.5 adds `BidCount`): the instance entry holds only `Quote`, `Underlyings`, `Next` and
 //!   `AssetCount`; everything keyed by an address or id (`Reserved`, `Opt`, `OpenFor`, `Listed`,
 //!   `AssetAt`, `WriterOpen`, v1.4 `Ask`) is a persistent entry, so permissionless listing cannot
 //!   grow the single instance entry.
@@ -95,6 +103,15 @@ const MAX_TENOR: u64 = 63_072_000;
 /// Longest classic asset code (`AlphaNum12`, v1.3 `list_asset`); codes of 1..=4 characters are
 /// `AlphaNum4`, codes of 5..=12 characters are `AlphaNum12`.
 const MAX_CODE_LEN: u32 = 12;
+
+/// v1.5: maximum number of ids in one underlying's open bid book (`Key::BidsFor(asset)`).
+/// `create_bid` refuses new bids on that underlying with `BidBookFull` once this many of its bids
+/// are `Open`.
+const MAX_OPEN_BIDS_PER_ASSET: u32 = 500;
+
+/// v1.5: maximum number of `Open` bids per buyer (`Key::BuyerOpen(addr)`); `create_bid` fails
+/// with `BuyerOpenLimit` beyond it.
+const MAX_OPEN_BIDS_PER_BUYER: u32 = 50;
 
 // ---------------------------------------------------------------------------------------------
 // Types (ABI §2)
@@ -210,6 +227,15 @@ pub enum Error {
     /// v1.4 buy_resale: the current ask is above the buyer's `max_total` (the seller re-listed at
     /// a higher price after the buyer saw the ask).
     PriceMoved = 121,
+    /// v1.5 cancel_bid/fill_bid: the bid is not `Open` (already filled, cancelled or pruned).
+    BidNotOpen = 122,
+    /// v1.5 cancel_bid: the caller is not the bid's buyer.
+    NotBidder = 123,
+    /// v1.5 create_bid: this underlying's open bid book already holds `MAX_OPEN_BIDS_PER_ASSET`
+    /// bids.
+    BidBookFull = 124,
+    /// v1.5 create_bid: this buyer already has `MAX_OPEN_BIDS_PER_BUYER` open bids.
+    BuyerOpenLimit = 125,
 }
 
 /// v1.4 `list_asks` row: an `Active` option `id` offered for resale by its current `holder` for
@@ -220,6 +246,37 @@ pub struct Ask {
     pub id: u32,
     pub holder: Address,
     pub ask_total: i128,
+}
+
+/// v1.5 lifecycle of a bid: Open -> Filled (a writer filled it), Open -> Cancelled (the buyer
+/// withdrew it), Open -> Expired (`prune_bids` after expiry). No other transition exists.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BidState {
+    Open,
+    Filled,
+    Cancelled,
+    Expired,
+}
+
+/// v1.5 funded bid: `buyer` escrowed `premium_total` quote units in the contract and asks any
+/// eligible writer to write the option `kind` on `qty` of `underlying` at `strike_total`, expiring
+/// at `expiry`. Own id space (`bid_count`), separate from option ids. `option_id` is the option
+/// created by `fill_bid` (None until then).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Bid {
+    pub id: u32,
+    pub buyer: Address,
+    pub kind: OptionType,
+    pub underlying: Address,
+    pub quote: Address,
+    pub qty: i128,
+    pub strike_total: i128,
+    pub premium_total: i128,
+    pub expiry: u64,
+    pub state: BidState,
+    pub option_id: Option<u32>,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -330,6 +387,44 @@ pub struct ResaleBought {
     pub ask_total: i128,
 }
 
+/// v1.5: `buyer` escrowed `premium_total` quote and opened bid `id` (`create_bid`).
+#[contractevent]
+pub struct BidCreated {
+    #[topic]
+    pub id: u32,
+    pub buyer: Address,
+    pub kind: OptionType,
+    pub underlying: Address,
+    pub qty: i128,
+    pub strike_total: i128,
+    pub premium_total: i128,
+    pub expiry: u64,
+}
+
+/// v1.5: the buyer withdrew bid `id`; the premium went back to it (`cancel_bid`).
+#[contractevent]
+pub struct BidCancelled {
+    #[topic]
+    pub id: u32,
+}
+
+/// v1.5: `writer` filled bid `bid_id`, creating the `Active` option `option_id` (`fill_bid`).
+#[contractevent]
+pub struct BidFilled {
+    #[topic]
+    pub bid_id: u32,
+    pub option_id: u32,
+    pub writer: Address,
+}
+
+/// v1.5: `prune_bids` closed expired open bid `id` and refunded its premium to the buyer.
+#[contractevent]
+pub struct BidPruned {
+    #[topic]
+    pub id: u32,
+    pub pruner: Address,
+}
+
 // ---------------------------------------------------------------------------------------------
 // Storage keys (ABI §8)
 // ---------------------------------------------------------------------------------------------
@@ -364,6 +459,15 @@ enum Key {
     /// persistent: i128, v1.4 resale ask of an `Active` option, in quote units (> 0). Present
     /// only while the option is `Active` and held by the account that posted it.
     Ask(u32),
+    /// persistent: Bid, v1.5. Never deleted.
+    Bid(u32),
+    /// instance: u32, v1.5 next bid id (= bid_count).
+    BidCount,
+    /// persistent: Vec<u32>, v1.5 open bid book of one underlying: its `Open` bid ids, oldest
+    /// first, at most `MAX_OPEN_BIDS_PER_ASSET`.
+    BidsFor(Address),
+    /// persistent: u32, v1.5 count of this buyer's `Open` bids.
+    BuyerOpen(Address),
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -609,6 +713,71 @@ fn writer_open_dec(e: &Env, writer: &Address) -> Result<(), Error> {
         .checked_sub(1)
         .ok_or(Error::Overflow)?;
     set_writer_open(e, writer, next);
+    Ok(())
+}
+
+/// v1.5: loads a bid or returns `NotFound`. Pure read.
+fn load_bid(e: &Env, id: u32) -> Result<Bid, Error> {
+    e.storage()
+        .persistent()
+        .get(&Key::Bid(id))
+        .ok_or(Error::NotFound)
+}
+
+/// v1.5: stores a bid and extends its persistent TTL.
+fn save_bid(e: &Env, bid: &Bid) {
+    let key = Key::Bid(bid.id);
+    e.storage().persistent().set(&key, bid);
+    bump_persistent(e, &key);
+}
+
+/// v1.5: number of bids ever created (= next bid id).
+fn bid_count_of(e: &Env) -> u32 {
+    e.storage().instance().get(&Key::BidCount).unwrap_or(0)
+}
+
+/// v1.5: open bid book of `asset` (its `Open` bid ids, oldest first). Pure read.
+fn bid_list(e: &Env, asset: &Address) -> Vec<u32> {
+    e.storage()
+        .persistent()
+        .get(&Key::BidsFor(asset.clone()))
+        .unwrap_or_else(|| Vec::new(e))
+}
+
+/// v1.5: stores `asset`'s open bid book and extends the entry's TTL.
+fn set_bid_list(e: &Env, asset: &Address, book: &Vec<u32>) {
+    let key = Key::BidsFor(asset.clone());
+    e.storage().persistent().set(&key, book);
+    bump_persistent(e, &key);
+}
+
+/// v1.5: number of `buyer`'s `Open` bids. Pure read.
+fn buyer_open(e: &Env, buyer: &Address) -> u32 {
+    e.storage()
+        .persistent()
+        .get(&Key::BuyerOpen(buyer.clone()))
+        .unwrap_or(0)
+}
+
+/// v1.5: stores `buyer`'s open-bid count and extends the entry's TTL.
+fn set_buyer_open(e: &Env, buyer: &Address, count: u32) {
+    let key = Key::BuyerOpen(buyer.clone());
+    e.storage().persistent().set(&key, &count);
+    bump_persistent(e, &key);
+}
+
+/// v1.5: a bid left `Open` (fill, cancel, prune): removes it from its underlying's bid book and
+/// decrements the buyer's open count (checked; below zero is broken accounting -> `Overflow`).
+fn bid_close(e: &Env, bid: &Bid) -> Result<(), Error> {
+    let mut book = bid_list(e, &bid.underlying);
+    if let Some(i) = book.first_index_of(bid.id) {
+        book.remove(i);
+        set_bid_list(e, &bid.underlying, &book);
+    }
+    let next = buyer_open(e, &bid.buyer)
+        .checked_sub(1)
+        .ok_or(Error::Overflow)?;
+    set_buyer_open(e, &bid.buyer, next);
     Ok(())
 }
 
@@ -1523,6 +1692,348 @@ impl OptionsContract {
             }
         }
         page
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // v1.5 buyer side: funded bids any eligible writer can fill
+    // -----------------------------------------------------------------------------------------
+
+    /// v1.5. `buyer` posts a funded bid: escrows `premium_total` quote in the contract (added to
+    /// the quote's reserved total, so `open_collateral(quote)` includes it) and asks any eligible
+    /// writer to write `kind` on `qty` of `underlying` at `strike_total`, expiring at `expiry`.
+    /// Returns the new bid id (own id space, `bid_count`).
+    /// Check order: auth -> InvalidArgs (buyer is the contract) -> AssetNotAllowed (quote is not
+    /// the configured quote, or underlying not listed) -> InvalidArgs (amounts <= 0, expiry <=
+    /// now) -> TenorOutOfRange -> NotEligible (buyer on the underlying) -> BidBookFull ->
+    /// BuyerOpenLimit -> premium transfer -> storage -> event.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_bid(
+        env: Env,
+        buyer: Address,
+        kind: OptionType,
+        underlying: Address,
+        quote: Address,
+        qty: i128,
+        strike_total: i128,
+        premium_total: i128,
+        expiry: u64,
+    ) -> Result<u32, Error> {
+        // auth
+        buyer.require_auth();
+        // backstop: the contract is never a party
+        let me = env.current_contract_address();
+        if buyer == me {
+            return Err(Error::InvalidArgs);
+        }
+        // assets and arguments
+        if quote != quote_addr(&env) || !listed(&env, &underlying, true) {
+            return Err(Error::AssetNotAllowed);
+        }
+        let now = env.ledger().timestamp();
+        if qty <= 0 || strike_total <= 0 || premium_total <= 0 || expiry <= now {
+            return Err(Error::InvalidArgs);
+        }
+        if expiry > now.checked_add(MAX_TENOR).ok_or(Error::Overflow)? {
+            return Err(Error::TenorOutOfRange);
+        }
+        // eligibility: the buyer will hold the option (deliver the underlying for a PUT, receive
+        // it for a CALL)
+        if !eligible(&env, &underlying, &buyer) {
+            return Err(Error::NotEligible);
+        }
+        // capacity
+        if bid_list(&env, &underlying).len() >= MAX_OPEN_BIDS_PER_ASSET {
+            return Err(Error::BidBookFull);
+        }
+        let open_count = buyer_open(&env, &buyer);
+        if open_count >= MAX_OPEN_BIDS_PER_BUYER {
+            return Err(Error::BuyerOpenLimit);
+        }
+
+        let id = bid_count_of(&env);
+        let next_id = id.checked_add(1).ok_or(Error::Overflow)?;
+        let next_open = open_count.checked_add(1).ok_or(Error::Overflow)?;
+
+        // transfers: escrow the premium
+        TokenClient::new(&env, &quote).transfer(&buyer, &me, &premium_total);
+
+        // storage
+        add_reserved(&env, &quote, premium_total)?;
+        env.storage().instance().set(&Key::BidCount, &next_id);
+        let mut book = bid_list(&env, &underlying);
+        book.push_back(id);
+        set_bid_list(&env, &underlying, &book);
+        set_buyer_open(&env, &buyer, next_open);
+        save_bid(
+            &env,
+            &Bid {
+                id,
+                buyer: buyer.clone(),
+                kind,
+                underlying: underlying.clone(),
+                quote,
+                qty,
+                strike_total,
+                premium_total,
+                expiry,
+                state: BidState::Open,
+                option_id: None,
+            },
+        );
+        bump_instance(&env);
+
+        // event
+        BidCreated {
+            id,
+            buyer,
+            kind,
+            underlying,
+            qty,
+            strike_total,
+            premium_total,
+            expiry,
+        }
+        .publish(&env);
+        Ok(id)
+    }
+
+    /// v1.5. The buyer withdraws an `Open` bid (before or after expiry); the escrowed premium goes
+    /// back to it and leaves the reserved total.
+    /// Check order: auth -> NotFound -> BidNotOpen -> NotBidder -> refund -> storage -> event.
+    pub fn cancel_bid(env: Env, buyer: Address, id: u32) -> Result<(), Error> {
+        // auth
+        buyer.require_auth();
+        // NotFound -> state -> ownership
+        let mut bid = load_bid(&env, id)?;
+        if bid.state != BidState::Open {
+            return Err(Error::BidNotOpen);
+        }
+        if bid.buyer != buyer {
+            return Err(Error::NotBidder);
+        }
+
+        // transfers: refund the premium
+        TokenClient::new(&env, &bid.quote).transfer(
+            &env.current_contract_address(),
+            &buyer,
+            &bid.premium_total,
+        );
+
+        // storage
+        sub_reserved(&env, &bid.quote, bid.premium_total)?;
+        bid_close(&env, &bid)?;
+        bid.state = BidState::Cancelled;
+        save_bid(&env, &bid);
+        bump_instance(&env);
+
+        // event
+        BidCancelled { id }.publish(&env);
+        Ok(())
+    }
+
+    /// v1.5. `writer` fills an `Open` bid before its expiry, in one invocation: locks the
+    /// collateral (PUT: `strike_total` quote; CALL: `qty` underlying) exactly as `create_offer`,
+    /// receives the escrowed premium, and a new option (next option id) is stored directly as
+    /// `Active` with `holder = bid.buyer`. The option never enters an open book and does not count
+    /// toward the writer's open-offer cap. Emits `OptionBought` for the new option (as `buy` does
+    /// when an option becomes `Active`), then `BidFilled`. Returns the new option id.
+    /// Check order: auth -> InvalidArgs (writer is the contract) -> NotFound -> BidNotOpen ->
+    /// Expired -> SelfTrade (writer is the buyer) -> NotEligible (writer on the underlying and the
+    /// quote, buyer still on the underlying) -> ContractNotAuthorized -> CollateralShortfall ->
+    /// transfers -> storage -> events.
+    pub fn fill_bid(env: Env, writer: Address, id: u32) -> Result<u32, Error> {
+        // auth
+        writer.require_auth();
+        // backstop: the contract is never a party
+        let me = env.current_contract_address();
+        if writer == me {
+            return Err(Error::InvalidArgs);
+        }
+        // NotFound -> state -> time -> self-trade -> eligibility -> solvency
+        let mut bid = load_bid(&env, id)?;
+        if bid.state != BidState::Open {
+            return Err(Error::BidNotOpen);
+        }
+        if env.ledger().timestamp() >= bid.expiry {
+            return Err(Error::Expired);
+        }
+        if writer == bid.buyer {
+            return Err(Error::SelfTrade);
+        }
+        if !eligible(&env, &bid.underlying, &writer)
+            || !eligible(&env, &bid.quote, &writer)
+            || !eligible(&env, &bid.underlying, &bid.buyer)
+        {
+            return Err(Error::NotEligible);
+        }
+        if !eligible(&env, &bid.underlying, &me) {
+            return Err(Error::ContractNotAuthorized);
+        }
+        check_collateral(&env, &bid.quote, &bid.underlying)?;
+
+        let opt_id: u32 = env.storage().instance().get(&Key::Next).unwrap_or(0);
+        let next_id = opt_id.checked_add(1).ok_or(Error::Overflow)?;
+        let opt = OptionData {
+            id: opt_id,
+            underlying: bid.underlying.clone(),
+            quote: bid.quote.clone(),
+            option_type: bid.kind,
+            qty: bid.qty,
+            strike_total: bid.strike_total,
+            premium_total: bid.premium_total,
+            expiry: bid.expiry,
+            writer: writer.clone(),
+            holder: Some(bid.buyer.clone()),
+            state: State::Active,
+        };
+
+        // transfers: collateral in, escrowed premium out to the writer
+        let (c_token, c_amount) = collateral_of(&opt);
+        TokenClient::new(&env, &c_token).transfer(&writer, &me, &c_amount);
+        TokenClient::new(&env, &bid.quote).transfer(&me, &writer, &bid.premium_total);
+
+        // storage
+        add_reserved(&env, &c_token, c_amount)?;
+        sub_reserved(&env, &bid.quote, bid.premium_total)?;
+        env.storage().instance().set(&Key::Next, &next_id);
+        save_opt(&env, &opt);
+        bid_close(&env, &bid)?;
+        bid.state = BidState::Filled;
+        bid.option_id = Some(opt_id);
+        save_bid(&env, &bid);
+        bump_instance(&env);
+
+        // events
+        OptionBought {
+            id: opt_id,
+            holder: bid.buyer.clone(),
+            premium_total: bid.premium_total,
+        }
+        .publish(&env);
+        BidFilled {
+            bid_id: id,
+            option_id: opt_id,
+            writer,
+        }
+        .publish(&env);
+        Ok(opt_id)
+    }
+
+    /// v1.5. Anyone (authenticated, for the event) may close expired open bids. For each id in
+    /// order: `NotFound` (reverts the whole call) if unknown; skipped unless the bid is `Open` and
+    /// `now >= expiry`. The premium goes back to the **buyer** with `try_transfer`; if that fails
+    /// the id is skipped and nothing about it changes. Otherwise the premium leaves the reserved
+    /// total, the bid leaves its book and the buyer's open count, its state becomes `Expired` and
+    /// `BidPruned { id, pruner }` is published. Returns the number of bids pruned. Live bids are
+    /// never touched; only the buyer can `cancel_bid`.
+    pub fn prune_bids(env: Env, pruner: Address, ids: Vec<u32>) -> Result<u32, Error> {
+        // auth (accountability only; anyone may prune)
+        pruner.require_auth();
+        let me = env.current_contract_address();
+        if pruner == me {
+            return Err(Error::InvalidArgs);
+        }
+        let now = env.ledger().timestamp();
+        let mut pruned: u32 = 0;
+        for id in ids.iter() {
+            let mut bid = load_bid(&env, id)?;
+            if bid.state != BidState::Open || now < bid.expiry {
+                continue;
+            }
+            if !matches!(
+                TokenClient::new(&env, &bid.quote).try_transfer(
+                    &me,
+                    &bid.buyer,
+                    &bid.premium_total
+                ),
+                Ok(Ok(()))
+            ) {
+                continue;
+            }
+            sub_reserved(&env, &bid.quote, bid.premium_total)?;
+            bid_close(&env, &bid)?;
+            bid.state = BidState::Expired;
+            save_bid(&env, &bid);
+            BidPruned {
+                id,
+                pruner: pruner.clone(),
+            }
+            .publish(&env);
+            pruned = pruned.checked_add(1).ok_or(Error::Overflow)?;
+        }
+        bump_instance(&env);
+        Ok(pruned)
+    }
+
+    /// v1.5. Returns the stored bid or `NotFound`. Pure read (no TTL change).
+    pub fn get_bid(env: Env, id: u32) -> Result<Bid, Error> {
+        load_bid(&env, id)
+    }
+
+    /// v1.5. Bids with ids `from, from + 1, ...`, stopping at `bid_count()` and after at most
+    /// `min(limit, MAX_PAGE)` entries (same rule as `get_options`). Pure read, never fails.
+    pub fn get_bids(env: Env, from: u32, limit: u32) -> Vec<Bid> {
+        let count = bid_count_of(&env);
+        let mut page = Vec::new(&env);
+        for i in 0..limit.min(MAX_PAGE) {
+            let id = match from.checked_add(i) {
+                Some(id) if id < count => id,
+                _ => break,
+            };
+            // bids are never deleted, so the Err arm is unreachable
+            match load_bid(&env, id) {
+                Ok(bid) => page.push_back(bid),
+                Err(_) => break,
+            }
+        }
+        page
+    }
+
+    /// v1.5. Number of bids ever created (= next bid id).
+    pub fn bid_count(env: Env) -> u32 {
+        bid_count_of(&env)
+    }
+
+    /// v1.5. `Open` bid ids on `asset`, oldest first, paged like `list_open_for`. May include bids
+    /// past expiry (clients filter by `expiry`). Pure read, never fails.
+    pub fn list_open_bids_for(env: Env, asset: Address, from: u32, limit: u32) -> Vec<u32> {
+        let book = bid_list(&env, &asset);
+        let len = book.len();
+        if from >= len {
+            return Vec::new(&env);
+        }
+        let end = from.saturating_add(limit.min(MAX_PAGE)).min(len);
+        book.slice(from..end)
+    }
+
+    /// v1.5. Number of `buyer`'s `Open` bids (0 if none).
+    pub fn buyer_open_count(env: Env, buyer: Address) -> u32 {
+        buyer_open(&env, &buyer)
+    }
+
+    /// v1.5. Anyone may call. Extends the instance and code TTL and, for every id in `ids`, the
+    /// bid's persistent entry (`NotFound` for an unknown id reverts the whole call) and, when
+    /// present, its underlying's bid book (`BidsFor`), its buyer's open count (`BuyerOpen`), the
+    /// reserved total of its quote (`Reserved`) and its underlying's registry entry (`Listed`).
+    pub fn extend_bid_ttl(env: Env, ids: Vec<u32>) -> Result<(), Error> {
+        for id in ids.iter() {
+            let bid = load_bid(&env, id)?;
+            bump_persistent(&env, &Key::Bid(id));
+            listed(&env, &bid.underlying, true);
+            for key in [
+                Key::BidsFor(bid.underlying),
+                Key::BuyerOpen(bid.buyer),
+                Key::Reserved(bid.quote),
+            ] {
+                if env.storage().persistent().has(&key) {
+                    bump_persistent(&env, &key);
+                }
+            }
+        }
+        bump_instance(&env);
+        env.deployer()
+            .extend_ttl(env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
+        Ok(())
     }
 }
 
