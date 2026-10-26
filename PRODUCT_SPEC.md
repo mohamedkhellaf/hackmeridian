@@ -1,6 +1,6 @@
 # Strata product specification (Covered regime)
 
-**Owner:** Dev 1 (what the instrument promises). **Date:** 2026-10-26. **Scope:** the `contracts/options` contract as specified in ABI v1.3.1 (`docs/contract-abi.md` §12–§13 on branch `feat/contract-v1-3`). The latest deployment recorded in `docs/contract-testnet-evidence.md` is v1.3; behaviors marked v1.3.1 (transfer guards, per-asset open books, `prune_expired` caller) apply once v1.3.1 is deployed and merged. `main` currently carries v1.2. **Network:** Stellar Testnet only, fictional assets only. This document states what Strata promises. If code and this document disagree, that is a stop-ship blocker (AGENTS.md).
+**Owner:** Dev 1 (what the instrument promises). **Date:** 2026-10-26. **Scope:** the `contracts/options` contract as specified in ABI v1.3.1 (`docs/contract-abi.md` §12–§13, on `main` since PR #55). The latest deployment recorded in `docs/contract-testnet-evidence.md` is v1.3.1 (`CBASUA3L…MJUEE`, 2026-10-26 00:50 UTC), and `main` carries the source that builds byte-identical to it, so every behavior below, including the v1.3.1 transfer guard, per-asset open books and third-party `prune_expired`, is live on that deployment. A frontend build still pointed at v1.2 (`CAJ2WJP4…GBAX`) lacks `list_asset`, EQTY and the v1.3.1 limits until its `VITE_OPTIONS_CONTRACT_ID` is switched. **Network:** Stellar Testnet only, fictional assets only. This document states what Strata promises. If code and this document disagree, that is a stop-ship blocker (AGENTS.md).
 
 ## Open questions for Dev 1
 
