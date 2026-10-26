@@ -252,8 +252,10 @@ Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from
   `from >= option_count()` or `limit == 0`. Never fails. Clients page with `from += returned.len()`.
 - `get_option(id)`: the stored `OptionData` or `NotFound`. Pure read.
 - `list_open_for(asset, from, limit)` (v1.3.1): ids in state `Offered` for one underlying, oldest first, paged (`MAX_PAGE`).
-- `list_open()`: ids whose state is `Offered`, oldest first (v1.3.1: concatenation of the per-asset books in registry order,
-  truncated to 200 ids; use `list_open_for` for a complete view). May include offers past `expiry`; clients filter by
+- `list_open()`: ids whose state is `Offered`, oldest first (v1.3.1: concatenation of the per-asset books of the **first
+  `MAX_PAGE` (50) registry assets** in registry order, truncated to 200 ids, so its reads stay bounded under permissionless
+  listing; books of later-listed assets are reachable only through `list_assets` + `list_open_for`, which clients must use
+  for a complete view). May include offers past `expiry`; clients filter by
   `expiry` before showing them as purchasable. Since v1.3.1 the books are persistent per-asset lists capped at
   `MAX_OPEN_PER_ASSET` (§13); before that a single instance-storage list capped at 1000 (§10).
 - `option_count()`: number of options ever created (next id).
@@ -489,7 +491,8 @@ position token, impairment/refund, margin.
    `NotEligible` (§3). A frozen holder may still transfer (its own tokens never move).
 3. **Per-asset open books** (fix for F-1R): `Key::OpenFor(asset)` persistent, capped at `MAX_OPEN_PER_ASSET = 500`;
    `OpenListFull` is per asset; new view `list_open_for(asset, from, limit)`; `list_open()` keeps its signature and returns
-   the per-asset books concatenated in registry order, truncated to 200 ids. Instance `Key::Open` and `MAX_OPEN` are removed.
+   the per-asset books of the first `MAX_PAGE` registry assets concatenated in registry order, truncated to 200 ids (bounded
+   reads; complete views go through `list_assets` + `list_open_for`). Instance `Key::Open` and `MAX_OPEN` are removed.
 4. **`list_asset` check order**: `AlreadyListed` before `AssetNotDeployed`.
 5. **`extend_ttl(ids)`** also extends `Listed(option.underlying)`, `WriterOpen(option.writer)` and `OpenFor(option.underlying)`
    for each id, plus `AssetAt(0..min(asset_count, MAX_PAGE))` and their `Listed` entries (keeper coverage of the registry).
