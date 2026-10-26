@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { MarketTable } from '../market/MarketSeries'
 import { filterOffers } from '../market/series'
 import type { KindFilter } from '../market/series'
@@ -19,6 +20,8 @@ export interface MarketsViewProps {
   health: CollateralHealth[]
   /** In-memory mock client. The shell footer carries the mock notice, so this view does not repeat it. */
   mock: boolean
+  /** Resale section (contract v1.4), rendered below the offers. */
+  resale?: ReactNode
 }
 
 const KINDS: { value: KindFilter; label: string }[] = [
@@ -27,7 +30,7 @@ const KINDS: { value: KindFilter; label: string }[] = [
   { value: 'all', label: 'All' },
 ]
 
-export function MarketsView({ offers, me, busy, busyId, onBuy, health }: MarketsViewProps) {
+export function MarketsView({ offers, me, busy, busyId, onBuy, health, resale }: MarketsViewProps) {
   const [asset, setAsset] = useState('all')
   const [kind, setKind] = useState<KindFilter>('all')
   const codes = [...new Set(offers.map((o) => o.underlying.code))].sort()
@@ -96,6 +99,7 @@ export function MarketsView({ offers, me, busy, busyId, onBuy, health }: Markets
           )}
         </Card>
       </div>
+      {resale}
     </div>
   )
 }

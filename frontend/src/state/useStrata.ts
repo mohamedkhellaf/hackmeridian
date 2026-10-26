@@ -3,13 +3,15 @@ import { config } from '../config'
 import { createOptionsClient } from '../options'
 import { MockOptionsClient } from '../options/mockClient'
 import type { OptionsClient } from '../options/client'
-import type { CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets } from '../options/types'
+import type { Ask, CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets } from '../options/types'
 import type { OptionRow } from '../market/OptionsTable'
 import type { Notice } from '../ui'
 import { useBalances } from '../wallet/useBalances'
 import { useFreighter } from '../wallet/useFreighter'
 
-export type TxOutcome = { ok: true; hash: string; mock: boolean } | { ok: false; error: string }
+import { runTx } from './runTx'
+import type { TxOutcome } from './runTx'
+export type { TxOutcome } from './runTx'
 
 export type PositionAction =NonNullable<Parameters<typeof OptionRow>[0]['action']>
 
@@ -28,6 +30,8 @@ export function useStrata() {
     [mock, walletAddress, walletSign, walletSignAuth],
   )
   const [options, setOptions] = useState<OptionOffer[]>([])
+  // Resale asks; null when the contract has no resale (before v1.4) or the read failed.
+  const [asks, setAsks] = useState<Ask[] | null>(null)
   const [assets, setAssets] = useState<SupportedAssets | null>(null)
   const [collateral, setCollateral] = useState<CollateralLine[]>([])
   const [health, setHealth] = useState<CollateralHealth[]>([])
@@ -40,13 +44,15 @@ export function useStrata() {
   const refreshBalances = balances.refresh
 
   const refresh = useCallback(async () => {
-    const [opts, assets, lines, hl] = await Promise.all([
+    const [opts, assets, lines, hl, ak] = await Promise.all([
       client.listOptions(),
       client.supportedAssets(),
       client.openCollateral(),
       client.collateralHealth().catch(() => [] as CollateralHealth[]),
+      client.listAsks().catch(() => null),
     ])
     setOptions(opts)
+    setAsks(ak)
     setAssets(assets)
     setCollateral(lines)
     setHealth(hl)
@@ -56,24 +62,20 @@ export function useStrata() {
     void refresh()
   }, [refresh])
 
-  // Runs a transaction, sets the toast and refreshes state. Returns the hash on success.
+  // Runs a transaction, sets the toast and refreshes state (runTx: a failed refresh never fails a confirmed tx).
   const runDetailed = async (id: bigint, label: string, fn: () => Promise<{ hash: string }>): Promise<TxOutcome> => {
     setBusyId(id)
-    setNotice(null)
-    let ok = false
     try {
-      const { hash } = await fn()
-      ok = true
-      setNotice({ kind: 'ok', text: label, hash, mock: client.isMock })
-      return { ok: true, hash, mock: client.isMock }
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e)
-      setNotice({ kind: 'err', text: error })
-      return { ok: false, error }
+      return await runTx(label, client.isMock, fn, {
+        setNotice,
+        refresh: async () => {
+          setBusyId(null)
+          await refresh()
+        },
+        onSuccess: () => void refreshBalances(),
+      })
     } finally {
       setBusyId(null)
-      await refresh()
-      if (ok) void refreshBalances()
     }
   }
 
@@ -97,6 +99,14 @@ export function useStrata() {
     if (!o || !me) return null
     return runDetailed(o.id, 'Bought', () => client.buy(o.id, me))
   }
+
+  // Resale (contract v1.4). Each resolves with the outcome so the resale dialogs can show their own result.
+  const listForSale = (o: OptionOffer, askTotal: bigint) =>
+    runDetailed(o.id, 'Listed for sale', () => client.listForSale(o.id, me!, askTotal))
+  const cancelSale = (o: OptionOffer) => runDetailed(o.id, 'Sale cancelled', () => client.cancelSale(o.id, me!))
+  // `maxTotal` is the ask the buyer reviewed; the contract refuses a higher price (PriceMoved 121).
+  const buyResale = (o: OptionOffer, maxTotal: bigint) =>
+    runDetailed(o.id, 'Bought from holder', () => client.buyResale(o.id, me!, maxTotal))
 
   /** The next action the connected wallet can take on a position, if any. */
   const actionFor = (o: OptionOffer): PositionAction | undefined => {
@@ -141,6 +151,10 @@ export function useStrata() {
     client,
     isMock: client.isMock,
     options,
+    asks,
+    listForSale,
+    cancelSale,
+    buyResale,
     market,
     positions,
     assets,
