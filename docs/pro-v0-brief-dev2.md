@@ -328,3 +328,10 @@ Never cut:
 - LP shares round down. The minimum first deposit limits, but does not remove, share-price manipulation by fee donations (a sole LP can still inflate the share price through self-dealt premiums).
 - The margin engine (`strata_risk.py`) values the calls as European. For a non-dividend underlying an American call has the same value, so margins are unchanged; early exercise only brings the payment forward. A dividend-paying or yield-bearing underlying would need an early-exercise premium in the mark.
 - Parameters are illustrative, taken from the liquid-equity calibration. They do not suit thin RWAs, which stay in the Covered regime.
+
+### Contract build notes (Dev 2, 26 Oct, `contracts/pro/` at v0.3.2)
+
+Found by an independent read-only review of the built contract; neither affects a 48-hour demo (persistent entries live 30 days after their last write), both are v1 items:
+
+- **`latest_snap()` reads the snapshot of every series ever listed**, exactly as the model's `_latest_snap()`, so the read footprint of `requirement()` for a writer with expired unpriced debt grows with the lifetime series count (not with the 16 live-series cap the §4 tests measure), and an archived snapshot of a long-closed series would fail that call until restored. v1: iterate live series only, or keep a `LatestSnap` scalar; the model and fixtures must change with it (§1 rule).
+- **`extend_ttl` covers the instance, vault, series, snapshots, books and positions, not `Acct`, `Offer` or `Lp` entries.** An account that goes idle is bumped only when it is written; after 30 days without a write, `exercise`, `settle` and `liquidate` against that writer need a restore first. Keep the demo accounts active or extend `extend_ttl` with an `accounts` parameter in v1.

@@ -37,7 +37,7 @@
 - **P1 — only after P0+ succeeds:** transfer of option ownership; position token if feasible; issuer freeze/clawback failure demo; financial strategy presets (protective put, covered call, collar) with **accurate payoff previews**; trustworthy impairment/refund logic if fully specified and tested.
 - **P2 — optional:** multi-leg on-chain execution and composed strategies, a more sophisticated RFQ backend, third asset class, Trustless Work integration. Do not claim that a multi-leg structured product is issued or guaranteed unless **all** legs are funded and settle consistently.
 - **06:00 Monday:** freeze features of the Covered product (`contracts/options/` and its UI). Then integration fixes, tests, README, deck, demo recording and submission only. **Submit by 11:00**, leaving a one-hour buffer. The Strata Pro track and Dev 1's new-derivative specs are exempt from the 06:00 freeze, on their own branches, until the Pro go/no-go below; nothing from them merges into `main` without passing its gate.
-- **Strata Pro track — full on-chain attempt, never at the expense of the Covered demo:** Dev 2 builds `contracts/pro/` to the **full** spec in `docs/pro-v0-brief-dev2.md` (American exercise included; no "European only" cut). Dev 3 builds the Pro UI behind a feature flag (see "Strata Pro UI"). Both work on their own branches.
+- **Strata Pro track — full on-chain attempt, never at the expense of the Covered demo:** Dev 2 builds `contracts/pro/` to the **full** spec in `docs/pro-v0-brief-dev2.md` (American exercise included; no "European only" cut). Dev 3 builds the Pro UI behind a feature flag (see "Strata Pro UI"). Both work on their own branches. **Status, 26 Oct 05:40 Lisbon:** `contracts/pro/` is built on branch `claude/clever-mendel-89dem2`; it replays the 16 fixture scenarios (691 steps) with identical results, errors and state, and passes 24 brief §7 negative/footprint tests; the Testnet run is pending (`scripts/deploy/deploy-pro.sh`, `scripts/deploy/pro-demo.sh`, `docs/pro-testnet-runbook.md`).
   - **Go/no-go at 09:30 Lisbon.** The gate is all of the following:
     - `contracts/pro` replays every step of `packages/risk/fixtures/pro_v0.json`;
     - it passes the brief §7 negative tests;
@@ -118,7 +118,7 @@
 ## Project layout
 
 - `Cargo.toml`, `contracts/options/src/`: Soroban Rust, `#![no_std]`, tests under contract crate.
-- `contracts/pro/`: experimental Strata Pro contract (Dev 2), being built on its own branch; on `main` only after the Pro gate passes. `frontend/src/pro/` (or equivalent): flagged Pro UI (Dev 3), same gate. `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
+- `contracts/pro/`: experimental Strata Pro contract (Dev 2), soroban-sdk 28, `#![no_std]`; `tests/fixtures.rs` replays `packages/risk/fixtures/pro_v0.json`, `tests/negative.rs` holds the brief §7 negative and footprint tests; deploy with `scripts/deploy/deploy-pro.sh`, evidence run with `scripts/deploy/pro-demo.sh` (see `docs/pro-testnet-runbook.md`). On `main` only after the Pro gate passes. `frontend/src/pro/` (or equivalent): flagged Pro UI (Dev 3), same gate. `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
 - `scripts/`: Testnet asset creation/issuer permissions, deployment, funding demo accounts, repeatable integration steps.
 - `frontend/`: Vite + React + TypeScript, Stellar SDK and Freighter, app and transaction UI, generated bindings.
 - `packages/payoff/` and `packages/rfq/`: **planned** shared financial modules owned by Dev 1. If the existing monorepo structure differs, agree on paths once rather than having agents create competing package trees.
@@ -134,6 +134,7 @@
 | BOND SAC (fictional; `BOND:GCNW…FDGM`, auth required/revocable/clawback) | — | `CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP` | strata-rwa-issuer `GCNWQR5OA24X7LPTCXUEL4V4ZLSIFKUNIEZEO3UVCVXECPPGX7ERFDGM` |
 | EQTY SAC (fictional tokenized-equity label; `EQTY:GCNW…FDGM`, auth required/revocable/clawback; not in the constructor, listed with `list_asset` on v1.3 and again on v1.3.1) | — | `CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU` | strata-rwa-issuer `GCNWQR5OA24X7LPTCXUEL4V4ZLSIFKUNIEZEO3UVCVXECPPGX7ERFDGM` |
 | USDx SAC (fictional quote token; `USDx:GAE6…ARFS`, no flags) | — | `CAKXMQVKSW2AEKF5DSMDPHJAYGNVOQANHXLI64QJS2H3GOCXRW2GCICU` | strata-usdx-issuer `GAE6ONGU5S3JHDBR5Z3BUVXCL4WLEHQVLBDNTCKHKOYFBYBPBW4IARFS` |
+| pro v0.3.2 (EXPERIMENTAL; naked American calls, partial margin; quote = USDx SAC above; admin `strata-pro-admin`, publisher `strata-pro-publisher`; **not yet deployed**: fill in from `scripts/out/testnet.env` after `deploy-pro.sh`, same PR as the deploy) | pro | _pending_ | strata-deployer |
 
 ## Commands and references
 
