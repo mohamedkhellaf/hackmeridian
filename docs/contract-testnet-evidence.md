@@ -512,66 +512,92 @@ Part B ran on a throwaway v1.3.1 instance, never the main id. Throwaway
 - `writer_open_count` is 0 for maker1 and for maker2.
 - The contract's balance and `open_collateral` are both 0 for USDx, RWA, BOND and EQTY.
 
-The v1.3.1 unit, invariant and negative suites are on their own branches and were not run in this deployment
-step. On `feat/v131-verify`, the contract tests still use the v1.3 API (`prune_expired` without `pruner`,
-`MAX_OPEN`) and do not compile until those branches are merged.
+The v1.3.1 unit, invariant and negative suites were not run in this deployment step. Their results on the merged
+tree are under "Off-chain assurance" below.
 
 ## Off-chain assurance
 
-On the merged v1.3 tree (branch `feat/contract-v1-3`). Its `lib.rs` is the `c3db0a6` file. `stellar contract build
---package options --meta source_repo=github:mohamedkhellaf/hackmeridian` on this tree gives sha256 `fdd6fc16…97e6`,
-26,966 bytes, byte-identical to the v1.3 wasm fetched back from chain (section above). `cargo test -p options`:
-171 passed, 0 failed, 1 ignored.
+On the merged v1.3.1 tree (branch `feat/contract-v1-3-1`: `feat/v131-impl`, `feat/v131-tests`,
+`feat/v131-invariants`, `feat/v131-negative` and `feat/v131-verify` merged in that order, no conflicts). Its `lib.rs`
+is the `3d386eb` file. `stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian`
+on this tree gives sha256 `acecb2f2…354b`, 29,957 bytes, byte-identical to the v1.3.1 wasm fetched back from chain
+with `stellar contract fetch` (section above). `cargo test -p options`: **199 passed, 0 failed, 2 ignored** (unit
+118 + 1 ignored, invariants 16 + 1 ignored, negative 65). The merged v1.3 tree had 171 passed, 1 ignored.
 
-- 105 unit tests in `contracts/options/src/test.rs`: the 81 v1.2 tests plus 24 for v1.3. The new tests cover:
-  - `list_asset`: canonical SAC derivation for alphanum-4 and alphanum-12 codes, lister auth, a bad code, a contract
-    issuer, a duplicate and the quote asset, an undeployed SAC, no authorization granted, and a PUT on a newly listed
-    asset that settles. Also the constructor-seeded registry, `list_assets` paging and `create_offer` on an unlisted
-    SAC.
-  - The per-writer cap (the 51st offer, and its check order) and the tenor cap.
-  - `prune_expired`: collateral goes back to the writer; live and bought offers are skipped, and so are offers whose
-    CALL writer is frozen or that the contract cannot pay; it needs no auth and extends TTLs.
-  - Registry TTL extension, the contract-address backstop, the v1.3 events and the appended error codes 116–119.
+- 119 unit tests in `contracts/options/src/test.rs`: 118 run and 1 is `#[ignore]`d (below). They are the 105 v1.3
+  tests, minus 2 that v1.3.1 retires, plus 16 new ones.
+  - Retired: `open_list_cap_returns_open_list_full` (the single `MAX_OPEN` list is gone; see `per_asset_open_cap`)
+    and `prune_expired_needs_no_auth` (see `prune_requires_pruner_auth`).
+  - New tests for §13.1, `prune_expired(pruner, ids)`: `prune_requires_pruner_auth` and `prune_event_carries_pruner`.
+  - §13.2, the `transfer` guards: `transfer_rejects_when_contract_deauthorized`, `transfer_rejects_during_shortfall`,
+    `transfer_rejects_during_quote_shortfall` and `frozen_holder_can_still_transfer`.
+  - §13.3, per-asset books: `per_asset_open_cap`, `list_open_for_pages` and
+    `list_open_concatenates_registry_order_and_truncates_at_200`.
+  - §13.4: `list_asset_already_listed_before_undeployed_probe`.
+  - §13.5, keeper coverage: `extend_ttl_extends_registry_writer_and_book_entries` and
+    `extend_ttl_registry_coverage_is_the_first_max_page_assets`.
+  - §13.8, persistent `Reserved`: `reserved_is_persistent_and_extended_on_touch`,
+    `reserved_and_open_book_ttls_extended_on_every_touching_path` and
+    `instance_storage_stays_four_keys_as_assets_and_tokens_grow`.
+  - The ignored `list_open_includes_books_past_the_first_max_page_assets`.
+- 17 tests in `contracts/options/tests/invariants.rs`: 16 run and 1 is `#[ignore]`d (below).
+  - 1 property test, `invariants_hold_for_random_operation_sequences`. Its reference model now includes
+    `prune_expired(pruner, ids)` with pruner auth and the backstop, and the `transfer` guards. A composite stress
+    operation de-authorizes the escrow, or claws RWA back from it, right before a holder transfer that would otherwise
+    succeed. The model also covers the per-asset books (invariant 5 reads every book page by page), `list_open()` as
+    their concatenation, and `AlreadyListed` before `AssetNotDeployed`.
+  - Invariants 1–10 are checked after every step of random sequences of 1–40 operations, 200 cases by default. Any
+    run of 100 or more cases fails unless each of 14 required (call, outcome) pairs happens, including `transfer`
+    `ContractNotAuthorized` and `CollateralShortfall`. On this tree the default run is clean (59.45 s), and so is a
+    1,000-case run (`PROPTEST_CASES=1000`, 272.44 s).
+  - `create_offer` → `OpenListFull` cannot happen in random runs: 500 offers on one asset need at least 10 writers,
+    and the fixture has 5 actors and at most 40 operations per case. The `list_open()` truncation at 200 ids is
+    also out of reach. The deterministic `open_book_cap_is_per_asset_at_five_hundred` covers both.
+  - 16 deterministic regression tests: the 11 from v1.3 plus `open_books_concatenate_in_registry_order`,
+    `open_book_cap_is_per_asset_at_five_hundred`, `transfer_refuses_new_holders_while_the_escrow_cannot_settle`,
+    `list_asset_checks_already_listed_before_deployment` and the ignored `list_open_spans_the_whole_registry`.
+- 65 negative security tests in `contracts/options/tests/negative.rs`, all run, none ignored. They are the 55 v1.3
+  tests, minus 2 retired, plus 12 new ones.
+  - Retired: `griefing8_open_list_cap_and_full_list_operations_fit_limits` (the single list is gone) and the
+    ignored `finding_f1r_sybil_writers_on_a_self_listed_asset_must_not_block_other_writers`. The per-asset books fix
+    F-1R: the passing `griefing8_f1r_sybil_dust_on_a_self_listed_asset_fills_only_its_own_book` shows that sybil dust
+    on a self-listed asset fills only that asset's book.
+  - New tests for the pruner: `prune24_forged_pruner_signatures_are_rejected`.
+  - The `transfer` guards: `transfer16_deauthorized_escrow_blocks_hand_over` and
+    `transfer16_deficit_blocks_hand_over_with_no_state_change`.
+  - Per-asset books: `griefing8_open_book_cap_is_per_asset_and_full_book_operations_fit_limits`,
+    `griefing8_f1r_sybil_dust_on_a_self_listed_asset_fills_only_its_own_book`,
+    `books24_per_asset_cap_cannot_be_bypassed_by_alternating_assets`,
+    `books24_list_open_truncation_never_hides_the_first_registry_assets` and
+    `books24_list_open_stays_within_limits_whatever_the_registry_size` (250 listings after the constructor assets).
+  - Listing order: `listing18_relisting_is_rejected_before_the_deployment_probe`.
+  - Footprint and storage griefing: `griefing8_extend_ttl_spanning_many_assets_and_writers_fits_footprint_limit`,
+    `griefing8_listing_and_collateral_spam_never_grows_the_instance_entry` and
+    `griefing8_reserved_entries_are_kept_alive_by_every_path_that_touches_them`.
+- `cargo clippy -p options --all-targets -- -D warnings`: 0 warnings. `cargo fmt --all -- --check`: clean.
+  `bash -n` on every `*.sh` in the repository: clean.
 
-  The two v1.2 tests that had one writer create more than 50 offers (`open_list_cap_returns_open_list_full`,
-  `get_options_pages_in_order`) now spread those offers over several writers.
-- 12 tests in `contracts/options/tests/invariants.rs`:
-  - 1 property test. Its reference model now includes `list_asset`, `prune_expired`, the per-writer cap, the tenor
-    cap, listing EQTY and authorizing the escrow on it, and the contract-address backstop. Invariants 1–10 are
-    checked after every step of random sequences of 1–40 operations, 200 cases by default. Any run of 100 or more
-    cases fails unless each of 10 required v1.3 (call, outcome) pairs happens. A 1,000-case run
-    (`PROPTEST_CASES=1000`) on this tree is also clean.
-  - 11 deterministic regression tests: the 6 from v1.2 plus `contract_address_is_rejected_as_any_party`,
-    `tenor_cap_is_inclusive_at_two_years_from_now`, `list_asset_derives_the_sac_and_authorizes_nothing`,
-    `prune_expired_skips_live_bought_frozen_and_underfunded_offers` and
-    `writer_open_limit_is_exactly_fifty_offers_per_writer`.
-- 55 negative security tests in `contracts/options/tests/negative.rs`: 54 run and 1 is `#[ignore]`d.
-  - The v1.2 sections stay, adapted for v1.3: `transfer` to the contract, the F-1 griefing test, and more than 50
-    offers from one writer.
-  - New sections 18–23 cover permissionless listing, `prune_expired`, the per-writer cap, the tenor cap, the
-    contract-address backstop, and the v1.3 events and views.
-  - The test that was `#[ignore]`d for F-1, `finding_f1_dust_offers_must_not_block_other_writers`, is now the
-    passing `griefing8_f1_writer_cap_blocks_the_squatter_at_50_and_others_still_list`: v1.3 stops one writer at
-    50 open offers, and other writers can still list.
-- `cargo clippy -p options --all-targets`: 0 warnings. `cargo fmt -p options --check`: clean.
+Ignored tests (2). Both are about the same question:
 
-Ignored test (1):
+- Unit test `list_open_includes_books_past_the_first_max_page_assets`. Reason: `ABI deviation: list_open() visits
+  only the first MAX_PAGE (50) registry assets; ABI §3/§13.3 specify the concatenation of every per-asset book,
+  truncated only at 200 ids`.
+- Invariant test `list_open_spans_the_whole_registry`. Reason: `ABI deviation: list_open() visits only the first
+  MAX_PAGE (50) registry assets; ABI §3/§13.3 cap ids (200), not assets (observed [1], expected [1, 0])`.
+- Both tests assert the first wording of §3 and §13.3, in which `list_open()` joins the books of every registry
+  asset. The implementation stops after the first `MAX_PAGE` (50) registry assets. This keeps the view within the
+  per-transaction limits however many assets are listed (`books24_list_open_stays_within_limits_whatever_the_registry_size`
+  checks it over 250 listings).
+- Commit `438195d` ("Specify list_open's bounded registry window in v1.3.1") now specifies exactly that window in
+  §3 and §13.3. The implementation therefore matches the ABI, and the two tests encode the superseded wording. Their
+  reason strings are out of date.
+- Run with `--ignored` on this tree, the unit test fails with `left: []`, `right: [0]`: the only open offer is on
+  registry index 51. The invariant test fails with `left: [1]`, `right: [1, 0]`: the offers are on registry indexes
+  0 and 51. Both failures show the bounded window the ABI now specifies.
+- No passing test pins that bound exactly: the negative suite's `list_open()` oracle accepts either wording. Turning
+  the two tests into passing checks of the window is a test change for Dev 2.
 
-- `finding_f1r_sybil_writers_on_a_self_listed_asset_must_not_block_other_writers`, reason `finding F-1R: 20 sybil
-  writers on a self-listed unflagged asset still fill MAX_OPEN for up to MAX_TENOR`.
-  - The test asserts the secure behaviour, so it fails against v1.3 on purpose. Run on this tree with `--ignored`,
-    it fails with `an honest maker is locked out by sybil dust on a self-listed asset` (`left: Err(Ok(OpenListFull))`).
-  - Why: `MAX_OPEN` (1000) is one list over all assets, and listing is permissionless. 20 writers × 50 dust CALLs,
-    each collateralized with 1 unit of an attacker's own unflagged, self-listed asset at the maximum tenor, fill the
-    list. Honest makers on every asset then get `OpenListFull` until the sybils cancel, or until their offers expire
-    and are pruned, which can take up to `MAX_TENOR` (2 years).
-  - Impact: availability only. `OpenListFull` is raised only by `create_offer`, so it blocks new offers and does
-    not touch collateral or existing options.
-  - Candidate fixes are an economic decision for Dev 1 / Dev 2: per-underlying open lists, a minimum collateral in
-    quote units, or not counting self-listed assets against the shared list. `docs/contract-abi.md` §12 says
-    `prune_expired` closes F-1 and does not mention this residual yet.
-
-Earlier assurance, not re-run on the v1.3 `lib.rs`:
+Earlier assurance, not re-run on the v1.3 or v1.3.1 `lib.rs`:
 
 - Mutation testing of `lib.rs` (cargo-mutants 27.1.0 plus hand-written mutants). No mutant list or log is
   committed, so these counts cannot be reproduced from the repository. The exception is the last run below, whose
@@ -604,8 +630,8 @@ On v1 only (53-test suite, PRs #16 and #18), not re-run since:
 
 ## What this does not show
 
-Issuer freeze, contract de-authorization and clawback ran on chain against v1.1 only (section above; clawback only
-on a throwaway instance), not against v1.2 or v1.3 (the spike on 2026-10-25 also exercised them, see
+Issuer freeze, contract de-authorization and clawback ran on chain against v1.1 and v1.3.1 (sections above; clawback
+only on throwaway instances), not against v1.2 or v1.3 (the spike on 2026-10-25 also exercised them, see
 `research/decision/20_rwa_options_spike.md`). v1.2 adds code without changing the existing settlement paths:
 `git diff 784f280 35017e2 -- contracts/options/src/lib.rs` (v1.1 on `main` to v1.2 as merged in PR #29) adds
 `transfer`, `get_options`, `MAX_PAGE` and the event, and changes only comment lines otherwise (three removed). The
