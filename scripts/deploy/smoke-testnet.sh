@@ -7,6 +7,8 @@
 #                                               # cap, per-asset open books via list_open_for; needs contract v1.3.1)
 #   scripts/deploy/smoke-testnet.sh --p0-only   # stop after P0
 #   scripts/deploy/smoke-testnet.sh --no-v13    # skip V1.3 and V1.3.1 (for a v1.2 or v1.3 contract)
+#   scripts/deploy/smoke-testnet.sh --no-v14    # skip V1.4 (resale: list_for_sale / buy_resale / cancel_sale;
+#                                               # needs contract v1.4)
 #   scripts/deploy/smoke-testnet.sh --full      # V1.3 also fills maker2 to the 50-offer per-WRITER cap, expects #116
 #                                               # on the 51st, reads the multi-page RWA book, then cancels the dust
 #                                               # (~100 extra txs, ~2 test XLM, 10-20 min)
@@ -33,17 +35,19 @@ require_tools stellar jq curl
 
 RUN_P0PLUS=1
 RUN_V13=1
+RUN_V14=1
 RUN_FULL=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --p0-only) RUN_P0PLUS=0 ;;
     --no-v13) RUN_V13=0 ;;
+    --no-v14) RUN_V14=0 ;;
     --full) RUN_FULL=1 ;;
     -h | --help)
-      sed -n '2,27p' "$0"
+      sed -n '2,29p' "$0"
       exit 0
       ;;
-    *) die "unknown argument: $1 (usage: $0 [--p0-only | --no-v13 | --full])" ;;
+    *) die "unknown argument: $1 (usage: $0 [--p0-only | --no-v13 | --no-v14 | --full])" ;;
   esac
   shift
 done
@@ -51,6 +55,7 @@ if [[ $RUN_FULL == 1 && ($RUN_P0PLUS == 0 || $RUN_V13 == 0) ]]; then
   die "--full runs inside the V1.3 section; do not combine it with --p0-only or --no-v13"
 fi
 [[ $RUN_P0PLUS == 1 ]] || RUN_V13=0
+[[ $RUN_P0PLUS == 1 ]] || RUN_V14=0
 [[ "${DRY_RUN:-0}" != 1 ]] || die "DRY_RUN is not supported: the smoke run always sends real testnet transactions"
 
 load_env
@@ -76,9 +81,9 @@ COMP_PREM=8000000     # maker2's competing premium, 0.8 USDx
 EXP_SECS=45           # tenor of the offer used for the expiry path
 
 # ---------- results ----------
-declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
-declare -A NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
-declare -A NSKIP=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
+declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [V1.4]=0 [PRE]=0)
+declare -A NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [V1.4]=0 [PRE]=0)
+declare -A NSKIP=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [V1.4]=0 [PRE]=0)
 GROUP=PRE
 SUMMARY=()
 pass() {
@@ -1196,6 +1201,97 @@ v13_writer_cap() {
   fi
 }
 
+# resale_path (v1.4, docs/contract-abi.md §14): on-chain secondary market. maker1 writes an RWA PUT, the investor buys
+# it, lists it for resale (list_for_sale), maker2 takes the ask with a price cap (buy_resale), the old holder is out,
+# a second buy of the same ask is NoAsk, maker2 lists and withdraws (cancel_sale), then exercises; maker1 claims.
+RESALE_ASK=20000000 # 2 USDx for the whole position
+resale_path() {
+  local q="$PUT_QTY" k="$PUT_STRIKE" p="$PUT_PREM" a="$RESALE_ASK" id exp got
+  snap_reset
+  snapshot "RESALE before" "$RWA_SAC" RWA
+  exp=$(($(date +%s) + 3600))
+  send RESALE_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" --option_type Put \
+    --qty "$q" --strike_total "$k" --premium_total "$p" --expiry "$exp" || return 1
+  id="$RESULT"
+  [[ "$id" =~ ^[0-9]+$ ]] || {
+    fail RESALE_CREATE_ID "create_offer returned '$id', not a u32 id"
+    return 1
+  }
+  echo "   resale option id $id (Put, RWA, qty $q, strike_total $k, premium_total $p, expiry $exp)"
+  expect_fail FAIL_RESALE_LIST_OFFERED 106 WrongState "$ID_MAKER1" list_for_sale --holder "$MAKER1" --id "$id" \
+    --ask_total "$a"
+  send RESALE_BUY_PRIMARY "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$id" || return 1
+  expect_option RESALE_PRIMARY_STATE "$id" Active "$INVESTOR" || return 1
+  snapshot "RESALE after create + buy #$id" "$RWA_SAC" RWA
+
+  expect_fail FAIL_RESALE_NO_ASK 120 NoAsk "$ID_MAKER2" buy_resale --buyer "$MAKER2" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_LIST_NOT_HOLDER 108 NotHolder "$ID_MAKER2" list_for_sale --holder "$MAKER2" --id "$id" \
+    --ask_total "$a"
+  expect_fail FAIL_RESALE_LIST_ZERO 102 InvalidArgs "$ID_INVESTOR" list_for_sale --holder "$INVESTOR" --id "$id" \
+    --ask_total 0
+
+  send RESALE_LIST "$ID_INVESTOR" list_for_sale --holder "$INVESTOR" --id "$id" --ask_total "$a" || return 1
+  if grep -qi 'ask_listed' <<<"$ERR"; then pass RESALE_LIST_EVENT "ask_listed event in tx $HASH"; else
+    fail RESALE_LIST_EVENT "no ask_listed event in the CLI output of tx $HASH"
+  fi
+  got="$(view "$O" get_ask --id "$id" | num)"
+  expect_eq RESALE_GET_ASK "$got" "$a" "get_ask($id)"
+  got="$(view "$O" list_asks --from "$id" --limit 1)"
+  echo "   list_asks($id, 1) = $got"
+  if jq -e --argjson id "$id" --arg h "$INVESTOR" --arg a "$a" \
+    'length == 1 and .[0].id == $id and .[0].holder == $h and (.[0].ask_total | tostring) == $a' <<<"$got" >/dev/null 2>&1; then
+    pass RESALE_LIST_ASKS "list_asks($id, 1) = [{id $id, holder investor, ask_total $a}]"
+  else
+    fail RESALE_LIST_ASKS "list_asks($id, 1) = $got"
+  fi
+  snapshot "RESALE after list_for_sale #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_LIST_BAL "" || return 1
+
+  expect_fail FAIL_RESALE_SELF 111 SelfTrade "$ID_INVESTOR" buy_resale --buyer "$INVESTOR" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_WRITER 111 SelfTrade "$ID_MAKER1" buy_resale --buyer "$MAKER1" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_NOT_ELIGIBLE 104 NotEligible "$ID_OUTSIDER" buy_resale --buyer "$OUTSIDER" --id "$id" \
+    --max_total "$a"
+  expect_fail FAIL_RESALE_PRICE_MOVED 121 PriceMoved "$ID_MAKER2" buy_resale --buyer "$MAKER2" --id "$id" \
+    --max_total "$((a - 1))"
+
+  send RESALE_BUY "$ID_MAKER2" buy_resale --buyer "$MAKER2" --id "$id" --max_total "$a" || return 1
+  if grep -qi 'resale_bought' <<<"$ERR"; then pass RESALE_BUY_EVENT "resale_bought event in tx $HASH"; else
+    fail RESALE_BUY_EVENT "no resale_bought event in the CLI output of tx $HASH"
+  fi
+  expect_option RESALE_BUY_STATE "$id" Active "$MAKER2" || return 1
+  snapshot "RESALE after maker2 buy_resale #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_BUY_BAL "m2Q=-$a invQ=$a" || return 1
+  got="$(view "$O" get_ask --id "$id")"
+  if [[ -z "$got" || "$got" == null ]]; then pass RESALE_ASK_GONE "get_ask($id) = none"; else
+    fail RESALE_ASK_GONE "get_ask($id) = $got after buy_resale"
+  fi
+  expect_fail FAIL_RESALE_AGAIN 120 NoAsk "$ID_INVESTOR" buy_resale --buyer "$INVESTOR" --id "$id" --max_total "$a"
+  expect_fail FAIL_RESALE_OLD_HOLDER 108 NotHolder "$ID_INVESTOR" exercise --holder "$INVESTOR" --id "$id"
+
+  send RESALE_RELIST "$ID_MAKER2" list_for_sale --holder "$MAKER2" --id "$id" --ask_total "$((a * 2))" || return 1
+  expect_fail FAIL_RESALE_CANCEL_NOT_HOLDER 108 NotHolder "$ID_INVESTOR" cancel_sale --holder "$INVESTOR" --id "$id"
+  send RESALE_CANCEL "$ID_MAKER2" cancel_sale --holder "$MAKER2" --id "$id" || return 1
+  if grep -qi 'ask_cancelled' <<<"$ERR"; then pass RESALE_CANCEL_EVENT "ask_cancelled event in tx $HASH"; else
+    fail RESALE_CANCEL_EVENT "no ask_cancelled event in the CLI output of tx $HASH"
+  fi
+  got="$(view "$O" get_ask --id "$id")"
+  if [[ -z "$got" || "$got" == null ]]; then pass RESALE_CANCEL_GONE "get_ask($id) = none"; else
+    fail RESALE_CANCEL_GONE "get_ask($id) = $got after cancel_sale"
+  fi
+  expect_fail FAIL_RESALE_CANCEL_AGAIN 120 NoAsk "$ID_MAKER2" cancel_sale --holder "$MAKER2" --id "$id"
+  expect_fail FAIL_RESALE_AFTER_CANCEL 120 NoAsk "$ID_INVESTOR" buy_resale --buyer "$INVESTOR" --id "$id" \
+    --max_total "$((a * 2))"
+
+  snapshot "RESALE before maker2 exercise #$id" "$RWA_SAC" RWA
+  send RESALE_EXERCISE "$ID_MAKER2" exercise --holder "$MAKER2" --id "$id" || return 1
+  expect_option RESALE_EXERCISE_STATE "$id" Exercised "$MAKER2" || return 1
+  snapshot "RESALE after maker2 exercise #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_EXERCISE_BAL "m2U=-$q m2Q=$k ctrU=$q ctrQ=-$k ocQ=-$k ocU=$q" || return 1
+  send RESALE_CLAIM "$ID_MAKER1" claim_delivery --writer "$MAKER1" --id "$id" || return 1
+  snapshot "RESALE after claim_delivery #$id" "$RWA_SAC" RWA
+  check_deltas RESALE_CLAIM_BAL "ctrU=-$q m1U=$q ocU=-$q"
+}
+
 # ---------- run ----------
 section "Strata options smoke run on Stellar TESTNET ($(date -u +%FT%TZ))"
 echo "options contract  $O"
@@ -1288,6 +1384,12 @@ if [[ $RUN_V13 == 1 ]]; then
   fi
 fi
 
+if [[ $RUN_V14 == 1 ]]; then
+  GROUP=V1.4
+  section "V1.4-1 resale market on an RWA PUT (list_for_sale -> buy_resale with cap -> cancel_sale -> exercise)"
+  resale_path || echo "   resale path stopped"
+fi
+
 # Every required check must have run (a stopped path leaves its later checks unreached).
 require_ran() {
   local g="$1" l
@@ -1318,6 +1420,12 @@ require_ran P0 P0_PUT_CREATE P0_PUT_BUY P0_PUT_EXERCISE P0_PUT_CLAIM P0_PUT_CLAI
   V131_LIST_OPEN_PREFIX V131_OPEN_FOR_HAS_OFFER V131_OPEN_FOR_OTHER_ASSET V131_OPEN_FOR_PAST_END V131_OPEN_FOR_CAP \
   V131_OPEN_FOR_UNLISTED V131_BOOKS_OPEN V131_LIST_OPEN_CONCAT_OPEN V131_PRUNE_EVENT_PRUNER V131_BOOKS_PRUNED \
   V131_LIST_OPEN_CONCAT_PRUNED
+[[ $RUN_V14 != 1 ]] || require_ran V1.4 RESALE_CREATE FAIL_RESALE_LIST_OFFERED RESALE_BUY_PRIMARY FAIL_RESALE_NO_ASK \
+  FAIL_RESALE_LIST_NOT_HOLDER FAIL_RESALE_LIST_ZERO RESALE_LIST RESALE_LIST_EVENT RESALE_GET_ASK RESALE_LIST_ASKS \
+  RESALE_LIST_BAL FAIL_RESALE_SELF FAIL_RESALE_WRITER FAIL_RESALE_NOT_ELIGIBLE FAIL_RESALE_PRICE_MOVED RESALE_BUY \
+  RESALE_BUY_EVENT RESALE_BUY_STATE RESALE_BUY_BAL RESALE_ASK_GONE FAIL_RESALE_AGAIN FAIL_RESALE_OLD_HOLDER RESALE_RELIST \
+  FAIL_RESALE_CANCEL_NOT_HOLDER RESALE_CANCEL RESALE_CANCEL_EVENT RESALE_CANCEL_GONE FAIL_RESALE_CANCEL_AGAIN \
+  FAIL_RESALE_AFTER_CANCEL RESALE_EXERCISE RESALE_EXERCISE_BAL RESALE_CLAIM RESALE_CLAIM_BAL
 [[ $RUN_FULL != 1 ]] || require_ran V1.3.1 V131_CAP_BOOK V131_BOOKS_CAP V131_LIST_OPEN_CONCAT_CAP
 
 section "SUMMARY"
@@ -1339,6 +1447,7 @@ else
   echo "V1.3: not run (--p0-only or --no-v13)"
   echo "V1.3.1: not run (--p0-only or --no-v13)"
 fi
+if [[ $RUN_V14 == 1 ]]; then echo "V1.4: $(verdict V1.4) (${NPASS[V1.4]} passed, ${NFAIL[V1.4]} failed)"; else echo "V1.4: not run (--p0-only or --no-v14)"; fi
 echo "log: $SMOKE_LOG"
-total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2] + NFAIL[V1.3] + NFAIL[V1.3.1]))
+total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2] + NFAIL[V1.3] + NFAIL[V1.3.1] + NFAIL[V1.4]))
 exit $((total_fail > 0 ? 1 : 0))

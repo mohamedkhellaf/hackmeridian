@@ -1,4 +1,7 @@
-//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`, v1.3.1:
+//! Property-based invariant tests for the `options` contract (ABI: `docs/contract-abi.md`; v1.4
+//! adds the resale market of ABI §14: `list_for_sale`, `cancel_sale`, `buy_resale` with its
+//! `max_total` cap, `get_ask`, `list_asks`, errors `NoAsk` and `PriceMoved`, modelled with
+//! check order, events, auth and INV11 below. v1.3.1:
 //! error codes 101–119, `CollateralShortfall`, contract re-authorization check in `buy` (ABI §10),
 //! holder `transfer` and paged `get_options` (ABI §11), permissionless `list_asset` registry,
 //! per-writer open cap, tenor cap, `prune_expired` and the contract-address backstop (ABI §12),
@@ -62,6 +65,14 @@
 //!      writer: the balance deltas of those calls are exactly +collateral at the writer and
 //!      -collateral at the contract for every option they moved, computed from the option terms
 //!      read on chain (independent of the model);
+//!  11. (v1.4 resale) `list_asks` read in windows of 3 ids, `list_asks(0, u32::MAX)` and
+//!      `get_ask(id)` for every id agree with the model's asks; an ask exists only on an `Active`
+//!      option, names its current holder and is positive, so none survives `exercise`,
+//!      `transfer`, `reclaim` or `buy_resale`; `list_for_sale` / `cancel_sale` / `buy_resale`
+//!      leave `open_collateral` unchanged and change only their own id's ask; after `buy_resale`
+//!      the holder is the buyer and the ask is gone, the buyer paid exactly the ask to the seller
+//!      (INV6), and the seller's `exercise` then fails with `NotHolder` (composite `Op::Resale`);
+//!      other successful calls never add or reprice an ask;
 //!
 //!   plus atomicity: a failed call changes nothing observable (options, balances, reserves, open
 //!   list and per-asset books, per-writer counts, registry).
@@ -133,9 +144,9 @@
 #![allow(clippy::needless_range_loop)]
 
 use options::{
-    AssetListed, DeliveryClaimed, Error, OfferCancelled, OfferCreated, OfferPruned, OptionBought,
-    OptionData, OptionExercised, OptionReclaimed, OptionTransferred, OptionType, OptionsContract,
-    OptionsContractClient, State,
+    AskCancelled, AskListed, AssetListed, DeliveryClaimed, Error, OfferCancelled, OfferCreated,
+    OfferPruned, OptionBought, OptionData, OptionExercised, OptionReclaimed, OptionTransferred,
+    OptionType, OptionsContract, OptionsContractClient, ResaleBought, State,
 };
 use proptest::prelude::*;
 use soroban_sdk::{
@@ -290,6 +301,23 @@ enum Act {
         target: usize,
         authorized: bool,
     },
+    /// v1.4 `list_for_sale(who, id, ask)`.
+    ListSale {
+        id: u32,
+        who: usize,
+        ask: i128,
+    },
+    /// v1.4 `cancel_sale(who, id)`.
+    CancelSale {
+        id: u32,
+        who: usize,
+    },
+    /// v1.4 `buy_resale(who, id, max)`.
+    BuyResale {
+        id: u32,
+        who: usize,
+        max: i128,
+    },
 }
 
 /// The `issuer` argument of a `list_asset` request.
@@ -416,6 +444,19 @@ impl fmt::Display for Act {
                 let verb = if authorized { "unfreeze" } else { "freeze" };
                 write!(f, "issuer_{verb}(EQTY, {})", NAMES[target])
             }
+            Act::ListSale { id, who, ask } => {
+                write!(
+                    f,
+                    "list_for_sale({}, id={}, ask_total={})",
+                    NAMES[who], id, ask
+                )
+            }
+            Act::CancelSale { id, who } => write!(f, "cancel_sale({}, id={})", NAMES[who], id),
+            Act::BuyResale { id, who, max } => write!(
+                f,
+                "buy_resale({}, id={}, max_total={})",
+                NAMES[who], id, max
+            ),
         }
     }
 }
@@ -430,6 +471,8 @@ enum Who {
     Writer,
     Holder,
     Buyer,
+    /// v1.4 `buy_resale`: an actor that may take the option over (`recipient_for(.., Eligible)`).
+    Taker,
 }
 
 /// Recipient selector for `transfer`: a fixed actor, or (resolved against the model) an actor that
@@ -449,6 +492,15 @@ enum To {
 enum Stress {
     DeauthContract,
     ClawbackRwa,
+}
+
+/// v1.4 `buy_resale` price cap, resolved against the model's ask: no cap (`i128::MAX`), exactly
+/// the ask (Ok), or one unit below it (`PriceMoved`).
+#[derive(Clone, Copy, Debug)]
+enum Cap {
+    Max,
+    Exact,
+    Below,
 }
 
 /// `u8` id selector value that resolves to the first unknown id (`option_count`).
@@ -493,6 +545,15 @@ enum Op {
     Prune(usize, [u8; MAX_PRUNE], u8, Option<u8>),
     /// EQTY issuer `set_authorized(contract, bool)`.
     EqtyContractAuth(bool),
+    /// v1.4 `list_for_sale`: id selector (prefers `Active`), caller, ask_total.
+    ListSale(u8, Who, i128),
+    /// v1.4 `cancel_sale`: ask selector (prefers ids with an ask), caller.
+    CancelSale(u8, Who),
+    /// v1.4 `buy_resale`: ask selector (prefers ids with an ask), buyer.
+    BuyResale(u8, Who, Cap),
+    /// v1.4 composite (`World::step`): the holder of an `Active` option lists it at the ask, an
+    /// eligible taker buys it, then the previous holder's `exercise` must fail with `NotHolder`.
+    Resale(u8, i128),
     /// v1.3 backstop: the contract's own address as writer / buyer / holder / transfer recipient
     /// / `list_asset` lister / (v1.3.1) `prune_expired` pruner (kind, id or `LIST_CANDIDATES`
     /// selector).
@@ -610,6 +671,8 @@ struct Model {
     /// v1.3 asset registry in listing order: the constructor underlyings, then every successful
     /// `list_asset`.
     listed: Vec<usize>,
+    /// v1.4 resale asks: option id -> ask_total.
+    asks: BTreeMap<u32, i128>,
 }
 
 impl Model {
@@ -910,6 +973,71 @@ impl Model {
             Act::Prune { pruner, ids, len } => self
                 .plan_prune(pruner, &ids[..len as usize])
                 .map(|(_, t)| t),
+            // v1.4 ABI §14 `list_for_sale`: InvalidArgs (contract) -> NotFound -> WrongState ->
+            // NotHolder -> Expired -> InvalidArgs (ask_total <= 0). No token moves.
+            Act::ListSale { id, who, ask } => {
+                if who == CONTRACT {
+                    return Err(Error::InvalidArgs);
+                }
+                let o = self.opt(id).ok_or(Error::NotFound)?;
+                if o.state != State::Active {
+                    return Err(Error::WrongState);
+                }
+                if o.holder != Some(who) {
+                    return Err(Error::NotHolder);
+                }
+                if now >= o.expiry {
+                    return Err(Error::Expired);
+                }
+                if ask <= 0 {
+                    return Err(Error::InvalidArgs);
+                }
+                Ok(vec![])
+            }
+            // `cancel_sale`: NotFound -> NotHolder -> NoAsk. No token moves.
+            Act::CancelSale { id, who } => {
+                let o = self.opt(id).ok_or(Error::NotFound)?;
+                if o.holder != Some(who) {
+                    return Err(Error::NotHolder);
+                }
+                if !self.asks.contains_key(&id) {
+                    return Err(Error::NoAsk);
+                }
+                Ok(vec![])
+            }
+            // `buy_resale`: InvalidArgs (contract) -> NoAsk -> NotFound -> WrongState -> Expired ->
+            // SelfTrade (holder or writer) -> NotEligible -> ContractNotAuthorized ->
+            // CollateralShortfall; then the buyer pays the ask to the holder.
+            Act::BuyResale { id, who, max } => {
+                if who == CONTRACT {
+                    return Err(Error::InvalidArgs);
+                }
+                let ask = *self.asks.get(&id).ok_or(Error::NoAsk)?;
+                let o = self.opt(id).ok_or(Error::NotFound)?;
+                if o.state != State::Active {
+                    return Err(Error::WrongState);
+                }
+                if now >= o.expiry {
+                    return Err(Error::Expired);
+                }
+                let seller = o.holder.ok_or(Error::WrongState)?;
+                if who == seller || who == o.writer {
+                    return Err(Error::SelfTrade);
+                }
+                if !self.auth[o.underlying][who] {
+                    return Err(Error::NotEligible);
+                }
+                if !self.auth[o.underlying][CONTRACT] {
+                    return Err(Error::ContractNotAuthorized);
+                }
+                if self.shortfall(o.underlying) {
+                    return Err(Error::CollateralShortfall);
+                }
+                if ask > max {
+                    return Err(Error::PriceMoved);
+                }
+                Ok(vec![(USDX, who, seller, ask)])
+            }
             Act::SetTime { .. }
             | Act::SetAuthRwa { .. }
             | Act::SetAuthUsdx { .. }
@@ -1002,11 +1130,20 @@ impl Model {
                 o.holder = Some(who);
                 o.state = State::Active;
             }
-            Act::Exercise { id, .. } => self.opts[id as usize].state = State::Exercised,
-            // Only the holder changes; the state stays Active.
-            Act::Transfer { id, to, .. } => self.opts[id as usize].holder = Some(to),
+            Act::Exercise { id, .. } => {
+                self.opts[id as usize].state = State::Exercised;
+                self.asks.remove(&id); // v1.4: the ask leaves with Active
+            }
+            // Only the holder changes; the state stays Active. v1.4: the old holder's ask goes.
+            Act::Transfer { id, to, .. } => {
+                self.opts[id as usize].holder = Some(to);
+                self.asks.remove(&id);
+            }
             Act::Cancel { id, .. } => self.opts[id as usize].state = State::Cancelled,
-            Act::Reclaim { id, .. } => self.opts[id as usize].state = State::Expired,
+            Act::Reclaim { id, .. } => {
+                self.opts[id as usize].state = State::Expired;
+                self.asks.remove(&id);
+            }
             Act::Claim { id, .. } => self.opts[id as usize].state = State::Settled,
             Act::SetTime { t } => self.now = t,
             Act::SetAuthRwa { target, authorized } => self.auth[RWA][target] = authorized,
@@ -1028,7 +1165,25 @@ impl Model {
                 }
             }
             Act::SetAuthEqty { target, authorized } => self.auth[EQTY][target] = authorized,
+            Act::ListSale { id, ask, .. } => {
+                self.asks.insert(id, ask);
+            }
+            Act::CancelSale { id, .. } => {
+                self.asks.remove(&id);
+            }
+            Act::BuyResale { id, who, .. } => {
+                self.opts[id as usize].holder = Some(who);
+                self.asks.remove(&id);
+            }
         }
+    }
+
+    /// v1.4: the asks as `list_asks` reports them: (id, holder, ask_total) in id order.
+    fn ask_rows(&self) -> Vec<(u32, usize, i128)> {
+        self.asks
+            .iter()
+            .map(|(&id, &ask)| (id, self.opts[id as usize].holder.unwrap_or(N_HOLDERS), ask))
+            .collect()
     }
 }
 
@@ -1055,6 +1210,8 @@ struct Snap {
     assets: Vec<usize>,
     /// v1.3 `asset_count()`.
     asset_count: u32,
+    /// v1.4 every open ask `(id, holder, ask_total)` from `list_asks` (holder as an index).
+    asks: Vec<(u32, usize, i128)>,
 }
 
 /// Value returned by a successful call that the oracle checks.
@@ -1139,7 +1296,7 @@ fn outcome_matches(expect: Expect, outcome: Outcome, direct_sac: bool) -> bool {
 // ---------------------------------------------------------------------------------------------
 
 /// Every options `Error`, to name an observed code.
-const ALL_ERRORS: [Error; 19] = [
+const ALL_ERRORS: [Error; 21] = [
     Error::NotFound,
     Error::InvalidArgs,
     Error::AssetNotAllowed,
@@ -1159,6 +1316,8 @@ const ALL_ERRORS: [Error; 19] = [
     Error::AlreadyListed,
     Error::AssetNotDeployed,
     Error::TenorOutOfRange,
+    Error::NoAsk,
+    Error::PriceMoved,
 ];
 
 /// Pseudo-call under which `prune_expired` tallies the number of ids it pruned.
@@ -1197,6 +1356,9 @@ fn call_name(act: &Act) -> Option<&'static str> {
         Act::Claim { .. } => "claim_delivery",
         Act::List { .. } => "list_asset",
         Act::Prune { .. } => "prune_expired",
+        Act::ListSale { .. } => "list_for_sale",
+        Act::CancelSale { .. } => "cancel_sale",
+        Act::BuyResale { .. } => "buy_resale",
         Act::SetTime { .. }
         | Act::SetAuthRwa { .. }
         | Act::SetAuthUsdx { .. }
@@ -1410,6 +1572,7 @@ impl World {
             opts: Vec::new(),
             creates_ok: 0,
             listed: vec![RWA, BOND],
+            asks: BTreeMap::new(),
         };
         let mut w = World {
             env,
@@ -1431,6 +1594,7 @@ impl World {
                 listed: [false; N_TOKENS],
                 assets: Vec::new(),
                 asset_count: 0,
+                asks: Vec::new(),
             },
             history: Vec::new(),
         };
@@ -1466,11 +1630,20 @@ impl World {
             }
             sel as u32 % n
         };
+        // v1.4: selector < 128 picks an id with an open ask if any; otherwise like `pick`.
+        let pick_ask = |sel: u8| -> u32 {
+            if sel != UNKNOWN_ID && sel < 128 && !m.asks.is_empty() {
+                let ids: Vec<u32> = m.asks.keys().copied().collect();
+                return ids[sel as usize % ids.len()];
+            }
+            pick(sel, &[State::Active])
+        };
         let who_of = |id: u32, who: Who| match who {
             Who::Actor(a) => a,
             Who::Writer => m.opt(id).map(|o| o.writer).unwrap_or(WRITER1),
             Who::Holder => m.opt(id).and_then(|o| o.holder).unwrap_or(HOLDER1),
             Who::Buyer => buyer_for(m, id),
+            Who::Taker => recipient_for(m, id, To::Eligible),
         };
         match *op {
             Op::Create {
@@ -1589,6 +1762,35 @@ impl World {
                 target: CONTRACT,
                 authorized,
             },
+            Op::ListSale(s, w, ask) => {
+                let id = pick(s, &[State::Active]);
+                Act::ListSale {
+                    id,
+                    who: who_of(id, w),
+                    ask,
+                }
+            }
+            Op::CancelSale(s, w) => {
+                let id = pick_ask(s);
+                Act::CancelSale {
+                    id,
+                    who: who_of(id, w),
+                }
+            }
+            Op::Resale(s, ask) => self.resolve(&Op::ListSale(s, Who::Holder, ask)),
+            Op::BuyResale(s, w, cap) => {
+                let id = pick_ask(s);
+                let ask = m.asks.get(&id).copied().unwrap_or(1);
+                Act::BuyResale {
+                    id,
+                    who: who_of(id, w),
+                    max: match cap {
+                        Cap::Max => i128::MAX,
+                        Cap::Exact => ask,
+                        Cap::Below => ask - 1,
+                    },
+                }
+            }
             Op::Backstop(kind, s) => match kind % 7 {
                 0 => Act::Create {
                     writer: CONTRACT,
@@ -1664,6 +1866,43 @@ impl World {
         }
         if let Op::StressTransfer(sel, to, stress) = *op {
             return self.stress_transfer(sel, to, stress);
+        }
+        if let Op::Resale(sel, ask) = *op {
+            let list = self.resolve(&Op::ListSale(sel, Who::Holder, ask));
+            let listed = self.run(list);
+            let Act::ListSale {
+                id, who: seller, ..
+            } = list
+            else {
+                unreachable!()
+            };
+            if listed != Outcome::Ok {
+                return listed;
+            }
+            let buyer = recipient_for(&self.model, id, To::Eligible);
+            // a cap one unit below the ask first (`PriceMoved` once every earlier check passes,
+            // nothing moves), then exactly the ask
+            self.run(Act::BuyResale {
+                id,
+                who: buyer,
+                max: ask - 1,
+            });
+            let bought = self.run(Act::BuyResale {
+                id,
+                who: buyer,
+                max: ask,
+            });
+            if bought == Outcome::Ok {
+                let probe = Act::Exercise { id, who: seller };
+                let probed = self.run(probe);
+                if probed != Outcome::Typed(Error::NotHolder as u32) {
+                    self.fail(format!(
+                        "RESALE: after the resale of {id} the seller's `{probe}` returned \
+                         {probed}, expected NotHolder"
+                    ));
+                }
+            }
+            return bought;
         }
         let act = self.resolve(op);
         self.run(act)
@@ -1980,6 +2219,9 @@ impl World {
             Act::Cancel { id, who } => classify(c.try_cancel_offer(&h[who], &id)),
             Act::Reclaim { id, who } => classify(c.try_reclaim(&h[who], &id)),
             Act::Claim { id, who } => classify(c.try_claim_delivery(&h[who], &id)),
+            Act::ListSale { id, who, ask } => classify(c.try_list_for_sale(&h[who], &id, &ask)),
+            Act::CancelSale { id, who } => classify(c.try_cancel_sale(&h[who], &id)),
+            Act::BuyResale { id, who, max } => classify(c.try_buy_resale(&h[who], &id, &max)),
             Act::SetTime { t } => {
                 self.env.ledger().set_timestamp(t);
                 (Outcome::Ok, String::new())
@@ -2082,6 +2324,30 @@ impl World {
                     .to_xdr(env, me)
                 })
                 .collect(),
+            Act::ListSale { id, who, ask } => vec![AskListed {
+                id,
+                holder: h[who].clone(),
+                ask_total: ask,
+            }
+            .to_xdr(env, me)],
+            Act::CancelSale { id, .. } => vec![AskCancelled { id }.to_xdr(env, me)],
+            Act::BuyResale { id, who, .. } => {
+                let seller = opt(id).holder.ok_or_else(|| {
+                    format!("EVENTS: `{act}` succeeded on an option without holder")
+                })?;
+                let ask = *self
+                    .model
+                    .asks
+                    .get(&id)
+                    .ok_or_else(|| format!("EVENTS: `{act}` succeeded, model has no ask"))?;
+                vec![ResaleBought {
+                    id,
+                    seller: h[seller].clone(),
+                    buyer: h[who].clone(),
+                    ask_total: ask,
+                }
+                .to_xdr(env, me)]
+            }
             Act::SetTime { .. }
             | Act::SetAuthRwa { .. }
             | Act::SetAuthUsdx { .. }
@@ -2128,6 +2394,13 @@ impl World {
         let want_auths: Vec<Address> = match *act {
             Act::List { lister, .. } => vec![self.holders[lister].clone()],
             Act::Prune { pruner, .. } => vec![self.holders[pruner].clone()],
+            // v1.4: exactly the holder (list/cancel) or the buyer (buy_resale, whose tree also
+            // carries its quote payment).
+            Act::ListSale { who, .. }
+            | Act::CancelSale { who, .. }
+            | Act::BuyResale { who, .. } => {
+                vec![self.holders[who].clone()]
+            }
             _ => return Ok(()),
         };
         if auths != want_auths.as_slice() {
@@ -2241,6 +2514,7 @@ impl World {
                 "INV9 (config): config() changed from its constructor-time value: {cfg:?}"
             ));
         }
+        let asks = self.read_asks(count)?;
         Ok(Snap {
             now: self.env.ledger().timestamp(),
             bal,
@@ -2253,7 +2527,56 @@ impl World {
             listed,
             assets,
             asset_count,
+            asks,
         })
+    }
+
+    /// INV11 (v1.4 asks, reading): `list_asks` scanned in windows of 3 ids agrees with
+    /// `list_asks(0, u32::MAX)` (one window of `MAX_PAGE` ids) and with `get_ask(id)` for every id
+    /// below `option_count()` (and `None` at `option_count()`); rows are in id order.
+    fn read_asks(&self, count: u32) -> Result<Vec<(u32, usize, i128)>, String> {
+        const WINDOW: u32 = 3;
+        let c = &self.client;
+        let mut rows: Vec<(u32, usize, i128)> = Vec::new();
+        let mut from = 0u32;
+        while from < count {
+            for a in c.list_asks(&from, &WINDOW).iter() {
+                if a.id < from || a.id >= from + WINDOW {
+                    return Err(format!(
+                        "INV11 (list_asks): list_asks({from}, {WINDOW}) returned id {}",
+                        a.id
+                    ));
+                }
+                let holder = self
+                    .holders
+                    .iter()
+                    .position(|h| *h == a.holder)
+                    .ok_or_else(|| format!("INV11 (list_asks): unknown holder {:?}", a.holder))?;
+                rows.push((a.id, holder, a.ask_total));
+            }
+            from += WINDOW;
+        }
+        let whole: Vec<u32> = c.list_asks(&0, &u32::MAX).iter().map(|a| a.id).collect();
+        let head: Vec<u32> = rows
+            .iter()
+            .map(|r| r.0)
+            .filter(|&id| id < MAX_PAGE)
+            .collect();
+        if whole != head {
+            return Err(format!(
+                "INV11 (list_asks): list_asks(0, u32::MAX) = {whole:?}, the windows say {head:?}"
+            ));
+        }
+        for id in 0..=count {
+            let want = rows.iter().find(|r| r.0 == id).map(|r| r.2);
+            let got = c.get_ask(&id);
+            if got != want {
+                return Err(format!(
+                    "INV11 (get_ask): get_ask({id}) = {got:?}, list_asks says {want:?}"
+                ));
+            }
+        }
+        Ok(rows)
     }
 
     /// INV9 (paging): `list_assets` pages of `PAGE` read from 0 with `from += returned.len()` are
@@ -2328,6 +2651,27 @@ impl World {
                             .unwrap_or("<none>".into())
                     ));
                 }
+            }
+        }
+        // INV11 (v1.4 asks): chain == model, and an ask exists only on an `Active` option, names
+        // its current holder and is positive (so no ask survives a terminal transition).
+        if s.asks != m.ask_rows() {
+            return Err(format!(
+                "MODEL: asks differ\n  chain: {:?}\n  model: {:?}",
+                s.asks,
+                m.ask_rows()
+            ));
+        }
+        for &(id, holder, ask) in &s.asks {
+            let o = s
+                .opts
+                .get(id as usize)
+                .ok_or_else(|| format!("INV11 (asks): ask on unknown option {id}"))?;
+            if o.state != State::Active || o.holder != Some(holder) || ask <= 0 {
+                return Err(format!(
+                    "INV11 (asks): ask ({holder}, {ask}) on {o} (must be Active, held by the \
+                     asker, positive)"
+                ));
             }
         }
         for t in 0..N_TOKENS {
@@ -2657,8 +3001,11 @@ fn check_transition(
         let transferred = |x: usize, y: Option<usize>| {
             ok && b.state == State::Active
                 && a.state == State::Active
-                && matches!(*act, Act::Transfer { id, from, to }
+                && (matches!(*act, Act::Transfer { id, from, to }
                     if id == a.id && from == x && y == Some(to) && to != x)
+                    // v1.4: or a successful resale of this option to another actor
+                    || matches!(*act, Act::BuyResale { id, who, .. }
+                    if id == a.id && y == Some(who) && who != x))
         };
         match (b.holder, a.holder) {
             (Some(x), y) if y != Some(x) && !transferred(x, y) => {
@@ -2699,7 +3046,8 @@ fn check_transition(
         | (true, Act::Transfer { id, .. })
         | (true, Act::Cancel { id, .. })
         | (true, Act::Reclaim { id, .. })
-        | (true, Act::Claim { id, .. }) => vec![id],
+        | (true, Act::Claim { id, .. })
+        | (true, Act::BuyResale { id, .. }) => vec![id],
         // The ids the model prunes, in call order (distinct: a pruned id is skipped afterwards).
         (true, Act::Prune { .. }) => pruned.to_vec(),
         _ => vec![],
@@ -2780,13 +3128,23 @@ fn check_transition(
             (Act::Claim { .. }, Some(b), Some(a)) => {
                 b.state == State::Exercised && a.state == State::Settled
             }
+            // v1.4: only the holder changes, to the buyer; state stays Active.
+            (Act::BuyResale { who, .. }, Some(b), Some(a)) => {
+                b.state == State::Active
+                    && a.state == State::Active
+                    && a.holder == Some(who)
+                    && b.holder != Some(who)
+                    && b.writer != who
+            }
             (
                 Act::SetTime { .. }
                 | Act::SetAuthRwa { .. }
                 | Act::SetAuthUsdx { .. }
                 | Act::SetAuthEqty { .. }
                 | Act::ClawbackRwa { .. }
-                | Act::List { .. },
+                | Act::List { .. }
+                | Act::ListSale { .. }
+                | Act::CancelSale { .. },
                 None,
                 None,
             ) => true,
@@ -2882,6 +3240,52 @@ fn check_transition(
         }
     }
 
+    // INV11 (v1.4 transition): list_for_sale / cancel_sale / buy_resale never touch collateral
+    // or reserves; each changes the asks by exactly its own id; buy_resale leaves holder == buyer
+    // and no ask; every other successful call only removes asks (of ids that left Active or
+    // changed hands), never adds or reprices one.
+    if ok
+        && matches!(
+            *act,
+            Act::ListSale { .. } | Act::CancelSale { .. } | Act::BuyResale { .. }
+        )
+        && after.open_collateral != before.open_collateral
+    {
+        return Err(format!(
+            "INV11 (asks): `{act}` changed open_collateral {:?} -> {:?}",
+            before.open_collateral, after.open_collateral
+        ));
+    }
+    let ask_of = |s: &Snap, id: u32| s.asks.iter().find(|r| r.0 == id).copied();
+    let others_same = |id: u32| {
+        before
+            .asks
+            .iter()
+            .filter(|r| r.0 != id)
+            .eq(after.asks.iter().filter(|r| r.0 != id))
+    };
+    let asks_ok = match (ok, *act) {
+        (true, Act::ListSale { id, who, ask }) => {
+            others_same(id) && ask_of(after, id) == Some((id, who, ask))
+        }
+        (true, Act::CancelSale { id, .. }) => {
+            others_same(id) && ask_of(before, id).is_some() && ask_of(after, id).is_none()
+        }
+        (true, Act::BuyResale { id, who, .. }) => {
+            others_same(id)
+                && ask_of(before, id).is_some()
+                && ask_of(after, id).is_none()
+                && after.opts[id as usize].holder == Some(who)
+        }
+        _ => after.asks.iter().all(|r| before.asks.contains(r)),
+    };
+    if !asks_ok {
+        return Err(format!(
+            "INV11 (asks): `{act}` ({outcome}) moved the asks from {:?} to {:?}",
+            before.asks, after.asks
+        ));
+    }
+
     // INV9 (transition): the registry grows by exactly one asset through a successful
     // list_asset and is otherwise untouched.
     let registry = |s: &Snap| (s.assets.clone(), s.listed, s.asset_count);
@@ -2918,6 +3322,17 @@ fn amount() -> impl Strategy<Value = i128> {
     prop_oneof![
         15 => 1i128..=1_000,
         15 => 1i128..=1_000_000_000,
+        1 => Just(0i128),
+        1 => -1_000i128..=-1,
+    ]
+}
+
+/// v1.4 ask_total: mostly payable, sometimes more than any balance (SAC #10 at `buy_resale`),
+/// sometimes 0 or negative (`InvalidArgs`).
+fn ask_amount() -> impl Strategy<Value = i128> {
+    prop_oneof![
+        10 => 1i128..=1_000_000_000,
+        1 => Just(i128::MAX),
         1 => Just(0i128),
         1 => -1_000i128..=-1,
     ]
@@ -3018,6 +3433,16 @@ fn op() -> impl Strategy<Value = Op> {
         2 => prune_op(),
         1 => prop_oneof![3 => Just(true), 1 => Just(false)].prop_map(Op::EqtyContractAuth),
         1 => (0u8..7, any::<u8>()).prop_map(|(k, s)| Op::Backstop(k, s)),
+        3 => (id_sel(), who(Who::Holder), ask_amount())
+            .prop_map(|(i, w, a)| Op::ListSale(i, w, a)),
+        2 => (id_sel(), who(Who::Holder)).prop_map(|(i, w)| Op::CancelSale(i, w)),
+        2 => (0u8..128, ask_amount()).prop_map(|(i, a)| Op::Resale(i, a)),
+        3 => (
+            id_sel(),
+            prop_oneof![4 => Just(Who::Taker), 1 => Just(Who::Holder), 1 => any_actor()],
+            prop_oneof![3 => Just(Cap::Max), 2 => Just(Cap::Exact), 1 => Just(Cap::Below)],
+        )
+            .prop_map(|(i, w, c)| Op::BuyResale(i, w, c)),
     ]
 }
 
@@ -3038,7 +3463,7 @@ fn config() -> ProptestConfig {
 /// (call, outcome) rows every run of at least `MIN_CASES_FOR_COVERAGE` cases must observe, so
 /// that a generator change cannot silently stop exercising the v1.3 / v1.3.1 paths (each row
 /// occurs dozens of times per 200 cases).
-const REQUIRED_COVERAGE: [(&str, &str); 14] = [
+const REQUIRED_COVERAGE: [(&str, &str); 19] = [
     ("list_asset", "Ok"),
     ("list_asset", "AlreadyListed"),
     ("list_asset", "AssetNotDeployed"),
@@ -3053,6 +3478,11 @@ const REQUIRED_COVERAGE: [(&str, &str); 14] = [
     ("transfer", "Ok"),
     ("transfer", "ContractNotAuthorized"),
     ("transfer", "CollateralShortfall"),
+    ("list_for_sale", "Ok"),
+    ("cancel_sale", "Ok"),
+    ("buy_resale", "Ok"),
+    ("buy_resale", "NoAsk"),
+    ("buy_resale", "PriceMoved"),
 ];
 const MIN_CASES_FOR_COVERAGE: u32 = 100;
 

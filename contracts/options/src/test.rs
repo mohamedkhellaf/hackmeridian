@@ -5441,3 +5441,329 @@ fn instance_storage_stays_four_keys_as_assets_and_tokens_grow() {
         assert!(p.has(&Key::WriterOpen(t.writer.clone())));
     });
 }
+
+// ---------------------------------------------------------------------------
+// v1.4 secondary market: list_for_sale / cancel_sale / buy_resale / get_ask /
+// list_asks
+// ---------------------------------------------------------------------------
+
+const ASK: i128 = 30_000_000; // 3 USDx resale price
+
+/// PUT on RWA written by `writer`, bought by `holder`, so it is `Active`.
+fn active_put(t: &T) -> u32 {
+    let id = t.put(&t.writer);
+    t.c.buy(&t.holder, &id);
+    id
+}
+
+#[test]
+fn resale_list_then_buy_moves_price_and_holder() {
+    let t = setup();
+    let id = active_put(&t);
+    assert_eq!(t.c.get_ask(&id), None);
+
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [AskListed {
+            id,
+            holder: t.holder.clone(),
+            ask_total: ASK,
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.c.get_ask(&id), Some(ASK));
+
+    let seller0 = t.bals(&t.holder);
+    let buyer0 = t.bals(&t.maker2);
+    let contract0 = t.bals(&t.contract);
+    let writer0 = t.bals(&t.writer);
+    let open_usdx = t.c.open_collateral(&t.usdx);
+    let open_rwa = t.c.open_collateral(&t.rwa);
+
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [ResaleBought {
+            id,
+            seller: t.holder.clone(),
+            buyer: t.maker2.clone(),
+            ask_total: ASK,
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+
+    assert_eq!(t.bals(&t.maker2).usdx, buyer0.usdx - ASK);
+    assert_eq!(t.bals(&t.holder).usdx, seller0.usdx + ASK);
+    assert_eq!(t.bals(&t.holder).rwa, seller0.rwa);
+    assert_eq!(t.bals(&t.contract), contract0);
+    assert_eq!(t.bals(&t.writer), writer0);
+    assert_eq!(t.c.open_collateral(&t.usdx), open_usdx);
+    assert_eq!(t.c.open_collateral(&t.rwa), open_rwa);
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+    assert_eq!(t.state(id), State::Active);
+    assert_eq!(t.c.get_ask(&id), None);
+    assert_eq!(t.c.list_asks(&0, &50).len(), 0);
+}
+
+#[test]
+fn resale_ask_overwrite_keeps_latest_price() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.list_for_sale(&t.holder, &id, &(ASK * 2));
+    assert_eq!(t.c.get_ask(&id), Some(ASK * 2));
+    let buyer0 = t.bal(&t.usdx, &t.maker2);
+    // max_total == ask_total is accepted
+    t.c.buy_resale(&t.maker2, &id, &(ASK * 2));
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0 - ASK * 2);
+}
+
+#[test]
+fn resale_cancel_then_buy_is_no_ask() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.cancel_sale(&t.holder, &id);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [AskCancelled { id }.to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.c.get_ask(&id), None);
+    assert_err(t.c.try_buy_resale(&t.maker2, &id, &i128::MAX), Error::NoAsk);
+    assert_err(t.c.try_cancel_sale(&t.holder, &id), Error::NoAsk);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+}
+
+#[test]
+fn resale_new_holder_exercises_old_holder_cannot() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    assert_err(t.c.try_exercise(&t.holder, &id), Error::NotHolder);
+    assert_err(
+        t.c.try_list_for_sale(&t.holder, &id, &ASK),
+        Error::NotHolder,
+    );
+    let b0 = t.bals(&t.maker2);
+    t.c.exercise(&t.maker2, &id);
+    assert_eq!(t.state(id), State::Exercised);
+    assert_eq!(t.bals(&t.maker2).usdx, b0.usdx + STRIKE);
+    assert_eq!(t.bals(&t.maker2).rwa, b0.rwa - QTY);
+    // the writer still claims the delivered underlying
+    t.c.claim_delivery(&t.writer, &id);
+    assert_eq!(t.state(id), State::Settled);
+}
+
+#[test]
+fn resale_call_resold_then_exercised() {
+    let t = setup();
+    let id = t.call(&t.writer);
+    t.c.buy(&t.holder, &id);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    let b0 = t.bals(&t.maker2);
+    t.c.exercise(&t.maker2, &id);
+    assert_eq!(t.bals(&t.maker2).rwa, b0.rwa + QTY);
+    assert_eq!(t.bals(&t.maker2).usdx, b0.usdx - STRIKE);
+}
+
+#[test]
+fn resale_ask_cleared_by_exercise_transfer_and_reclaim() {
+    let t = setup();
+    // exercise
+    let a = active_put(&t);
+    t.c.list_for_sale(&t.holder, &a, &ASK);
+    t.c.exercise(&t.holder, &a);
+    assert_eq!(t.c.get_ask(&a), None);
+    assert_err(t.c.try_buy_resale(&t.maker2, &a, &i128::MAX), Error::NoAsk);
+
+    // transfer: the old holder's ask does not follow the option
+    let b = active_put(&t);
+    t.c.list_for_sale(&t.holder, &b, &ASK);
+    t.c.transfer(&t.holder, &t.maker2, &b);
+    assert_eq!(t.c.get_ask(&b), None);
+    assert_err(
+        t.c.try_buy_resale(&t.outsider, &b, &i128::MAX),
+        Error::NoAsk,
+    );
+
+    // reclaim (Active -> Expired)
+    let c = active_put(&t);
+    t.c.list_for_sale(&t.holder, &c, &ASK);
+    t.at(EXPIRY);
+    assert_err(
+        t.c.try_buy_resale(&t.maker2, &c, &i128::MAX),
+        Error::Expired,
+    );
+    assert_eq!(t.c.list_asks(&0, &50).len(), 1); // still listed until reclaimed
+    t.c.reclaim(&t.writer, &c);
+    assert_eq!(t.c.get_ask(&c), None);
+    assert_eq!(t.c.list_asks(&0, &50).len(), 0);
+}
+
+#[test]
+fn resale_list_asks_paging() {
+    let t = setup();
+    let mut ids = std::vec::Vec::new();
+    for _ in 0..6 {
+        ids.push(active_put(&t));
+    }
+    // an Offered option after them has no ask
+    let offered = t.put(&t.maker2);
+    for (i, id) in ids.iter().enumerate() {
+        if i % 2 == 0 {
+            t.c.list_for_sale(&t.holder, id, &(ASK + i as i128));
+        }
+    }
+    let all = t.c.list_asks(&0, &50);
+    assert_eq!(
+        all.iter().map(|a| a.id).collect::<std::vec::Vec<_>>(),
+        [ids[0], ids[2], ids[4]]
+    );
+    for a in all.iter() {
+        assert_eq!(a.holder, t.holder);
+        assert_eq!(Some(a.ask_total), t.c.get_ask(&a.id));
+    }
+    // scan windows: [0,3) and [3,6)
+    let p1 = t.c.list_asks(&0, &3);
+    let p2 = t.c.list_asks(&3, &3);
+    assert_eq!(
+        p1.iter().map(|a| a.id).collect::<std::vec::Vec<_>>(),
+        [ids[0], ids[2]]
+    );
+    assert_eq!(
+        p2.iter().map(|a| a.id).collect::<std::vec::Vec<_>>(),
+        [ids[4]]
+    );
+    assert_eq!(t.c.list_asks(&offered, &50).len(), 0);
+    assert_eq!(t.c.list_asks(&0, &0).len(), 0);
+    assert_eq!(t.c.list_asks(&u32::MAX, &50).len(), 0);
+    assert_eq!(t.c.get_ask(&offered), None);
+    assert_eq!(t.c.get_ask(&999), None);
+}
+
+#[test]
+fn resale_list_asks_capped_at_max_page() {
+    let t = setup();
+    // 55 Active options listed for sale: one call returns at most 50
+    let usdx_admin = t.sac(&t.usdx);
+    usdx_admin.mint(&t.holder, &(100 * USDX_START));
+    usdx_admin.mint(&t.writer, &(100 * USDX_START));
+    usdx_admin.mint(&t.maker2, &(100 * USDX_START));
+    for i in 0..55u32 {
+        let w = if i < 45 { &t.writer } else { &t.maker2 };
+        let id = t.put(w);
+        t.c.buy(&t.holder, &id);
+        t.c.list_for_sale(&t.holder, &id, &ASK);
+    }
+    assert_eq!(t.c.list_asks(&0, &100).len(), 50);
+    assert_eq!(t.c.list_asks(&50, &100).len(), 5);
+}
+
+#[test]
+fn resale_extend_ttl_bumps_ask_entry() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    let key: Vec<Val> = vec![
+        &t.env,
+        Symbol::new(&t.env, "Ask").into_val(&t.env),
+        id.into_val(&t.env),
+    ];
+    let ttl = |t: &T| {
+        t.env
+            .as_contract(&t.contract, || t.env.storage().persistent().get_ttl(&key))
+    };
+    assert!(ttl(&t) >= 29 * DAY);
+    t.env.ledger().with_mut(|l| l.sequence_number += 25 * DAY);
+    assert!(ttl(&t) < 7 * DAY);
+    t.c.extend_ttl(&vec![&t.env, id]);
+    assert!(ttl(&t) >= 29 * DAY);
+}
+
+#[test]
+fn resale_auths_are_holder_and_buyer() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    assert_eq!(
+        t.env.auths(),
+        std::vec![(
+            t.holder.clone(),
+            leaf(contract_fn(
+                &t,
+                &t.contract,
+                "list_for_sale",
+                (t.holder.clone(), id, ASK).into_val(&t.env)
+            ))
+        )]
+    );
+    t.c.buy_resale(&t.maker2, &id, &i128::MAX);
+    let auths = t.env.auths();
+    assert_eq!(auths.len(), 1);
+    assert_eq!(auths[0].0, t.maker2);
+    t.c.list_for_sale(&t.maker2, &id, &ASK);
+    t.c.cancel_sale(&t.maker2, &id);
+    assert_eq!(t.env.auths()[0].0, t.maker2);
+}
+
+#[test]
+fn resale_price_moved_when_ask_raised_after_buyer_saw_it() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    let seen = t.c.get_ask(&id).unwrap();
+    // the seller re-lists higher before the buyer's transaction lands
+    t.c.list_for_sale(&t.holder, &id, &(ASK + 1));
+    let buyer0 = t.bal(&t.usdx, &t.maker2);
+    let seller0 = t.bal(&t.usdx, &t.holder);
+    assert_err(t.c.try_buy_resale(&t.maker2, &id, &seen), Error::PriceMoved);
+    assert!(t.env.events().all().events().is_empty());
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0);
+    assert_eq!(t.bal(&t.usdx, &t.holder), seller0);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+    assert_eq!(t.c.get_ask(&id), Some(ASK + 1));
+    // a lower ask than the cap: the buyer pays the ask, not the cap
+    t.c.list_for_sale(&t.holder, &id, &(ASK - 1));
+    t.c.buy_resale(&t.maker2, &id, &seen);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0 - (ASK - 1));
+    assert_eq!(t.bal(&t.usdx, &t.holder), seller0 + (ASK - 1));
+    assert_eq!(t.holder_of(id), Some(t.maker2.clone()));
+}
+
+#[test]
+fn resale_edge_semantics_after_expiry() {
+    let t = setup();
+    let a = active_put(&t);
+    let b = active_put(&t);
+    t.c.list_for_sale(&t.holder, &a, &ASK);
+    t.c.list_for_sale(&t.holder, &b, &ASK);
+    t.at(EXPIRY);
+    // expired but not reclaimed: Expired, not NoAsk
+    assert_err(t.c.try_buy_resale(&t.maker2, &a, &ASK), Error::Expired);
+    // the holder may still withdraw its ask after expiry
+    t.c.cancel_sale(&t.holder, &a);
+    assert_eq!(t.c.get_ask(&a), None);
+    assert_err(t.c.try_buy_resale(&t.maker2, &a, &ASK), Error::NoAsk);
+    // reclaim clears the other one
+    t.c.reclaim(&t.writer, &b);
+    assert_eq!(t.c.get_ask(&b), None);
+}
+
+#[test]
+fn resale_ask_does_not_survive_a_round_trip_transfer() {
+    let t = setup();
+    let id = active_put(&t);
+    t.c.list_for_sale(&t.holder, &id, &ASK);
+    // A -> B -> A: the option is back with A, but A's old ask is gone
+    t.c.transfer(&t.holder, &t.maker2, &id);
+    t.c.transfer(&t.maker2, &t.holder, &id);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+    assert_eq!(t.c.get_ask(&id), None);
+    let buyer0 = t.bal(&t.usdx, &t.maker2);
+    assert_err(t.c.try_buy_resale(&t.maker2, &id, &ASK), Error::NoAsk);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), buyer0);
+    assert_eq!(t.holder_of(id), Some(t.holder.clone()));
+}

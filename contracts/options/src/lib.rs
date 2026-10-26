@@ -27,6 +27,15 @@
 //!   `MAX_PAGE` entries), `list_open`, `option_count`, `open_collateral`, `is_eligible`, (v1.3)
 //!   `is_listed`, `list_assets` (paged like `get_options`), `asset_count`, `writer_open_count`,
 //!   and (v1.3.1) `list_open_for` (paged like `get_options`).
+//! - Secondary market (v1.4): the holder of an `Active` option may post an ask
+//!   (`list_for_sale`, one persistent `Key::Ask(id)` = `ask_total` quote units per option),
+//!   withdraw it (`cancel_sale`), and any other eligible account may take it (`buy_resale`): the
+//!   buyer pays `ask_total` quote straight to the current holder and becomes the holder, in one
+//!   invocation. Collateral, reserved totals and open books never change. An ask is removed
+//!   whenever the option leaves `Active` or changes hands (`exercise`, `transfer`, `reclaim`,
+//!   `buy_resale`). `buy_resale(buyer, id, max_total)` fails with `PriceMoved` if the ask is
+//!   above the buyer's cap. The writer cannot buy back its own option (`SelfTrade`). Views `get_ask`,
+//!   `list_asks` (scan of option ids, at most `MAX_PAGE` per call).
 //! - No admin, no upgrade, no delisting; the quote token is fixed by the constructor.
 //! - Check order in every state-changing function:
 //!   auth -> NotFound -> ownership -> state -> time -> eligibility -> transfers -> storage -> event.
@@ -39,8 +48,8 @@
 //! - All amounts are exact `i128` token units; every addition/subtraction is checked.
 //! - Storage (v1.3.1): the instance entry holds only `Quote`, `Underlyings`, `Next` and
 //!   `AssetCount`; everything keyed by an address or id (`Reserved`, `Opt`, `OpenFor`, `Listed`,
-//!   `AssetAt`, `WriterOpen`) is a persistent entry, so permissionless listing cannot grow the
-//!   single instance entry.
+//!   `AssetAt`, `WriterOpen`, v1.4 `Ask`) is a persistent entry, so permissionless listing cannot
+//!   grow the single instance entry.
 #![no_std]
 
 use soroban_sdk::{
@@ -195,6 +204,22 @@ pub enum Error {
     AssetNotDeployed = 118,
     /// v1.3 create_offer: expiry > now + `MAX_TENOR` (2 years).
     TenorOutOfRange = 119,
+    /// v1.4 cancel_sale/buy_resale: the option has no ask (never listed, cancelled, already
+    /// bought, or cleared by exercise/transfer/reclaim).
+    NoAsk = 120,
+    /// v1.4 buy_resale: the current ask is above the buyer's `max_total` (the seller re-listed at
+    /// a higher price after the buyer saw the ask).
+    PriceMoved = 121,
+}
+
+/// v1.4 `list_asks` row: an `Active` option `id` offered for resale by its current `holder` for
+/// `ask_total` quote units.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Ask {
+    pub id: u32,
+    pub holder: Address,
+    pub ask_total: i128,
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -277,6 +302,34 @@ pub struct OfferPruned {
     pub pruner: Address,
 }
 
+/// v1.4: the holder of `Active` option `id` posted (or replaced) an ask of `ask_total` quote
+/// units (`list_for_sale`).
+#[contractevent]
+pub struct AskListed {
+    #[topic]
+    pub id: u32,
+    pub holder: Address,
+    pub ask_total: i128,
+}
+
+/// v1.4: the holder withdrew the ask on option `id` (`cancel_sale`).
+#[contractevent]
+pub struct AskCancelled {
+    #[topic]
+    pub id: u32,
+}
+
+/// v1.4: `buyer` paid `ask_total` quote to `seller` (the previous holder) and became the holder of
+/// option `id` (`buy_resale`).
+#[contractevent]
+pub struct ResaleBought {
+    #[topic]
+    pub id: u32,
+    pub seller: Address,
+    pub buyer: Address,
+    pub ask_total: i128,
+}
+
 // ---------------------------------------------------------------------------------------------
 // Storage keys (ABI §8)
 // ---------------------------------------------------------------------------------------------
@@ -308,6 +361,9 @@ enum Key {
     AssetCount,
     /// persistent: u32, v1.3 count of this writer's options in state Offered.
     WriterOpen(Address),
+    /// persistent: i128, v1.4 resale ask of an `Active` option, in quote units (> 0). Present
+    /// only while the option is `Active` and held by the account that posted it.
+    Ask(u32),
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -467,6 +523,19 @@ fn eligible(e: &Env, token: &Address, who: &Address) -> bool {
         StellarAssetClient::new(e, token).try_authorized(who),
         Ok(Ok(true))
     )
+}
+
+/// v1.4: the ask on option `id`, if any. Pure read (no TTL change).
+fn ask_of(e: &Env, id: u32) -> Option<i128> {
+    e.storage().persistent().get(&Key::Ask(id))
+}
+
+/// v1.4: removes the ask on option `id` if present (the option left `Active` or changed hands).
+fn clear_ask(e: &Env, id: u32) {
+    let key = Key::Ask(id);
+    if e.storage().persistent().has(&key) {
+        e.storage().persistent().remove(&key);
+    }
 }
 
 /// Extends the persistent TTL of `key` with the ABI §8 values.
@@ -820,6 +889,7 @@ impl OptionsContract {
         sub_reserved(&env, &c_token, c_amount)?;
         add_reserved(&env, &p_token, p_amount)?;
         opt.state = State::Exercised;
+        clear_ask(&env, id); // v1.4: the option left Active
         save_opt(&env, &opt);
         bump_instance(&env);
 
@@ -897,6 +967,8 @@ impl OptionsContract {
         if was_offered {
             open_remove(&env, &opt.underlying, id);
             writer_open_dec(&env, &writer)?;
+        } else {
+            clear_ask(&env, id); // v1.4: the Active option expired
         }
         opt.state = State::Expired;
         save_opt(&env, &opt);
@@ -988,8 +1060,9 @@ impl OptionsContract {
         }
         check_collateral(&env, &opt.quote, &opt.underlying)?;
 
-        // storage (no transfers)
+        // storage (no transfers); v1.4: the old holder's ask does not follow the option
         opt.holder = Some(to.clone());
+        clear_ask(&env, id);
         save_opt(&env, &opt);
         bump_instance(&env);
 
@@ -1082,13 +1155,21 @@ impl OptionsContract {
     /// option's persistent entry (`NotFound` for an unknown id, which reverts the whole call) and,
     /// v1.3.1, its underlying's registry entry (`Listed`), its writer's open count (`WriterOpen`),
     /// its underlying's open book (`OpenFor`) and the reserved totals of its quote and underlying
-    /// (`Reserved`), each when present. Then (v1.3.1) the registry index (`AssetAt`) and its
+    /// (`Reserved`), and (v1.4, `Active` ids only) its resale ask (`Ask`), each when present. Then (v1.3.1) the registry index (`AssetAt`) and its
     /// `Listed` entry for the first `min(asset_count, MAX_PAGE)` assets.
     pub fn extend_ttl(env: Env, ids: Vec<u32>) -> Result<(), Error> {
         for id in ids.iter() {
             let opt = load_opt(&env, id)?;
             bump_persistent(&env, &Key::Opt(id));
             listed(&env, &opt.underlying, true);
+            // v1.4: an ask can only exist on an Active option, so only those ids read `Ask(id)`
+            // (keeps the footprint of Offered ids as in v1.3.1)
+            if opt.state == State::Active {
+                let ask_key = Key::Ask(id);
+                if env.storage().persistent().has(&ask_key) {
+                    bump_persistent(&env, &ask_key);
+                }
+            }
             for key in [
                 Key::WriterOpen(opt.writer),
                 Key::OpenFor(opt.underlying.clone()),
@@ -1274,6 +1355,174 @@ impl OptionsContract {
         // from < len <= MAX_OPEN_PER_ASSET, so the sum cannot overflow; saturate anyway
         let end = from.saturating_add(limit.min(MAX_PAGE)).min(len);
         book.slice(from..end)
+    }
+
+    /// v1.4. The holder of an `Active` option posts (or replaces) a resale ask of `ask_total`
+    /// quote units. Nothing moves; any other eligible account may then take it with `buy_resale`.
+    /// Check order: auth -> InvalidArgs (holder is the contract) -> NotFound -> WrongState (not
+    /// `Active`) -> NotHolder -> Expired -> InvalidArgs (`ask_total <= 0`) -> storage -> event.
+    pub fn list_for_sale(env: Env, holder: Address, id: u32, ask_total: i128) -> Result<(), Error> {
+        // auth
+        holder.require_auth();
+        // backstop: the contract is never a party
+        if holder == env.current_contract_address() {
+            return Err(Error::InvalidArgs);
+        }
+        // NotFound -> state -> ownership -> time -> amount
+        let opt = load_opt(&env, id)?;
+        if opt.state != State::Active {
+            return Err(Error::WrongState);
+        }
+        if opt.holder != Some(holder.clone()) {
+            return Err(Error::NotHolder);
+        }
+        if env.ledger().timestamp() >= opt.expiry {
+            return Err(Error::Expired);
+        }
+        if ask_total <= 0 {
+            return Err(Error::InvalidArgs);
+        }
+
+        // storage
+        let key = Key::Ask(id);
+        env.storage().persistent().set(&key, &ask_total);
+        bump_persistent(&env, &key);
+        bump_persistent(&env, &Key::Opt(id));
+        bump_instance(&env);
+
+        // event
+        AskListed {
+            id,
+            holder,
+            ask_total,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    /// v1.4. The holder withdraws its ask on option `id`.
+    /// Check order: auth -> NotFound -> NotHolder -> NoAsk -> storage -> event.
+    pub fn cancel_sale(env: Env, holder: Address, id: u32) -> Result<(), Error> {
+        // auth
+        holder.require_auth();
+        // NotFound -> ownership -> ask
+        let opt = load_opt(&env, id)?;
+        if opt.holder != Some(holder) {
+            return Err(Error::NotHolder);
+        }
+        if ask_of(&env, id).is_none() {
+            return Err(Error::NoAsk);
+        }
+
+        // storage
+        clear_ask(&env, id);
+        bump_instance(&env);
+
+        // event
+        AskCancelled { id }.publish(&env);
+        Ok(())
+    }
+
+    /// v1.4. `buyer` takes the ask on option `id`: pays `ask_total` quote straight to the current
+    /// holder (the seller) and becomes the holder; the ask is removed. The state stays `Active`;
+    /// collateral, reserved totals and open books are untouched. All in one invocation: if the
+    /// payment fails (for example the buyer lacks quote) nothing changes. The writer cannot buy
+    /// back its own option (`SelfTrade`; writer buy-back is out of scope for v1.4). `max_total` is
+    /// the most the buyer agrees to pay: if the ask is above it (the seller re-listed higher after
+    /// the buyer read it) the call fails with `PriceMoved` and nothing moves. The buyer pays the
+    /// current `ask_total` (never more than `max_total`).
+    /// Check order: auth -> InvalidArgs (buyer is the contract) -> NoAsk -> NotFound -> WrongState
+    /// -> Expired -> SelfTrade (buyer is the holder or the writer) -> NotEligible (buyer on the
+    /// underlying) -> ContractNotAuthorized -> CollateralShortfall (as `transfer`) -> PriceMoved
+    /// (`ask_total > max_total`) -> payment -> storage -> event.
+    pub fn buy_resale(env: Env, buyer: Address, id: u32, max_total: i128) -> Result<(), Error> {
+        // auth
+        buyer.require_auth();
+        // backstop: the contract is never a party
+        let me = env.current_contract_address();
+        if buyer == me {
+            return Err(Error::InvalidArgs);
+        }
+        // ask -> NotFound -> state -> time -> self-trade -> eligibility -> solvency
+        let ask_total = ask_of(&env, id).ok_or(Error::NoAsk)?;
+        let mut opt = load_opt(&env, id)?;
+        if opt.state != State::Active {
+            return Err(Error::WrongState);
+        }
+        if env.ledger().timestamp() >= opt.expiry {
+            return Err(Error::Expired);
+        }
+        // an Active option always has a holder; a missing one is broken state, so refuse it
+        let seller = opt.holder.clone().ok_or(Error::WrongState)?;
+        if buyer == seller || buyer == opt.writer {
+            return Err(Error::SelfTrade);
+        }
+        if !eligible(&env, &opt.underlying, &buyer) {
+            return Err(Error::NotEligible);
+        }
+        // the escrow must still be able to settle the position the buyer takes on (as transfer)
+        if !eligible(&env, &opt.underlying, &me) {
+            return Err(Error::ContractNotAuthorized);
+        }
+        check_collateral(&env, &opt.quote, &opt.underlying)?;
+        // price cap: the buyer never pays more than it signed for
+        if ask_total > max_total {
+            return Err(Error::PriceMoved);
+        }
+
+        // transfers: the buyer pays the seller directly; the contract never holds the price
+        TokenClient::new(&env, &opt.quote).transfer(&buyer, &seller, &ask_total);
+
+        // storage
+        opt.holder = Some(buyer.clone());
+        clear_ask(&env, id);
+        save_opt(&env, &opt);
+        bump_instance(&env);
+
+        // event
+        ResaleBought {
+            id,
+            seller,
+            buyer,
+            ask_total,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    /// v1.4. The resale ask on option `id` in quote units, or `None`. Pure read (no TTL change).
+    pub fn get_ask(env: Env, id: u32) -> Option<i128> {
+        ask_of(&env, id)
+    }
+
+    /// v1.4. Open resale asks among option ids `from .. from + min(limit, MAX_PAGE)` (stopping at
+    /// `option_count()`), in id order, with the option's current holder. Scans ids, so a page may
+    /// hold fewer than `limit` rows; clients page with `from += min(limit, MAX_PAGE)`, not by the
+    /// number of rows. May include asks on options past expiry (`buy_resale` then fails with
+    /// `Expired`); clients filter by `expiry`. Pure read (no TTL change), never fails.
+    pub fn list_asks(env: Env, from: u32, limit: u32) -> Vec<Ask> {
+        let count: u32 = env.storage().instance().get(&Key::Next).unwrap_or(0);
+        let mut page = Vec::new(&env);
+        for i in 0..limit.min(MAX_PAGE) {
+            let id = match from.checked_add(i) {
+                Some(id) if id < count => id,
+                _ => break,
+            };
+            if let Some(ask_total) = ask_of(&env, id) {
+                if let Ok(OptionData {
+                    holder: Some(holder),
+                    ..
+                }) = load_opt(&env, id)
+                {
+                    page.push_back(Ask {
+                        id,
+                        holder,
+                        ask_total,
+                    });
+                }
+            }
+        }
+        page
     }
 }
 
