@@ -4,10 +4,10 @@ import { server } from '../stellar/rpc'
 import { baseClientOptions, clientSigning, signAndSend } from '../stellar/signer'
 import type { WalletSigner } from '../stellar/signer'
 import { readBalance } from '../stellar/tokens'
-import { collateralLines, expiryToU64, idToU32, assertI128, kindToAbi, optionFromAbi } from './abi'
-import type { AbiConfig, AbiOptionData, AbiOptionType } from './abi'
+import { askFromAbi, askTotalFromAbi, collateralLines, expiryToU64, idToU32, assertI128, kindToAbi, optionFromAbi } from './abi'
+import type { AbiAsk, AbiConfig, AbiOptionData, AbiOptionType } from './abi'
 import type { OptionsClient } from './client'
-import type { CollateralHealth, NewOffer, OptionOffer, SupportedAssets, TokenInfo, TxResult } from './types'
+import type { Ask, CollateralHealth, NewOffer, OptionOffer, SupportedAssets, TokenInfo, TxResult } from './types'
 
 // Hand-written typed view of the `options` contract (docs/contract-abi.md section 3), shaped like the
 // code `stellar contract bindings typescript` generates: named-argument objects, AssembledTransaction
@@ -55,10 +55,28 @@ interface OptionsContract {
   prune_expired?: (a: { pruner?: string; ids: number[] }, o?: Opt) => Tx<MaybeResult<number>>
   // v1.3.1+
   list_open_for?: (a: { asset: string; from: number; limit: number }, o?: Opt) => Tx<number[]>
+  // v1.4 resale
+  list_for_sale?: (a: { holder: string; id: number; ask_total: bigint }, o?: Opt) => Tx<MaybeResult<null>>
+  cancel_sale?: (a: { holder: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
+  buy_resale?: (a: { buyer: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
+  get_ask?: (a: { id: number }, o?: Opt) => Tx<bigint | null | undefined>
+  list_asks?: (a: { from: number; limit: number }, o?: Opt) => Tx<AbiAsk[]>
 }
 
 type Bound = contract.Client & OptionsContract
-type V13Fn = 'asset_count' | 'list_assets' | 'is_listed' | 'writer_open_count' | 'list_asset' | 'prune_expired' | 'list_open_for'
+type V13Fn =
+  | 'asset_count'
+  | 'list_assets'
+  | 'is_listed'
+  | 'writer_open_count'
+  | 'list_asset'
+  | 'prune_expired'
+  | 'list_open_for'
+  | 'list_for_sale'
+  | 'cancel_sale'
+  | 'buy_resale'
+  | 'get_ask'
+  | 'list_asks'
 
 // The generated client only has methods for functions in the deployed contract's spec, so presence of the
 // method is the feature flag: the same build runs against v1.2 and v1.3(.1).
@@ -289,6 +307,45 @@ export class SorobanOptionsClient implements OptionsClient {
   }
   claimDelivery(id: bigint, writer: string) {
     return this.simple((c, n) => c.claim_delivery({ writer, id: n }), id)
+  }
+
+  // v1.4 resale. Feature-detected: on an older contract listAsks is null and the UI hides resale.
+  listAsks(): Promise<Ask[] | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'list_asks')) return null
+      const count = await this.read((x) => x.option_count())
+      const out: Ask[] = []
+      // list_asks scans ids from..from+limit and returns only those with an ask, so advance by PAGE, not by length.
+      for (let from = 0; from < count; from += PAGE) {
+        const page = await this.read((x) => x.list_asks!({ from, limit: PAGE }))
+        out.push(...page.map(askFromAbi))
+      }
+      return out
+    })
+  }
+  getAsk(id: bigint): Promise<bigint | null> {
+    return this.guard(async () => {
+      const c = await this.client()
+      if (!has(c, 'get_ask')) return null
+      return askTotalFromAbi(await this.read((x) => x.get_ask!({ id: idToU32(id) })))
+    })
+  }
+  // The SDK only binds functions in the deployed spec; a pre-v1.4 contract has no resale functions.
+  private resaleWrite(call: (c: Bound, id: number) => Tx<MaybeResult<null>>, id: bigint): Promise<TxResult> {
+    return this.simple((c, n) => {
+      if (!has(c, 'list_for_sale')) throw new Error('This contract version has no resale (needs v1.4).')
+      return call(c, n)
+    }, id)
+  }
+  listForSale(id: bigint, holder: string, askTotal: bigint) {
+    return this.resaleWrite((c, n) => c.list_for_sale!({ holder, id: n, ask_total: assertI128(askTotal) }), id)
+  }
+  cancelSale(id: bigint, holder: string) {
+    return this.resaleWrite((c, n) => c.cancel_sale!({ holder, id: n }), id)
+  }
+  buyResale(id: bigint, buyer: string) {
+    return this.resaleWrite((c, n) => c.buy_resale!({ buyer, id: n }), id)
   }
 
   // v1.2 capabilities, client only (no UI yet). transfer moves no tokens: payment is settled off-chain.

@@ -1,4 +1,4 @@
-import type { CollateralLine, OptionKind, OptionOffer, OptionState, TokenInfo } from './types'
+import type { Ask, CollateralLine, OptionKind, OptionOffer, OptionState, TokenInfo } from './types'
 import { requiredCollateral } from './types'
 
 // Pure mapping/conversion helpers between the on-chain ABI (docs/contract-abi.md) and the
@@ -22,6 +22,18 @@ export interface AbiOptionData {
   holder: string | null | undefined // the SDK decodes Option::None as null at runtime
   state: AbiState
 }
+
+// v1.4 `Ask { id: u32, holder: Address, ask_total: i128 }` as the SDK decodes it.
+export interface AbiAsk {
+  id: number
+  holder: string
+  ask_total: bigint
+}
+
+export const askFromAbi = (a: AbiAsk): Ask => ({ id: BigInt(a.id), holder: a.holder, askTotal: a.ask_total })
+
+// `Option<i128>` from get_ask: the SDK decodes None as undefined (or null).
+export const askTotalFromAbi = (v: bigint | null | undefined): bigint | null => (v === undefined || v === null ? null : BigInt(v))
 
 export interface AbiConfig {
   quote: string

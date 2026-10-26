@@ -3,7 +3,7 @@ import { config } from '../config'
 import { createOptionsClient } from '../options'
 import { MockOptionsClient } from '../options/mockClient'
 import type { OptionsClient } from '../options/client'
-import type { CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets } from '../options/types'
+import type { Ask, CollateralHealth, CollateralLine, NewOffer, OptionOffer, SupportedAssets } from '../options/types'
 import type { OptionRow } from '../market/OptionsTable'
 import type { Notice } from '../ui'
 import { useBalances } from '../wallet/useBalances'
@@ -28,6 +28,8 @@ export function useStrata() {
     [mock, walletAddress, walletSign, walletSignAuth],
   )
   const [options, setOptions] = useState<OptionOffer[]>([])
+  // Resale asks; null when the contract has no resale (before v1.4) or the read failed.
+  const [asks, setAsks] = useState<Ask[] | null>(null)
   const [assets, setAssets] = useState<SupportedAssets | null>(null)
   const [collateral, setCollateral] = useState<CollateralLine[]>([])
   const [health, setHealth] = useState<CollateralHealth[]>([])
@@ -40,13 +42,15 @@ export function useStrata() {
   const refreshBalances = balances.refresh
 
   const refresh = useCallback(async () => {
-    const [opts, assets, lines, hl] = await Promise.all([
+    const [opts, assets, lines, hl, ak] = await Promise.all([
       client.listOptions(),
       client.supportedAssets(),
       client.openCollateral(),
       client.collateralHealth().catch(() => [] as CollateralHealth[]),
+      client.listAsks().catch(() => null),
     ])
     setOptions(opts)
+    setAsks(ak)
     setAssets(assets)
     setCollateral(lines)
     setHealth(hl)
@@ -98,6 +102,12 @@ export function useStrata() {
     return runDetailed(o.id, 'Bought', () => client.buy(o.id, me))
   }
 
+  // Resale (contract v1.4). Each resolves with the outcome so the resale dialogs can show their own result.
+  const listForSale = (o: OptionOffer, askTotal: bigint) =>
+    runDetailed(o.id, 'Listed for sale', () => client.listForSale(o.id, me!, askTotal))
+  const cancelSale = (o: OptionOffer) => runDetailed(o.id, 'Sale cancelled', () => client.cancelSale(o.id, me!))
+  const buyResale = (o: OptionOffer) => runDetailed(o.id, 'Bought from holder', () => client.buyResale(o.id, me!))
+
   /** The next action the connected wallet can take on a position, if any. */
   const actionFor = (o: OptionOffer): PositionAction | undefined => {
     if (!me) return undefined
@@ -141,6 +151,10 @@ export function useStrata() {
     client,
     isMock: client.isMock,
     options,
+    asks,
+    listForSale,
+    cancelSale,
+    buyResale,
     market,
     positions,
     assets,
