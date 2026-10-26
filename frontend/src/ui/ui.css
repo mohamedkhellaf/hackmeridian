@@ -828,9 +828,9 @@
   width: calc(100% + 64px);
 }
 .ui-hero-text {
-  flex: 1 1 420px;
+  flex: 1.35 1 420px;
   min-width: 0;
-  padding: 56px 48px 44px 32px;
+  padding: 56px 40px 44px 32px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -854,7 +854,7 @@
 .ui-hero-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px 40px;
+  gap: 16px 36px;
   margin-top: 8px;
 }
 .ui-hero-stat {
@@ -872,13 +872,26 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  white-space: nowrap;
+}
+/* Callers join several <Amount/>s with a separator span; stack them one per line instead. */
+.ui-hero-stat-value > [aria-hidden='true'] {
+  display: none;
+}
+.ui-hero-stat-value > .ui-amount:not(:only-child) {
+  font-size: 26px;
+  line-height: 1.1;
 }
 .ui-hero-stat-value .ui-amount-unit {
   font-family: var(--font-sans);
   font-size: 18px;
   letter-spacing: 0;
+}
+.ui-hero-stat-value > .ui-amount:not(:only-child) .ui-amount-unit {
+  font-size: 14px;
 }
 .ui-hero-media {
   flex: 1 1 420px;
@@ -919,6 +932,10 @@
   }
   .ui-hero-stat-value {
     font-size: 28px;
+    white-space: normal;
+  }
+  .ui-hero-stat-value > .ui-amount:not(:only-child) {
+    font-size: 20px;
   }
   .ui-hero-stat-value .ui-amount-unit {
     font-size: 14px;
