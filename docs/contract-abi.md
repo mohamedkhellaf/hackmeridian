@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11; v1.3 (permissionless listing, per-writer cap, prune_expired, tenor cap, backstop) decided 22:10, see §12; v1.3.1 corrections (pruner argument, transfer guards, per-asset open books, keeper coverage) decided 2026-10-26 00:20, see §13.** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11; v1.3 (permissionless listing, per-writer cap, prune_expired, tenor cap, backstop) decided 22:10, see §12; v1.3.1 corrections (pruner argument, transfer guards, per-asset open books, keeper coverage) decided 2026-10-26 00:20, see §13; v1.4 on-chain resale (`list_for_sale`, `cancel_sale`, `buy_resale` with a `max_total` cap, `get_ask`, `list_asks`, errors 120–121) decided 2026-10-26 07:40, see §14.** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -510,3 +510,62 @@ position token, impairment/refund, margin.
 
 No new error codes. Signature changes: `prune_expired` (new first argument), `list_open_for` added. Everything else is
 unchanged. Deployment of v1.3.1 replaces the v1.3 id in the Deployed contracts table.
+
+## 14. v1.4: on-chain secondary market (resale of an `Active` option; deployed 2026-10-26 07:56 UTC as `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`)
+
+The holder of an `Active` option can post a price for the whole position; any other eligible account can take it.
+The buyer pays the quote token straight to the seller and becomes the holder in one invocation. Collateral, reserved
+totals, open books and the writer are never touched. v1.4 = v1.3.1 + the items below; nothing else changed.
+
+**Functions**
+
+| Function | Auth | Check order (first failure wins) | Effect |
+|---|---|---|---|
+| `list_for_sale(holder: Address, id: u32, ask_total: i128) -> Result<(), Error>` | `holder` | `InvalidArgs` (holder is the contract) → `NotFound` (101) → `WrongState` (106, not `Active`) → `NotHolder` (108) → `Expired` (109, `now >= expiry`) → `InvalidArgs` (102, `ask_total <= 0`) | sets or overwrites `Ask(id) = ask_total`; event `AskListed` |
+| `cancel_sale(holder: Address, id: u32) -> Result<(), Error>` | `holder` | `NotFound` → `NotHolder` → `NoAsk` (120) | removes `Ask(id)`; event `AskCancelled` |
+| `buy_resale(buyer: Address, id: u32, max_total: i128) -> Result<(), Error>` | `buyer` (its signed tree also carries the quote `transfer(buyer, seller, ask_total)`) | `InvalidArgs` (buyer is the contract) → `NoAsk` → `NotFound` → `WrongState` → `Expired` → `SelfTrade` (111, buyer is the current holder **or the writer**) → `NotEligible` (104, buyer on the underlying) → `ContractNotAuthorized` (105) → `CollateralShortfall` (115, quote or underlying, as `transfer`) → `PriceMoved` (121, `ask_total > max_total`) | quote `transfer(buyer → current holder, ask_total)`; `holder = buyer`; removes `Ask(id)`; event `ResaleBought` |
+| `get_ask(id: u32) -> Option<i128>` | view | never fails | the ask in quote units, or `None` |
+| `list_asks(from: u32, limit: u32) -> Vec<Ask>` | view | never fails | scans option ids `from .. from + min(limit, MAX_PAGE = 50)` (stops at `option_count()`) and returns the ones with an ask, in id order, with the option's current holder |
+
+`#[contracttype] struct Ask { id: u32, holder: Address, ask_total: i128 }`. Because `list_asks` scans ids, a page can
+hold fewer rows than `limit`: page with `from += min(limit, 50)`, not by the number of rows returned. It may include
+asks on options past expiry (until the writer reclaims); clients filter by `expiry` (`buy_resale` returns `Expired`).
+
+**Errors** (appended; nothing renumbered): `NoAsk = 120` (no ask on this id: never listed, cancelled, already bought, or
+cleared by `exercise` / `transfer` / `reclaim`), `PriceMoved = 121` (the current ask is above the buyer's `max_total`).
+
+**Events** (default topic = snake_case name, then `id`): `ask_listed { id, holder, ask_total }`,
+`ask_cancelled { id }`, `resale_bought { id, seller, buyer, ask_total }`. The SAC also emits its own `transfer` event
+for the payment.
+
+**Storage and TTL**: persistent `Key::Ask(id) -> i128`, written with the §8 TTL (`extend_ttl(entry, 7 days, 30 days)`)
+and the option entry is bumped on `list_for_sale`. `extend_ttl(ids)` also extends `Ask(id)` when present, for `Active`
+ids only (an ask exists only on an `Active` option; this keeps the footprint of `Offered` ids exactly as in v1.3.1 and
+keeps the keeper batch at ≥ 50 ids). The instance entry does not grow.
+
+**Ask lifecycle**: an ask exists only while the option is `Active` and held by the account that posted it. It is
+removed by `cancel_sale`, `buy_resale`, `exercise` (→ `Exercised`), `transfer` (the old holder's price never follows
+the option to a new holder) and `reclaim` of an `Active` option (→ `Expired`). `cancel_offer` and `prune_expired` only
+touch `Offered` options, which never have an ask.
+
+**Decisions**
+
+1. **Writer buy-back is excluded** in v1.4: `buy_resale` by the writer returns `SelfTrade`, like `buy` and `transfer`.
+   A writer closing its short by buying the option back needs its own settlement rule (release collateral instead of
+   holding both sides) and is out of scope.
+2. **Price cap (`max_total`)**: added after an independent review. Between the buyer's read/simulation and its
+   submission the seller can re-list at a higher ask; the cap makes the buyer's limit explicit in the call arguments,
+   whatever the wallet's auth semantics. The buyer pays the current ask, which is never above `max_total`.
+   Clients pass the ask they showed the user.
+3. **Edge semantics after expiry**: `cancel_sale` has no time check, so a holder can withdraw an ask after expiry
+   (holder + ask only). `buy_resale` on an expired, not yet reclaimed option returns `Expired` (109), not `NoAsk`
+   (the ask is checked first and still exists). `list_for_sale` after expiry returns `Expired`.
+4. **Same incoming-participant guards as `transfer`**: the buyer must be authorized on the underlying, the escrow must
+   still be authorized on it, and there must be no pooled deficit on the quote or the underlying (an issuer clawback);
+   otherwise the position is not sold to a new participant.
+5. **No escrow of the price**: the quote goes buyer → seller directly in the same invocation; the contract never holds
+   it. If the payment fails (buyer lacks quote, seller has no trustline or is frozen on the quote) the whole call reverts.
+6. **No fee, no partial sale**: the ask is for the whole position; one ask per option.
+
+Unchanged: every v1.3.1 function, error, event and constant. The ABI of §2–§5 is extended, not changed, except that
+the three listed paths now also delete `Ask(id)`.
