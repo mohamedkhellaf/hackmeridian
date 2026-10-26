@@ -1034,7 +1034,7 @@ impl Snap {
             for (_, book) in self.open_for.iter_mut() {
                 book.retain(|&i| i != id);
             }
-            self.open = list_open_of(&self.open_for, usize::MAX);
+            self.open = list_open_of(&self.open_for, MAX_PAGE as usize);
         }
     }
 
@@ -1065,20 +1065,17 @@ impl Snap {
             "an Offered option is missing from every book"
         );
         assert!(
-            self.open == list_open_of(&self.open_for, usize::MAX)
-                || self.open == list_open_of(&self.open_for, MAX_PAGE as usize),
+            self.open == list_open_of(&self.open_for, MAX_PAGE as usize),
             "list_open() {:?} is not the registry-order concatenation of the books",
             self.open
         );
     }
 }
 
-/// `list_open()` per ABI §3 (v1.3.1): the per-asset books concatenated in registry order,
-/// truncated to `LIST_OPEN_MAX`, visiting at most the first `max_assets` registry assets. ABI §3
-/// states no visiting bound (`usize::MAX`); an implementation that stops after the first
-/// `MAX_PAGE` registry assets, to keep the view bounded however many assets are listed
-/// (`books24_list_open_stays_within_limits_*`), is accepted too. Both agree whenever at most
-/// `MAX_PAGE` assets are listed.
+/// `list_open()` per ABI §3/§13.3 (v1.3.1): the per-asset books of the first `max_assets` registry
+/// assets concatenated in registry order, truncated to `LIST_OPEN_MAX`. The ABI window is
+/// `max_assets = MAX_PAGE` (50), which keeps the view bounded however many assets are listed
+/// (`books24_list_open_stays_within_limits_*`).
 fn list_open_of(books: &[(Address, std::vec::Vec<u32>)], max_assets: usize) -> std::vec::Vec<u32> {
     books
         .iter()
@@ -6668,9 +6665,9 @@ fn books24_list_open_truncation_never_hides_the_first_registry_assets() {
 /// asset (`AssetAt(i)`, `OpenFor(asset)`) while the books in front hold fewer than 200 ids: with
 /// such an implementation the 200th registry asset was the first to push the view past the
 /// 400-entry footprint (measured), so ~200 junk listings would break it for good.
-/// feat/v131-impl visits at most the first `MAX_PAGE` registry assets, which keeps the view
-/// bounded; offers on later assets are visible through `list_open_for`, which this test checks
-/// without asserting whether the window shows them (ABI §3 does not state the bound).
+/// ABI §3/§13.3 (v1.3.1) bound the view to the first `MAX_PAGE` registry assets, which keeps it
+/// within the limits; an offer on a later asset is visible through `list_open_for` only, and this
+/// test checks both.
 #[test]
 fn books24_list_open_stays_within_limits_whatever_the_registry_size() {
     let t = setup();
@@ -6697,8 +6694,8 @@ fn books24_list_open_stays_within_limits_whatever_the_registry_size() {
         first_over, None,
         "list_open() exceeds the per-transaction limits once the registry holds this many assets"
     );
-    // an offer on the last listed asset (registry index 251): always in its own book, and the
-    // window still starts with RWA and stays within the limits
+    // an offer on the last listed asset (registry index 251): in its own book, outside the
+    // list_open() window, which still holds only RWA's offer and stays within the limits
     let last = last.unwrap();
     let w = Address::generate(env);
     t.sac(&last).mint(&w, &1);
@@ -6707,6 +6704,5 @@ fn books24_list_open_stays_within_limits_whatever_the_registry_size() {
     assert_eq!(t.open_book(&last), [tail]);
     let open = t.c.list_open();
     assert!(t.exceeded_ledger().is_empty(), "{:?}", t.exceeded_ledger());
-    assert_eq!(open.get(0), Some(id));
-    assert!(open.len() <= 2);
+    assert_eq!(open, vec![env, id]);
 }

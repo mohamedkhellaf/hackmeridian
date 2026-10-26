@@ -4409,6 +4409,11 @@ fn open_book(t: &T, asset: &Address) -> std::vec::Vec<u32> {
             return book;
         }
         book.extend(page.iter());
+        assert!(
+            book.len() <= ASSET_CAP as usize,
+            "open book of {} ids exceeds MAX_OPEN_PER_ASSET",
+            book.len()
+        );
     }
 }
 
@@ -5153,19 +5158,44 @@ fn list_unflagged_assets(t: &T, n: usize) -> std::vec::Vec<Address> {
 }
 
 #[test]
-#[ignore = "ABI deviation: list_open() visits only the first MAX_PAGE (50) registry assets; ABI §3/§13.3 \
-            specify the concatenation of every per-asset book, truncated only at 200 ids"]
-fn list_open_includes_books_past_the_first_max_page_assets() {
-    // ABI §3 Views, §13.3 (v1.3.1): list_open() returns the per-asset books
-    // concatenated in registry order, truncated to 200 ids. With one open offer
-    // in total, on the 52nd listed asset, list_open() is that one id.
+fn list_open_visits_only_the_first_max_page_registry_assets() {
+    // ABI §3 Views, §13.3 (v1.3.1): list_open() concatenates, in registry order,
+    // the books of the first MAX_PAGE (50) registry assets only, truncated to 200
+    // ids. With 52 listed assets and one offer each on registry indexes 49, 50
+    // and 51, list_open() shows only the index-49 offer; the other two are
+    // reachable through list_open_for (the complete view).
     let t = setup();
     let assets = list_unflagged_assets(&t, 50);
-    let last = assets[51].clone();
-    t.sac(&last).mint(&t.writer, &UNDERLYING_START);
-    let id = t.offer(&t.writer, &last, OptionType::Call);
-    assert_eq!(open_book(&t, &last), [id]);
-    assert_eq!(t.open(), [id]);
+    assert_eq!(assets.len(), 52);
+    let mut ids = std::vec::Vec::new();
+    for i in [49usize, 50, 51] {
+        t.sac(&assets[i]).mint(&t.writer, &UNDERLYING_START);
+        ids.push(t.offer(&t.writer, &assets[i], OptionType::Call));
+    }
+    for (k, i) in [49usize, 50, 51].into_iter().enumerate() {
+        assert_eq!(open_book(&t, &assets[i]), [ids[k]]);
+    }
+    assert_eq!(t.open(), [ids[0]]);
+}
+
+#[test]
+fn registry_entries_get_full_ttl_on_creation() {
+    // ABI §8: registry_push (constructor seeding and list_asset) extends both
+    // Listed(token) and AssetAt(index) to TTL_EXTEND_TO (~30 days).
+    let t = setup();
+    for (i, a) in [t.rwa.clone(), t.bond.clone()].iter().enumerate() {
+        let at = key_ttl(&t, "AssetAt", (i as u32).into_val(&t.env));
+        assert!(at >= 29 * DAY, "constructor AssetAt({i}) TTL {at}");
+        let l = key_ttl(&t, "Listed", a.clone().into_val(&t.env));
+        assert!(l >= 29 * DAY, "constructor Listed({i}) TTL {l}");
+    }
+    let (sac, code, issuer) = new_asset(&t, false);
+    age_below_ttl_threshold(&t);
+    assert_eq!(t.c.list_asset(&t.maker2, &code, &issuer), sac);
+    let at = key_ttl(&t, "AssetAt", 2u32.into_val(&t.env));
+    assert!(at >= 29 * DAY, "list_asset AssetAt(2) TTL {at}");
+    let l = key_ttl(&t, "Listed", sac.into_val(&t.env));
+    assert!(l >= 29 * DAY, "list_asset Listed(sac) TTL {l}");
 }
 
 #[test]

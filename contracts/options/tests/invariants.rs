@@ -96,10 +96,9 @@
 //!   truncation at 200 ids and every way a slot is freed (buy, cancel, reclaim, prune).
 //! * `list_open()` truncation (200 ids) is likewise unreachable at random; the same regression
 //!   pins it, `open_books_concatenate_in_registry_order` pins the registry-order concatenation
-//!   with the full oracle, and `list_open_spans_the_whole_registry` (own fixture, 52 assets) that
-//!   the concatenation covers more than `MAX_PAGE` listed assets (the ABI caps ids, not assets).
-//!   That regression is `#[ignore]`d as an ABI deviation: the v1.3.1 implementation visits only
-//!   the first `MAX_PAGE` registry assets, a bound ABI §3/§13.3 do not state.
+//!   with the full oracle, and `list_open_window_is_the_first_max_page_registry_assets` (own
+//!   fixture, 52 assets) the ABI §3/§13.3 window: the concatenation covers only the first
+//!   `MAX_PAGE` (50) registry assets; later books are complete through `list_open_for`.
 //! * `WriterOpenLimit` (ABI §12.2, `MAX_OPEN_PER_WRITER = 50`) is predicted by the model but 40
 //!   random operations cannot reach it; the regression
 //!   `writer_open_limit_is_exactly_fifty_offers_per_writer` drives one writer to the cap and pins
@@ -5332,17 +5331,13 @@ fn open_book_cap_is_per_asset_at_five_hundred() {
     assert_eq!(page(0, u32::MAX), book[..50]);
 }
 
-/// ABI §3 `list_open()` (v1.3.1): the per-asset books concatenated in registry order, truncated
-/// to 200 ids. The cap is on ids, not on assets: with 52 listed assets (2 constructor
-/// underlyings, then 50 `list_asset` calls; more than `MAX_PAGE`) and one offer on the first
-/// and one on the last asset, `list_open()` holds both, in registry order.
-///
-/// Ignored: the v1.3.1 implementation stops after the first `MAX_PAGE` registry assets, so the
-/// offer on asset #52 is missing (observed `[1]`, expected `[1, 0]`). Un-ignore once the ABI and
-/// the implementation agree.
+/// ABI §3 `list_open()`, §13.3 (v1.3.1): the books of the first `MAX_PAGE` (50) registry assets
+/// concatenated in registry order, truncated to 200 ids. With 52 listed assets (2 constructor
+/// underlyings, then 50 `list_asset` calls) and one offer on each of registry indexes 51, 0, 49
+/// and 50, `list_open()` holds the offers on indexes 0 and 49, in registry order; the offers on
+/// indexes 50 and 51 are outside the window and complete through `list_open_for`.
 #[test]
-#[ignore = "ABI deviation: list_open() visits only the first MAX_PAGE (50) registry assets; ABI §3/§13.3 cap ids (200), not assets (observed [1], expected [1, 0])"]
-fn list_open_spans_the_whole_registry() {
+fn list_open_window_is_the_first_max_page_registry_assets() {
     let env = Env::new_with_config(EnvTestConfig {
         capture_snapshot_at_drop: false,
     });
@@ -5378,6 +5373,14 @@ fn list_open_spans_the_whole_registry() {
     let put = |u: &Address| c.create_offer(&writer, u, &OptionType::Put, &1, &1, &1, &(T0 + 1_000));
     assert_eq!(put(&assets[51]), 0);
     assert_eq!(put(&assets[0]), 1);
-    assert_eq!(c.list_open_for(&assets[51], &0, &MAX_PAGE).len(), 1);
-    assert_eq!(c.list_open().iter().collect::<Vec<u32>>(), [1, 0]);
+    assert_eq!(put(&assets[49]), 2);
+    assert_eq!(put(&assets[50]), 3);
+    let book = |u: &Address| {
+        c.list_open_for(u, &0, &MAX_PAGE)
+            .iter()
+            .collect::<Vec<u32>>()
+    };
+    assert_eq!(book(&assets[50]), [3]);
+    assert_eq!(book(&assets[51]), [0]);
+    assert_eq!(c.list_open().iter().collect::<Vec<u32>>(), [1, 2]);
 }
