@@ -48,6 +48,29 @@ SACs from `strata-rwa-issuer`. It is needed after **every** contract deploy: wit
 second argument names the env keys it records (`TX_<label>_RWA`, `TX_<label>_BOND`; default `AUTHORIZE_OPTIONS`).
 `deploy.sh --throwaway` passes `AUTHORIZE_THROWAWAY` so the main contract's authorization txs are not overwritten.
 
+## Onboard an external wallet (`onboard-account.sh`)
+
+Gives a wallet the scripts do not control (for example a teammate's Freighter account) the demo assets, so it can
+buy and exercise from the UI.
+
+```sh
+scripts/setup-testnet/onboard-account.sh <G-address> [--assets RWA,BOND,EQTY] [--usdx 100000] \
+  [--underlying 1000] [--wait-minutes 10]
+```
+
+1. Friendbot-funds the account if it does not exist yet.
+2. Prints the exact `CODE:ISSUER` trustlines the **owner** must add in their wallet (`USDx` always, plus each of
+   `--assets`). The script cannot sign for the account, so it cannot add them itself.
+3. Polls Horizon every 15 s for up to `--wait-minutes`. As each trustline appears, `strata-rwa-issuer` authorizes
+   it (RWA/BOND/EQTY, `set-trustline-flags --set-authorize`) and the right issuer pays the balance up to the target
+   (`USDx` from `strata-usdx-issuer`, RWA/BOND/EQTY from `strata-rwa-issuer`). Every tx prints `TX <label> <hash>`.
+
+Exits 0 when every requested trustline is authorized and at or above target. Exits 2 if the wait expires, listing
+the trustlines still missing. Re-run it after the owner adds them: an authorized trustline is not re-authorized, and
+a balance at or above target gets no payment. A trustline limit below the target stops the script with an error.
+EQTY is issued by `strata-rwa-issuer` in the shared Testnet world (`EQTY_SAC` in `testnet.env`); `02-assets.sh`
+does not create it, so pass `--assets RWA,BOND` in a world without EQTY.
+
 ## Issuer actions (freeze, de-authorize, clawback)
 
 `strata-rwa-issuer` is the admin of the RWA and BOND SACs, so it can call `set_authorized(<address>, false|true)`
