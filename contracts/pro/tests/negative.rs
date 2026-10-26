@@ -1,4 +1,4 @@
-//! Negative and footprint tests for the Strata Pro contract (brief `docs/pro-v0-brief-dev2.md` §4, §7).
+//! Negative and footprint tests for the StellSec Pro contract (brief `docs/pro-v0-brief-dev2.md` §4, §7).
 //!
 //! Every expected value below was produced by driving the executable spec
 //! `packages/risk/pro_v0_model.py` (v0.3.2) through the same sequence; nothing is derived from the Rust

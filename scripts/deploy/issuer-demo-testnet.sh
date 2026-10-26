@@ -338,7 +338,7 @@ trap 'cleanup' EXIT
 trap 'echo "interrupted"; exit 130' INT TERM
 
 # ---------- run ----------
-section "Strata issuer-action demo on Stellar TESTNET ($(date -u +%FT%TZ))"
+section "StellSec issuer-action demo on Stellar TESTNET ($(date -u +%FT%TZ))"
 echo "main options contract  $MAIN   (part A: reversible actions only)"
 echo "                       https://stellar.expert/explorer/testnet/contract/$MAIN"
 echo "RWA SAC $RWA_SAC | BOND SAC $BOND_SAC | USDx SAC $USDX_SAC"

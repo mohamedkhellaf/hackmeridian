@@ -149,7 +149,7 @@ export function AppShell({ route, portfolioBadge, contractId, network, wallet, c
       <header className="topbar">
         <div className="topbar-inner">
           <a href={hrefFor('markets')} className="brand">
-            Strata
+            StellSec
           </a>
           <nav className="topnav" aria-label="Main">
             {NAV.map((item) => (

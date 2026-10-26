@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
 
-/** Strata Pro is mounted only when the build sets VITE_ENABLE_PRO=1. */
+/** StellSec Pro is mounted only when the build sets VITE_ENABLE_PRO=1. */
 export const PRO_ENABLED = import.meta.env.VITE_ENABLE_PRO === '1'
 
 export interface NavItem {

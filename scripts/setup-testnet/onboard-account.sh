@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Onboard an externally owned wallet (e.g. a teammate's Freighter account) onto the Strata demo assets on TESTNET.
+# Onboard an externally owned wallet (e.g. a teammate's Freighter account) onto the StellSec demo assets on TESTNET.
 #
 #   scripts/setup-testnet/onboard-account.sh <G-address> [--assets RWA,BOND,EQTY] [--usdx 100000] \
 #       [--underlying 1000] [--wait-minutes 10]

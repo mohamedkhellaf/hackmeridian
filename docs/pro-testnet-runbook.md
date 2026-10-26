@@ -1,4 +1,4 @@
-# Strata Pro (experimental): Testnet runbook for Dev 2
+# StellSec Pro (experimental): Testnet runbook for Dev 2
 
 Stellar **TESTNET ONLY**. Fictional `USDx` quote token, fictional `EQTY` underlying label (cash-settled: no underlying
 token exists on chain). The publisher (risk snapshots and settlement price) and the vault's seed capital are
@@ -64,10 +64,10 @@ series and new offers on the same contract (the old series stays until its TTL l
 | pro v0 EXPERIMENTAL, cash-settled margin calls (deploy tx `<PRO_DEPLOY_TX>`, wasm sha256 `<first 16 hex>…`; admin `<G...>`, publisher `<G...>`, quote USDx SAC) | pro | `<PRO_ID>` | strata-deployer `GBVPEL6MT4IZ4XL5J7TTMB3GND7TPRS54KOJTUFCUOVFVFPZKE5HDA73` |
 ```
 
-**README.md** (section "Strata Pro (experimental)"), after the evidence run:
+**README.md** (section "StellSec Pro (experimental)"), after the evidence run:
 
 ```
-Strata Pro is an EXPERIMENTAL cash-settled margin layer on TESTNET (contract `<PRO_ID>`), separate from the fully
+StellSec Pro is an EXPERIMENTAL cash-settled margin layer on TESTNET (contract `<PRO_ID>`), separate from the fully
 collateralized options contract. The risk publisher and settlement price are operated by the team (not an oracle) and
 the backstop vault holds team seed capital, not third-party liquidity. Evidence: docs/pro-testnet-evidence.md
 (list_series, publish_risk, deposit, buy, exercise, liquidation to the vault, publish_settlement, settle, settle_vault, claim).

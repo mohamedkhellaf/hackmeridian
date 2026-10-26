@@ -16,7 +16,7 @@ import type { DialogState, WalletState } from './walletContext'
 type Kit = Awaited<ReturnType<typeof loadKit>>
 
 // Multi-wallet state on top of Stellar Wallets Kit. The kit is loaded lazily; the picker UI is
-// Strata's own (ConnectWalletDialog), driven by `dialog`.
+// StellSec's own (ConnectWalletDialog), driven by `dialog`.
 export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
   const [address, setAddress] = useState<string | null>(null)
   const [walletName, setWalletName] = useState<string | null>(null)

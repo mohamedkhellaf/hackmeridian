@@ -21,7 +21,7 @@ export function loadKit(): Promise<Kit> {
       import('@jsr/creit-tech__stellar-wallets-kit/modules/bitget'),
     ])
     const [freighter, xbull, lobstr, albedo, rabet, hana, onekey, bitget] = mods
-    if (config.networkPassphrase !== Networks.TESTNET) throw new Error('Strata supports Testnet only')
+    if (config.networkPassphrase !== Networks.TESTNET) throw new Error('StellSec supports Testnet only')
     // Explicit list instead of defaultModules(): that helper also pulls in the MetaMask module, whose
     // dependency (@metamask/connect-stellar) imports the v1 npm package and breaks the Vite build.
     // Ledger/Trezor are deliberately not added.
@@ -45,7 +45,7 @@ export function loadKit(): Promise<Kit> {
           projectId,
           allowedChains: [WalletConnectTargetChain.TESTNET],
           metadata: {
-            name: 'Strata',
+            name: 'StellSec',
             description: 'Tokenised options on Stellar Testnet',
             url: window.location.origin,
             icons: [`${window.location.origin}/favicon.svg`],

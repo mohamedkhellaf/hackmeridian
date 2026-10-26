@@ -5,7 +5,7 @@ Stellar **testnet** only (protocol 29). Every hash below was confirmed `successf
 testnet identities created by `scripts/setup-testnet/`; their public keys are listed below (also in the git-ignored
 `scripts/out/testnet.env`). Re-run everything with `scripts/deploy/smoke-testnet.sh`.
 
-Strata Pro (EXPERIMENTAL, separate contract `CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`): its deployment and
+StellSec Pro (EXPERIMENTAL, separate contract `CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`): its deployment and
 full Testnet evidence run (list_series → … → claim, every tx hash) are in `docs/pro-testnet-evidence.md`.
 
 ## Roles (testnet public keys, no secrets)

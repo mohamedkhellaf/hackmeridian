@@ -1,4 +1,4 @@
-//! Strata `options` contract: fully collateralized, physically settled calls and puts on
+//! StellSec `options` contract: fully collateralized, physically settled calls and puts on
 //! listed Stellar Asset Contract (SAC) underlyings, quoted in one SAC quote token (USDx).
 //!
 //! The ABI in `docs/contract-abi.md` is LOCKED; this file implements it exactly.

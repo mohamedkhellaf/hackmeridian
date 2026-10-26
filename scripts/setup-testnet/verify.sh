@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check the Strata testnet setup against Horizon (read-only). Exits non-zero on any mismatch.
+# Check the StellSec testnet setup against Horizon (read-only). Exits non-zero on any mismatch.
 #   scripts/setup-testnet/verify.sh
 # With OPTIONS_ID in scripts/out/testnet.env it also checks that the contract is authorized on RWA and BOND, and reports
 # (without failing) whether it is authorized on EQTY: EQTY is not a constructor underlying; on contract v1.3 the smoke

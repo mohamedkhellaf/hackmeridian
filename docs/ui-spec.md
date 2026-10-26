@@ -1,6 +1,6 @@
 # UI spec: trading screen, payoff and disclosures (Dev 1 → Dev 3)
 
-**Owner of the promise:** Dev 1. **Owner of the code:** Dev 3 (`frontend/`). **Date:** 2026-10-26. **Scope:** the Covered regime (`contracts/options`). Strata Pro has no on-chain UI (no-go, PR #30).
+**Owner of the promise:** Dev 1. **Owner of the code:** Dev 3 (`frontend/`). **Date:** 2026-10-26. **Scope:** the Covered regime (`contracts/options`). StellSec Pro has no on-chain UI (no-go, PR #30).
 
 This is a **delta** on what the frontend already has: Markets (series with competing makers), Buy dialog, Portfolio, Write, Reserves (with a shortfall banner) and Issuer. It follows the patterns retail option apps use (option chain → order ticket with payoff chart → positions with an exercise action). Nothing here changes the contract or its economics. If an item conflicts with `PRODUCT_SPEC.md`, the spec wins.
 

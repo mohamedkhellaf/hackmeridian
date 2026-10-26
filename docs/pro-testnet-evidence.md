@@ -1,4 +1,4 @@
-# Strata Pro (experimental): testnet evidence
+# StellSec Pro (experimental): testnet evidence
 
 Stellar **TESTNET ONLY**. Fictional assets (`USDx` quote token, fictional `EQTY` underlying label; cash-settled, no
 underlying token exists). The risk publisher and the settlement price are **team-operated** (`strata-pro-publisher`),

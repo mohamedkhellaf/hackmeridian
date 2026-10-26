@@ -1,4 +1,4 @@
-/* Strata tokens and base styles. Dark only. Rules: frontend/STYLE.md. */
+/* StellSec tokens and base styles. Dark only. Rules: frontend/STYLE.md. */
 :root {
   /* Neutral dark. Contrast on --bg: text 15:1, text-2 6.9:1, muted 5.2:1, accent 6.2:1. */
   --bg: #18181a;

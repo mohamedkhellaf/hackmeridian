@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Keep a Strata Pro series demo-ready on TESTNET: publish one fresh risk snapshot (publish_risk) from the
+# Keep a StellSec Pro series demo-ready on TESTNET: publish one fresh risk snapshot (publish_risk) from the
 # team-operated publisher (strata-pro-publisher). Snapshots older than max_age = 3600 s block buy/margin checks and
 # early exercise needs one <= 120 s old, so run this every few minutes while recording a UI demo.
 #

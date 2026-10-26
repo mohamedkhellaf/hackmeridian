@@ -20,7 +20,7 @@ import { ReservesView } from './views/ReservesView'
 import { WriteView } from './views/WriteView'
 import './App.css'
 
-// Strata Pro (experimental): a lazy chunk that exists only when the build sets VITE_ENABLE_PRO=1.
+// StellSec Pro (experimental): a lazy chunk that exists only when the build sets VITE_ENABLE_PRO=1.
 const ProApp = import.meta.env.VITE_ENABLE_PRO === '1' ? lazy(() => import('./pro/ProApp')) : null
 
 function App() {

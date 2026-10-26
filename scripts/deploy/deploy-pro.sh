@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and deploy the EXPERIMENTAL Strata Pro contract (contracts/pro) to Stellar TESTNET.
+# Build and deploy the EXPERIMENTAL StellSec Pro contract (contracts/pro) to Stellar TESTNET.
 #
 #   scripts/deploy/deploy-pro.sh                 # identities, stellar contract build --package pro, deploy (alias "pro")
 #   scripts/deploy/deploy-pro.sh --wasm <path>   # deploy a wasm built elsewhere
@@ -141,7 +141,7 @@ else
 
   if [[ ! -f "$EVIDENCE_MD" ]]; then
     cat >"$EVIDENCE_MD" <<'EOF'
-# Strata Pro (experimental): testnet evidence
+# StellSec Pro (experimental): testnet evidence
 
 Stellar **TESTNET ONLY**. Fictional assets (`USDx` quote token, fictional `EQTY` underlying label; cash-settled, no
 underlying token exists). The risk publisher and the settlement price are **team-operated** (`strata-pro-publisher`),

@@ -1,5 +1,5 @@
 """
-Strata Pro — moteur de risque de référence.
+StellSec Pro — moteur de risque de référence.
 
 Rôle : fixer exactement ce que le publieur de risque calcule hors chaîne et ce que
 le contrat Soroban vérifie. Les flottants servent à la recherche et à la calibration ;
@@ -97,7 +97,7 @@ class ScanConfig:
     psr: float                  # price scan range U, fraction du spot
     vol_shift: float = 0.25     # vol x (1 ± vol_shift)
     ext_mult: float = 3.0       # scénarios extrêmes à ± ext_mult * U
-    ext_weight: float = 1.0     # 0.35 = SPAN classique ; Strata : 1.0 (queue non sous-pondérée)
+    ext_weight: float = 1.0     # 0.35 = SPAN classique ; StellSec : 1.0 (queue non sous-pondérée)
     short_min: float = 0.05     # plancher par lot court, fraction du spot
     long_haircut: float = 0.5   # crédit des longs dont le vendeur est lui-même sur marge
     token_haircut: float = 0.15

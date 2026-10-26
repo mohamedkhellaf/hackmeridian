@@ -151,7 +151,7 @@ function LiveStatus({ client, connected }: { client: SorobanProClient; connected
 }
 
 /**
- * Strata Pro inside the main AppShell at `#/pro/...`. One disclosure banner, sub-navigation as a segmented control.
+ * StellSec Pro inside the main AppShell at `#/pro/...`. One disclosure banner, sub-navigation as a segmented control.
  * Runs on the live contract when the build sets VITE_PRO_CONTRACT_ID, otherwise on fixtures.
  */
 export default function ProApp() {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create and friendbot-fund the Strata demo identities on Stellar TESTNET.
+# Create and friendbot-fund the StellSec demo identities on Stellar TESTNET.
 # Idempotent: existing identities are reused; accounts that already exist on testnet are not re-funded.
 # Secrets stay in the stellar CLI keystore (~/.config/stellar/identity). Only public keys are written,
 # to scripts/out/testnet.env.

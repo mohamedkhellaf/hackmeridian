@@ -1,4 +1,4 @@
-//! Fixture replay for the Strata Pro contract (brief §7).
+//! Fixture replay for the StellSec Pro contract (brief §7).
 //!
 //! Replays every scenario of `packages/risk/fixtures/pro_v0.json` (generated from the executable spec
 //! `packages/risk/pro_v0_model.py`) against the compiled contract and requires identical results, error

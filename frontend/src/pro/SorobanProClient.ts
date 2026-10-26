@@ -1,4 +1,4 @@
-// On-chain Strata Pro client: contracts/pro on Testnet, read through simulated view calls and written through the
+// On-chain StellSec Pro client: contracts/pro on Testnet, read through simulated view calls and written through the
 // connected wallet (simulate -> sign -> send), like the Covered options client (src/options/sorobanClient.ts).
 // Encoding goes through the contract spec (proSpec.ts) with explicit i128/u32/u64 argument types; amounts stay
 // bigint integer units end to end. Margin figures come from the contract's views (get_requirement, vault_value);

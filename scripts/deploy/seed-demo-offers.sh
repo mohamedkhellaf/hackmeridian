@@ -100,7 +100,7 @@ view() { # view <fn> [args...]: simulation only, prints the return value
 
 # ---------- preflight (reads only) ----------
 contract_exists "$CONTRACT" || die "no contract instance at $CONTRACT on $NETWORK"
-count_before="$(view option_count)" || die "option_count failed on $CONTRACT; is it a Strata options contract?"
+count_before="$(view option_count)" || die "option_count failed on $CONTRACT; is it a StellSec options contract?"
 log "contract $CONTRACT: option_count=$count_before, list_open=$(view list_open || echo '?')"
 for a in RWA BOND; do
   sac_var="${a}_SAC"
