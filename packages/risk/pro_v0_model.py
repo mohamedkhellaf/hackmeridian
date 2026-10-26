@@ -8,13 +8,19 @@ tous les montants sont en unités USDx (7 décimales), les quantités en lots en
 Une transaction qui échoue ne modifie rien (comme une invocation Soroban qui panique) :
 `_tx` restaure l'état complet en cas d'erreur.
 
-Produit : calls nus AMÉRICAINS réglés en cash. Le porteur peut exercer à tout moment tant que
-`now < expiry` (au spot du dernier snapshot frais) ; sinon il est réglé au prix final après l'échéance.
+Produit : calls nus AMÉRICAINS réglés en cash. Le porteur peut exercer avant `expiry` au spot d'un
+snapshot de moins de `exercise_max_age` secondes, sauf sur un book repris par le vault (réglé à
+l'échéance) ou contre un vendeur liquidable ou en règlement ; sinon il est réglé au prix final.
 
 v0.1 (revue de la PR #30) : les positions appartiennent à un *book* (owner, série). La reprise
 déplace des books (O(séries)), pas des positions ; le règlement est en deux temps puis chaque porteur
 `claim` sa part (O(1) par transaction, aucun transfert poussé vers un tiers). Le vault paie au prorata
 des insuffisances d'une série. Rôles séparés et exclus du marché.
+
+v0.2 (2e revue) : pas d'exercice anticipé sur un book du vault ; snapshot d'exercice <= exercise_max_age ;
+dette échue non cotée bornée par le snapshot le plus récent du sous-jacent ; cash d'un vendeur réparti
+au prorata entre ses séries échues ; retraits LP coupés en v0 (dépôt seulement) ; reprise par le vault
+toujours possible quand NLV < MM, pour que la perte soit visible.
 
 Conventions de risque (publiées par le publieur, bornées par le contrat) :
 - `ra[w]`  : perte par lot COURT dans le scénario w (16 scénarios, ordre de strata_risk.ScanConfig),
@@ -51,7 +57,10 @@ ERRORS = {
     "OutOfTheMoney": 223,      # exercice anticipé sans valeur intrinsèque
     "LiquidateFirst": 224,     # le vendeur de la position est liquidable : reprise avant exercice
     "SettlementPending": 225,  # une série échue n'est pas clôturée : flux LP gelés
+    # v0.2
+    "NoEarlyExercise": 226,    # book repris par le vault : réglé à l'échéance, au prorata
 }
+# WithdrawLocked (215) reste réservé : les retraits LP sont coupés en v0.
 
 
 class ProError(Exception):
@@ -83,14 +92,15 @@ class MarketConfig:
     max_writer_oi: int = 20_000    # lots, toutes séries d'un vendeur
     bonus_bps: int = 500           # bonus du repreneur au-dessus du mark
     reserve_fee_bps: int = 1_000   # part de la prime versée au vault
-    lp_notice: int = 7 * 86_400    # préavis de retrait LP
     settle_window: int = 86_400    # délai pour publier le prix final après l'échéance
+    exercise_max_age: int = 120    # âge max du snapshot pour un exercice anticipé (s)
 
     def validate(self):
         ok = (0 < self.psr_bps <= BPS and 1 <= self.ext_mult <= 4 and 0 < self.short_min_bps <= BPS
               and BPS <= self.im_bps <= 3 * BPS and self.max_age > 0 and self.max_series_oi > 0
               and 0 < self.max_writer_oi <= self.max_series_oi and self.bonus_bps <= 1_000
-              and self.reserve_fee_bps <= BPS and self.lp_notice > 0 and self.settle_window > 0)
+              and self.reserve_fee_bps <= BPS and self.settle_window > 0
+              and 0 < self.exercise_max_age <= self.max_age)
         if not ok:
             raise ProError("InvalidArgs")
 
@@ -182,7 +192,6 @@ class ProModel:
         self.positions: dict[int, Position] = {}
         self.lp_shares: dict[str, int] = {}
         self.total_shares = 0
-        self.lp_requests: dict[str, tuple] = {}      # lp -> (shares, unlock_at, amount_at_request)
         self.wallets: dict[str, int] = {}            # soldes USDx hors contrat (pour la conservation)
         self.contract_balance = 0
         self.events: list = []
@@ -235,13 +244,21 @@ class ProModel:
             raise ProError("StaleSnapshot")
         return s
 
+    def _latest_snap(self) -> Snapshot | None:
+        """Snapshot le plus récent du déploiement (un seul sous-jacent) ; à égalité, le spot le plus haut."""
+        return max(self.snaps.values(), key=lambda x: (x.ts, x.spot), default=None)
+
+    def _expired_unpriced(self, a: Account) -> bool:
+        return any(q and not self._live(sid) and self.series[sid].settlement_price is None
+                   for sid, q in a.shorts.items())
+
     def _expired_liability(self, sid: int, q: int) -> int:
-        """Série échue : dette exacte si le prix final est publié, sinon borne prudente sans fraîcheur
-        (intrinsèque au scénario extrême haussier du dernier snapshot)."""
+        """Série échue : dette exacte si le prix final est publié, sinon borne prudente sans fraîcheur :
+        intrinsèque au scénario extrême haussier du snapshot le plus récent du sous-jacent (toutes séries)."""
         ser = self.series[sid]
         if ser.settlement_price is not None:
             return chk(q * max(ser.settlement_price - ser.strike, 0))
-        s = self.snaps.get(sid)
+        s = self._latest_snap()
         if s is None:
             return 0
         s_up = s.spot * (BPS + self.cfg.ext_mult * self.cfg.psr_bps) // BPS
@@ -437,8 +454,9 @@ class ProModel:
     # ------------------------------------------------------------------ exercice américain
 
     def exercise(self, holder: str, pid: int):
-        """Exercice anticipé, toute la position, au spot du dernier snapshot frais. Payé par le propriétaire
-        du book, qui doit être sain (NLV >= MM) : un compte liquidable est d'abord repris."""
+        """Exercice anticipé, toute la position, au spot d'un snapshot de moins de `exercise_max_age`. Payé par
+        le vendeur propriétaire du book, qui doit être sain (NLV >= MM) et sans dette échue non cotée.
+        Un book repris par le vault n'est pas exerçable avant l'échéance : le vault paie au prorata à settle_vault."""
         return self._tx(self._exercise, holder, pid)
 
     def _exercise(self, holder, pid):
@@ -453,14 +471,20 @@ class ProModel:
         ser = self.series[p.series_id]
         if self.now >= ser.expiry:
             raise ProError("SeriesExpired")           # après l'échéance : règlement puis claim
-        snap = self._fresh(p.series_id)
+        owner = book.owner
+        if owner == VAULT:
+            raise ProError("NoEarlyExercise")         # pas de course au cash du vault
+        snap = self.snaps.get(p.series_id)
+        if snap is None or self.now - snap.ts > self.cfg.exercise_max_age:
+            raise ProError("StaleSnapshot")           # pas d'option de regard en arrière sur un prix ancien
         per_lot = max(snap.spot - ser.strike, 0)
         if per_lot == 0:
             raise ProError("OutOfTheMoney")
-        owner = book.owner
+        if self._expired_unpriced(self.acct(owner)):
+            raise ProError("SettlementPending")       # la dette échue non cotée passe avant
         r = self.requirement(owner)
         if r["nlv"] < r["mm"]:
-            raise ProError("VaultCapacity" if owner == VAULT else "LiquidateFirst")
+            raise ProError("LiquidateFirst")
         due = chk(p.qty * per_lot)
         a = self.acct(owner)
         # NLV >= MM >= 0 et due <= qty x mark <= liability : le cash couvre toujours `due`
@@ -473,8 +497,7 @@ class ProModel:
         if book.qty == 0:
             book.settled = True
             ser.open_books -= 1
-            if owner != VAULT:
-                a.books.remove(book.id)
+            a.books.remove(book.id)
         p.settled, p.exercised, p.paid = True, True, due
         self._push(holder, due)
         self.events.append(("Exercised", pid, holder, owner, p.qty, snap.spot, due))
@@ -527,12 +550,12 @@ class ProModel:
             w.books.remove(bid)
             if taker != VAULT:
                 t.books.append(bid)
-        rt = self.requirement(taker)
-        if taker == VAULT:
-            if rt["nlv"] < rt["mm"]:
-                raise ProError("VaultCapacity")
-        elif rt["nlv"] < rt["im"]:
-            raise ProError("InsufficientMargin")
+        if taker != VAULT:
+            rt = self.requirement(taker)
+            if rt["nlv"] < rt["im"]:
+                raise ProError("InsufficientMargin")
+        # le vault reprend toujours un compte sous MM, même s'il passe lui-même sous MM : la perte devient
+        # visible dans vault_value (qui bloque alors les dépôts LP) au lieu de rester cachée chez le vendeur
         self.events.append(("TakenOver", writer, taker, live, x, pay, deficit))
         return {"x": x, "paid": pay, "deficit": deficit}
 
@@ -573,7 +596,17 @@ class ProModel:
             raise ProError("WrongState")
         a = self.acct(b.owner)
         due = chk(b.qty * max(ser.settlement_price - ser.strike, 0))
-        from_owner = 0 if b.owner == VAULT else min(due, a.cash)
+        if b.owner == VAULT:
+            from_owner = 0
+        else:
+            # le cash du vendeur est partagé au prorata entre toutes ses séries échues : on attend que chacune
+            # ait son prix (ou que sa fenêtre soit close), puis chaque book reçoit due x cash / dette totale
+            if any(q and not self._live(sid) and self.series[sid].settlement_price is None
+                   and self.now <= self.series[sid].expiry + self.cfg.settle_window for sid, q in a.shorts.items()):
+                raise ProError("NoSettlementPrice")
+            total = sum(self._book_due(x) for x in a.books if not self._live(self.books[x].series_id)
+                        and self.series[self.books[x].series_id].settlement_price is not None)
+            from_owner = due if a.cash >= total else (chk(due * a.cash) // total if total else 0)
         a.cash -= from_owner
         a.shorts[b.series_id] -= b.qty
         if a.shorts[b.series_id] == 0:
@@ -587,6 +620,11 @@ class ProModel:
             a.books.remove(bid)
         self.events.append(("BookSettled", bid, b.owner, due, from_owner, due - from_owner))
         return {"due": due, "from_owner": from_owner, "shortfall": due - from_owner}
+
+    def _book_due(self, bid: int) -> int:
+        b = self.books[bid]
+        ser = self.series[b.series_id]
+        return chk(b.qty * max(ser.settlement_price - ser.strike, 0))
 
     def settle_vault(self, sid: int):
         """Permissionless, étape 2 : une fois tous les books de la série réglés, le vault couvre la somme des
@@ -668,44 +706,8 @@ class ProModel:
         self.events.append(("LpDeposited", lp, amount, shares))
         return shares
 
-    def lp_request_withdraw(self, lp: str, shares: int):
-        return self._tx(self._lp_request, lp, shares)
-
-    def _lp_request(self, lp, shares):
-        if shares <= 0 or shares > self.lp_shares.get(lp, 0) or lp in self.lp_requests:
-            raise ProError("InvalidArgs")
-        at_request = max(self.vault_value(), 0) * shares // self.total_shares
-        self.lp_requests[lp] = (shares, self.now + self.cfg.lp_notice, at_request)
-        self.events.append(("LpWithdrawRequested", lp, shares, at_request))
-
-    def lp_withdraw(self, lp: str) -> int:
-        return self._tx(self._lp_withdraw, lp)
-
-    def _lp_withdraw(self, lp):
-        if lp not in self.lp_requests:
-            raise ProError("NotFound")
-        shares, unlock, at_request = self.lp_requests[lp]
-        if self.now < unlock:
-            raise ProError("WithdrawLocked")
-        if self._settlement_pending():
-            raise ProError("SettlementPending")      # pas de sortie entre l'échéance et la clôture
-        value = self.vault_value()
-        # min(valeur à la demande, valeur actuelle) : le préavis ne permet pas d'échapper aux pertes
-        amount = min(max(value, 0) * shares // self.total_shares, at_request)
-        v = self.accounts[VAULT]
-        if amount > v.cash:
-            raise ProError("VaultCapacity")
-        if any(v.shorts.values()):
-            r = self.requirement(VAULT)
-            if r["nlv"] - amount < r["im"]:
-                raise ProError("VaultCapacity")      # le capital engagé reste bloqué
-        v.cash -= amount
-        self.lp_shares[lp] -= shares
-        self.total_shares -= shares
-        del self.lp_requests[lp]
-        self._push(lp, amount)
-        self.events.append(("LpWithdrawn", lp, shares, amount))
-        return amount
+    # Retraits LP : coupés en v0 (2e revue PR #30). Le capital LP reste dans le vault : un retrait sûr exige de
+    # connaître toutes les pertes latentes (vendeurs insolvables pas encore repris), ce que v0 ne sait pas faire.
 
     # ------------------------------------------------------------------ invariants
 

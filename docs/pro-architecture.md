@@ -14,7 +14,7 @@ Strata Pro n'est pas « un contrat d'options avec une formule de marge ». C'est
 4. **Waterfall de défaut explicite.** Marge du défaillant, puis sa contribution, puis le backstop, puis le fonds mutualisé, puis une réduction pro rata des créances longues.
 5. **Plafonds d'open interest dérivés du capital de défaut.** Ce ne sont pas des choix commerciaux.
 
-Les calls Pro sont américains (exerçables à tout moment avant l'échéance, au spot du dernier snapshot frais) et réglés en cash. Le règlement physique reste réservé au régime Covered.
+Les calls Pro sont américains et réglés en cash : exerçables avant l'échéance au spot d'un snapshot de moins de 120 s, contre un vendeur sain ; un book repris par le vault, un vendeur liquidable ou une dette échue non cotée renvoient au règlement à l'échéance (brief §1). Le règlement physique reste réservé au régime Covered.
 
 ## 1. Les vrais problèmes, par ordre de gravité
 
@@ -44,7 +44,7 @@ Les calls Pro sont américains (exerçables à tout moment avant l'échéance, a
                                                  │ Backstop │  │ Default Fund │
                                                  │ Vault LP │  │ (makers)     │
                                                  └──────────┘  └──────────────┘
-  strata_core (Covered Physical existant) : contrat séparé, aucun flux partagé.
+  contracts/options (régime Covered, physique) : contrat séparé, aucun flux partagé.
 ```
 
 - **strata_pro**: un contrat. Vault, backstop et fonds de défaut y sont des compartiments comptables séparés. Un seul contrat, c'est moins d'appels inter-contrats et des invariants vérifiables en un endroit.
@@ -136,7 +136,7 @@ Ce que cela tranche :
 1. **Sous-pondérer la queue est la pire option.** Le SPAN classique demande le moins de capital, mais présente 10 à 40 fois plus de risque de déficit. Pour un short call, la queue *est* le risque.
 2. **Action liquide** : environ 15 à 24 % du notionnel suffit à rendre le déficit négligeable dans ce modèle. Pro y est **4 à 6 fois plus efficace** qu'un covered call. Le marché est éligible.
 3. **RWA fin** : aucune marge sous environ 35 % du notionnel ne descend sous 1 % de probabilité de déficit. À 59 %, le gain sur un covered call n'est que de 1,7 fois, et il faut encore payer la réserve (§6.3). **Les RWA fins restent en Covered ou Defined Risk.** C'est la justification chiffrée de la séparation des régimes.
-4. Le maker passif (non montré, voir `calibration_results.txt`) fait *moins* de déficits, car il est liquidé dès les premières variations, dans 90 à 99 % des trajectoires. Une marge qui « marche » parce qu'elle liquide tout le monde n'est pas viable pour un maker. L'hystérésis IM/MM et la liquidation partielle sont là pour ça.
+4. Le maker passif (non montré ; `python strata_risk.py 30000`) fait *moins* de déficits, car il est liquidé dès les premières variations, dans la grande majorité des trajectoires (84,5 % mesuré par Dev 2 sur le simulateur actuel, revue 2 de la PR #30). Une marge qui « marche » parce qu'elle liquide tout le monde n'est pas viable pour un maker. L'hystérésis IM/MM et la liquidation partielle sont là pour ça.
 
 Reproduire : `python strata_risk.py 30000` (environ 5 min).
 
@@ -215,7 +215,7 @@ Tableau de comparaison pour un maker sur l'action liquide : un covered call immo
 4. Une reprise ne modifie aucune position longue.
 5. Σ allocations du backstop ≤ capital du backstop. Le fonds de défaut n'est jamais compté dans la marge d'un maker.
 6. Un règlement s'exécute une seule fois par position. Le prix final est immuable.
-7. Les pertes Pro ne touchent jamais `strata_core`.
+7. Les pertes Pro ne touchent jamais `contracts/options`.
 8. Arithmétique i128 vérifiée. Les arrondis vont toujours contre le compte qui porte le risque.
 
 ## 10. ABI minimale
