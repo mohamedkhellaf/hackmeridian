@@ -171,3 +171,23 @@
 .rs-short-note a {
   color: var(--link);
 }
+
+/* Attestation: ratio cards, legend, footnotes */
+.rs-readline .ui-btn { margin-left: 4px; }
+.rs-ratios { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.rs-ratio-card { border: 1px solid var(--border); border-radius: var(--r-xl); background: var(--surface); padding: 20px 22px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rs-ratio-card--short { border-color: color-mix(in srgb, var(--warn) 35%, var(--border)); }
+.rs-ratio-top { display: flex; align-items: center; gap: 10px; }
+.rs-ratio-top > .ui-tag { margin-left: auto; }
+.rs-ratio-pct { font-family: var(--font-display); font-size: 52px; line-height: 1.05; font-weight: 500; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.rs-ratio-cap { font-size: 12.5px; color: var(--muted); }
+.rs-ratio-nums { display: flex; flex-wrap: wrap; gap: 4px 20px; margin-top: 8px; font-size: 13px; color: var(--text-2); }
+.rs-fnref { font-size: 0.75em; line-height: 0; margin-left: 2px; }
+.rs-fnref a { color: var(--link); text-decoration: none; padding: 0 1px; }
+.rs-fnref a:hover { text-decoration: underline; }
+.rs-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-2); }
+.rs-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.rs-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55; color: var(--text-2); }
+.rs-notes li { display: flex; gap: 10px; scroll-margin-top: 80px; }
+.rs-notes b { color: var(--text); font-weight: 600; }
+.rs-note-mark { flex: none; width: 1.2em; color: var(--muted); }
