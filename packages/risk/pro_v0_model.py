@@ -1,5 +1,5 @@
 """
-Strata Pro v0.3.2 — modèle de référence en entiers.
+StellSec Pro v0.3.2 — modèle de référence en entiers.
 
 Spécification exécutable de `contracts/pro/`. Chaque fonction publique correspond à une fonction
 du contrat, avec les mêmes contrôles dans le même ordre et les mêmes erreurs. Aucun flottant :

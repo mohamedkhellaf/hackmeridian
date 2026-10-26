@@ -1,4 +1,4 @@
-# Strata Pro — architecture de compensation pour calls non couverts
+# StellSec Pro — architecture de compensation pour calls non couverts
 
 Version du 25 octobre 2026. Conception pour Testnet. Les modèles et les tests sont dans `packages/risk/` (`strata_risk.py`, `test_strata_risk.py`).
 
@@ -6,7 +6,7 @@ Version du 25 octobre 2026. Conception pour Testnet. Les modèles et les tests s
 
 ## 0. Décision
 
-Strata Pro n'est pas « un contrat d'options avec une formule de marge ». C'est une **mini-chambre de compensation** construite sur cinq pièces :
+StellSec Pro n'est pas « un contrat d'options avec une formule de marge ». C'est une **mini-chambre de compensation** construite sur cinq pièces :
 
 1. **Comptes de marge croisée par sous-jacent.** La marge est calculée par scénarios, sur un modèle SPAN à 16 scénarios.
 2. **Publieur de risque hors chaîne.** Il signe des *risk arrays* par série. Le contrat ne fait que de l'algèbre entière : aucun Black–Scholes on-chain.
@@ -68,7 +68,7 @@ Pour un compte et un sous-jacent :
 
 - Prix ∈ {0, ±⅓U, ±⅔U, ±U} × vol ∈ {×1,25 ; ×0,75}.
 - Deux extrêmes à ±m·U.
-- **Différence clé avec SPAN** : SPAN pondère les extrêmes à 35 %. Strata les pondère à 100 %, car le risque d'un short call est précisément dans la queue (§5).
+- **Différence clé avec SPAN** : SPAN pondère les extrêmes à 35 %. StellSec les pondère à 100 %, car le risque d'un short call est précisément dans la queue (§5).
 - U = max(plancher, z·σ_eff·√(H/252)) + add-on de saut, avec σ_eff = max(σ_courte, σ_longue, σ_plancher).
 - H = détection + inclusion + sortie + plus longue fermeture du marché de référence.
 
@@ -123,20 +123,20 @@ Un call vendu à 10 % hors de la monnaie, sur 21 jours, 30 000 trajectoires. Deu
 |---|---|---|---|---|---|
 | Action liquide (σ 35 %, 4 sauts/an σ_J 8 %, lag 1 h) | Fixe FINRA 20 %/10 % | 12,5 % | 0,10 % | 0,004 | 0,34 |
 | | SPAN classique U=10 %, extrêmes à 35 % | 8,5 % | **0,96 %** | 0,040 | **8,97** |
-| | **Strata U=15 %, extrêmes ×2 à 100 %** | 24,1 % | 0,01 % | 0,0005 | 0,00 |
-| | Strata U=20 %, plancher 10 % | 36,3 % | 0,00 % | 0 | 0 |
+| | **StellSec U=15 %, extrêmes ×2 à 100 %** | 24,1 % | 0,01 % | 0,0005 | 0,00 |
+| | StellSec U=20 %, plancher 10 % | 36,3 % | 0,00 % | 0 | 0 |
 | RWA fin (σ 60 %, 10 sauts/an σ_J 15 %, lag 3 h, ADV 10k) | Fixe FINRA 20 %/10 % | 12,5 % | 2,00 % | 0,166 | 23,7 |
 | | SPAN classique U=10 % | 8,4 % | **4,07 %** | 0,365 | 30,1 |
-| | Strata U=15 % | 23,4 % | 2,12 % | 0,196 | 25,9 |
-| | **Strata U=20 %, plancher 10 %** | 34,6 % | 0,94 % | 0,080 | 18,5 |
-| | Strata U=30 %, plancher 10 % | 58,8 % | 0,09 % | 0,006 | 0,00 |
+| | StellSec U=15 % | 23,4 % | 2,12 % | 0,196 | 25,9 |
+| | **StellSec U=20 %, plancher 10 %** | 34,6 % | 0,94 % | 0,080 | 18,5 |
+| | StellSec U=30 %, plancher 10 % | 58,8 % | 0,09 % | 0,006 | 0,00 |
 
 Ce que cela tranche :
 
 1. **Sous-pondérer la queue est la pire option.** Le SPAN classique demande le moins de capital, mais présente 10 à 40 fois plus de risque de déficit sur l'action liquide (2 à 4 fois sur le RWA fin, mesure de Dev 2, revue 4). Pour un short call, la queue *est* le risque.
 2. **Action liquide** : environ 15 à 24 % du notionnel suffit à rendre le déficit négligeable dans ce modèle. Pro y est **4 à 6 fois plus efficace** qu'un covered call. Le marché est éligible.
 3. **RWA fin** : aucune marge sous environ 35 % du notionnel ne descend sous 1 % de probabilité de déficit. À 59 %, le gain sur un covered call n'est que de 1,7 fois, et il faut encore payer la réserve (§6.3). **Les RWA fins restent en Covered ou Defined Risk.** C'est la justification chiffrée de la séparation des régimes.
-4. Le maker passif (non montré ; `python strata_risk.py 30000`) fait *moins* de déficits, car il est liquidé dès les premières variations, dans la grande majorité des trajectoires (98,9 à 99,4 % avec les marges Strata, 84,5 % avec la seule marge FINRA ; mesures de Dev 2, revue 4 de la PR #30). Une marge qui « marche » parce qu'elle liquide tout le monde n'est pas viable pour un maker. L'hystérésis IM/MM et la liquidation partielle sont là pour ça.
+4. Le maker passif (non montré ; `python strata_risk.py 30000`) fait *moins* de déficits, car il est liquidé dès les premières variations, dans la grande majorité des trajectoires (98,9 à 99,4 % avec les marges StellSec, 84,5 % avec la seule marge FINRA ; mesures de Dev 2, revue 4 de la PR #30). Une marge qui « marche » parce qu'elle liquide tout le monde n'est pas viable pour un maker. L'hystérésis IM/MM et la liquidation partielle sont là pour ça.
 
 Reproduire : `python strata_risk.py 30000` (environ 5 min).
 

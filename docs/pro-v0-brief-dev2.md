@@ -1,4 +1,4 @@
-# Strata Pro v0.3.2 — build brief for Dev 2
+# StellSec Pro v0.3.2 — build brief for Dev 2
 
 Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **full on-chain attempt on Testnet**, decided by Dev 1 after PR #30 merged. Dev 2 builds `contracts/pro/` to this brief, with no "European only" cut. Go/no-go at 09:30 Lisbon under the gate in `AGENTS.md`; if it fails, Pro stays "specified and simulated" and the submission uses the Covered MVP. Dev 2 keeps the veto on unsafe behavior.
 

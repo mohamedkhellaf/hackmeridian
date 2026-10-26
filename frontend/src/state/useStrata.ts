@@ -193,4 +193,4 @@ export function useStrata() {
   }
 }
 
-export type Strata = ReturnType<typeof useStrata>
+export type StellSec = ReturnType<typeof useStrata>

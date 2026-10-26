@@ -1453,7 +1453,7 @@ bids_path() {
 }
 
 # ---------- run ----------
-section "Strata options smoke run on Stellar TESTNET ($(date -u +%FT%TZ))"
+section "StellSec options smoke run on Stellar TESTNET ($(date -u +%FT%TZ))"
 echo "options contract  $O"
 echo "                  https://stellar.expert/explorer/testnet/contract/$O"
 echo "USDx SAC (quote)  $USDX_SAC"

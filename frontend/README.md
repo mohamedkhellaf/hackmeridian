@@ -1,4 +1,4 @@
-# Strata frontend
+# StellSec frontend
 
 Vite + React 19 + TypeScript app for collateralized options on tokenized Stellar assets (Testnet).
 
@@ -27,7 +27,7 @@ Current Testnet deployment: v1.3.1, `CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTI
 
 Restart `npm run dev` after changing the env file.
 
-## Strata Pro (experimental)
+## StellSec Pro (experimental)
 
 Off by default. Build or run with `VITE_ENABLE_PRO=1` to mount the Pro section (`#/pro/...`, code in `src/pro/`, lazy chunk; a default build contains none of it). It renders inside the main shell: a `Pro` link at the end of the navigation, the five screens (Margin, Trade, Positions, Liquidations, Vault) behind a segmented control.
 Until the Pro contract passes its gate it runs on `packages/risk/fixtures/pro_v0.json` through `FixtureProClient`, and the Pro shell shows one banner: "Simulated on fixtures. No contract is called."

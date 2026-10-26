@@ -1,4 +1,4 @@
-//! Strata Pro v0.3.2: naked American calls, cash-settled in one SAC quote token (USDx), with partial
+//! StellSec Pro v0.3.2: naked American calls, cash-settled in one SAC quote token (USDx), with partial
 //! margin, takeover liquidation and an LP-funded backstop vault.
 //!
 //! EXPERIMENTAL, TESTNET ONLY. Isolated from `contracts/options` (no shared storage, balance or call).

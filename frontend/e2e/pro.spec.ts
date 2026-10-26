@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-// Strata Pro runs on fixtures here (the dev server is started with VITE_ENABLE_PRO=1).
+// StellSec Pro runs on fixtures here (the dev server is started with VITE_ENABLE_PRO=1).
 const SIMULATED = 'Simulated on fixtures. No contract is called.'
 
-test.describe('Strata Pro (simulated)', () => {
+test.describe('StellSec Pro (simulated)', () => {
   test('every screen carries the one simulated banner, the sub-navigation and the oracle row', async ({ page }) => {
     for (const sub of ['margin', 'trade', 'positions', 'liquidations', 'vault']) {
       await page.goto(`/#/pro/${sub}`)

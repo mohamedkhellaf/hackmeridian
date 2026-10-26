@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Issue the fictional Strata demo assets on Stellar TESTNET and deploy their Stellar Asset Contracts.
+# Issue the fictional StellSec demo assets on Stellar TESTNET and deploy their Stellar Asset Contracts.
 #
 #   RWA:<strata-rwa-issuer>   underlying, regulated issuer (AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED)
 #   BOND:<strata-rwa-issuer>  underlying, same regulated issuer

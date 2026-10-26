@@ -1,4 +1,4 @@
-# Strata UI primitives
+# StellSec UI primitives
 
 Rules: `frontend/STYLE.md`. Tokens: `src/index.css` (`--bg --surface --surface-hover --border --border-strong --row-line --text --text-2 --muted --accent --accent-fg --danger --warn --profit --loss --font-sans --font-mono --r --gutter --control-h`). Public Sans everywhere, IBM Plex Mono only for ids and hashes. Import from `src/ui`.
 

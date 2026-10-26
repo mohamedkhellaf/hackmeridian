@@ -1,6 +1,6 @@
-# Strata frontend style rules
+# StellSec frontend style rules
 
-Strata is a clearing desk. Holders of tokenized assets buy protection, makers lock collateral, and the app reads like a broker's paperwork: term sheet, contract note, reconciliation. It opens on the work (tables of offers and positions), speaks in terms and numbers, and proves things with links to the chain. Anything that reads as marketing, decoration or reassurance is out. The tone is professional, ergonomic and quiet.
+StellSec is a clearing desk. Holders of tokenized assets buy protection, makers lock collateral, and the app reads like a broker's paperwork: term sheet, contract note, reconciliation. It opens on the work (tables of offers and positions), speaks in terms and numbers, and proves things with links to the chain. Anything that reads as marketing, decoration or reassurance is out. The tone is professional, ergonomic and quiet.
 
 Every PR that touches `frontend/` is checked against this file. Research behind it: practitioner catalogues of AI-generated UI tells (avoid-ai-design, Kostac, 925studios), Linear's redesign notes, GitHub Primer typography, Deribit and Bloomberg conventions.
 
@@ -36,7 +36,7 @@ Neutral dark, not tinted. Tokens live in `src/index.css`; keep these names.
 
 ## 3. Layout and components
 
-- **Shell.** A horizontal top bar: the `Strata` wordmark (Public Sans 700, no logo mark), then `Markets`, `Protect`, `Write`, `Positions`, `Collateral`, `Issuer` (and `Pro` when the flag is on) as plain text links, the active one with an accent underline, and the wallet button on the right. No sidebar. Content is at most 1280px wide with 24px gutters (16px on phones). A one-line footer carries the testnet and mock disclosure.
+- **Shell.** A horizontal top bar: the `StellSec` wordmark (Public Sans 700, no logo mark), then `Markets`, `Protect`, `Write`, `Positions`, `Collateral`, `Issuer` (and `Pro` when the flag is on) as plain text links, the active one with an accent underline, and the wallet button on the right. No sidebar. Content is at most 1280px wide with 24px gutters (16px on phones). A one-line footer carries the testnet and mock disclosure.
 - **Phones (768px and below).** The top bar shrinks to wordmark and wallet. A bottom tab bar has four tabs (`Markets`, `Protect`, `Positions`, `Collateral`) and `More`, which opens a sheet with `Write`, `Issuer` and `Pro`. Touch targets are at least 44px.
 - Each page starts with an h1 and, at most, one row of actions or a filter row. No hero, no eyebrow, no lede, no stat cards, no illustration panel.
 - Tables over cards. Rows 36 to 38px with a hairline divider. A card is used only for one discrete object: an offer detail, an order review, a form. No nested bordered boxes.
@@ -72,7 +72,7 @@ These are required by `AGENTS.md` and must remain, but each appears in exactly o
 | Issuer can freeze or claw back, which can block settlement | Buy dialog, review step, one muted line | `The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.` |
 | Premium is paid to the maker at purchase and is not refunded | Buy dialog, review step, next to the premium row | `Paid to the maker now. Not refundable.` |
 | Payoff chart is hypothetical | Chart caption | `Hypothetical payoff at expiry. Not a quote.` |
-| Strata Pro is simulated | Pro pages, one banner at the top of the Pro shell | `Simulated on fixtures. No contract is called.` |
+| StellSec Pro is simulated | Pro pages, one banner at the top of the Pro shell | `Simulated on fixtures. No contract is called.` |
 
 Nothing else repeats them. No disclaimer paragraphs in rails, cards or heroes.
 
