@@ -7,7 +7,7 @@ HackMeridian 2026, Lisbon · Genesis path · Stellar Unlocked track · Testnet o
 | | |
 |---|---|
 | App | https://hackmeridian-psi.vercel.app |
-| Contract (options v1.4) | [`<V1_4_ID>`](https://stellar.expert/explorer/testnet/contract/<V1_4_ID>) |
+| Contract (options v1.4) | [`CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`](https://stellar.expert/explorer/testnet/contract/CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK) |
 | Spec · ABI · evidence | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) · [docs/contract-abi.md](docs/contract-abi.md) · [docs/contract-testnet-evidence.md](docs/contract-testnet-evidence.md) |
 | Demo video · deck | added at submission |
 
@@ -44,20 +44,20 @@ Every transaction we claim is listed in [docs/contract-testnet-evidence.md](docs
 
 | Claim | Testnet tx |
 |---|---|
-| v1.4 deployed | [`<V1_4_DEPLOY_TX>`](https://stellar.expert/explorer/testnet/tx/<V1_4_DEPLOY_TX>) |
+| v1.4 deployed; `contracts/options` on `main` builds byte-identical to the on-chain wasm (`437de9d5…4e57`) | [`da27e9fd…`](https://stellar.expert/explorer/testnet/tx/da27e9fd2afebaefc7385ce813406cebff3b7fa469f4a0fb2926c06743237fb8) |
 | Asset listed at runtime (EQTY), escrow authorized by its issuer, then a put created, bought, exercised and claimed | [`89147386…`](https://stellar.expert/explorer/testnet/tx/891473865d9330d7881b9208e02388166afe8e7cf13344853180ae5547de0512), [`26158344…`](https://stellar.expert/explorer/testnet/tx/261583446ee575fd29dc2b1a9b43eb08da0701fff78996f74e025a19c5714147) |
 | Issuer claws back collateral from the escrow; RWA offers refused while the token is short, BOND unaffected; issuer repays | [`f45330be…`](https://stellar.expert/explorer/testnet/tx/f45330bed06985a957993ab49a8e81d1a276dc7e8444498fa5a57eaf5b5dcbeb), [`c6ef0692…`](https://stellar.expert/explorer/testnet/tx/c6ef06926cb5d47366ac16a89da0e9b87151c61e85aafe80a62ca4feae66432a) |
 | Third party prunes an expired unsold offer, collateral returns to the writer | [`da477e8c…`](https://stellar.expert/explorer/testnet/tx/da477e8cc5d490bdfb8f88f90c65e3ae0121073668a9ce53908a31fc7622ac7d) |
 | Holder transfers an active option | [`c4a60668…`](https://stellar.expert/explorer/testnet/tx/c4a60668b296e7c643d9aca1cee7e54d1b3e864de2604caef9a880ccd73c0c67) |
-| Holder lists an option for resale, another eligible account buys it; holder changes, collateral untouched | [`<RESALE_TX>`](https://stellar.expert/explorer/testnet/tx/<RESALE_TX>) |
+| Holder lists an option for resale, another eligible account buys it; holder changes, collateral untouched | [`a5c5a3d2…`](https://stellar.expert/explorer/testnet/tx/a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949) |
 
-Tests: 120 unit, 17 property-based invariants (collateral conservation, no double use, per-token reserves), 65 negative (replay, double exercise, unauthorized cancel, withdrawn collateral, caps, tenor). Frontend: Vitest unit tests and a Playwright suite with a test-only wallet. All run in CI.
+Tests: 133 unit, 17 property-based invariants (collateral conservation, no double use, per-token reserves), 76 negative (replay, double exercise, unauthorized cancel, withdrawn collateral, caps, tenor). Frontend: Vitest unit tests and a Playwright suite with a test-only wallet. All run in CI.
 
 ### Deployed (Testnet)
 
 | | ID |
 |---|---|
-| options v1.4 | `<V1_4_ID>` |
+| options v1.4 | `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK` |
 | RWA SAC | `CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U` |
 | BOND SAC | `CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP` |
 | EQTY SAC (listed with `list_asset`) | `CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU` |
@@ -76,10 +76,10 @@ Locally:
 ```sh
 rustup target add wasm32v1-none
 stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian
-sha256sum target/wasm32v1-none/release/options.wasm      # compare with the deployed wasm hash
+sha256sum target/wasm32v1-none/release/options.wasm      # 437de9d56a05…
 cargo test -p options
 
-cd frontend && npm install && cp .env.example .env         # VITE_OPTIONS_CONTRACT_ID=<V1_4_ID>
+cd frontend && npm install && cp .env.example .env         # VITE_OPTIONS_CONTRACT_ID=CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK
 npm run dev                                                 # npm test · npm run e2e · npm run build
 ```
 
@@ -114,12 +114,12 @@ stateDiagram-v2
 | `prune_expired(pruner, ids)` | anyone | Returns expired unsold collateral to writers, frees the book. |
 | `transfer(holder, to, id)` | holder | Hands an active option to an eligible address. |
 | `list_for_sale(holder, id, ask_total)` · `cancel_sale(holder, id)` | holder | Sets or removes a resale ask, in the quote token. One ask per option. |
-| `buy_resale(buyer, id)` | buyer | Pays `ask_total` to the holder; buyer becomes holder. Buyer must be eligible and not the holder or the writer. The option itself is unchanged. |
+| `buy_resale(buyer, id, max_total)` | buyer | Pays `ask_total` to the holder; buyer becomes holder. Buyer must be eligible and not the holder or the writer. The option itself is unchanged. |
 | `list_asset(lister, code, issuer)` | anyone | Adds the canonical SAC of a classic asset to the registry. |
 | `extend_ttl(ids)` | anyone | Bumps storage rent. |
 | `get_option`, `get_options`, `get_ask`, `list_asks`, `list_open`, `list_open_for`, `open_collateral`, `is_eligible`, `list_assets`, `writer_open_count`, `config`, … | read | What the app shows. |
 
-Limits: 500 open offers per asset, 50 per writer, expiry within 2 years. Errors 101–120, decoded in the app: `NotFound` 101, `InvalidArgs` 102, `AssetNotAllowed` 103, `NotEligible` 104, `ContractNotAuthorized` 105, `WrongState` 106, `NotWriter` 107, `NotHolder` 108, `Expired` 109, `NotExpired` 110, `SelfTrade` 111, `Overflow` 112, `InvalidConfig` 113, `OpenListFull` 114, `CollateralShortfall` 115, `WriterOpenLimit` 116, `AlreadyListed` 117, `AssetNotDeployed` 118, `TenorOutOfRange` 119, `NoAsk` 120. An ask is removed on exercise, transfer, expiry, cancel or purchase.
+Limits: 500 open offers per asset, 50 per writer, expiry within 2 years. Errors 101–121, decoded in the app: `NotFound` 101, `InvalidArgs` 102, `AssetNotAllowed` 103, `NotEligible` 104, `ContractNotAuthorized` 105, `WrongState` 106, `NotWriter` 107, `NotHolder` 108, `Expired` 109, `NotExpired` 110, `SelfTrade` 111, `Overflow` 112, `InvalidConfig` 113, `OpenListFull` 114, `CollateralShortfall` 115, `WriterOpenLimit` 116, `AlreadyListed` 117, `AssetNotDeployed` 118, `TenorOutOfRange` 119, `NoAsk` 120, `PriceMoved` 121 (the ask rose above the cap the buyer passed). An ask is removed on exercise, transfer, expiry, cancel or purchase.
 
 Decisions and their reasons are in [PRODUCT_SPEC.md](PRODUCT_SPEC.md): premium paid at purchase, never refunded (D1); no self-purchase (D2); 2-year tenor (D4); no impaired state, no refund after issuer action (D6); free transfer to eligible addresses only (D7); resale at a holder-set price, option unchanged (D8).
 

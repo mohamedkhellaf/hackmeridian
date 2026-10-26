@@ -21,7 +21,7 @@ Setup (assets, trustlines, funding, authorizing the options contract on the FUND
 
 Pre-staged state needed before recording (ask Dev 2 to produce it, or do it off camera):
 - Maker A's and Maker B's offers (scenes 2 and 3) are created on camera. One extra option, bought by the Investor and still `active`, must exist off camera for scene 7 (the freeze scene), because scene 5 consumes the first one. Simplest: a third funded offer from Maker B, bought by the Investor before recording.
-- Scene 4b (resale, contract v1.4 `<V1_4_ID>`) needs one more option, bought by the Investor off camera and still `active`, with no ask on it. Do not resell the option bought in scene 4: scene 5 exercises it.
+- Scene 4b (resale, contract v1.4 `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`) needs one more option, bought by the Investor off camera and still `active`, with no ask on it. Do not resell the option bought in scene 4: scene 5 exercises it.
 - Short expiry is risky: use an expiry at least 2 hours after the recording time.
 
 ## Pre-recording checklist
@@ -74,7 +74,7 @@ Fill the evidence column before recording. "Test" = automated test name, "tx" = 
 | Fully collateralized, no leverage or margin | ABI section 2 derived values table; AGENTS.md "Never in this hackathon" | contract tests TBD by Dev 2 |
 | Two makers compete with on-chain funded offers | txs of scenes 2 and 3; Market tab reads `list_open` | TODO tx hashes |
 | Investor buys, premium goes to the maker at purchase | `buy` transfers premium buyer to writer (ABI section 3). Policy is PROVISIONAL (ABI section 7): Dev 1 must confirm or change before we say more than this | needs Dev 1 decision |
-| A holder resells at a price they set; the buyer pays the holder and becomes holder; strike, expiry and collateral unchanged | `list_for_sale` and `buy_resale` (v1.4, `<V1_4_ID>`); PRODUCT_SPEC D8; tx `<RESALE_TX>`; `open_collateral` the same before and after | TODO scene 4b recording |
+| A holder resells at a price they set; the buyer pays the holder and becomes holder; strike, expiry and collateral unchanged | `list_for_sale` and `buy_resale` (v1.4, `CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`); PRODUCT_SPEC D8; tx `a5c5a3d2d80e510bfcebe9f9781b82bdc3313121feffaf30fa642d8556e69949`; `open_collateral` the same before and after | TODO scene 4b recording |
 | Exercise is atomic delivery-versus-payment | `exercise` in one transaction (ABI section 3); spike on-chain revert proof tx `a005ab41...` (`research/decision/20_rwa_options_spike.md`); tx of scene 5 | TODO scene 5 tx hash |
 | Writer claims delivery after exercise | `claim_delivery` (ABI section 3); scene 6 tx | TODO tx hash |
 | Frozen holder cannot exercise, clear message, nothing moves | ABI section 6; spike results (e) and (d+); error text for SAC #11 in `frontend/src/stellar/errors.ts` ("Token balance is deauthorized...") | TODO scene 7 recording; Dev 2 contract test |
