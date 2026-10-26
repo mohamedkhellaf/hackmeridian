@@ -3,7 +3,7 @@ import { OptionsTable } from '../market/OptionsTable'
 import type { OptionOffer } from '../options/types'
 import { computeKpis, filterPositions, moneyWith, nowMs, waitingActions } from '../portfolio/positions'
 import type { PositionFilter } from '../portfolio/positions'
-import { Banner, PageHeader, Segmented, Stat, StatGrid } from '../ui'
+import { Banner, PageHero, Segmented } from '../ui'
 import type { PositionAction } from '../state/useStrata'
 import '../portfolio/portfolio.css'
 
@@ -34,30 +34,39 @@ export function PortfolioView({ me, rows, actionFor }: PortfolioViewProps) {
 
   return (
     <div className="pf">
-      <PageHeader title="Portfolio" subtitle="Options you hold and options you wrote, with the next action for each." />
+      <PageHero
+        eyebrow={me ? `Your positions · ${me.slice(0, 4)}…${me.slice(-4)}` : 'Your positions'}
+        title="Portfolio"
+        lede="Everything you hold or have written, with the one thing each position is waiting for."
+        sediment={{ seed: me ?? 'portfolio', captionLabel: 'Open and recent', caption: me ? `${counts.all} ${counts.all === 1 ? 'position' : 'positions'}` : 'Connect a wallet' }}
+        stats={
+          me
+            ? [
+                { label: 'Holding', value: kpis.holding },
+                { label: 'Writing', value: kpis.writing },
+                {
+                  label: 'Your collateral locked',
+                  value:
+                    kpis.locked.length === 0 ? (
+                      '—'
+                    ) : (
+                      <span className="pf-multi">
+                        {kpis.locked.map((l) => (
+                          <span key={l.token.contractId}>{moneyWith(l.amount, l.token)}</span>
+                        ))}
+                      </span>
+                    ),
+                },
+                {
+                  label: 'Premium earned',
+                  value: kpis.premium ? <span className="pf-pos">+{moneyWith(kpis.premium.amount, kpis.premium.token)}</span> : '—',
+                },
+              ]
+            : undefined
+        }
+      />
       {me ? (
         <>
-          <div className="pf-kpis">
-            <StatGrid columns={4}>
-              <Stat label="Holding">{kpis.holding}</Stat>
-              <Stat label="Writing">{kpis.writing}</Stat>
-              <Stat label="Your collateral locked">
-                {kpis.locked.length === 0 ? (
-                  '—'
-                ) : (
-                  <span className="pf-multi">
-                    {kpis.locked.map((l) => (
-                      <span key={l.token.contractId}>{moneyWith(l.amount, l.token)}</span>
-                    ))}
-                  </span>
-                )}
-              </Stat>
-              <Stat label="Premium earned">
-                {kpis.premium ? <span className="pf-pos">+{moneyWith(kpis.premium.amount, kpis.premium.token)}</span> : '—'}
-              </Stat>
-            </StatGrid>
-          </div>
-
           {waiting.length > 0 && (
             <Banner tone="info">
               {waiting.length} {waiting.length === 1 ? 'action' : 'actions'} waiting: {joinPhrases(waiting)}.

@@ -5,7 +5,7 @@ import { formatExpiry } from '../options/format'
 import { requiredCollateral } from '../options/types'
 import type { NewOffer, OptionKind, OptionOffer, SupportedAssets } from '../options/types'
 import { money, moneyWith, nowMs } from '../portfolio/positions'
-import { AssetBadge, Button, Chip, Icon } from '../ui'
+import { AssetBadge, Button, Chip, Icon, PayoffSketch } from '../ui'
 import { useBalances } from '../wallet/useBalances'
 import { buildOffer } from './buildOffer'
 import { lowestOpenInSeries, premiumPerUnitText } from './lowestOffer'
@@ -239,6 +239,12 @@ export function WriteOfferForm({
           </span>
           <span className="wr-help">Returned to you if the offer is cancelled or expires unexercised.</span>
         </div>
+
+        {offer && (
+          <div className="wr-sketch">
+            <PayoffSketch kind={kind} strikeLabel={strike.trim() || '0'} asset={underlyingCode} />
+          </div>
+        )}
 
         <dl className="wr-rows">
           <div className="wr-row">
