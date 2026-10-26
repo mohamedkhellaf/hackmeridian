@@ -528,7 +528,9 @@ totals, open books and the writer are never touched. v1.4 = v1.3.1 + the items b
 | `list_asks(from: u32, limit: u32) -> Vec<Ask>` | view | never fails | scans option ids `from .. from + min(limit, MAX_PAGE = 50)` (stops at `option_count()`) and returns the ones with an ask, in id order, with the option's current holder |
 
 `#[contracttype] struct Ask { id: u32, holder: Address, ask_total: i128 }`. Because `list_asks` scans ids, a page can
-hold fewer rows than `limit`: page with `from += min(limit, 50)`, not by the number of rows returned. It may include
+hold fewer rows than `limit`, or none at all while later ids still carry asks. **Clients must step the cursor by
+`from += min(limit, 50)`** (as the frontend does) and stop at `option_count()`, never by the number of rows returned
+and never on an empty page. It may include
 asks on options past expiry (until the writer reclaims); clients filter by `expiry` (`buy_resale` returns `Expired`).
 
 **Errors** (appended; nothing renumbered): `NoAsk = 120` (no ask on this id: never listed, cancelled, already bought, or
@@ -537,6 +539,14 @@ cleared by `exercise` / `transfer` / `reclaim`), `PriceMoved = 121` (the current
 **Events** (default topic = snake_case name, then `id`): `ask_listed { id, holder, ask_total }`,
 `ask_cancelled { id }`, `resale_bought { id, seller, buyer, ask_total }`. The SAC also emits its own `transfer` event
 for the payment.
+
+Event semantics for indexers: `ask_cancelled` is emitted **only** by `cancel_sale`. The other paths that remove an ask
+do it silently, and their own event implies the removal: `option_exercised` (ask gone, option `Exercised`),
+`option_transferred` (ask gone, new holder has none) and `option_reclaimed` of an `Active` option (ask gone, option
+`Expired`); `resale_bought` also removes it. `resale_bought` itself changes the holder from `seller` to `buyer`; no
+`option_transferred` is emitted for a resale. An indexer that tracks asks and holders must therefore apply all six
+events (`ask_listed`, `ask_cancelled`, `resale_bought`, `option_exercised`, `option_transferred`, `option_reclaimed`),
+or simply re-read `get_ask` / `list_asks`.
 
 **Storage and TTL**: persistent `Key::Ask(id) -> i128`, written with the §8 TTL (`extend_ttl(entry, 7 days, 30 days)`)
 and the option entry is bumped on `list_for_sale`. `extend_ttl(ids)` also extends `Ask(id)` when present, for `Active`
