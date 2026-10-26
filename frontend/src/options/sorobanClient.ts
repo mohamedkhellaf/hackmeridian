@@ -1,4 +1,4 @@
-import { contract } from '@stellar/stellar-sdk'
+import { contract, rpc } from '@stellar/stellar-sdk'
 import { describeError } from '../stellar/errors'
 import { server } from '../stellar/rpc'
 import { baseClientOptions, clientSigning, signAndSend } from '../stellar/signer'
@@ -11,8 +11,9 @@ import type { CollateralHealth, NewOffer, OptionOffer, SupportedAssets, TokenInf
 
 // Hand-written typed view of the `options` contract (docs/contract-abi.md section 3), shaped like the
 // code `stellar contract bindings typescript` generates: named-argument objects, AssembledTransaction
-// results. Methods returning Result<T, Error> are unwrapped by `unwrap` below. Replace with the
-// generated bindings once the contract is deployed; the signatures here must match the spec.
+// results. Methods returning Result<T, Error> are unwrapped by `unwrap` below. Checked against the
+// deployed v1.2 spec (`stellar contract info interface`, 2026-10-26): names, argument order and types match
+// exactly, so we keep this hand-written view instead of vendoring generated bindings.
 type Tx<T> = Promise<contract.AssembledTransaction<T>>
 type Opt = contract.MethodOptions
 type MaybeResult<T> = T | { isOk?: () => boolean; isErr?: () => boolean; unwrap?: () => T; unwrapErr?: () => unknown }
@@ -23,6 +24,10 @@ interface OptionsContract {
   option_count: (o?: Opt) => Tx<number>
   open_collateral: (a: { token: string }, o?: Opt) => Tx<bigint>
   is_eligible: (a: { token: string; who: string }, o?: Opt) => Tx<boolean>
+  list_open: (o?: Opt) => Tx<number[]>
+  get_options: (a: { from: number; limit: number }, o?: Opt) => Tx<AbiOptionData[]>
+  extend_ttl: (a: { ids: number[] }, o?: Opt) => Tx<MaybeResult<null>>
+  transfer: (a: { holder: string; to: string; id: number }, o?: Opt) => Tx<MaybeResult<null>>
   create_offer: (
     a: {
       writer: string
@@ -55,6 +60,15 @@ export function unwrap<T>(r: MaybeResult<T>): T {
   }
   return r as T
 }
+
+// A failed Result<T, Error> simulation: the SDK maps it to Err(doc text) and drops the numeric code, but keeps
+// the raw host error ("Error(Contract, #101)") in `simulation.error`. Rethrow that so errors.ts can decode it.
+function throwSimulationError(tx: contract.AssembledTransaction<unknown>): void {
+  const sim = tx.simulation
+  if (sim && rpc.Api.isSimulationError(sim)) throw new Error(sim.error)
+}
+
+const PAGE = 50 // contract MAX_PAGE
 
 const nowSec = () => Math.floor(Date.now() / 1000)
 
@@ -99,7 +113,9 @@ export class SorobanOptionsClient implements OptionsClient {
 
   private async read<T>(call: (c: Bound) => Tx<T>): Promise<T> {
     const c = await this.client()
-    return (await call(c)).result
+    const tx = await call(c)
+    throwSimulationError(tx)
+    return tx.result
   }
 
   private async write<T>(call: (c: Bound) => Tx<T>): Promise<{ hash: string; result: T }> {
@@ -154,15 +170,19 @@ export class SorobanOptionsClient implements OptionsClient {
     })
   }
 
-  // All options ever created (positions need non-open ones too). Fine for a hackathon-sized id space.
+  // All options ever created (positions need non-open ones too). v1.2 get_options pages 50 at a time
+  // (MAX_PAGE), so this is ceil(n/50) simulations instead of 1+n.
   listOptions(): Promise<OptionOffer[]> {
     return this.guard(async () => {
       const [count, tokens] = await Promise.all([this.read((c) => c.option_count()), this.tokenMap()])
       const now = nowSec()
-      const raws = await Promise.all(
-        Array.from({ length: Number(count) }, (_, id) => this.read((c) => c.get_option({ id }))),
-      )
-      return raws.map((r) => optionFromAbi(unwrap(r), tokens, now))
+      const raws: AbiOptionData[] = []
+      while (raws.length < count) {
+        const page = await this.read((c) => c.get_options({ from: raws.length, limit: PAGE }))
+        if (page.length === 0) break
+        raws.push(...page)
+      }
+      return raws.map((r) => optionFromAbi(r, tokens, now))
     })
   }
 
@@ -228,5 +248,20 @@ export class SorobanOptionsClient implements OptionsClient {
   }
   claimDelivery(id: bigint, writer: string) {
     return this.simple((c, n) => c.claim_delivery({ writer, id: n }), id)
+  }
+
+  // v1.2 capabilities, client only (no UI yet). transfer moves no tokens: payment is settled off-chain.
+  transferHolder(id: bigint, holder: string, to: string) {
+    return this.simple((c, n) => c.transfer({ holder, to, id: n }), id)
+  }
+  openIds(): Promise<bigint[]> {
+    return this.guard(async () => (await this.read((c) => c.list_open())).map(BigInt))
+  }
+  extendTtl(ids: bigint[]) {
+    return this.guard(async () => {
+      const { hash, result } = await this.write((c) => c.extend_ttl({ ids: ids.map(idToU32) }))
+      unwrap(result)
+      return { hash }
+    })
   }
 }
