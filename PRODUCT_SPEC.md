@@ -63,7 +63,7 @@ Each item adopts the behavior already coded, with its justification.
 
 **D6. No Impaired state and no refund.** The contract promises the economics of the option, not protection against the issuer. If an issuer claws back tokens from the escrow, the escrow holds one pooled balance per token, so payouts are served **first come, first served** until the pool runs out. The shortfall falls on whoever claims last, not on the option whose collateral was clawed. While such a deficit exists, new offers, purchases and transfers on that token are refused (`CollateralShortfall`, #115), so the hole cannot spread to new participants. **This rule must be shown in the UI as a warning on every option of the affected token, and in the README** (see Open question 1). A pro-rata or refund mechanism is out of scope until its economics are specified and its detection and settlement are proven.
 
-**D7. `transfer` is free and goes to an eligible address only.** The holder can hand an Active option to another address that is authorized on the underlying, with no payment leg on-chain; any payment is settled outside the call. State, collateral and the writer's rights are untouched, and the previous holder can no longer exercise. A paid resale (on-chain price discovery, or a position token) is **roadmap**, not part of this release.
+**D7. `transfer` is free and goes to an eligible address only.** The holder can hand an Active option to another address that is authorized on the underlying, with no payment leg on-chain; any payment is settled outside the call. State, collateral and the writer's rights are untouched, and the previous holder can no longer exercise. A paid resale is decision D8 (v1.4); a position token remains roadmap.
 
 ## 5. Premium and who gains what
 
@@ -107,6 +107,8 @@ These payoffs are at expiry, before any costs; they are hypothetical, not execut
 - A frozen holder can still transfer, because the transfer moves no tokens. It cannot exercise.
 - There is no paid secondary market and no position token in this release.
 
+**D8. Resale: the holder sets the price, the buyer pays the holder, the option is unchanged.** (v1.4) The holder of an Active, unexpired option may post an ask in the option's quote token (`list_for_sale`), replace it by posting again, or withdraw it (`cancel_sale`). Anyone eligible on the underlying, other than the current holder or the writer, may take it with `buy_resale(buyer, id, max_total)`: the ask moves buyer → holder and the buyer becomes holder, in one invocation; if the ask is above the buyer's `max_total` the call fails with `PriceMoved` (#121), so a buyer never pays more than the price they accepted. Nothing else changes: strike, expiry, quantity, the writer's collateral and the writer's obligations are exactly as before, so a resale cannot weaken the backing. The ask is a limit price set by one holder, not a market quote, and the UI labels it so. An ask dies with the position: exercise, transfer, expiry or purchase removes it. Writer buy-back is excluded (`SelfTrade`) because closing a position early would require releasing collateral and is a separate decision. No fee, no matching, one ask per option.
+
 ## 8. Issuer powers and what Strata does not guarantee
 
 Strata promises the **economics of the option** under the issuer's own rules. It does not override issuer control and it is **not** an unconditional guarantee against issuer action.
@@ -134,6 +136,7 @@ Each criterion must be demonstrable by an automated test or a recorded Testnet t
 8. **Issuer cases:** each row of §8 reproduces on Testnet with the stated error; after a clawback, `open_collateral > balance(escrow)` and `create_offer`/`buy` fail with #115.
 9. **Collateral accounting:** each option's collateral is counted once; `open_collateral(token)` equals locked collateral of Offered and Active options plus unclaimed proceeds of Exercised ones.
 10. **Disclosure:** the README and the UI show the §8 limitations, including the first-come-first-served rule, before this spec is called satisfied.
+11. **Resale (v1.4):** only the holder of an Active, unexpired option can list; `buy_resale` moves exactly the ask from buyer to the previous holder, changes only the holder and removes the ask; an ask above `max_total` fails with `PriceMoved` (#121) and moves nothing; a second `buy_resale` fails with `NoAsk` (#120); the writer and the holder cannot buy; an ineligible buyer is refused; after exercise, transfer or expiry `get_ask` is empty; `open_collateral` is identical before and after any resale call.
 
 ## 10. Strata Pro (experimental)
 

@@ -2,7 +2,7 @@ import type { OptionsClient } from './client'
 import { collateralLines, reservedOf } from './abi'
 import { OPTIONS_ERRORS } from '../stellar/errors'
 import { MAX_OPEN_PER_WRITER, MAX_TENOR_SECONDS } from './types'
-import type { CollateralHealth, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
+import type { Ask, CollateralHealth, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
 
 // In-memory stand-in for the options contract. Fictional assets and accounts,
 // fake tx hashes. The UI shows a "mock data" banner while this is in use.
@@ -33,10 +33,12 @@ function seed(): OptionOffer[] {
 export class MockOptionsClient implements OptionsClient {
   readonly isMock = true
   private options = seed()
+  // Resale asks by option id (contract v1.4 semantics; the mock moves no tokens).
+  private asks = new Map<bigint, { holder: string; askTotal: bigint }>()
 
   private find(id: bigint): OptionOffer {
     const o = this.options.find((x) => x.id === id)
-    if (!o) throw new Error('Option not found')
+    if (!o) throw new Error(OPTIONS_ERRORS[101])
     return o
   }
 
@@ -116,6 +118,7 @@ export class MockOptionsClient implements OptionsClient {
       if (o.state !== 'active') throw new Error('Option is not active')
       if (o.expiry <= now()) throw new Error('Option has expired')
       o.state = 'exercised'
+      this.asks.delete(id)
     })
   }
 
@@ -145,6 +148,67 @@ export class MockOptionsClient implements OptionsClient {
       if (o.writer !== writer) throw new Error('Only the writer can cancel')
       if (o.state !== 'offered') throw new Error('Only open offers can be cancelled')
       o.state = 'cancelled'
+    })
+  }
+
+  // An ask is live (listed, buyable) only while its option is Active, unexpired and still held by the lister.
+  // Stale asks stay in the map so the holder can still cancel after expiry, as the contract allows.
+  private liveAsk(id: bigint): { holder: string; askTotal: bigint } | null {
+    const a = this.asks.get(id)
+    if (!a) return null
+    const o = this.options.find((x) => x.id === id)
+    if (!o || o.state !== 'active' || o.expiry <= now() || o.holder !== a.holder) return null
+    return a
+  }
+
+  async listAsks(): Promise<Ask[]> {
+    await delay(100)
+    const out: Ask[] = []
+    for (const id of [...this.asks.keys()].sort((a, b) => (a < b ? -1 : 1))) {
+      const a = this.liveAsk(id)
+      if (a) out.push({ id, holder: a.holder, askTotal: a.askTotal })
+    }
+    return out
+  }
+
+  async getAsk(id: bigint) {
+    return this.liveAsk(id)?.askTotal ?? null
+  }
+
+  // Check order matches the contract: NotFound -> WrongState -> NotHolder -> Expired -> InvalidArgs.
+  listForSale(id: bigint, holder: string, askTotal: bigint) {
+    return this.tx(() => {
+      const o = this.find(id)
+      if (o.state !== 'active') throw new Error(OPTIONS_ERRORS[106])
+      if (o.holder !== holder) throw new Error(OPTIONS_ERRORS[108])
+      if (o.expiry <= now()) throw new Error(OPTIONS_ERRORS[109])
+      if (askTotal <= 0n) throw new Error(OPTIONS_ERRORS[102])
+      this.asks.set(id, { holder, askTotal })
+    })
+  }
+
+  // Allowed after expiry (only removes the ask).
+  cancelSale(id: bigint, holder: string) {
+    return this.tx(() => {
+      const o = this.find(id)
+      if (o.holder !== holder) throw new Error(OPTIONS_ERRORS[108])
+      const a = this.asks.get(id)
+      if (!a || a.holder !== o.holder || o.state !== 'active') throw new Error(OPTIONS_ERRORS[120])
+      this.asks.delete(id)
+    })
+  }
+
+  // Pays at most `maxTotal`: a re-priced ask fails with PriceMoved (121) instead of charging more.
+  buyResale(id: bigint, buyer: string, maxTotal: bigint) {
+    return this.tx(() => {
+      const o = this.find(id)
+      if (o.state === 'active' && o.expiry <= now()) throw new Error(OPTIONS_ERRORS[109])
+      const a = this.liveAsk(id)
+      if (!a) throw new Error(OPTIONS_ERRORS[120])
+      if (buyer === o.holder || buyer === o.writer) throw new Error(OPTIONS_ERRORS[111])
+      if (a.askTotal > maxTotal) throw new Error(OPTIONS_ERRORS[121])
+      o.holder = buyer
+      this.asks.delete(id)
     })
   }
 }

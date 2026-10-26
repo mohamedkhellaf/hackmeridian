@@ -11,6 +11,8 @@ import { BalancesBar } from './wallet/BalancesBar'
 import { IssuerView } from './views/IssuerView'
 import { MarketsView } from './views/MarketsView'
 import { PortfolioView } from './views/PortfolioView'
+import { ResaleMarket } from './resale/ResaleMarket'
+import { SellPanel } from './resale/SellPanel'
 import { ProtectView } from './views/ProtectView'
 import { ReservesView } from './views/ReservesView'
 import { WriteView } from './views/WriteView'
@@ -67,13 +69,42 @@ function App() {
             collateral={s.collateral}
             health={s.health}
             mock={s.isMock}
+            resale={
+              <ResaleMarket
+                options={s.options}
+                asks={s.asks}
+                me={me}
+                busy={s.busy}
+                client={s.client}
+                onBuy={s.buyResale}
+                onOutcomeShown={s.dismissNotice}
+              />
+            }
           />
         )}
         {route === 'protect' && (
           <ProtectView assets={s.assets} offers={s.market} me={me} balances={s.balances.balances} mock={s.isMock} busy={s.busy} onBuy={s.setBuying} />
         )}
         {route === 'write' && <WriteView assets={s.assets} client={s.client} me={me} busy={s.busy} onSubmit={s.writeOffer} />}
-        {route === 'portfolio' && <PortfolioView me={me} rows={s.positions} actionFor={s.actionFor} health={s.health} />}
+        {route === 'portfolio' && (
+          <PortfolioView
+            me={me}
+            rows={s.positions}
+            actionFor={s.actionFor}
+            health={s.health}
+            resale={
+              <SellPanel
+                me={me}
+                rows={s.positions}
+                asks={s.asks}
+                busy={s.busy}
+                busyId={s.busyId}
+                onList={s.listForSale}
+                onCancel={s.cancelSale}
+              />
+            }
+          />
+        )}
         {route === 'reserves' && <ReservesView collateral={s.collateral} health={s.health} contractId={config.optionsContractId} />}
         {route === 'pro' && ProApp && (
           <Suspense fallback={null}>

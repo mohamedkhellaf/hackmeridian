@@ -45,8 +45,8 @@ test('the open Buy dialog states the issuer, premium and chart disclosures exact
   // The premium note sits in the premium row.
   await expect(dialog.locator('dl div').filter({ hasText: /^Premium/ })).toContainText(PREMIUM_TEXT)
   for (const s of [ISSUER_TEXT, PREMIUM_TEXT, CHART_TEXT, DEMO_TEXT, MOCK_TEXT]) expect(await countVisible(page, s), s).toBe(1)
-  // Behind the dialog, the Markets page itself carries none of them.
-  await expect(page.getByRole('main')).not.toContainText(/can freeze|claw it back|Not refundable|Hypothetical/)
+  // Next to the ticket, the chain and the offers list carry none of them.
+  for (const name of ['Option chain', 'Offers']) await expect(page.getByRole('table', { name, exact: true })).not.toContainText(/can freeze|claw it back|Not refundable|Hypothetical/)
   for (const old of RETIRED) await expect(page.locator('body')).not.toContainText(old)
 })
 

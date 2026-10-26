@@ -95,10 +95,13 @@ export interface PremiumCell {
   tone: 'neg' | 'pos' | 'muted' | 'ask'
 }
 
-/** Signed premium for the connected wallet: -paid as holder, +earned as writer once sold, the ask while open. */
+/**
+ * Premium for the connected wallet: +earned as writer once sold, the ask while open. For a holder it is the
+ * original premium paid to the writer, which is not the holder's own cost if they bought on resale.
+ */
 export function premiumOf(o: OptionOffer, role: Role): PremiumCell {
   const amt = moneyWith(o.totalPremium, o.quote)
-  if (role === 'holder') return { text: `−${amt}`, tone: 'neg' }
+  if (role === 'holder') return { text: `${amt} original premium (paid to the writer)`, tone: 'muted' }
   if (o.holder) return { text: `+${amt}`, tone: 'pos' }
   if (o.state === 'offered') return { text: `${amt} ask`, tone: 'ask' }
   return { text: '–', tone: 'muted' }
