@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react'
 import type { CollateralHealth, CollateralLine, TokenInfo } from '../options/types'
 import { AssetBadge, Card, shortContractId, Mono, StrataBar, Tag } from '../ui'
 import { backingFor, formatFixed, formatTenths, lineTotal, stellarExpertContract } from './reserves'
 import { ShortfallBanner } from './ShortfallWarning'
+import { FnRef, type FootnoteId } from './Footnotes'
 import './reserves.css'
 
 // Proof that every option is fully backed: what the contract owes vs what it holds, per token.
@@ -21,6 +23,13 @@ export function CollateralPanel({ lines, health = [], contractId }: { lines: Col
     </div>
   )
 }
+
+const LEGEND: { key: string; label: string; fn: FootnoteId }[] = [
+  { key: 'offered', label: 'Open offers', fn: 1 },
+  { key: 'active', label: 'Sold options', fn: 2 },
+  { key: 'awaiting', label: 'Unclaimed proceeds', fn: 3 },
+  { key: 'reclaim', label: 'Expired, to reclaim', fn: 4 },
+]
 
 function TokenCard({ line, health, real }: { line: CollateralLine; health?: CollateralHealth; real: boolean }) {
   const t = line.token
@@ -46,15 +55,17 @@ function TokenCard({ line, health, real }: { line: CollateralLine; health?: Coll
           <span className="ui-num rs-fig-v" data-testid="owed">
             {fmt(b.owed)}
           </span>
-          <span className="ui-label">Owed · open_collateral</span>
+          <span className="ui-label">Owed · open_collateral<FnRef n={5} /></span>
         </div>
         <div className="rs-fig">
           <span className="ui-num rs-fig-v">{b.held === null ? 'n/a' : fmt(b.held)}</span>
-          <span className="ui-label">Held · balance(contract)</span>
+          <span className="ui-label">Held · balance(contract)<FnRef n={5} /></span>
         </div>
         <div className="rs-fig">
           <span className="ui-num rs-fig-v">{b.status === 'short' ? `-${fmt(b.shortfall)}` : b.held === null ? 'n/a' : fmt(surplus)}</span>
-          <span className="ui-label">{b.status === 'short' ? 'Shortfall' : 'Surplus'}</span>
+          <span className="ui-label">{b.status === 'short' ? 'Shortfall' : 'Surplus'}
+            {b.status === 'short' && <FnRef n={6} />}
+          </span>
         </div>
       </div>
 
@@ -64,17 +75,30 @@ function TokenCard({ line, health, real }: { line: CollateralLine; health?: Coll
           held={b.held}
           unit={t.code}
           format={fmtN}
+          legend={false}
           layers={{ offered: line.offered, active: line.active, awaiting: line.unclaimed, reclaim: line.pendingReclaim }}
         />
       ) : (
         <p className="rs-empty">The held balance could not be read, so the backing cannot be drawn.</p>
       )}
 
+      {b.held !== null && (
+        <ul className="rs-legend" aria-label="Layers">
+          {LEGEND.map((d) => (
+            <li key={d.key}>
+              <span className="ui-strata-swatch" style={{ background: `var(--layer-${d.key})` }} aria-hidden="true" />
+              {d.label}
+              <FnRef n={d.fn} />
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div className="rs-rows">
-        <Row label="Open offers" value={fmt(line.offered)} />
-        <Row label="Sold options" value={fmt(line.active)} />
-        <Row label="Unclaimed proceeds" value={fmt(line.unclaimed)} />
-        <Row label="Expired, to reclaim" value={fmt(line.pendingReclaim)} />
+        <Row label={<>Open offers<FnRef n={1} /></>} value={fmt(line.offered)} />
+        <Row label={<>Sold options<FnRef n={2} /></>} value={fmt(line.active)} />
+        <Row label={<>Unclaimed proceeds<FnRef n={3} /></>} value={fmt(line.unclaimed)} />
+        <Row label={<>Expired, to reclaim<FnRef n={4} /></>} value={fmt(line.pendingReclaim)} />
         <Row label="Total owed" value={fmt(lineTotal(line))} strong />
         {b.tenthsPct !== null && <Row label="Held / owed" value={formatTenths(b.tenthsPct)} />}
       </div>
@@ -84,7 +108,7 @@ function TokenCard({ line, health, real }: { line: CollateralLine; health?: Coll
   )
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Row({ label, value, strong }: { label: ReactNode; value: string; strong?: boolean }) {
   return (
     <div className={strong ? 'rs-row rs-row--strong' : 'rs-row'}>
       <span>{label}</span>
