@@ -2,7 +2,7 @@
 
 **Draft for Dev 1 review.** Dev 1 owns the final narrative (AGENTS.md). Nothing here changes what the instrument promises. Every spoken line maps to evidence in the claims table (section 3). Amounts match `scripts/deploy/seed-demo-offers.sh`. Replace them if the recording uses different values.
 
-**Contract version caveat.** `main` carries options **v1.3.1** (`CBASUA3L…JUEE`, PR #55; source builds byte-identical to the deployed wasm). At the time of writing the live app (https://hackmeridian-psi.vercel.app/) is still built against **v1.2** (`CAJ2WJP4…GBAX`); permissionless listing (`list_asset`) and the EQTY asset exist only on v1.3.1, so the app's `VITE_OPTIONS_CONTRACT_ID` must be switched before recording. Lines marked **[v1.3.1]** are true on that deployment. They need one of two things: the app is switched to v1.3.1 before recording, or that scene shows the recorded v1.3.1 transaction on stellar.expert and says so. Scene 5c (resale) needs contract **v1.4** (`CC6AI7AKKEVSXH3QQF7HBXZNIBS4ACFP2UQLXG3WOAZ5VDFCTXVFPWNK`) in the app; marked **[v1.4]**. Drop it if the app is not on v1.4.
+**Contract version caveat.** `main` carries options **v1.5** (`CAIKMS2B…GKY6`, PR #74; source builds byte-identical to the deployed wasm). v1.5 includes resale (v1.4) and funded buyer requests (v1.5). The live app must point `VITE_OPTIONS_CONTRACT_ID` at `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`; check the Markets page shows Requests and Resale before recording. Earlier ids: v1.4 `CC6AI7AK…PWNK`, v1.3.1 `CBASUA3L…JUEE`.
 
 ---
 
