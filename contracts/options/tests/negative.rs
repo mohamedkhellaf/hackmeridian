@@ -6,7 +6,7 @@
 //! list, every per-asset open book, `option_count`, every stored `OptionData`, every tracked
 //! party's `writer_open_count` and the asset registry) and that no contract event was emitted.
 //!
-//! Contract errors are `options::Error`, codes 101–121 (120 `NoAsk`, 121 `PriceMoved` appended in v1.4) (renumbered in v1.1, 116–119 appended in
+//! Contract errors are `options::Error`, codes 101–125 (120 `NoAsk`, 121 `PriceMoved` appended in v1.4; 122–125 bid errors in v1.5) (renumbered in v1.1, 116–119 appended in
 //! v1.3), and are matched by variant name, never by number. v1.2 adds `transfer(holder, to, id)`,
 //! `get_options(from, limit)` and the `OptionTransferred` event: sections 16 and 17 cover them,
 //! and sections 1, 2, 3, 12 and 15 include `transfer` in their existing checks.
@@ -61,7 +61,9 @@
 //!   `env.deployer().with_stellar_asset(..).deployed_address()`, independently of the contract.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
-use options::{Error, OptionData, OptionType, OptionsContract, OptionsContractClient, State};
+use options::{
+    Bid, BidState, Error, OptionData, OptionType, OptionsContract, OptionsContractClient, State,
+};
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{
@@ -179,6 +181,12 @@ struct Snap {
     assets: std::vec::Vec<Address>,
     /// v1.4: every open resale ask `(id, holder, ask_total)` (`list_asks`, all scan windows).
     asks: std::vec::Vec<(u32, Address, i128)>,
+    /// v1.5: every stored bid (`get_bids`, all pages).
+    bids: std::vec::Vec<Bid>,
+    /// v1.5: `buyer_open_count` of every tracked party, in `tracked()` order.
+    buyer_open: std::vec::Vec<u32>,
+    /// v1.5: every registry asset's open bid book (`list_open_bids_for`), in registry order.
+    bids_for: std::vec::Vec<(Address, std::vec::Vec<u32>)>,
 }
 
 fn setup() -> T {
@@ -323,10 +331,61 @@ impl T {
                 .collect(),
             assets: self.assets(),
             asks: self.asks(count),
+            bids: self.all_bids(),
+            buyer_open: self
+                .tracked()
+                .iter()
+                .map(|a| self.c.buyer_open_count(a))
+                .collect(),
+            bids_for: self
+                .assets()
+                .into_iter()
+                .map(|a| {
+                    let book = self.bid_book(&a);
+                    (a, book)
+                })
+                .collect(),
         };
         snap.assert_open_books();
         snap.assert_asks();
+        snap.assert_bids();
         snap
+    }
+
+    /// v1.5: every stored bid, paged through `get_bids` with `from += returned.len()`.
+    fn all_bids(&self) -> std::vec::Vec<Bid> {
+        let count = self.c.bid_count();
+        let mut out = std::vec::Vec::new();
+        while (out.len() as u32) < count {
+            let page = self.c.get_bids(&(out.len() as u32), &u32::MAX);
+            assert!(
+                !page.is_empty() && page.len() <= MAX_PAGE,
+                "get_bids page size {}",
+                page.len()
+            );
+            out.extend(page.iter());
+        }
+        out
+    }
+
+    /// v1.5: one asset's complete open bid book (`list_open_bids_for`, all pages).
+    fn bid_book(&self, asset: &Address) -> std::vec::Vec<u32> {
+        let mut out = std::vec::Vec::new();
+        loop {
+            let page = self
+                .c
+                .list_open_bids_for(asset, &(out.len() as u32), &u32::MAX);
+            assert!(page.len() <= MAX_PAGE, "list_open_bids_for page size");
+            if page.is_empty() {
+                break;
+            }
+            let full = page.len() == MAX_PAGE;
+            out.extend(page.iter());
+            if !full {
+                break;
+            }
+        }
+        out
     }
 
     /// v1.4: every open ask, scanning `list_asks` in windows of `MAX_PAGE` ids up to `count`.
@@ -1033,6 +1092,62 @@ fn rejected_as<R: Debug>(
 }
 
 impl Snap {
+    /// v1.5 bid invariant, checked on every snapshot: each asset's bid book is exactly its `Open`
+    /// bids in id order; each tracked party's `buyer_open_count` is its number of `Open` bids; a
+    /// `Filled` bid names an `Active`-or-later option held first by its buyer; only `Filled` bids
+    /// carry an option id.
+    #[track_caller]
+    fn assert_bids(&self) {
+        let mut seen = 0usize;
+        for (asset, book) in &self.bids_for {
+            let open: std::vec::Vec<u32> = self
+                .bids
+                .iter()
+                .filter(|b| b.state == BidState::Open && b.underlying == *asset)
+                .map(|b| b.id)
+                .collect();
+            assert_eq!(book, &open, "bid book of {asset:?}");
+            seen += open.len();
+        }
+        let all_open = self
+            .bids
+            .iter()
+            .filter(|b| b.state == BidState::Open)
+            .count();
+        assert_eq!(seen, all_open, "an Open bid is missing from every book");
+        for (i, (who, _)) in self.balances.iter().enumerate() {
+            let n = self
+                .bids
+                .iter()
+                .filter(|b| b.state == BidState::Open && b.buyer == *who)
+                .count();
+            assert_eq!(
+                self.buyer_open[i] as usize, n,
+                "buyer_open_count of {who:?}"
+            );
+        }
+        for b in &self.bids {
+            match (b.state, b.option_id) {
+                (BidState::Filled, Some(oid)) => {
+                    let o = self
+                        .options
+                        .iter()
+                        .find(|o| o.id == oid)
+                        .expect("filled bid's option is stored");
+                    assert_ne!(o.state, State::Offered, "filled bid's option {oid}");
+                    assert_eq!(o.option_type, b.kind);
+                    assert_eq!(o.qty, b.qty);
+                    assert_eq!(o.strike_total, b.strike_total);
+                    assert_eq!(o.premium_total, b.premium_total);
+                    assert_eq!(o.expiry, b.expiry);
+                }
+                (BidState::Filled, None) => panic!("filled bid {} without option id", b.id),
+                (_, Some(_)) => panic!("unfilled bid {} with an option id", b.id),
+                _ => {}
+            }
+        }
+    }
+
     /// v1.4 ask invariant, checked on every snapshot: an ask exists only on an `Active` option,
     /// names its current holder and is positive.
     #[track_caller]
@@ -7375,4 +7490,708 @@ fn resale25_seller_without_quote_trustline_reverts_atomically() {
     t.c.buy_resale(m, &id, &ASK);
     assert_eq!(t.bal(&t.usdx, &g), ASK);
     assert_eq!(t.c.get_option(&id).holder, Some(m.clone()));
+}
+
+// =============================================================================================
+// 26. v1.5 buyer side: create_bid / cancel_bid / fill_bid / prune_bids
+// =============================================================================================
+
+/// ABI §15: `create_bid` fails with `BidBookFull` once an underlying's bid book holds this many.
+const MAX_OPEN_BIDS_PER_ASSET: u32 = 500;
+/// ABI §15: `create_bid` fails with `BuyerOpenLimit` at this many `Open` bids per buyer.
+const MAX_OPEN_BIDS_PER_BUYER: u32 = 50;
+
+impl T {
+    fn bid_x(&self, buyer: &Address, u: &Address, ty: OptionType, expiry: u64) -> u32 {
+        self.c
+            .create_bid(buyer, &ty, u, &self.usdx, &QTY, &STRIKE, &PREMIUM, &expiry)
+    }
+
+    /// Bid by `buyer` for the fixture terms on RWA.
+    fn bid(&self, buyer: &Address, ty: OptionType) -> u32 {
+        self.bid_x(buyer, &self.rwa, ty, EXPIRY)
+    }
+
+    fn bid_state(&self, id: u32) -> BidState {
+        self.c.get_bid(&id).state
+    }
+
+    /// `create_bid` on RWA with the fixture terms except the given buyer, kind and asset.
+    fn try_bid(
+        &self,
+        buyer: &Address,
+        u: &Address,
+        ty: OptionType,
+    ) -> Result<Result<u32, soroban_sdk::ConversionError>, Result<Error, InvokeError>> {
+        self.c
+            .try_create_bid(buyer, &ty, u, &self.usdx, &QTY, &STRIKE, &PREMIUM, &EXPIRY)
+    }
+}
+
+/// Arguments of `create_bid(buyer, ty, RWA, USDx, QTY, STRIKE, PREMIUM, EXPIRY)`.
+fn bid_args(t: &T, buyer: &Address, ty: OptionType) -> Vec<Val> {
+    (
+        buyer.clone(),
+        ty,
+        t.rwa.clone(),
+        t.usdx.clone(),
+        QTY,
+        STRIKE,
+        PREMIUM,
+        EXPIRY,
+    )
+        .into_val(&t.env)
+}
+
+/// create_bid / cancel_bid / fill_bid / prune_bids signed by anyone but the named party are
+/// rejected by the host's auth check, with no event and no state change.
+#[test]
+fn bids26_unauthorized_create_cancel_fill_prune_are_auth_failures() {
+    let t = setup();
+    let env = &t.env;
+    let (h, w, m) = (&t.holder, &t.writer, &t.maker2);
+    let id = t.bid(h, OptionType::Put);
+
+    // create_bid(holder, ..): only the holder can escrow its own premium
+    let fee = [transfer(
+        &t,
+        &t.usdx,
+        (h, &t.contract, PREMIUM).into_val(env),
+    )];
+    let create = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "create_bid",
+        args: bid_args(&t, h, OptionType::Put),
+        sub_invokes: &fee,
+    };
+    let create_root_only = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "create_bid",
+        args: bid_args(&t, h, OptionType::Put),
+        sub_invokes: &[],
+    };
+    let create_call = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "create_bid",
+        args: bid_args(&t, h, OptionType::Call),
+        sub_invokes: &fee,
+    };
+    assert_auth_cases(
+        &t,
+        "create_bid",
+        &bid_args(&t, h, OptionType::Put),
+        &[
+            (
+                "writer signs the holder's tree",
+                std::vec![MockAuth {
+                    address: w,
+                    invoke: &create
+                }],
+            ),
+            (
+                "holder signs the root without the escrow",
+                std::vec![MockAuth {
+                    address: h,
+                    invoke: &create_root_only
+                }],
+            ),
+            (
+                "holder's tree for another kind",
+                std::vec![MockAuth {
+                    address: h,
+                    invoke: &create_call
+                }],
+            ),
+            ("nobody signs", std::vec![]),
+        ],
+    );
+
+    // cancel_bid(holder, id)
+    let cancel = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "cancel_bid",
+        args: (h, id).into_val(env),
+        sub_invokes: &[],
+    };
+    assert_auth_cases(
+        &t,
+        "cancel_bid",
+        &(h, id).into_val(env),
+        &[
+            (
+                "writer signs",
+                std::vec![MockAuth {
+                    address: w,
+                    invoke: &cancel
+                }],
+            ),
+            (
+                "maker2 signs",
+                std::vec![MockAuth {
+                    address: m,
+                    invoke: &cancel
+                }],
+            ),
+            ("nobody signs", std::vec![]),
+        ],
+    );
+
+    // fill_bid(writer, id): only the writer can lock its own collateral
+    let lock = [transfer(
+        &t,
+        &t.usdx,
+        (w, &t.contract, STRIKE).into_val(env),
+    )];
+    let fill = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "fill_bid",
+        args: (w, id).into_val(env),
+        sub_invokes: &lock,
+    };
+    let fill_root_only = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "fill_bid",
+        args: (w, id).into_val(env),
+        sub_invokes: &[],
+    };
+    assert_auth_cases(
+        &t,
+        "fill_bid",
+        &(w, id).into_val(env),
+        &[
+            (
+                "buyer signs the writer's tree",
+                std::vec![MockAuth {
+                    address: h,
+                    invoke: &fill
+                }],
+            ),
+            (
+                "maker2 signs the writer's tree",
+                std::vec![MockAuth {
+                    address: m,
+                    invoke: &fill
+                }],
+            ),
+            (
+                "writer signs the root without the collateral",
+                std::vec![MockAuth {
+                    address: w,
+                    invoke: &fill_root_only
+                }],
+            ),
+            ("nobody signs", std::vec![]),
+        ],
+    );
+
+    // prune_bids(pruner, ids): the named pruner must sign
+    t.at(EXPIRY);
+    let ids = vec![env, id];
+    let prune = MockAuthInvoke {
+        contract: &t.contract,
+        fn_name: "prune_bids",
+        args: (m, ids.clone()).into_val(env),
+        sub_invokes: &[],
+    };
+    assert_auth_cases(
+        &t,
+        "prune_bids",
+        &(m, ids.clone()).into_val(env),
+        &[
+            (
+                "writer signs maker2's prune",
+                std::vec![MockAuth {
+                    address: w,
+                    invoke: &prune
+                }],
+            ),
+            ("nobody signs", std::vec![]),
+        ],
+    );
+
+    // the correctly signed prune works and refunds the buyer
+    env.mock_auths(&[MockAuth {
+        address: m,
+        invoke: &prune,
+    }]);
+    let mut want = t.snap();
+    assert_eq!(t.c.prune_bids(m, &ids), 1);
+    env.mock_all_auths();
+    want.add(h, 0, PREMIUM);
+    want.add(&t.contract, 0, -PREMIUM);
+    want.open_collateral[0] -= PREMIUM;
+    want.bids[id as usize].state = BidState::Expired;
+    want.bids_for[0].1.clear();
+    let i = want.balances.iter().position(|(a, _)| a == h).unwrap();
+    want.buyer_open[i] -= 1;
+    assert_eq!(t.snap(), want);
+}
+
+/// create_bid rejects every misuse with its typed error, in the ABI §15 check order.
+#[test]
+fn bids26_create_bid_rejections() {
+    let t = setup();
+    let h = &t.holder;
+    let before = t.snap();
+    let cb = |buyer: &Address,
+              u: &Address,
+              q: &Address,
+              qty: i128,
+              strike: i128,
+              premium: i128,
+              expiry: u64| {
+        t.c.try_create_bid(
+            buyer,
+            &OptionType::Put,
+            u,
+            q,
+            &qty,
+            &strike,
+            &premium,
+            &expiry,
+        )
+    };
+    // the contract is never a party
+    rejected(
+        &t,
+        cb(&t.contract, &t.rwa, &t.usdx, QTY, STRIKE, PREMIUM, EXPIRY),
+        Error::InvalidArgs,
+        &before,
+    );
+    // unlisted underlying (a random address, the quote token) and a wrong quote are 103, and the
+    // asset check comes before the argument check
+    let stranger = Address::generate(&t.env);
+    for (u, q) in [
+        (&stranger, &t.usdx),
+        (&t.usdx, &t.usdx),
+        (&t.rwa, &t.bond),
+        (&t.rwa, &t.rwa),
+        (&t.rwa, &stranger),
+    ] {
+        rejected(
+            &t,
+            cb(h, u, q, QTY, STRIKE, PREMIUM, EXPIRY),
+            Error::AssetNotAllowed,
+            &before,
+        );
+        rejected(
+            &t,
+            cb(h, u, q, 0, STRIKE, PREMIUM, EXPIRY),
+            Error::AssetNotAllowed,
+            &before,
+        );
+    }
+    // amounts and expiry
+    for bad in [0, -1, i128::MIN] {
+        for (qty, strike, premium) in [
+            (bad, STRIKE, PREMIUM),
+            (QTY, bad, PREMIUM),
+            (QTY, STRIKE, bad),
+        ] {
+            rejected(
+                &t,
+                cb(h, &t.rwa, &t.usdx, qty, strike, premium, EXPIRY),
+                Error::InvalidArgs,
+                &before,
+            );
+        }
+    }
+    for expiry in [0, START - 1, START] {
+        rejected(
+            &t,
+            cb(h, &t.rwa, &t.usdx, QTY, STRIKE, PREMIUM, expiry),
+            Error::InvalidArgs,
+            &before,
+        );
+    }
+    // tenor cap is inclusive, checked before eligibility
+    for buyer in [h, &t.outsider] {
+        for expiry in [START + MAX_TENOR + 1, u64::MAX] {
+            rejected(
+                &t,
+                cb(buyer, &t.rwa, &t.usdx, QTY, STRIKE, PREMIUM, expiry),
+                Error::TenorOutOfRange,
+                &before,
+            );
+        }
+    }
+    // buyer not authorized on the underlying
+    rejected(
+        &t,
+        cb(&t.outsider, &t.rwa, &t.usdx, QTY, STRIKE, PREMIUM, EXPIRY),
+        Error::NotEligible,
+        &before,
+    );
+    // the boundary itself is accepted
+    let id = t.bid_x(h, &t.rwa, OptionType::Put, START + MAX_TENOR);
+    assert_eq!(id, 0);
+    assert_eq!(t.c.get_bid(&id).expiry, START + MAX_TENOR);
+}
+
+/// A buyer who cannot pay the premium fails inside the quote SAC; no bid, no reserve change.
+#[test]
+fn bids26_buyer_without_premium_fails_in_the_sac_atomically() {
+    let t = setup();
+    let poor = Address::generate(&t.env);
+    t.sac(&t.rwa).set_authorized(&poor, &true);
+    t.extra.borrow_mut().push(poor.clone());
+    let before = t.snap();
+    sac_rejected(
+        &t,
+        t.try_bid(&poor, &t.rwa, OptionType::Put),
+        SAC_BALANCE,
+        &before,
+    );
+    t.sac(&t.usdx).mint(&poor, &(PREMIUM - 1));
+    let before = t.snap();
+    sac_rejected(
+        &t,
+        t.try_bid(&poor, &t.rwa, OptionType::Call),
+        SAC_BALANCE,
+        &before,
+    );
+    assert_eq!(t.c.bid_count(), 0);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    assert_eq!(t.c.buyer_open_count(&poor), 0);
+}
+
+/// cancel_bid: unknown id, non-bidder, and every non-Open state; cancel after expiry is allowed.
+#[test]
+fn bids26_cancel_bid_rejections() {
+    let t = setup();
+    let (w, h, m) = (&t.writer, &t.holder, &t.maker2);
+    let open = t.bid(h, OptionType::Put);
+    let filled = t.bid(h, OptionType::Put);
+    t.c.fill_bid(w, &filled);
+    let cancelled = t.bid(h, OptionType::Call);
+    t.c.cancel_bid(h, &cancelled);
+    let before = t.snap();
+    rejected(&t, t.c.try_cancel_bid(h, &99), Error::NotFound, &before);
+    rejected(&t, t.c.try_get_bid(&99), Error::NotFound, &before);
+    rejected(&t, t.c.try_cancel_bid(w, &open), Error::NotBidder, &before);
+    rejected(&t, t.c.try_cancel_bid(m, &open), Error::NotBidder, &before);
+    // state is checked before ownership
+    for who in [h, w, m] {
+        rejected(
+            &t,
+            t.c.try_cancel_bid(who, &filled),
+            Error::BidNotOpen,
+            &before,
+        );
+        rejected(
+            &t,
+            t.c.try_cancel_bid(who, &cancelled),
+            Error::BidNotOpen,
+            &before,
+        );
+    }
+    // after expiry the buyer may still cancel; then a prune skips it
+    t.at(EXPIRY + 10);
+    let usdx0 = t.bal(&t.usdx, h);
+    t.c.cancel_bid(h, &open);
+    t.assert_one_event("bid_cancelled", open);
+    assert_eq!(t.bal(&t.usdx, h), usdx0 + PREMIUM);
+    assert_eq!(t.c.prune_bids(m, &vec![&t.env, open]), 0);
+    let after = t.snap();
+    rejected(&t, t.c.try_cancel_bid(h, &open), Error::BidNotOpen, &after);
+}
+
+/// fill_bid rejects every misuse with its typed error, in the ABI §15 check order.
+#[test]
+fn bids26_fill_bid_rejections() {
+    let t = setup();
+    let (w, h, m) = (&t.writer, &t.holder, &t.maker2);
+    let id = t.bid(h, OptionType::Put);
+    let before = t.snap();
+    rejected(&t, t.c.try_fill_bid(w, &99), Error::NotFound, &before);
+    rejected(
+        &t,
+        t.c.try_fill_bid(&t.contract, &id),
+        Error::InvalidArgs,
+        &before,
+    );
+    rejected(&t, t.c.try_fill_bid(h, &id), Error::SelfTrade, &before);
+    rejected(
+        &t,
+        t.c.try_fill_bid(&t.outsider, &id),
+        Error::NotEligible,
+        &before,
+    );
+    // a writer frozen on the underlying is not eligible either
+    t.sac(&t.rwa).set_authorized(m, &false);
+    let frozen = t.snap();
+    rejected(&t, t.c.try_fill_bid(m, &id), Error::NotEligible, &frozen);
+    t.sac(&t.rwa).set_authorized(m, &true);
+    // the buyer frozen after bidding: nobody can hand it the option
+    t.sac(&t.rwa).set_authorized(h, &false);
+    let frozen = t.snap();
+    rejected(&t, t.c.try_fill_bid(w, &id), Error::NotEligible, &frozen);
+    t.sac(&t.rwa).set_authorized(h, &true);
+    // the escrow de-authorized on the underlying
+    t.sac(&t.rwa).set_authorized(&t.contract, &false);
+    let deauth = t.snap();
+    rejected(
+        &t,
+        t.c.try_fill_bid(w, &id),
+        Error::ContractNotAuthorized,
+        &deauth,
+    );
+    t.sac(&t.rwa).set_authorized(&t.contract, &true);
+    // expiry is exclusive and comes before self-trade and eligibility
+    t.at(EXPIRY);
+    let expired = t.snap();
+    for who in [w, h, &t.outsider] {
+        rejected(&t, t.c.try_fill_bid(who, &id), Error::Expired, &expired);
+    }
+    t.at(EXPIRY - 1);
+    let opt = t.c.fill_bid(w, &id);
+    assert_eq!(t.c.get_bid(&id).option_id, Some(opt));
+    // double fill (by anyone) is BidNotOpen, nothing moves
+    let after = t.snap();
+    for who in [w, m, h] {
+        rejected(&t, t.c.try_fill_bid(who, &id), Error::BidNotOpen, &after);
+    }
+    rejected(&t, t.c.try_cancel_bid(h, &id), Error::BidNotOpen, &after);
+}
+
+/// A writer that cannot lock the collateral fails inside the SAC; the bid stays Open and funded.
+#[test]
+fn bids26_writer_without_collateral_fails_in_the_sac_atomically() {
+    let t = setup();
+    let put = t.bid(&t.holder, OptionType::Put);
+    let call = t.bid(&t.holder, OptionType::Call);
+    let poor = Address::generate(&t.env);
+    for u in [&t.rwa, &t.bond] {
+        t.sac(u).set_authorized(&poor, &true);
+    }
+    t.sac(&t.usdx).mint(&poor, &(STRIKE - 1));
+    t.sac(&t.rwa).mint(&poor, &(QTY - 1));
+    t.extra.borrow_mut().push(poor.clone());
+    let before = t.snap();
+    sac_rejected(&t, t.c.try_fill_bid(&poor, &put), SAC_BALANCE, &before);
+    sac_rejected(&t, t.c.try_fill_bid(&poor, &call), SAC_BALANCE, &before);
+    assert_eq!(t.bid_state(put), BidState::Open);
+    assert_eq!(t.bid_state(call), BidState::Open);
+}
+
+/// A pooled deficit (issuer clawback from the escrow) blocks every fill on that underlying.
+#[test]
+fn bids26_fill_blocked_by_collateral_shortfall() {
+    let t = setup();
+    let (w, h) = (&t.writer, &t.holder);
+    let put = t.bid(h, OptionType::Put);
+    let call = t.bid(h, OptionType::Call);
+    // some RWA in the escrow: a CALL offer
+    t.call(&t.maker2);
+    t.sac(&t.rwa).clawback(&t.contract, &1);
+    let before = t.snap();
+    for id in [put, call] {
+        rejected(
+            &t,
+            t.c.try_fill_bid(w, &id),
+            Error::CollateralShortfall,
+            &before,
+        );
+    }
+    // the buyer can still withdraw its premium (the quote side is whole)
+    t.c.cancel_bid(h, &call);
+    t.sac(&t.rwa).mint(&t.contract, &1);
+    let opt = t.c.fill_bid(w, &put);
+    assert_eq!(t.c.get_option(&opt).holder, Some(h.clone()));
+}
+
+/// Per-asset (500) and per-buyer (50) bid caps; neither can be bypassed by alternating assets,
+/// and closing a bid frees one slot.
+#[test]
+fn bids26_bid_book_and_buyer_caps() {
+    let t = setup();
+    // 10 buyers x 50 bids fill RWA's bid book
+    let buyers: std::vec::Vec<Address> = (0..11).map(|_| t.c_actor([USDX_START, 0, 0])).collect();
+    for b in &buyers[..10] {
+        for _ in 0..MAX_OPEN_BIDS_PER_BUYER {
+            t.bid(b, OptionType::Put);
+        }
+    }
+    assert_eq!(
+        t.c.list_open_bids_for(&t.rwa, &0, &u32::MAX).len(),
+        MAX_PAGE
+    );
+    let before = t.snap();
+    assert_eq!(before.bids_for[0].1.len() as u32, MAX_OPEN_BIDS_PER_ASSET);
+    // an 11th buyer is refused on RWA ...
+    rejected(
+        &t,
+        t.try_bid(&buyers[10], &t.rwa, OptionType::Call),
+        Error::BidBookFull,
+        &before,
+    );
+    // ... a full buyer is refused everywhere (on RWA the book check comes first)
+    rejected(
+        &t,
+        t.try_bid(&buyers[0], &t.rwa, OptionType::Put),
+        Error::BidBookFull,
+        &before,
+    );
+    rejected(
+        &t,
+        t.try_bid(&buyers[0], &t.bond, OptionType::Put),
+        Error::BuyerOpenLimit,
+        &before,
+    );
+    // ... while the 11th buyer can still bid on BOND
+    t.bid_x(&buyers[10], &t.bond, OptionType::Put, EXPIRY);
+    // a fill frees one RWA slot and one slot of that buyer
+    let first = before.bids_for[0].1[0];
+    t.c.fill_bid(&t.writer, &first);
+    assert_eq!(
+        t.c.buyer_open_count(&buyers[0]),
+        MAX_OPEN_BIDS_PER_BUYER - 1
+    );
+    t.bid(&buyers[10], OptionType::Put);
+    let full = t.snap();
+    rejected(
+        &t,
+        t.try_bid(&buyers[0], &t.rwa, OptionType::Put),
+        Error::BidBookFull,
+        &full,
+    );
+    t.bid_x(&buyers[0], &t.bond, OptionType::Put, EXPIRY);
+    assert_eq!(t.c.buyer_open_count(&buyers[0]), MAX_OPEN_BIDS_PER_BUYER);
+    let full = t.snap();
+    rejected(
+        &t,
+        t.try_bid(&buyers[0], &t.bond, OptionType::Call),
+        Error::BuyerOpenLimit,
+        &full,
+    );
+    // fills never touch the writer's open-offer count
+    assert_eq!(t.c.writer_open_count(&t.writer), 0);
+}
+
+/// prune_bids closes only Open bids at or past expiry; live, filled and cancelled bids are
+/// skipped; an unknown id reverts the whole call; the contract is never the pruner.
+#[test]
+fn bids26_prune_skips_live_and_non_open_bids() {
+    let t = setup();
+    let (w, h, m) = (&t.writer, &t.holder, &t.maker2);
+    let short = t.bid_x(h, &t.rwa, OptionType::Put, START + 100);
+    let live = t.bid(h, OptionType::Call);
+    let filled = t.bid_x(m, &t.rwa, OptionType::Put, START + 100);
+    t.c.fill_bid(w, &filled);
+    let cancelled = t.bid_x(m, &t.bond, OptionType::Call, START + 100);
+    t.c.cancel_bid(m, &cancelled);
+    let all = vec![&t.env, short, live, filled, cancelled];
+
+    // nothing is expired yet
+    t.at(START + 99);
+    let before = t.snap();
+    assert_eq!(t.c.prune_bids(&t.outsider, &all), 0);
+    assert_eq!(t.snap(), before);
+    // an unknown id reverts everything, even at expiry
+    t.at(START + 100);
+    let before = t.snap();
+    rejected(
+        &t,
+        t.c.try_prune_bids(&t.outsider, &vec![&t.env, short, 99]),
+        Error::NotFound,
+        &before,
+    );
+    rejected(
+        &t,
+        t.c.try_prune_bids(&t.contract, &all),
+        Error::InvalidArgs,
+        &before,
+    );
+    // at expiry (inclusive) only the short Open bid is pruned; its premium goes to its buyer
+    let usdx0 = t.bal(&t.usdx, h);
+    assert_eq!(t.c.prune_bids(&t.outsider, &all), 1);
+    assert_eq!(
+        t.opt_events(),
+        std::vec![(std::string::String::from("bid_pruned"), short, 2usize)]
+    );
+    assert_eq!(t.bal(&t.usdx, h), usdx0 + PREMIUM);
+    assert_eq!(t.bid_state(short), BidState::Expired);
+    assert_eq!(t.bid_state(live), BidState::Open);
+    assert_eq!(t.bid_state(filled), BidState::Filled);
+    assert_eq!(t.bid_state(cancelled), BidState::Cancelled);
+    // a second prune is a no-op; a pruned bid can be neither cancelled nor filled
+    let after = t.snap();
+    assert_eq!(t.c.prune_bids(&t.outsider, &all), 0);
+    assert_eq!(t.snap(), after);
+    rejected(&t, t.c.try_cancel_bid(h, &short), Error::BidNotOpen, &after);
+    rejected(&t, t.c.try_fill_bid(w, &short), Error::BidNotOpen, &after);
+    // left in the quote reserve: the live bid's premium and the filled PUT's strike
+    assert_eq!(t.c.open_collateral(&t.usdx), PREMIUM + STRIKE);
+}
+
+/// fill_bid moves exactly the collateral and the premium; the option is Active, held by the
+/// buyer, never in an open book, and does not count toward the writer's open-offer cap.
+#[test]
+fn bids26_fill_moves_exact_amounts_and_never_touches_offer_books() {
+    let t = setup();
+    let (w, h) = (&t.writer, &t.holder);
+    // the writer is at its offer cap: fills still work
+    for _ in 0..MAX_OPEN_PER_WRITER {
+        t.offer_x(w, &t.bond, OptionType::Put, 1, 1, 1, EXPIRY);
+    }
+    let put = t.bid(h, OptionType::Put);
+    let call = t.bid(h, OptionType::Call);
+    let mut want = t.snap();
+    let opt = t.c.fill_bid(w, &put);
+    assert_eq!(
+        t.opt_events(),
+        std::vec![
+            (std::string::String::from("option_bought"), opt, 2usize),
+            (std::string::String::from("bid_filled"), put, 2usize),
+        ]
+    );
+    want.add(w, 0, PREMIUM - STRIKE);
+    want.add(&t.contract, 0, STRIKE - PREMIUM);
+    want.open_collateral[0] += STRIKE - PREMIUM;
+    want.count += 1;
+    want.options.push(OptionData {
+        id: opt,
+        underlying: t.rwa.clone(),
+        quote: t.usdx.clone(),
+        option_type: OptionType::Put,
+        qty: QTY,
+        strike_total: STRIKE,
+        premium_total: PREMIUM,
+        expiry: EXPIRY,
+        writer: w.clone(),
+        holder: Some(h.clone()),
+        state: State::Active,
+    });
+    want.bids[put as usize].state = BidState::Filled;
+    want.bids[put as usize].option_id = Some(opt);
+    want.bids_for[0].1.retain(|&i| i != put);
+    let i = want.balances.iter().position(|(a, _)| a == h).unwrap();
+    want.buyer_open[i] -= 1;
+    assert_eq!(t.snap(), want);
+    assert_eq!(t.c.writer_open_count(w), MAX_OPEN_PER_WRITER);
+
+    let want = t.snap();
+    let opt2 = t.c.fill_bid(w, &call);
+    assert_eq!(opt2, opt + 1);
+    let snap = t.snap();
+    let mut bals = want.clone();
+    bals.add(w, 0, PREMIUM);
+    bals.add(w, 1, -QTY);
+    bals.add(&t.contract, 0, -PREMIUM);
+    bals.add(&t.contract, 1, QTY);
+    assert_eq!(snap.balances, bals.balances);
+    assert_eq!(
+        snap.open_collateral,
+        [
+            want.open_collateral[0] - PREMIUM,
+            want.open_collateral[1] + QTY,
+            want.open_collateral[2]
+        ]
+    );
+    assert_eq!(snap.open, want.open);
+    assert_eq!(snap.writer_open, want.writer_open);
+    // the holder exercises the CALL, the writer claims the strike
+    t.c.exercise(h, &opt2);
+    t.c.claim_delivery(w, &opt2);
+    assert_eq!(t.c.get_option(&opt2).state, State::Settled);
 }

@@ -561,6 +561,49 @@ Off-chain on the same tree (`cargo test -p options`): 133 unit, 17 invariant (20
 INV11 resale model, `buy_resale` Ok / `PriceMoved` / `NoAsk` / `CollateralShortfall` all reached and predicted
 exactly) and 76 negative tests pass; `cargo clippy -p options --all-targets` is clean.
 
+## v1.5 deployment (2026-10-26 08:50 UTC): funded bids (buyer side of the market)
+
+v1.4 plus the bid functions of `docs/contract-abi.md` §15: `create_bid`, `cancel_bid`, `fill_bid`, `prune_bids`,
+`extend_bid_ttl`, views `get_bid`, `get_bids`, `bid_count`, `list_open_bids_for`, `buyer_open_count`, errors
+`BidNotOpen = 122`, `NotBidder = 123`, `BidBookFull = 124`, `BuyerOpenLimit = 125`, events `bid_created`,
+`bid_cancelled`, `bid_filled`, `bid_pruned`. Nothing else in the interface changed.
+
+| Item | Value |
+|---|---|
+| Options contract v1.5 | `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6` |
+| Source | `feat/contract-v1-5-bids` at `7094cf6` (later commits change `lib.rs` only by a plain `//` comment in `open_collateral`; a rebuild gives the same sha256 below) |
+| Constructor | `quote` = USDx SAC, `underlyings` = [RWA SAC, BOND SAC]; EQTY listed afterwards with `list_asset` by the smoke run |
+| Wasm upload / deploy tx | `edec1ea54c33d35e3588fc4acf1e87926f8663ae5b5670d038dc29975778db48` / `b3c8fdd1a609e688f2b76b92e9dc9ce3f867062129a09fcc6092e667c7c7808e` |
+| Wasm sha256, 48,064 bytes (fetched back with `stellar contract fetch`; identical to the local build) | `64ab726516d9dff13921dacb197f786dca1aa64f6ae62f33f10f902fcea62de8` |
+| Issuer authorizes the contract on RWA / BOND (`deploy.sh`) | `c1c72ac8b2dc0b3dd33f41734b5799c28ad705991d379e7d63a76627fcc4e92e` / `fefcc12d929f59d6e056e1aa33562ad35bccb857c8a73c51485f454fd24a193d` |
+| maker1 lists EQTY (`list_asset`, smoke `V13_LIST`) / issuer authorizes the contract on EQTY | `9e83e587e158582d1667b4e5a29b8e400e37f3042a16692ee6dd0a0944bfb69f` / `59fe141e5588f216b97cf851d567f5af1ae04c80eb3cae6ec161c1edf34ebf21` |
+| Seeded demo offers (`seed-demo-offers.sh --hours 72`, expiry 1793264449 = 2026-10-29 09:00:49 UTC) | ids 12, 13, 14, 15: `5dc1525031fa0b7fc9948d072e12e5f3939400ef215265c7deebe398f5052531`, `7e0beb1cdf7df0ccdc91015d048841917362630ba4c6da2542d8499e9f7aff39`, `d0b4857bb85468ea3e4c87584ceba80e61917c2e25d79ba6f6ee66fabd7492de`, `177c88cb94e6d1cf3afe39d802ea47aed9c6c51f792f628a437278e818c3be67` |
+| Seeded open bids (`seed-demo-bids.sh --hours 72`, investor, expiry 1793264489 = 2026-10-29 09:01:29 UTC) | bid 3 (PUT RWA, 5 RWA, strike 50, premium 0.9 USDx) `98fc0991c9e083d5528affdb7467abce5403fcdffa8dde279539b876a979312d`; bid 4 (CALL RWA, 3 RWA, strike 30, premium 0.4 USDx) `a8fe32dd87722bc108a8fe5ec6fb095ee2f4793fae0b5097573e570f888c65c6` |
+| `extend_bid_ttl([3, 4])` / `extend-ttl.sh` over option ids 12–15 | `258e4e7f4020d6b27f27d37bb657b5602f5a00053086a89673782da21ed87941` / `498cd3170ec9d70f6b2e0e732ea4b183a629ba9d120a54b3513130a3178fbede` (instance live until ledger 5914613, ~29 days) |
+
+Built with `stellar contract build --package options --meta source_repo=github:mohamedkhellaf/hackmeridian`.
+
+Smoke runs against v1.5 (`scripts/deploy/smoke-testnet.sh`, logs git-ignored):
+- full run `smoke-20261026T085138Z` (sections up to V1.4, the v1.4 script): **PRE 6/6, P0 36/36, P0+ 24/24, V1.2 26/26,
+  V1.3 53/53 (1 skipped: `CAP_FILL`, `--full` not used), V1.3.1 15/15, V1.4 35/35, exit 0**;
+- `--v15-only` run `smoke-20261026T085902Z`: **PRE 6/6, V1.5 42/42 (1 skipped: `BID_PRUNE_LIVE_SIM`, the 45 s bid had
+  already expired when that check came up; a live prune is covered by the unit and negative tests), exit 0.**
+
+**Bids on chain (V1.5 section; investor buys, maker2 writes, RWA).**
+
+| Step | Effect | Tx |
+|---|---|---|
+| `create_bid` (investor, PUT, 45 s) | bid #0 `Open` (the prune path) | `66a2e476ba171539bd5f0ef8e92a92bf00fd11f5897fd7c0163392759db1e5c6` |
+| `create_bid` (investor, PUT 5 RWA, strike 50, premium 1 USDx, 1 h) | bid #1 `Open`, `bid_created` event, in `list_open_bids_for(RWA)`, `buyer_open_count` 2; investor −1 USDx, contract and `open_collateral(USDx)` +1 USDx. Simulated: maker2 `cancel_bid` #123 `NotBidder`, investor `fill_bid` #111 `SelfTrade`, outsider `fill_bid` #104 `NotEligible` | `171125c3cf7d0faf27eecb913ac2fc3a7f91fd6fe6232122356c4c8bdb35c26a` |
+| `fill_bid(maker2, 1)` | option #11 `Active`, holder investor, writer maker2; bid `Filled`, `option_id` 11, out of the book; events `option_bought` + `bid_filled`; maker2 −50 +1 USDx, contract and `open_collateral(USDx)` +49 USDx. Simulated: maker1 fills again #122, investor cancels #122 | `ce841e7eea37bc98821eb34360259aef5d32227b6a879e0f1b64c3f6ac9c35b3` |
+| `exercise` (investor, the bidder) | #11 `Exercised`; investor −5 RWA +50 USDx; ABI §2 deltas | `088f106685763d1b2ebb796f0309f88f56838dd4c366678f18ba0f7ad634276c` |
+| `claim_delivery` (maker2) | maker2 +5 RWA | `80196949d7020c9a4596e5229f9831788a112a656552b584ca65d6234f04506e` |
+| `create_bid` (investor, CALL 3 RWA, strike 30, premium 0.5 USDx) | bid #2 `Open`; investor −0.5 USDx into escrow | `eac8193e0a9a35dcc28101b2628b57fc708ba68dc1a372f0c0e14923df90d1db` |
+| `cancel_bid(investor, 2)` | `bid_cancelled`, state `Cancelled`, premium back. Simulated: cancel again #122 | `113a2662f097b10165e84ae27c06f5ee01152a0875de4943e124cf9361e6aabc` |
+| `prune_bids(maker2, [0])` after expiry | returns 1, `bid_pruned`, bid #0 `Expired`, investor +1 USDx (maker2 nothing); before it, maker1 `fill_bid` simulated #109 `Expired`; a second prune simulates 0; `buyer_open_count(investor)` back to 0 | `d66648eb755630a2223fcf68a19499ff5a11688c72e7f3008c239789691538c8` |
+
+Off-chain on the same tree (`cargo test -p options`): 146 unit (13 bid tests), 18 invariant (new bid property test, 128 cases, every bid error path reached) and 86 negative tests (10 new `bids26_*`) pass; `cargo clippy -p options --all-targets` is clean.
+
 ## Off-chain assurance
 
 On the merged v1.3.1 tree (branch `feat/contract-v1-3-1`: `feat/v131-impl`, `feat/v131-tests`,
