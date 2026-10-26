@@ -146,3 +146,23 @@ id.
       if a rehearsal left a demo balance below target, re-run `scripts/setup-testnet/02-assets.sh` first).
 - [ ] `scripts/deploy/smoke-testnet.sh` ends with `P0: PASS` and `P0+: PASS` (PUT/CALL lifecycles on RWA and BOND,
       expected contract errors in simulation, expiry/reclaim, maker competition). Full log in `scripts/out/smoke-*.log`.
+
+## Pro (experimental)
+
+`contracts/pro` is the EXPERIMENTAL cash-settled margin layer (brief `docs/pro-v0-brief-dev2.md`). It is deployed
+separately from `options`, with its own identities (`strata-pro-{admin,publisher,keeper,maker,holder,lp}`) and the
+existing USDx SAC as quote token. The publisher and the vault's seed capital are team-operated. TESTNET only.
+
+```sh
+scripts/deploy/deploy-pro.sh                     # identities (friendbot), stellar contract build --package pro, deploy alias "pro"
+DRY_RUN=1 scripts/deploy/deploy-pro.sh           # print every command; send and write nothing
+python3 scripts/deploy/pro-snapshot.py --series-id 0 --strike 110 --expiry <unix> --spot 100 --seq 1   # publish_risk snap JSON
+scripts/deploy/pro-demo.sh [--expiry-minutes 15] [--settlement-price 175]   # evidence run, ~20 min, real txs
+```
+
+`deploy-pro.sh` writes `PRO_ID`, `PRO_DEPLOY_TX`, `PRO_WASM_SHA256` and the `PRO_*` public keys to
+`scripts/out/testnet.env`, prints the AGENTS.md row and creates `docs/pro-testnet-evidence.md`. `pro-demo.sh`
+records list_series, publish_risk, deposit, buy, exercise, publish_risk at the higher price, liquidation to the vault,
+publish_settlement, settle, settle_vault and claim as `| op | tx hash |` rows in that file. Step-by-step instructions,
+the exact sequence and amounts, and troubleshooting (friendbot, trustlines, `StaleSnapshot`, `SettlementWindowClosed`)
+are in `docs/pro-testnet-runbook.md`.
