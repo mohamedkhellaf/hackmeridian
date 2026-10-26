@@ -848,8 +848,9 @@ prune_create() {
 }
 
 # Permissionless listing of EQTY (not in the constructor). Returns 0 iff EQTY is listed afterwards.
+B36=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 v13_listing() {
-  local listed got assets n len zz
+  local listed got assets n len reg zz zcode i
   listed="$(view "$O" is_listed --token "$EQTY_SAC")"
   echo "   is_listed(EQTY $EQTY_SAC) before listing = ${listed:-unreadable}"
   echo "   config().underlyings = $(view "$O" config | jq -c '.underlyings' 2>/dev/null)"
@@ -885,22 +886,33 @@ v13_listing() {
   got="$(jq -c '.[0:2]' <<<"$assets" 2>/dev/null)"
   expect_eq V13_LIST_ASSETS_SEED "$got" "$(jq -cn --arg a "$RWA_SAC" --arg b "$BOND_SAC" '[$a, $b]')" \
     "list_assets(0, 50)[0..2] (constructor seed RWA, BOND)"
+  # Listing is permissionless and the registry only grows, so other accounts may have listed more assets: check
+  # asset_count() against the paged registry and the lower bound this run guarantees, not an exact total.
   n="$(view "$O" asset_count | num)"
-  len="$(jq length <<<"$assets" 2>/dev/null)"
-  expect_eq V13_ASSET_COUNT "$n" 3 "asset_count() (RWA + BOND from the constructor, EQTY listed; list_assets length ${len:-?})"
+  len=""
+  reg="$(registry)" && len="$(jq length <<<"$reg" 2>/dev/null)"
+  if [[ "$n" =~ ^[0-9]+$ ]] && ((n >= 3)) && [[ "$len" == "$n" ]]; then
+    pass V13_ASSET_COUNT "asset_count() = $n >= 3 (RWA + BOND from the constructor, EQTY listed) = length of list_assets paged to the end"
+  else
+    fail V13_ASSET_COUNT "asset_count() = ${n:-unreadable}, list_assets paged length = ${len:-unreadable}; wanted equal and >= 3"
+  fi
 
   expect_fail V13_FAIL_ALREADY_LISTED 117 AlreadyListed "$ID_MAKER2" list_asset --lister "$MAKER2" --code EQTY \
     --issuer "$RWA_ISSUER"
   expect_fail V13_FAIL_LIST_QUOTE 117 AlreadyListed "$ID_MAKER2" list_asset --lister "$MAKER2" --code USDx \
     --issuer "$USDX_ISSUER"
-  zz="$(stellar contract id asset --asset "ZZZZ:$USDX_ISSUER" --network "$NETWORK" 2>/dev/null)"
+  # A fresh random code per run (Z + 7 of [A-Z0-9]): anyone can deploy the SAC of a fixed code, which would break
+  # this precondition for good.
+  zcode=Z
+  for i in 1 2 3 4 5 6 7; do zcode+="${B36:RANDOM%36:1}"; done
+  zz="$(stellar contract id asset --asset "$zcode:$USDX_ISSUER" --network "$NETWORK" 2>/dev/null)"
   if ! is_contract_id "$zz"; then
-    fail V13_FAIL_NOT_DEPLOYED "could not derive the SAC id of ZZZZ:$USDX_ISSUER"
+    fail V13_FAIL_NOT_DEPLOYED "could not derive the SAC id of $zcode:$USDX_ISSUER"
   elif contract_exists "$zz"; then
-    fail V13_FAIL_NOT_DEPLOYED "precondition broken: the SAC $zz of ZZZZ:$USDX_ISSUER is deployed; pick another code"
+    fail V13_FAIL_NOT_DEPLOYED "precondition broken: the SAC $zz of $zcode:$USDX_ISSUER is deployed; re-run for another code"
   else
-    echo "   SAC of ZZZZ:<usdx-issuer> would be $zz and is not deployed (precondition for #118)"
-    expect_fail V13_FAIL_NOT_DEPLOYED 118 AssetNotDeployed "$ID_MAKER1" list_asset --lister "$MAKER1" --code ZZZZ \
+    echo "   SAC of $zcode:<usdx-issuer> would be $zz and is not deployed (precondition for #118)"
+    expect_fail V13_FAIL_NOT_DEPLOYED 118 AssetNotDeployed "$ID_MAKER1" list_asset --lister "$MAKER1" --code "$zcode" \
       --issuer "$USDX_ISSUER"
   fi
   expect_fail V13_FAIL_BAD_CODE 102 InvalidArgs "$ID_MAKER1" list_asset --lister "$MAKER1" --code 'bad code!' \

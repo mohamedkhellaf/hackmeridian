@@ -60,9 +60,9 @@ the rest of both sections is reported as not reached.
 |---|---|---|
 | `V13_INTERFACE` + `V131_INTERFACE` | `asset_count()`, then `list_open_for(RWA, 0, 1)` | readable u32 / id array (else the rest of V1.3 and V1.3.1 is skipped and fails) |
 | `V13_LIST` | maker1 `list_asset(lister=maker1, code=EQTY, issuer=rwa-issuer)` | tx succeeds, `asset_listed` event, returned address `== EQTY_SAC` |
-| `V13_IS_LISTED`, `V13_LIST_ASSETS`, `V13_ASSET_COUNT` | views | `is_listed(EQTY)`, `list_assets(0,50)` contains EQTY and starts with `[RWA, BOND]`, `asset_count() == 3` |
+| `V13_IS_LISTED`, `V13_LIST_ASSETS`, `V13_ASSET_COUNT` | views | `is_listed(EQTY)`, `list_assets(0,50)` contains EQTY and starts with `[RWA, BOND]`, `asset_count() >= 3` and equals the length of `list_assets` paged to the end (anyone may list, so the total is not fixed) |
 | `V13_FAIL_ALREADY_LISTED` / `V13_FAIL_LIST_QUOTE` | list EQTY again / list `USDx` | #117 `AlreadyListed` |
-| `V13_FAIL_NOT_DEPLOYED` | list `ZZZZ:<usdx-issuer>` (its SAC is checked to be undeployed first) | #118 `AssetNotDeployed` |
+| `V13_FAIL_NOT_DEPLOYED` | list `Z???????:<usdx-issuer>`, a random code per run (its SAC is checked to be undeployed first) | #118 `AssetNotDeployed` |
 | `V13_FAIL_BAD_CODE` / `V13_FAIL_ISSUER_NOT_ACCOUNT` | code `bad code!` / issuer = a contract address | #102 `InvalidArgs` |
 | `V13_FAIL_CONTRACT_NOT_AUTHORIZED` | `create_offer` on EQTY before the issuer acts | #105 `ContractNotAuthorized` |
 | `V13_AUTHORIZE_EQTY` | `scripts/setup-testnet/03-authorize-contract.sh <OPTIONS_ID> EQTY` | exits 0; `is_eligible(EQTY, contract)` true, outsider false |
