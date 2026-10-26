@@ -38,7 +38,7 @@
 }
 .is-note--body {
   font-size: 13px;
-  color: #c9ced6;
+  color: var(--text);
   line-height: 1.55;
 }
 .is-break {
@@ -118,7 +118,7 @@
   align-items: center;
   gap: 10px;
   background: var(--surface-sunken);
-  border: 1px solid #1c2129;
+  border: 1px solid var(--row-line);
   border-radius: var(--r-md);
   padding: 12px 14px;
   font-size: 13px;
@@ -128,7 +128,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #c9ced6;
+  color: var(--text);
   min-width: 0;
 }
 .is-status > .is-status-text {
@@ -157,7 +157,7 @@
 }
 
 .is-danger-card {
-  border-color: #3a2120;
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
 }
 .is-danger-card .ui-card-body {
   padding-top: 20px;
@@ -197,7 +197,7 @@
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: #c9ced6;
+  color: var(--text);
 }
 .is-flag--ok svg {
   color: var(--ok);
@@ -210,7 +210,7 @@
   font-size: 12px;
 }
 .is-sep {
-  border-top: 1px solid #1c2129;
+  border-top: 1px solid var(--row-line);
   padding-top: 14px;
   display: flex;
   flex-direction: column;
