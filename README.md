@@ -22,7 +22,7 @@ A market maker writes a put or a call on an eligible asset and locks the full co
 
 Two ways to back a call live in the same product. **Covered** (default): the writer locks the full strike or the full underlying before the sale; the holder's only risk is issuer action. **Margin** (experimental, separate contract): the writer posts partial margin in USDx, the option settles in cash at a published price, and a vault funded by liquidity providers backstops liquidations. Choosing Margin when posting an offer opens a risk warning the user must acknowledge, and every margin screen repeats it:  that payouts can be reduced and any deficit is shown. The two contracts share no storage or balance, so a margin loss can never touch covered collateral.
 
-- Eligibility is the asset's own `AUTH_REQUIRED` trustline authorization, read from the Stellar Asset Contract. The issuer keeps every power; the contract checks them, it does not replace them.
+- Eligibility is the asset's own trustline authorization, read from the Stellar Asset Contract. An issuer that sets `AUTH_REQUIRED` approves holders one by one; one that does not gets automatic authorization; either way the issuer keeps freeze and clawback. The contract checks the issuer's decision, it does not replace it.
 - Anyone can list a classic asset by `(code, issuer)`. The contract derives the canonical SAC. The issuer still decides who may hold it, including the escrow.
 - A holder can list an active option for resale at a price they set. An eligible buyer pays that price to the holder and becomes the holder in one transaction. Strike, expiry, quantity and the writer's collateral do not change.
 - Buyers can post too. A request names the terms and the premium offered, with that premium escrowed in the contract; any eligible maker fills it in one transaction and the option is created with the buyer as holder. Offers and requests sit side by side on Markets; nothing matches automatically.
@@ -30,13 +30,13 @@ Two ways to back a call live in the same product. **Covered** (default): the wri
 
 This works for any Stellar asset whose issuer permits it, not for every token. Freeze and clawback remain the issuer's powers and can block settlement (see [Limits](#limits)).
 
-Demo assets: `RWA`, `BOND`, `EQTY` (auth required, revocable, clawback enabled) and the quote token `USDx`. All fictional, all Testnet.
+Demo assets: `RWA`, `BOND`, `EQTY` (revocable and clawback enabled; new trustlines auto-authorized so anyone can try it) and the quote token `USDx`. All fictional, all Testnet.
 
 ## Stellar Unlocked
 
 | Protocol feature | Use |
 |---|---|
-| Asset flags `AUTH_REQUIRED`, `AUTH_REVOCABLE`, `AUTH_CLAWBACK_ENABLED` | Regulated-asset rules come from the ledger. The issuer authorizes holders and the escrow with `set_trust_line_flags`. |
+| Asset flags `AUTH_REQUIRED`, `AUTH_REVOCABLE`, `AUTH_CLAWBACK_ENABLED` | Regulated-asset rules come from the ledger. The issuer authorizes, freezes or claws back with `set_trust_line_flags` and `clawback`; the contract reads the resulting trustline state. The built-in DEX doubles as the Testnet faucet. |
 | Stellar Asset Contract | One Soroban contract serves every classic asset. It moves tokens through the SAC and reads `authorized(address)` for eligibility. Listing an asset is deriving its SAC address. |
 | Soroban cross-contract calls | Exercise is one invocation with `require_auth` and checked `i128` math. Issuer actions during exercise fail the whole transaction; balances stay unchanged. |
 
@@ -74,9 +74,16 @@ Earlier versions v1 to v1.4: [AGENTS.md](AGENTS.md#deployed-contracts-testnet-on
 
 ## Try it
 
-Without a wallet: Markets, Locked reserves and option history in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
+Without a wallet: Markets, Collateral and every option's history in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
 
-With a wallet: Freighter on Testnet, funded by Friendbot. The underlyings require issuer authorization, so open an issue with your Testnet `G…` address and we run `scripts/setup-testnet/onboard-account.sh`: trustlines, authorization on the three assets, `USDx` and underlying balances. With `USDx` alone you can buy and exercise a call.
+With a wallet, self-service, about two minutes, no approval from us:
+
+1. Install [Freighter](https://www.freighter.app/), switch it to **Testnet**, fund the account with Friendbot (Freighter offers it).
+2. Add trustlines (Manage assets → add by code and issuer): `USDx` from `GAE6ONGU5S3JHDBR5Z3BUVXCL4WLEHQVLBDNTCKHKOYFBYBPBW4IARFS`, and `RWA`, `BOND` or `EQTY` from `GCNWQR5OA24X7LPTCXUEL4V4ZLSIFKUNIEZEO3UVCVXECPPGX7ERFDGM`.
+3. Swap some XLM for `USDx` and for the asset you want, in Freighter's Swap tab. The issuers keep standing sell offers on Stellar's built-in DEX: 100 USDx per XLM, 10 RWA, BOND or EQTY per XLM. Nothing else is needed: the demo issuer authorizes every new trustline automatically.
+4. Open the app, connect, and trade: buy an offer, post a bid, fill a bid as a maker, resell, exercise.
+
+The issuer keeps `AUTH_REVOCABLE` and clawback, so the Issuer console can still freeze any holder or claw tokens back, and the `strata-outsider` demo account stays unauthorized to show the refusal path. Verified from a fresh key on 26 October: Friendbot, two trustlines, two swaps, `is_eligible` true ([evidence](docs/contract-testnet-evidence.md#self-service-access)).
 
 Locally:
 

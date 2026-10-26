@@ -726,3 +726,15 @@ only on throwaway instances), not against v1.2 or v1.3 (the spike on 2026-10-25 
 `transfer`, `get_options`, `MAX_PAGE` and the event, and changes only comment lines otherwise (three removed). The
 build of that `lib.rs` is still the deployed v1.2 wasm `8778dc77…422f`: comments on private items are not embedded
 in the contract spec. Testnet resets quarterly; nothing here is durable, and none of it involves real assets.
+
+## Self-service access (2026-10-26 ~11:25 UTC)
+
+To let anyone try the app without an onboarding step, the demo issuer cleared `AUTH_REQUIRED` (keeping `AUTH_REVOCABLE` and `AUTH_CLAWBACK_ENABLED`) and both issuers posted standing sell offers on the built-in DEX.
+
+| Action | Tx |
+|---|---|
+| `strata-rwa-issuer` set_options clear `AUTH_REQUIRED` (flags now revocable + clawback) | `5f5dbbdfc05e8bc933be2c971cf5b603b0b2d2d8fcb2c0df353cac43229a2022` |
+| Issuer sell offers RWA, BOND, EQTY vs XLM (1,000,000 each at 0.1 XLM) | `29b65578f17da8c18421d4aa078811b3336b6c582cd0d3ca5166a5c38dbeb333` / `47d93427f953d8b03f681dcb2d632dc79072442b0cad2200d431f8c6a971f792` / `fe8db8fd0e9f253b0fbea4c12d5303f0ca77c20a9d10a28fdc956b84012fd9f4` |
+| `strata-usdx-issuer` sell offer USDx vs XLM (10,000,000 at 0.01 XLM) | `18b2f425b8aad29ef2858dca4a7ecbf4a6c9be8b54057629998334819cd35f60` |
+
+Verification from a fresh key `GCUCZAJCRKM6GQSLH5K26YGQZLORAQLRK7VO3YPN45IGDUWKHCRJSYU2`: Friendbot, `change_trust` USDx and RWA, `path_payment_strict_send` 20 XLM → 2,000 USDx and 5 XLM → 50 RWA, both trustlines `is_authorized = true`, `is_eligible(RWA, key) = true` on v1.5. `strata-outsider` still returns `false` (its trustline keeps the deauthorized flag), so the ineligible-buyer and freeze demos are unchanged.
