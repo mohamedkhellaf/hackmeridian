@@ -1,6 +1,6 @@
 # Strata Pro v0.3.2 — build brief for Dev 2
 
-Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **experimental track, spec + integer model + simulator for the hackathon.** Dev 2's review of PR #30 recommended no-go for on-chain Pro before the 06:00 freeze; Dev 1 accepts. This brief is the build spec for when `contracts/pro/` is built. Dev 2 keeps the veto on unsafe behavior.
+Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **full on-chain attempt on Testnet**, decided by Dev 1 after PR #30 merged. Dev 2 builds `contracts/pro/` to this brief, with no "European only" cut. Go/no-go at 09:30 Lisbon under the gate in `AGENTS.md`; if it fails, Pro stays "specified and simulated" and the submission uses the Covered MVP. Dev 2 keeps the veto on unsafe behavior.
 
 **The executable spec is `packages/risk/pro_v0_model.py` (v0.3.2).** Every function below exists there with the same checks, in the same order, with the same errors. The brief and the model must agree. If Dev 2 finds that a behavior is unsafe or unbuildable on-chain, Dev 2 may deviate. Dev 1 then updates the model and the fixtures to match before the contract merges. The model never overrides on-chain safety. Background and calibration: `docs/pro-architecture.md`.
 
@@ -295,11 +295,14 @@ Regenerate the fixtures with `cd packages/risk && python gen_pro_fixtures.py`. T
 
 Already cut in v0.2: LP withdrawal (deposit only; say withdrawals are not implemented).
 
-Cut, in this order:
-1. Early exercise (European only: positions settle at expiry). The newest surface goes first.
-2. Private takers (keep vault-only `liquidate`).
-3. Multi-series accounts (one series per account).
-4. Offers (writer and buyer co-sign a single `sell(writer, buyer, series, qty, premium)`).
+American early exercise is **not** cuttable: it is the product (Dev 1 decision after PR #30; this replaces the earlier "European only" cut #1).
+
+Cut only if the 09:30 gate is at risk, in this order:
+1. Private takers (keep vault-only `liquidate`).
+2. Multi-series accounts (one series per account; the vault keeps several).
+3. Offers (writer and buyer co-sign a single `sell(writer, buyer, series, qty, premium)`).
+
+Any cut invalidates the fixture scenarios that use the cut feature. Tell Dev 1, who marks or regenerates them.
 
 Never cut:
 - the margin check after `buy`, and `PremiumBelowMark`;
@@ -309,7 +312,7 @@ Never cut:
 - pull claims (`claim`), never pushed payouts;
 - the post-expiry `withdraw` block and the `SettlementPending` LP freeze;
 - book-level `liquidate` and O(1) settlement (the storage bounds of §4, tested at the cap);
-- if early exercise ships: `NoEarlyExercise` on vault-owned books, `exercise_max_age`, `SettlementPending` against a writer with expired unpriced debt, and `LiquidateFirst` against an unhealthy writer;
+- American early exercise with its guards: `NoEarlyExercise` on vault-owned books, `exercise_max_age`, `SettlementPending` against a writer with expired unpriced debt, and `LiquidateFirst` against an unhealthy writer;
 - pro-rata vault coverage within a series, and pro-rata writer cash across its expired series.
 
 ## 10. Known limits to disclose (README and UI)

@@ -2,7 +2,7 @@
 
 Python 3 + numpy. Owner: Dev 1.
 
-**Status: roadmap only.** `contracts/pro/`, its contract tests and a publisher service do not exist; margin trading is out of scope for this hackathon (no-go for on-chain Pro). What exists is the spec, this integer reference model, the float engine and deterministic fixtures for a future contract to replay.
+**Status: on-chain attempt in progress.** Dev 2 is building `contracts/pro/` on its own branch and Dev 3 a flagged Pro UI; neither is on `main` until the Pro gate in `AGENTS.md` passes (go/no-go 09:30 Lisbon). Until then, what exists on `main` is the spec, this integer reference model, the float engine and the deterministic fixtures the contract must replay, and Pro is described as "specified and simulated".
 
 | File | Role |
 |---|---|
