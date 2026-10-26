@@ -2,7 +2,7 @@
 
 Version du 25 octobre 2026. Conception pour Testnet. Les modèles et les tests sont dans `packages/risk/` (`strata_risk.py`, `test_strata_risk.py`).
 
-> **Périmètre v0 :** ce document décrit la cible. Ce qui est construit pour la soumission est défini par `docs/pro-v0-brief-dev2.md` et `packages/risk/pro_v0_model.py`. Pas en v0 : TWAP de règlement, enchère hollandaise, liquidation partielle, fonds de défaut des makers, tokens en couverture, MMP. Aucun paramètre n'est validé pour des fonds réels. **v0.3.2 (26 octobre)** intègre les revues 1 à 4 de Dev 2 sur la PR #30 (voir le §0 du brief) ; on-chain : no-go pour le hackathon, Pro est livré comme spec + modèle + simulateur. Sous-jacent démo : le label fictif `EQTY`, avec la calibration « action liquide » ; les RWA fins restent en Covered (§5).
+> **Périmètre v0 :** ce document décrit la cible. Ce qui est construit pour la soumission est défini par `docs/pro-v0-brief-dev2.md` et `packages/risk/pro_v0_model.py`. Pas en v0 : TWAP de règlement, enchère hollandaise, liquidation partielle, fonds de défaut des makers, tokens en couverture, MMP. Aucun paramètre n'est validé pour des fonds réels. **v0.3.2 (26 octobre)** intègre les revues 1 à 4 de Dev 2 sur la PR #30 (voir le §0 du brief) ; on-chain : tentative complète par Dev 2 sur Testnet, avec un go/no-go à 09 h 30 (`AGENTS.md`) ; en cas d'échec, Pro reste « spécifié et simulé » et la soumission repose sur le régime Covered. Sous-jacent démo : le label fictif `EQTY`, avec la calibration « action liquide » ; les RWA fins restent en Covered (§5).
 
 ## 0. Décision
 
@@ -256,7 +256,7 @@ Côté Soroban :
 
 ## 11. Plan 24 h (UI hors périmètre) — remplacé
 
-> Plan d'origine, conservé pour mémoire. Remplacé par la décision no-go on-chain du 26 octobre (brief §0). L'ABI réelle est celle du brief §6, pas celle du §10 ci-dessus.
+> Plan d'origine, conservé pour mémoire. Remplacé par les revues de la PR #30 puis par la tentative on-chain gardée du 26 octobre (`AGENTS.md`). L'ABI réelle est celle du brief §6, pas celle du §10 ci-dessus.
 
 | Créneau (Lisbonne) | Dev1 : quant | Dev2 : contrat | Dev3 : infra |
 |---|---|---|---|

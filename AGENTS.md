@@ -7,7 +7,7 @@
 - **Product:** Strata (working name; previously Backstop). Repository: `hackmeridian`.
 - **Event:** HackMeridian Genesis / Stellar Unlocked, Lisbon, October 25–26, 2026.
 - **Hard deadline:** Monday, **October 26 at 12:00 Lisbon time**. Target submission by 11:00; feature freeze by 06:00. The demo, deck, README, GitHub repository, and submission answers are deliverables, not afterthoughts.
-- **Thesis:** Stellar has tokenized assets, but many lack useful risk-management products. Build a **multi-asset, fully collateralized options layer** that turns eligible tokenized assets into physically settled calls/puts, with transparent collateral and issuer-enforced transfer rules. Simple strategies sit on top of this layer. **Strata Pro (experimental; spec + integer model + simulator only in this hackathon, no on-chain build without Dev 2's acceptance):** a separate contract for naked, cash-settled American calls with partial margin, liquidation by takeover and a pre-funded backstop vault; see "Strata Pro" below. Pro never weakens the fully collateralized guarantees of `contracts/options/`.
+- **Thesis:** Stellar has tokenized assets, but many lack useful risk-management products. Build a **multi-asset, fully collateralized options layer** that turns eligible tokenized assets into physically settled calls/puts, with transparent collateral and issuer-enforced transfer rules. Simple strategies sit on top of this layer. **Strata Pro (experimental; full on-chain attempt on Testnet in progress, gated, see "Strata Pro" below):** a separate contract for naked, cash-settled American calls with partial margin, liquidation by takeover and a pre-funded backstop vault; see "Strata Pro" below. Pro never weakens the fully collateralized guarantees of `contracts/options/`.
 - **Honest claim:** *Any supported, eligible Stellar asset* — NOT every token automatically. The MVP uses fictional Testnet assets; real RWA integrations need issuer cooperation, legal permission, and technical compatibility.
 - **Existing evidence:** A put exercise was proven in a Testnet spike; see `research/decision/20_rwa_options_spike.md`. Original decision context: `WINNING_IDEAS.md` and `research/decision/`.
 - **Coding gate:** Respect a human team's explicit **GO** before implementing. Once GO is given, work autonomously within your assigned scope. Never wait for blanket permission on each small task. If a freeze/stop is called, obey it.
@@ -36,9 +36,16 @@
 - **P0+ — by ~01:00 Monday:** covered CALL; two distinct underlying Testnet assets using the *same* contract; maker competition (funded offers), eligibility checks, issuer authorization demo, collateral-proof UI, automated Rust tests and working hosted frontend.
 - **P1 — only after P0+ succeeds:** transfer of option ownership; position token if feasible; issuer freeze/clawback failure demo; financial strategy presets (protective put, covered call, collar) with **accurate payoff previews**; trustworthy impairment/refund logic if fully specified and tested.
 - **P2 — optional:** multi-leg on-chain execution and composed strategies, a more sophisticated RFQ backend, third asset class, Trustless Work integration. Do not claim that a multi-leg structured product is issued or guaranteed unless **all** legs are funded and settle consistently.
-- **06:00 Monday:** freeze features. Then integration fixes, tests, README, deck, demo recording and submission only. **Submit by 11:00**, leaving a one-hour buffer.
-- **Strata Pro track — never at the expense of P0/P0+:** spec, integer reference model and simulator (`packages/risk/`, `docs/pro-v0-brief-dev2.md`). After Dev 2's review of PR #30 the on-chain go/no-go is **no-go for the hackathon**: Pro ships as spec + simulator and every claim says "specified and simulated".
-- **Never in this hackathon:** Mainnet or real customer funds; real regulated-fund integrations without permission; margin, leverage, uncollateralized promises, unaudited claims of production security, hidden oracle assumptions. **Single exception, not active in this hackathon:** partial margin, and the leverage it implies (naked calls), inside `contracts/pro/` only, under the rules below and only once Dev 2 accepts it with tests and a recorded Testnet run; never present a Pro position as fully collateralized.
+- **06:00 Monday:** freeze features of the Covered product (`contracts/options/` and its UI). Then integration fixes, tests, README, deck, demo recording and submission only. **Submit by 11:00**, leaving a one-hour buffer. The Strata Pro track and Dev 1's new-derivative specs are exempt from the 06:00 freeze, on their own branches, until the Pro go/no-go below; nothing from them merges into `main` without passing its gate.
+- **Strata Pro track — full on-chain attempt, never at the expense of the Covered demo:** Dev 2 builds `contracts/pro/` to the **full** spec in `docs/pro-v0-brief-dev2.md` (American exercise included; no "European only" cut). Dev 3 builds the Pro UI behind a feature flag (see "Strata Pro UI"). Both work on their own branches.
+  - **Go/no-go at 09:30 Lisbon.** The gate is all of the following:
+    - `contracts/pro` replays every step of `packages/risk/fixtures/pro_v0.json`;
+    - it passes the brief §7 negative tests;
+    - one recorded Testnet run (list_series → publish_risk → deposit → buy → early exercise → price move → liquidate → publish_settlement → settle → settle_vault → claim) with transaction hashes in `docs/contract-testnet-evidence.md`;
+    - Dev 2 signs off.
+  - **Go:** the contract and the flagged UI merge, the Deployed contracts table is updated, and Pro may be shown and described as "on Testnet".
+  - **No-go:** nothing merges. The submission stays on the fully collateralized Covered MVP, and Pro is described as "specified and simulated" (README, deck, video). A Pro UI shown against fixtures must be labelled "simulated, not on-chain".
+- **Never in this hackathon:** Mainnet or real customer funds; real regulated-fund integrations without permission; margin, leverage, uncollateralized promises, unaudited claims of production security, hidden oracle assumptions. **Single exception, Testnet only:** partial margin, and the leverage it implies (naked calls), inside `contracts/pro/` only, under the rules below. It may be built now; it ships (merge to `main`, demo as on-chain, public claims) only once it passes the Pro gate above. Never present a Pro position as fully collateralized.
 
 ## Contract and asset architecture
 
@@ -56,11 +63,40 @@
 
 - **Isolation:** separate crate and deployment. No storage, balance or call is shared with `contracts/options/`; Pro losses can never touch options collateral. The locked options ABI is not modified for Pro.
 - **Product:** naked American calls, cash-settled in `USDx` (no clawback flag today, but its issuer is not `AUTH_IMMUTABLE`, so margin is not guaranteed safe from clawback until it is). One underlying market per deployment. The holder may exercise early at the publisher's spot (snapshot ≤ 120 s old) against a healthy writer; positions owned by the vault, or against a liquidatable writer or one with unpriced expired debt, settle at expiry instead. The payoff `qty × max(S − K, 0)` is paid from writer margin (after a vault takeover, from the writer's takeover payment reserved for that book), then the backstop vault: pro rata within a series at settlement (no early exercise draws on the vault), in settlement order across series; any remainder is a recorded deficit and a haircut on the holder. A takeover shortfall becomes the writer's debt to the vault, collected from the writer's free cash at any takeover, then when its last expired position settles, and before any withdrawal; any part its cash cannot cover stays a recorded unrecovered debt. LP capital cannot be withdrawn in v0. Never call it guaranteed.
-- **Roles (exception to "no admin", Pro only, under the same Dev 2 gate as partial margin: accepted by Dev 2 with tests and a recorded Testnet run, otherwise it does not apply):** `admin` lists series (market parameters are fixed at deployment); `publisher` publishes risk snapshots and the settlement price. They must be different accounts, and neither may trade, take over or provide LP capital. **The publisher's prices decide every liquidation, early exercise and payout**; neither role can change a live series' terms, rewrite a final price or delete a long position. Roles are disclosed in README and UI.
+- **Roles (exception to "no admin", Pro only, under the same Pro gate as partial margin):** `admin` lists series (market parameters are fixed at deployment); `publisher` publishes risk snapshots and the settlement price. They must be different accounts, and neither may trade, take over or provide LP capital. **The publisher's prices decide every liquidation, early exercise and payout**; neither role can change a live series' terms, rewrite a final price or delete a long position. Roles are disclosed in README and UI.
 - **Oracle:** demo feed and settlement price operated by the team, labelled as such. The contract checks every snapshot's consistency (mark within arbitrage bounds, extreme-scenario floor, freshness, monotonic sequence), not the price itself.
 - **Margin model:** owned by Dev 1 in `packages/risk/` (reference engine, integer reference model, fixtures). Contract tests reproduce `packages/risk/fixtures/pro_v0.json`. Where Dev 2 finds an on-chain safety issue, Dev 2 may deviate, and Dev 1 updates the model and fixtures before merge. Parameters are illustrative, not calibrated on real data.
 - **Claims:** "partial margin with liquidation and a pre-funded backstop; residual default risk is disclosed". Not: "safe", "insured", "fully backed".
+- **Open items Dev 2 must close or explicitly accept before the gate:**
+  - the settlement-price bound and overflow guard;
+  - stored keys instead of scans (`LiveSeries` as a list of ids, `LatestSpot`);
+  - stale marks in `liquidate`/`lp_deposit`;
+  - USDx `AUTH_IMMUTABLE` or its disclosure;
+  - issue #51 (deposit by an indebted writer);
+  - the brief §7 negative tests at every cap.
 
+## Strata Pro UI (Dev 3)
+
+- **Isolation:** a separate "Pro (experimental)" section of the app (for example `frontend/src/pro/`), off by default behind a feature flag (for example `VITE_ENABLE_PRO`). It never changes the Covered markets, buy, exercise or reserves flows. It goes to the hosted app only after the Pro gate passes.
+- **Data:**
+  - until Dev 2 publishes the Pro bindings, mock against `packages/risk/fixtures/pro_v0.json` (every step carries the full state and the expected result or error code);
+  - then swap to the generated bindings;
+  - amounts stay exact integer units (`bigint`), as in Covered, and use the model's names (`nlv`, `mm`, `im`, `owed`, `reserve`, `deficit`).
+- **Screens:**
+  1. **Margin account:** deposit and withdraw; NLV, MM and IM with distance to liquidation; any debt owed to the vault. Withdrawal is blocked while expired positions are unsettled.
+  2. **Write an uncovered call:** pick a series, quantity and premium. Preview the IM after the fill from `get_requirement`, never computed in React. The offer is an unfunded quote: the margin check happens at `buy`. A premium below `qty × mark` is refused.
+  3. **Buy:** state plainly that the call is partially collateralized — paid from the writer's margin, then the vault, with a deficit possible and shown.
+  4. **Positions:**
+     - **Early exercise** (American) at the latest snapshot, with each refusal mapped to its reason: `NoEarlyExercise` (vault-owned book, settles at expiry), `StaleSnapshot`, `OutOfTheMoney`, `SettlementPending`, `LiquidateFirst`.
+     - **After expiry:** `settle(book)` → `settle_vault(series)` → `claim`, showing what was paid and any deficit.
+  5. **Liquidation:** accounts with NLV < MM; "take over to the vault" (anyone can call it) and a private takeover, with the takeover price and any deficit.
+  6. **Vault:** LP deposit only (no withdrawal in v0), vault value, reserved takeover payments, debts owed by writers, shortfalls and deficits per series.
+  7. **Oracle:** latest snapshot age and sequence, and settlement-price status. The banner "prices and the settlement price are set by the team's publisher" is shown on every Pro screen.
+- **Copy:**
+  - every Pro screen carries "Testnet only. Partial margin: payouts can be reduced; any deficit is shown.";
+  - never "guaranteed", "insured", "safe", "fully backed" or "fully collateralized";
+  - before the gate passes, any Pro screen shown in the demo says "simulated, not on-chain".
+- **Ownership:** Dev 3 owns the UI. Financial formulas come from Dev 1 (the model and `packages/payoff`) and the contract views, never from custom logic in components.
 ## Financial and market-data rules (Dev 1)
 
 - Put buyer receives the **right to sell** the underlying at the strike; call buyer the **right to buy** it. The market maker is the option writer and receives a premium under the agreed premium policy.
@@ -73,7 +109,7 @@
 ## Coding agents and Git workflow
 
 - **Humans own decisions; agents own bounded tasks.** For each task, specify owner, files/directories, inputs, acceptance criteria, tests, expected output, and whether it may alter public interfaces. Coding agents must not redefine the product or silently change contract economics.
-- Separate agent lanes: **Dev 1:** quant/payoff agent, RFQ agent, financial red-team (read-only); **Dev 2:** contract implementer, Rust/test agent, security auditor (read-only); **Dev 3:** UI agent, wallet/bindings agent, e2e agent. A documentation/pitch agent works on docs only under Dev 1.
+- Separate agent lanes: **Dev 1:** quant/payoff agent, RFQ agent, financial red-team (read-only), new-derivatives spec agent (new instruments as spec + integer model + fixtures in `packages/risk/` and `docs/` only; no on-chain or UI claim until Dev 2 accepts an instrument); **Dev 2:** contract implementer, Rust/test agent, security auditor (read-only); **Dev 3:** UI agent, wallet/bindings agent, e2e agent. A documentation/pitch agent works on docs only under Dev 1.
 - Never allow two agents to write the same files simultaneously. Use isolated branches/worktrees; coordinate API changes with all owners before merging. Human lead checks diffs, tests, and claims.
 - `main` stays demoable. Code, dependency, CI and contract changes use small short-lived PRs (`feat/…`, `fix/…`, `chore/…`). Docs-only changes may go directly to `main` if harmless. CI/build/tests must pass; **contract or financial-settlement changes require human review by Dev 2**. For other PRs, the relevant owner reviews if time permits. Squash-merge, delete branch, pull `main` frequently.
 - Every coding agent must report: **changed paths, commands/tests run, test results, blockers, and transaction/contract IDs if relevant**. Never claim success when it only compiled or rendered. Keep commit messages imperative; no AI/co-author attribution trailers.
@@ -82,7 +118,7 @@
 ## Project layout
 
 - `Cargo.toml`, `contracts/options/src/`: Soroban Rust, `#![no_std]`, tests under contract crate.
-- `contracts/pro/`: planned experimental Strata Pro contract (Dev 2); not built, no-go for this hackathon. `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
+- `contracts/pro/`: experimental Strata Pro contract (Dev 2), being built on its own branch; on `main` only after the Pro gate passes. `frontend/src/pro/` (or equivalent): flagged Pro UI (Dev 3), same gate. `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
 - `scripts/`: Testnet asset creation/issuer permissions, deployment, funding demo accounts, repeatable integration steps.
 - `frontend/`: Vite + React + TypeScript, Stellar SDK and Freighter, app and transaction UI, generated bindings.
 - `packages/payoff/` and `packages/rfq/`: **planned** shared financial modules owned by Dev 1. If the existing monorepo structure differs, agree on paths once rather than having agents create competing package trees.
