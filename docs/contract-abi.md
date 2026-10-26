@@ -254,7 +254,8 @@ Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from
 - `list_open_for(asset, from, limit)` (v1.3.1): ids in state `Offered` for one underlying, oldest first, paged (`MAX_PAGE`).
 - `list_open()`: ids whose state is `Offered`, oldest first (v1.3.1: concatenation of the per-asset books in registry order,
   truncated to 200 ids; use `list_open_for` for a complete view). May include offers past `expiry`; clients filter by
-  `expiry` before showing them as purchasable. The list lives in instance storage, so it is bounded (see §10).
+  `expiry` before showing them as purchasable. Since v1.3.1 the books are persistent per-asset lists capped at
+  `MAX_OPEN_PER_ASSET` (§13); before that a single instance-storage list capped at 1000 (§10).
 - `option_count()`: number of options ever created (next id).
 - `open_collateral(token)`: total units of `token` the contract must currently hold for non-terminal options:
   locked collateral of `Offered`/`Active` options plus unclaimed proceeds of `Exercised` options. Clients compare
@@ -269,7 +270,9 @@ Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from
   non-issuer `G` account with no trustline reads `false`; on an AUTH_REVOCABLE asset a revoked trustline or contract
   balance reads `false`.
 - `extend_ttl(ids)`: anyone may call. Extends the contract instance and code TTL and the persistent entry of every
-  id in `ids` (`NotFound` for an unknown id). See §8.
+  id in `ids` (`NotFound` for an unknown id); since v1.3.1 also each listed option's `Listed(underlying)`,
+  `WriterOpen(writer)`, `OpenFor(underlying)`, `Reserved(quote)` and `Reserved(underlying)` entries, plus the first
+  `MAX_PAGE` registry index entries (§13.5, §13.8). See §8.
 
 ## 4. Lifecycle
 
