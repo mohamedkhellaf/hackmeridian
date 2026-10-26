@@ -102,7 +102,7 @@ USDx trustline false. `get_option(999)` → `NotFound` #101. State after the run
 
 Run 2 of `scripts/deploy/issuer-demo-testnet.sh` against v1.1 `CBRTUM4NF5P5ENYSPPOTT3NMRCPT65QSKMD2BB3AJPLU2C4YCFOCMSQC`:
 PRE 6/6, A1 12/12, A2 9/9, A3 12/12, B 14/14, CLEANUP 5/5. The script (and `scripts/deploy/extend-ttl.sh`) land with
-branch `feat/testnet-issuer-demo`. These are the issuer-action limits of `docs/contract-abi.md` §6 recorded on chain:
+PR #29. These are the issuer-action limits of `docs/contract-abi.md` §6 recorded on chain:
 the issuer of a regulated underlying can block settlement, and the contract does not promise otherwise.
 
 **A1: holder frozen on RWA (option #10).**
@@ -403,7 +403,10 @@ Ignored test (1):
 
 Earlier assurance, not re-run on the v1.3 `lib.rs`:
 
-- Mutation testing of `lib.rs` (cargo-mutants 27.1.0 plus hand-written mutants; logs are not committed):
+- Mutation testing of `lib.rs` (cargo-mutants 27.1.0 plus hand-written mutants). No mutant list or log is
+  committed, so these counts cannot be reproduced from the repository. The exception is the last run below, whose
+  tree is v1.2 as merged to `main` (`35017e2`, PR #29) and whose command is given; for the hand-written mutants only
+  the 11 named survivors can be checked:
   - First run, on the v1.1 `lib.rs` with the suite of the time (59 unit and 6 invariant tests): cargo-mutants
     97 mutants → 79 caught, 0 survived, 18 unviable. 34 hand-written mutants (per-call TTL extension, guards,
     transfer order and other changes cargo-mutants does not generate) → 23 caught, 11 survived: 8 real test gaps
@@ -413,10 +416,15 @@ Earlier assurance, not re-run on the v1.3 `lib.rs`:
     `deployer().extend_ttl`; `reclaim` calling `open_remove` unconditionally).
   - The 10 TTL and transfer-order tests close the 9 non-equivalent survivors: re-applied to the v1.2 `lib.rs`, each
     one is caught by the merged suite, and the 2 equivalent mutants still pass, as expected.
-  - Re-run of cargo-mutants on the merged v1.2 tree (81 unit and 7 invariant tests): 111 mutants → 89 caught,
-    20 unviable, 2 missed. Both missed mutants weaken the `id < count` guard in `get_options` (to `true` and to
-    `<=`) and are equivalent: an id at or past `option_count()` has no stored entry, so `load_opt` fails and the
-    loop stops at the same place.
+  - cargo-mutants on the v1.2 `lib.rs` with the unit and invariant suites only (81 unit and 7 invariant tests,
+    before `tests/negative.rs`): 111 mutants → 89 caught, 20 unviable, 2 missed. Both missed mutants weaken the
+    `id < count` guard in `get_options` (to `true` and to `<=`). They are equivalent for every state a deployment
+    can reach: an id at or past `option_count()` has no stored entry, so `load_opt` fails and the loop stops at the
+    same place.
+  - cargo-mutants on the full merged v1.2 suite (`cargo mutants -p options --file contracts/options/src/lib.rs`,
+    unit, invariant and negative tests): 111 mutants → 91 caught, 20 unviable, 0 missed. The 2 guard mutants are
+    killed by `negative.rs` `paging17_get_options_never_panics_and_never_reveals_ids_at_or_past_count`, which
+    lowers `Key::Next` below stored ids so the guard becomes observable.
 
 On v1 only (53-test suite, PRs #16 and #18), not re-run since:
 
@@ -428,7 +436,8 @@ On v1 only (53-test suite, PRs #16 and #18), not re-run since:
 
 Issuer freeze, contract de-authorization and clawback ran on chain against v1.1 only (section above; clawback only
 on a throwaway instance), not against v1.2 or v1.3 (the spike on 2026-10-25 also exercised them, see
-`research/decision/20_rwa_options_spike.md`). v1.2 adds code without changing the existing settlement paths: the
-`lib.rs` diff from `afda0da` ("Redeploy options v1.1 to testnet") to `627bac3` adds `transfer`, `get_options`,
-`MAX_PAGE` and the event, and removes only two comment lines. Testnet resets quarterly;
-nothing here is durable, and none of it involves real assets.
+`research/decision/20_rwa_options_spike.md`). v1.2 adds code without changing the existing settlement paths:
+`git diff 784f280 35017e2 -- contracts/options/src/lib.rs` (v1.1 on `main` to v1.2 as merged in PR #29) adds
+`transfer`, `get_options`, `MAX_PAGE` and the event, and changes only comment lines otherwise (three removed). The
+build of that `lib.rs` is still the deployed v1.2 wasm `8778dc77…422f`: comments on private items are not embedded
+in the contract spec. Testnet resets quarterly; nothing here is durable, and none of it involves real assets.

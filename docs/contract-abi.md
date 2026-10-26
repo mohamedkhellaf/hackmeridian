@@ -254,7 +254,8 @@ Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from
 - `list_open_for(asset, from, limit)` (v1.3.1): ids in state `Offered` for one underlying, oldest first, paged (`MAX_PAGE`).
 - `list_open()`: ids whose state is `Offered`, oldest first (v1.3.1: concatenation of the per-asset books in registry order,
   truncated to 200 ids; use `list_open_for` for a complete view). May include offers past `expiry`; clients filter by
-  `expiry` before showing them as purchasable. The list lives in instance storage, so it is bounded (see §10).
+  `expiry` before showing them as purchasable. Since v1.3.1 the books are persistent per-asset lists capped at
+  `MAX_OPEN_PER_ASSET` (§13); before that a single instance-storage list capped at 1000 (§10).
 - `option_count()`: number of options ever created (next id).
 - `open_collateral(token)`: total units of `token` the contract must currently hold for non-terminal options:
   locked collateral of `Offered`/`Active` options plus unclaimed proceeds of `Exercised` options. Clients compare
@@ -269,7 +270,9 @@ Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from
   non-issuer `G` account with no trustline reads `false`; on an AUTH_REVOCABLE asset a revoked trustline or contract
   balance reads `false`.
 - `extend_ttl(ids)`: anyone may call. Extends the contract instance and code TTL and the persistent entry of every
-  id in `ids` (`NotFound` for an unknown id). See §8.
+  id in `ids` (`NotFound` for an unknown id); since v1.3.1 also each listed option's `Listed(underlying)`,
+  `WriterOpen(writer)`, `OpenFor(underlying)`, `Reserved(quote)` and `Reserved(underlying)` entries, plus the first
+  `MAX_PAGE` registry index entries (§13.5, §13.8). See §8.
 
 ## 4. Lifecycle
 
@@ -365,7 +368,7 @@ enum Key {
     Quote,              // instance: Address
     Underlyings,        // instance: Vec<Address>
     Next,               // instance: u32 (next id)
-    Reserved(Address),  // instance: i128 per token (see open_collateral)
+    Reserved(Address),  // persistent: i128 per token, v1.3.1 (was instance until v1.3); TTL extended on every state-changing path that touches it and by extend_ttl
     Opt(u32),           // persistent: OptionData
     OpenFor(Address),   // persistent: Vec<u32>, v1.3.1 per-asset open book (replaces instance Key::Open)
     Listed(Address),    // persistent: bool, v1.3 asset registry membership (seeded by the constructor)
@@ -382,7 +385,9 @@ const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
 ```
 
-Registry and per-writer entries are persistent and get their TTL extended whenever they are read on a state-changing path (v1.3).
+Instance storage holds only `Quote`, `Underlyings`, `Next` and `AssetCount` (v1.3.1); every other key is persistent.
+Registry and per-writer entries get their TTL extended whenever they are read on a state-changing path (v1.3), and
+`Reserved` entries whenever a state-changing path touches them (v1.3.1).
 Every state-changing function extends the contract instance **and code** TTL (`instance().extend_ttl` does both
 in soroban-sdk 28) and the touched option's persistent TTL with `(TTL_THRESHOLD, TTL_EXTEND_TO)`. `extend_ttl(ids)`
 does the same for the instance/code and for every listed option, so a keeper can keep idle options alive.
@@ -491,6 +496,9 @@ position token, impairment/refund, margin.
 6. **`list_assets` order**: constructor underlyings in constructor order, then listings in `list_asset` order.
 7. Doc corrections applied in the same change: §2 `AssetNotAllowed` comment, §3 constructor sentence, §6 regulated-only
    wording and F-1/F-1R status, §7.4 tenor bounds, §12 frontend wording.
+8. **`Reserved(token)` moves to persistent storage** (one entry per token, TTL extended on touch and by `extend_ttl` for
+   the option's quote and underlying). Found by the v1.3 gate: with permissionless listing, per-token instance keys let
+   anyone grow the single instance entry without bound.
 
 No new error codes. Signature changes: `prune_expired` (new first argument), `list_open_for` added. Everything else is
 unchanged. Deployment of v1.3.1 replaces the v1.3 id in the Deployed contracts table.

@@ -5,30 +5,42 @@
 //!
 //! Design summary (see the ABI for the full rules):
 //! - The contract holds all collateral itself and tracks, per token, how much it must hold
-//!   (`Key::Reserved`). PUT collateral = `strike_total` of quote; CALL collateral = `qty` of underlying.
+//!   (`Key::Reserved`, one persistent entry per token since v1.3.1). PUT collateral =
+//!   `strike_total` of quote; CALL collateral = `qty` of underlying.
 //! - Lifecycle: Offered -> Active -> Exercised -> Settled, or Offered -> Cancelled,
 //!   or Offered/Active -> Expired (reclaim after expiry; v1.3: anyone may `prune_expired` an
-//!   unsold expired offer, and the collateral always goes back to the writer). No other
-//!   transition exists. `transfer` (v1.2) hands an `Active` option to a new eligible holder; the
-//!   state stays `Active` and no tokens, reserved totals or open-list entries change.
+//!   unsold expired offer, and the collateral always goes back to the writer; v1.3.1: the pruner
+//!   authenticates and is named in `OfferPruned`). No other transition exists. `transfer` (v1.2)
+//!   hands an `Active` option to a new eligible holder; the state stays `Active` and no tokens,
+//!   reserved totals or open-book entries change.
+//! - Open books (v1.3.1): one persistent list of `Offered` ids per underlying
+//!   (`Key::OpenFor(asset)`), capped at `MAX_OPEN_PER_ASSET`, so dust offers on one asset can
+//!   only crowd out that asset's own book. `list_open_for` pages one book; `list_open` returns
+//!   the books concatenated in registry order, truncated to `MAX_LIST_OPEN` ids.
 //! - Asset registry (v1.3): seeded with the constructor's underlyings; `list_asset` lets anyone add
 //!   a classic Stellar asset by deriving its canonical SAC address on chain, so a custom token
 //!   contract can never be listed. Listing authorizes nothing: the issuer's authorization rules
 //!   still apply to the escrow and to every counterparty.
 //! - Functions: `create_offer`, `buy`, `exercise`, `cancel_offer`, `reclaim`, `claim_delivery`,
-//!   `transfer` (v1.2), `extend_ttl`, `list_asset` (v1.3), `prune_expired` (v1.3); views `config`,
-//!   `get_option`, `get_options` (v1.2, paged, at most `MAX_PAGE` entries), `list_open`,
-//!   `option_count`, `open_collateral`, `is_eligible`, and (v1.3) `is_listed`, `list_assets`
-//!   (paged like `get_options`), `asset_count`, `writer_open_count`.
+//!   `transfer` (v1.2), `extend_ttl`, `list_asset` (v1.3), `prune_expired` (v1.3; `pruner`
+//!   argument since v1.3.1); views `config`, `get_option`, `get_options` (v1.2, paged, at most
+//!   `MAX_PAGE` entries), `list_open`, `option_count`, `open_collateral`, `is_eligible`, (v1.3)
+//!   `is_listed`, `list_assets` (paged like `get_options`), `asset_count`, `writer_open_count`,
+//!   and (v1.3.1) `list_open_for` (paged like `get_options`).
 //! - No admin, no upgrade, no delisting; the quote token is fixed by the constructor.
 //! - Check order in every state-changing function:
 //!   auth -> NotFound -> ownership -> state -> time -> eligibility -> transfers -> storage -> event.
 //!   Right after auth, the contract's own address is rejected as a party (`InvalidArgs`, v1.3).
-//!   `create_offer` and `buy` add guards between eligibility and transfers: the open-list cap and
-//!   the per-writer cap (`create_offer` only, `OpenListFull`, `WriterOpenLimit`) and the
-//!   pooled-collateral check (`CollateralShortfall`).
+//!   `create_offer`, `buy` and (v1.3.1) `transfer` add guards after the participant eligibility
+//!   checks: the escrow's own authorization on the underlying (`ContractNotAuthorized`), the
+//!   per-asset open-book cap and the per-writer cap (`create_offer` only, `OpenListFull`,
+//!   `WriterOpenLimit`) and the pooled-collateral check (`CollateralShortfall`).
 //!   Any failure reverts the whole invocation (the transaction is the atomicity boundary).
 //! - All amounts are exact `i128` token units; every addition/subtraction is checked.
+//! - Storage (v1.3.1): the instance entry holds only `Quote`, `Underlyings`, `Next` and
+//!   `AssetCount`; everything keyed by an address or id (`Reserved`, `Opt`, `OpenFor`, `Listed`,
+//!   `AssetAt`, `WriterOpen`) is a persistent entry, so permissionless listing cannot grow the
+//!   single instance entry.
 #![no_std]
 
 use soroban_sdk::{
@@ -49,17 +61,22 @@ const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
 /// Maximum number of allowlisted underlyings accepted by the constructor (ABI §2 `Config`).
 const MAX_UNDERLYINGS: u32 = 8;
 
-/// Maximum number of ids in the open list (`Key::Open`, ABI §8). The list lives in the single
-/// instance-storage entry (64 KB limit), so `create_offer` refuses new offers with `OpenListFull`
-/// once this many offers are in state `Offered`.
-const MAX_OPEN: u32 = 1000;
+/// Maximum number of ids in one underlying's open book (`Key::OpenFor(asset)`, ABI §8; v1.3.1).
+/// `create_offer` refuses new offers on that underlying with `OpenListFull` once this many of its
+/// offers are in state `Offered`; other underlyings' books are unaffected (fix for F-1R).
+const MAX_OPEN_PER_ASSET: u32 = 500;
 
-/// Maximum number of options returned by one `get_options` call (ABI §3 Views, §8; v1.2).
-/// Keeps a page well inside the read limits of a single simulation.
+/// Maximum number of ids returned by `list_open` (ABI §3 Views; v1.3.1). `list_open_for` gives a
+/// complete, paged view of one underlying's book.
+const MAX_LIST_OPEN: u32 = 200;
+
+/// Maximum number of entries returned by one `get_options`, `list_assets` or `list_open_for` call
+/// (ABI §3 Views, §8; v1.2). Keeps a page well inside the read limits of a single simulation.
+/// Also bounds how many registry assets `list_open` and `extend_ttl` visit (v1.3.1).
 const MAX_PAGE: u32 = 50;
 
 /// Maximum number of offers one writer may have in state `Offered` (ABI §8; v1.3). With
-/// `MAX_TENOR` and `prune_expired` this stops one writer from filling the open list (finding F-1).
+/// `MAX_TENOR` and `prune_expired` this stops one writer from filling an open book (finding F-1).
 const MAX_OPEN_PER_WRITER: u32 = 50;
 
 /// Maximum tenor of a new offer in seconds (ABI §8; v1.3): `create_offer` requires
@@ -144,7 +161,8 @@ pub enum Error {
     AssetNotAllowed = 103,
     /// Writer/buyer not authorized on the underlying SAC, or writer not authorized on the quote SAC.
     NotEligible = 104,
-    /// The contract itself is not authorized to hold the underlying (create_offer and buy).
+    /// The contract itself is not authorized to hold the underlying (create_offer, buy and,
+    /// v1.3.1, transfer).
     ContractNotAuthorized = 105,
     /// Action not valid in the option's current State.
     WrongState = 106,
@@ -162,10 +180,12 @@ pub enum Error {
     Overflow = 112,
     /// Constructor: empty/duplicate/too many underlyings, or quote in underlyings.
     InvalidConfig = 113,
-    /// create_offer: `MAX_OPEN` offers are already in state Offered.
+    /// create_offer: this underlying's open book already holds `MAX_OPEN_PER_ASSET` offers in
+    /// state Offered (v1.3.1; before that, a global `MAX_OPEN` of 1000).
     OpenListFull = 114,
-    /// create_offer/buy: SAC balance(contract) < open_collateral(token) for the option's quote or
-    /// underlying token (an issuer clawback left a pooled deficit; no new exposure on that token).
+    /// create_offer/buy/transfer (transfer since v1.3.1): SAC balance(contract) <
+    /// open_collateral(token) for the option's quote or underlying token (an issuer clawback left
+    /// a pooled deficit; no new participant on that token).
     CollateralShortfall = 115,
     /// v1.3 create_offer: this writer already has `MAX_OPEN_PER_WRITER` offers in state Offered.
     WriterOpenLimit = 116,
@@ -248,7 +268,8 @@ pub struct AssetListed {
 }
 
 /// v1.3: `prune_expired` closed an expired unsold offer and returned its collateral to the writer.
-/// `prune_expired` takes no caller argument (no auth), so `pruner` is the contract's own address.
+/// v1.3.1: `pruner` is the authenticated caller of `prune_expired` (v1.3 emitted the contract's
+/// own address).
 #[contractevent]
 pub struct OfferPruned {
     #[topic]
@@ -269,12 +290,15 @@ enum Key {
     Underlyings,
     /// instance: u32, next option id (= option_count; `get_options` pages over `0..Next`).
     Next,
-    /// instance: Vec<u32>, ids in state Offered, oldest first.
-    Open,
-    /// instance: i128 per token, units the contract must hold for non-terminal options.
+    /// persistent: i128 per token, units the contract must hold for non-terminal options (0 when
+    /// absent). v1.3.1: moved from instance storage, so self-listed assets cannot grow the
+    /// instance entry.
     Reserved(Address),
     /// persistent: OptionData. Never deleted; `holder` changes on `buy` and `transfer` (v1.2).
     Opt(u32),
+    /// persistent: Vec<u32>, v1.3.1 open book of one underlying: its ids in state Offered, oldest
+    /// first, at most `MAX_OPEN_PER_ASSET` (replaces the v1.3 instance `Open` list).
+    OpenFor(Address),
     /// persistent: bool, v1.3 asset registry membership (seeded by the constructor).
     Listed(Address),
     /// persistent: Address, v1.3 registry index for paging (`list_assets` pages over
@@ -342,12 +366,20 @@ fn proceeds_of(opt: &OptionData) -> (Address, i128) {
     }
 }
 
-/// Current reserved total for `token` (0 if never used).
+/// Current reserved total for `token` (0 if never used). Persistent entry since v1.3.1. Pure read
+/// (no TTL change).
 fn reserved(e: &Env, token: &Address) -> i128 {
     e.storage()
-        .instance()
+        .persistent()
         .get(&Key::Reserved(token.clone()))
         .unwrap_or(0)
+}
+
+/// Stores the reserved total of `token` and extends the entry's TTL (v1.3.1).
+fn set_reserved(e: &Env, token: &Address, amount: i128) {
+    let key = Key::Reserved(token.clone());
+    e.storage().persistent().set(&key, &amount);
+    bump_persistent(e, &key);
 }
 
 /// Adds `amount` to the reserved total of `token` with checked math.
@@ -355,9 +387,7 @@ fn add_reserved(e: &Env, token: &Address, amount: i128) -> Result<(), Error> {
     let next = reserved(e, token)
         .checked_add(amount)
         .ok_or(Error::Overflow)?;
-    e.storage()
-        .instance()
-        .set(&Key::Reserved(token.clone()), &next);
+    set_reserved(e, token, next);
     Ok(())
 }
 
@@ -370,43 +400,60 @@ fn sub_reserved(e: &Env, token: &Address, amount: i128) -> Result<(), Error> {
     if next < 0 {
         return Err(Error::Overflow);
     }
-    e.storage()
-        .instance()
-        .set(&Key::Reserved(token.clone()), &next);
+    set_reserved(e, token, next);
     Ok(())
 }
 
-/// Open list (ids in state Offered, oldest first).
-fn open_list(e: &Env) -> Vec<u32> {
+/// Open book of `asset` (v1.3.1: its ids in state Offered, oldest first; empty if none). Pure
+/// read (no TTL change).
+fn open_list(e: &Env, asset: &Address) -> Vec<u32> {
     e.storage()
-        .instance()
-        .get(&Key::Open)
+        .persistent()
+        .get(&Key::OpenFor(asset.clone()))
         .unwrap_or_else(|| Vec::new(e))
 }
 
-/// Appends `id` to the open list.
-fn open_push(e: &Env, id: u32) {
-    let mut open = open_list(e);
-    open.push_back(id);
-    e.storage().instance().set(&Key::Open, &open);
+/// Stores `asset`'s open book and extends the entry's TTL (v1.3.1).
+fn set_open_list(e: &Env, asset: &Address, open: &Vec<u32>) {
+    let key = Key::OpenFor(asset.clone());
+    e.storage().persistent().set(&key, open);
+    bump_persistent(e, &key);
 }
 
-/// Removes `id` from the open list if present.
-fn open_remove(e: &Env, id: u32) {
-    let mut open = open_list(e);
+/// Appends `id` to `asset`'s open book. Enforces nothing: `create_offer` checks
+/// `MAX_OPEN_PER_ASSET` (`OpenListFull`) before any transfer.
+fn open_push(e: &Env, asset: &Address, id: u32) {
+    let mut open = open_list(e, asset);
+    open.push_back(id);
+    set_open_list(e, asset, &open);
+}
+
+/// Removes `id` from `asset`'s open book if present.
+fn open_remove(e: &Env, asset: &Address, id: u32) {
+    let mut open = open_list(e, asset);
     if let Some(i) = open.first_index_of(id) {
         open.remove(i);
-        e.storage().instance().set(&Key::Open, &open);
+        set_open_list(e, asset, &open);
     }
 }
 
 /// `CollateralShortfall` if the contract's SAC balance of `quote` or `underlying` is below the
 /// reserved total of that token (an issuer clawback hit the pooled balance). Used by
-/// `create_offer` and `buy` so a deficit cannot spread to new participants (ABI §6).
+/// `create_offer`, `buy` and (v1.3.1) `transfer` so a deficit cannot spread to new participants
+/// (ABI §6). Only state-changing paths call it, so each `Reserved` entry it reads gets its TTL
+/// extended (ABI §8, v1.3.1); an absent entry counts as 0 and is not created.
 fn check_collateral(e: &Env, quote: &Address, underlying: &Address) -> Result<(), Error> {
     let me = e.current_contract_address();
     for token in [quote, underlying] {
-        if TokenClient::new(e, token).balance(&me) < reserved(e, token) {
+        let key = Key::Reserved(token.clone());
+        let held: i128 = match e.storage().persistent().get(&key) {
+            Some(amount) => {
+                bump_persistent(e, &key);
+                amount
+            }
+            None => 0,
+        };
+        if TokenClient::new(e, token).balance(&me) < held {
             return Err(Error::CollateralShortfall);
         }
     }
@@ -558,7 +605,6 @@ impl OptionsContract {
         storage.set(&Key::Quote, &quote);
         storage.set(&Key::Underlyings, &underlyings);
         storage.set(&Key::Next, &0u32);
-        storage.set(&Key::Open, &Vec::<u32>::new(&env));
         // v1.3: the asset registry starts with the constructor's underlyings, in order
         storage.set(&Key::AssetCount, &0u32);
         for underlying in underlyings.iter() {
@@ -580,11 +626,11 @@ impl OptionsContract {
 
     /// Writer funds a new offer. Pulls the collateral (PUT: `strike_total` quote; CALL: `qty`
     /// underlying) from the writer into the contract, stores the option as `Offered`, appends it to
-    /// the open list and adds the collateral to the reserved total. Returns the new id.
+    /// its underlying's open book and adds the collateral to the reserved total. Returns the new id.
     /// Check order: auth -> InvalidArgs (writer is the contract, v1.3) -> AssetNotAllowed (not in
     /// the registry) -> InvalidArgs -> TenorOutOfRange (v1.3) -> NotEligible (writer on underlying,
-    /// then on quote) -> ContractNotAuthorized -> OpenListFull -> WriterOpenLimit (v1.3) ->
-    /// CollateralShortfall -> transfers.
+    /// then on quote) -> ContractNotAuthorized -> OpenListFull (this underlying's book, v1.3.1) ->
+    /// WriterOpenLimit (v1.3) -> CollateralShortfall -> transfers.
     #[allow(clippy::too_many_arguments)]
     pub fn create_offer(
         env: Env,
@@ -625,8 +671,9 @@ impl OptionsContract {
         if !eligible(&env, &underlying, &me) {
             return Err(Error::ContractNotAuthorized);
         }
-        // capacity: the open list lives in instance storage and is bounded
-        if open_list(&env).len() >= MAX_OPEN {
+        // capacity: each underlying's open book is bounded, so dust on one asset cannot crowd out
+        // the others (v1.3.1, F-1R)
+        if open_list(&env, &underlying).len() >= MAX_OPEN_PER_ASSET {
             return Err(Error::OpenListFull);
         }
         // per-writer cap (v1.3)
@@ -659,7 +706,7 @@ impl OptionsContract {
         // storage
         add_reserved(&env, &c_token, c_amount)?;
         env.storage().instance().set(&Key::Next, &next_id);
-        open_push(&env, id);
+        open_push(&env, &underlying, id);
         writer_open_inc(&env, &writer)?;
         save_opt(&env, &opt);
         bump_instance(&env);
@@ -722,7 +769,7 @@ impl OptionsContract {
         // storage
         opt.holder = Some(buyer.clone());
         opt.state = State::Active;
-        open_remove(&env, id);
+        open_remove(&env, &opt.underlying, id);
         writer_open_dec(&env, &opt.writer)?;
         save_opt(&env, &opt);
         bump_instance(&env);
@@ -782,7 +829,8 @@ impl OptionsContract {
     }
 
     /// Writer withdraws an unsold (`Offered`) offer, before or after expiry. Returns the collateral,
-    /// releases it from the reserve, removes the id from the open list; state becomes `Cancelled`.
+    /// releases it from the reserve, removes the id from its underlying's open book; state becomes
+    /// `Cancelled`.
     pub fn cancel_offer(env: Env, writer: Address, id: u32) -> Result<(), Error> {
         // auth
         writer.require_auth();
@@ -805,7 +853,7 @@ impl OptionsContract {
 
         // storage
         sub_reserved(&env, &c_token, c_amount)?;
-        open_remove(&env, id);
+        open_remove(&env, &opt.underlying, id);
         writer_open_dec(&env, &writer)?;
         opt.state = State::Cancelled;
         save_opt(&env, &opt);
@@ -817,8 +865,8 @@ impl OptionsContract {
     }
 
     /// Writer reclaims the collateral of an `Offered` or `Active` option once `now >= expiry`.
-    /// Releases it from the reserve, removes the id from the open list if it was `Offered`;
-    /// state becomes `Expired`.
+    /// Releases it from the reserve, removes the id from its underlying's open book if it was
+    /// `Offered`; state becomes `Expired`.
     pub fn reclaim(env: Env, writer: Address, id: u32) -> Result<(), Error> {
         // auth
         writer.require_auth();
@@ -847,7 +895,7 @@ impl OptionsContract {
         // storage
         sub_reserved(&env, &c_token, c_amount)?;
         if was_offered {
-            open_remove(&env, id);
+            open_remove(&env, &opt.underlying, id);
             writer_open_dec(&env, &writer)?;
         }
         opt.state = State::Expired;
@@ -896,11 +944,13 @@ impl OptionsContract {
 
     /// v1.2. Holder hands an `Active` option to `to` before expiry. Only `holder` changes: the
     /// state stays `Active`, no tokens move (any payment for the position is settled outside this
-    /// call), and collateral, reserved totals and the open list are untouched. The previous holder
-    /// can no longer exercise.
+    /// call), and collateral, reserved totals and the open books are untouched. The previous holder
+    /// can no longer exercise. A holder frozen on the underlying may still transfer (its own tokens
+    /// never move).
     /// Check order: auth -> InvalidArgs (holder or to is the contract, v1.3) -> NotFound ->
     /// NotHolder -> WrongState -> Expired -> InvalidArgs (to == holder) -> SelfTrade (to == writer)
-    /// -> NotEligible (to on the underlying).
+    /// -> NotEligible (to on the underlying) -> ContractNotAuthorized (v1.3.1) ->
+    /// CollateralShortfall (v1.3.1).
     pub fn transfer(env: Env, holder: Address, to: Address, id: u32) -> Result<(), Error> {
         // auth
         holder.require_auth();
@@ -931,6 +981,12 @@ impl OptionsContract {
         if !eligible(&env, &opt.underlying, &to) {
             return Err(Error::NotEligible);
         }
+        // the escrow must still be able to settle the position the new holder takes on (v1.3.1):
+        // authorized on the underlying, and no pooled deficit on the quote or the underlying
+        if !eligible(&env, &opt.underlying, &me) {
+            return Err(Error::ContractNotAuthorized);
+        }
+        check_collateral(&env, &opt.quote, &opt.underlying)?;
 
         // storage (no transfers)
         opt.holder = Some(to.clone());
@@ -974,10 +1030,32 @@ impl OptionsContract {
         page
     }
 
-    /// Ids in state `Offered`, oldest first. May include offers past expiry; clients filter by
-    /// `expiry` before showing them as purchasable.
+    /// Ids in state `Offered` (v1.3.1): the per-asset open books, each oldest first, concatenated in
+    /// registry order (`list_assets` order) and truncated to `MAX_LIST_OPEN` ids; at most the first
+    /// `MAX_PAGE` registry assets are visited, so the read stays bounded however many assets are
+    /// listed. Use `list_open_for` for a complete view of one book. May include offers past expiry;
+    /// clients filter by `expiry` before showing them as purchasable. Pure read (no TTL change).
     pub fn list_open(env: Env) -> Vec<u32> {
-        open_list(&env)
+        let mut ids = Vec::new(&env);
+        for index in 0..listed_count(&env).min(MAX_PAGE) {
+            if ids.len() >= MAX_LIST_OPEN {
+                break;
+            }
+            // Every index below `asset_count` has a stored entry (the registry only grows), so the
+            // `None` arm is unreachable.
+            let asset: Address = match env.storage().persistent().get(&Key::AssetAt(index)) {
+                Some(asset) => asset,
+                None => break,
+            };
+            let book = open_list(&env, &asset);
+            let room = MAX_LIST_OPEN - ids.len();
+            if book.len() > room {
+                ids.append(&book.slice(0..room));
+                break;
+            }
+            ids.append(&book);
+        }
+        ids
     }
 
     /// Number of options ever created (= next id).
@@ -1000,17 +1078,35 @@ impl OptionsContract {
         eligible(&env, &token, &who)
     }
 
-    /// Anyone may call. Extends the contract instance and code TTL, and the persistent entry of
-    /// every id in `ids` (`NotFound` for an unknown id, which reverts the whole call).
+    /// Anyone may call. Extends the contract instance and code TTL, and for every id in `ids` the
+    /// option's persistent entry (`NotFound` for an unknown id, which reverts the whole call) and,
+    /// v1.3.1, its underlying's registry entry (`Listed`), its writer's open count (`WriterOpen`),
+    /// its underlying's open book (`OpenFor`) and the reserved totals of its quote and underlying
+    /// (`Reserved`), each when present. Then (v1.3.1) the registry index (`AssetAt`) and its
+    /// `Listed` entry for the first `min(asset_count, MAX_PAGE)` assets.
     pub fn extend_ttl(env: Env, ids: Vec<u32>) -> Result<(), Error> {
         for id in ids.iter() {
-            let key = Key::Opt(id);
-            if !env.storage().persistent().has(&key) {
-                return Err(Error::NotFound);
+            let opt = load_opt(&env, id)?;
+            bump_persistent(&env, &Key::Opt(id));
+            listed(&env, &opt.underlying, true);
+            for key in [
+                Key::WriterOpen(opt.writer),
+                Key::OpenFor(opt.underlying.clone()),
+                Key::Reserved(opt.quote),
+                Key::Reserved(opt.underlying),
+            ] {
+                if env.storage().persistent().has(&key) {
+                    bump_persistent(&env, &key);
+                }
             }
-            env.storage()
-                .persistent()
-                .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        }
+        for index in 0..listed_count(&env).min(MAX_PAGE) {
+            let at_key = Key::AssetAt(index);
+            // Every index below `asset_count` has a stored entry (the registry only grows).
+            if let Some(token) = env.storage().persistent().get::<Key, Address>(&at_key) {
+                bump_persistent(&env, &at_key);
+                listed(&env, &token, true);
+            }
         }
         bump_instance(&env);
         env.deployer()
@@ -1026,7 +1122,8 @@ impl OptionsContract {
     /// (`NotEligible`). Returns the SAC address.
     /// Check order: auth (accountability only; anyone may list) -> InvalidArgs (lister is the
     /// contract; code not 1..=12 of `[A-Za-z0-9]`; issuer not a `G...` account) ->
-    /// AssetNotDeployed -> AlreadyListed (listed, or the quote token) -> storage -> event.
+    /// AlreadyListed (listed, or the quote token) -> AssetNotDeployed (v1.3.1 order) -> storage ->
+    /// event.
     pub fn list_asset(
         env: Env,
         lister: Address,
@@ -1044,12 +1141,13 @@ impl OptionsContract {
             .deployer()
             .with_stellar_asset(asset_xdr(&env, &code, &issuer)?)
             .deployed_address();
+        // not listed yet, and not the quote token (checked before the deployment probe, v1.3.1)
+        if listed(&env, &sac, false) || sac == quote_addr(&env) {
+            return Err(Error::AlreadyListed);
+        }
         // it must be deployed (anyone can deploy it once with `stellar contract asset deploy`)
         if !matches!(TokenClient::new(&env, &sac).try_decimals(), Ok(Ok(_))) {
             return Err(Error::AssetNotDeployed);
-        }
-        if listed(&env, &sac, false) || sac == quote_addr(&env) {
-            return Err(Error::AlreadyListed);
         }
 
         // storage
@@ -1068,15 +1166,24 @@ impl OptionsContract {
     }
 
     /// v1.3. Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from it.
-    /// No auth. For each id in order: `NotFound` (reverts the whole call) if unknown; skipped unless
-    /// the option is `Offered` and `now >= expiry`. For each eligible id the collateral goes back to
-    /// the **writer** with `try_transfer`; if that transfer fails (for example a writer frozen on a
+    /// v1.3.1: `pruner.require_auth()` (accountability for the `OfferPruned` event only; any account
+    /// may prune), and the contract's own address is rejected as `pruner` (`InvalidArgs`). For each
+    /// id in order: `NotFound` (reverts the whole call) if unknown; skipped unless the option is
+    /// `Offered` and `now >= expiry`. For each eligible id the collateral goes back to the
+    /// **writer** with `try_transfer`; if that transfer fails (for example a writer frozen on a
     /// CALL's underlying) the id is skipped and nothing about it changes. Otherwise the collateral
-    /// leaves the reserve, the id leaves the open list and the writer's open count, the state
-    /// becomes `Expired`, and `OfferPruned` is published. Returns the number of options pruned.
-    /// Live offers (`now < expiry`) are never touched; only the writer can `cancel_offer`.
-    pub fn prune_expired(env: Env, ids: Vec<u32>) -> Result<u32, Error> {
+    /// leaves the reserve, the id leaves its underlying's open book and the writer's open count,
+    /// the state becomes `Expired`, and `OfferPruned { id, pruner }` is published. Returns the
+    /// number of options pruned. Live offers (`now < expiry`) are never touched; only the writer
+    /// can `cancel_offer`.
+    pub fn prune_expired(env: Env, pruner: Address, ids: Vec<u32>) -> Result<u32, Error> {
+        // auth (accountability only; anyone may prune, v1.3.1)
+        pruner.require_auth();
+        // backstop: the contract is never a party
         let me = env.current_contract_address();
+        if pruner == me {
+            return Err(Error::InvalidArgs);
+        }
         let now = env.ledger().timestamp();
         let mut pruned: u32 = 0;
         for id in ids.iter() {
@@ -1097,7 +1204,7 @@ impl OptionsContract {
 
             // storage
             sub_reserved(&env, &c_token, c_amount)?;
-            open_remove(&env, id);
+            open_remove(&env, &opt.underlying, id);
             writer_open_dec(&env, &opt.writer)?;
             opt.state = State::Expired;
             save_opt(&env, &opt);
@@ -1105,7 +1212,7 @@ impl OptionsContract {
             // event
             OfferPruned {
                 id,
-                pruner: me.clone(),
+                pruner: pruner.clone(),
             }
             .publish(&env);
             pruned = pruned.checked_add(1).ok_or(Error::Overflow)?;
@@ -1150,6 +1257,23 @@ impl OptionsContract {
     /// v1.3. Number of `writer`'s options currently in state `Offered` (0 if none).
     pub fn writer_open_count(env: Env, writer: Address) -> u32 {
         writer_open(&env, &writer)
+    }
+
+    /// v1.3.1. Ids in state `Offered` on `asset`, oldest first, same paging rule as `get_options`:
+    /// positions `from, from + 1, ...` of the asset's open book, stopping at its end and after at
+    /// most `min(limit, MAX_PAGE)` entries. Empty for an asset with no open offers (or not listed),
+    /// when `from` is past the end of the book, or when `limit == 0`. Pure read (no TTL change),
+    /// never fails. Clients page with `from += returned.len()`; the book changes whenever an offer
+    /// is created, bought, cancelled, reclaimed or pruned, so each page is a snapshot.
+    pub fn list_open_for(env: Env, asset: Address, from: u32, limit: u32) -> Vec<u32> {
+        let book = open_list(&env, &asset);
+        let len = book.len();
+        if from >= len {
+            return Vec::new(&env);
+        }
+        // from < len <= MAX_OPEN_PER_ASSET, so the sum cannot overflow; saturate anyway
+        let end = from.saturating_add(limit.min(MAX_PAGE)).min(len);
+        book.slice(from..end)
     }
 }
 

@@ -112,9 +112,11 @@ scripts/deploy/issuer-demo-testnet.sh --part-a-only   # main contract only, reve
 scripts/deploy/issuer-demo-testnet.sh --part-b-only [--wasm <path>]
 ```
 
-Part A undoes every issuer action in the same run. Whatever happens (failed step, Ctrl-C), an EXIT trap
-re-authorizes investor, maker1, maker2, the main contract and the throwaway contract on RWA. It also cancels any
-offer the run left in `Offered` state on the main contract. In the recorded runs the main contract was
+Part A undoes every issuer action in the same run. After a failed step or Ctrl-C, an EXIT trap re-authorizes
+investor, maker1, maker2, the main contract and the throwaway contract on RWA. It also cancels any offer the run
+left in `Offered` state on the main contract. (The log `tee` ignores SIGINT so the trap can still run on Ctrl-C.)
+A SIGKILL or a closed terminal can skip the trap; re-running the script re-authorizes everyone in its PRE step, but
+offers left open by the killed run must then be cancelled by hand. In the recorded runs the main contract was
 de-authorized for about 10 s (A2), the investor for 5–10 s (A1) and maker2 for about 20 s (A3), so do not run it
 while someone is demoing on the same contract. `DRY_RUN` is not supported: the script exists to produce real transactions.
 
