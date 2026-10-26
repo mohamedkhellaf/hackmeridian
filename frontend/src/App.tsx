@@ -13,7 +13,6 @@ import { MarketsView } from './views/MarketsView'
 import { PortfolioView } from './views/PortfolioView'
 import { SellPanel } from './resale/SellPanel'
 import { MyRequests } from './requests/MyRequests'
-import { ProtectView } from './views/ProtectView'
 import { ReservesView } from './views/ReservesView'
 import './App.css'
 
@@ -83,9 +82,6 @@ function App() {
             onWriteOffer={s.writeOffer}
             onOutcomeShown={s.dismissNotice}
           />
-        )}
-        {route === 'protect' && (
-          <ProtectView assets={s.assets} offers={s.market} me={me} balances={s.balances.balances} mock={s.isMock} busy={s.busy} onBuy={s.setBuying} />
         )}
         {route === 'portfolio' && (
           <PortfolioView

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
+export type Route = 'markets' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
 
 /** The margin section (code name `pro`) is mounted only when the build sets VITE_ENABLE_PRO=1. */
 export const PRO_ENABLED = import.meta.env.VITE_ENABLE_PRO === '1'
@@ -13,7 +13,6 @@ export interface NavItem {
 /** Top bar links; on phones four become tabs and the rest sit under More. */
 export const NAV: NavItem[] = [
   { route: 'markets', label: 'Markets' },
-  { route: 'protect', label: 'Protect' },
   { route: 'portfolio', label: 'Positions' },
   { route: 'reserves', label: 'Collateral' },
   { route: 'issuer', label: 'Issuer' },

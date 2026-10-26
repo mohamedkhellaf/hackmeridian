@@ -12,11 +12,10 @@ export const DEMO_TEXT = 'Stellar Testnet. Fictional assets and makers. No real 
 export const MOCK_TEXT = 'Mock data, not read from a chain.'
 
 /** Routes that get a tab on phones. The rest open from More. */
-const TAB_ROUTES: Route[] = ['markets', 'protect', 'portfolio', 'reserves']
+const TAB_ROUTES: Route[] = ['markets', 'portfolio', 'reserves']
 
 const ICONS: Record<Route, IconName> = {
   markets: 'markets',
-  protect: 'protect',
   write: 'write',
   portfolio: 'portfolio',
   reserves: 'reserves',
