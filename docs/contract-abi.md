@@ -40,7 +40,7 @@ pub enum State {
 #[contracttype] #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptionData {
     pub id: u32,
-    pub underlying: Address,      // SAC of the tokenized asset (allowlisted in the constructor)
+    pub underlying: Address,      // SAC of the tokenized asset (in the asset registry: constructor seed + list_asset since v1.3)
     pub quote: Address,           // SAC of the quote token (USDx), same for every option
     pub option_type: OptionType,
     pub qty: i128,                // total underlying quantity (> 0)
@@ -61,20 +61,20 @@ pub struct Config {
 #[contracterror] #[derive(Copy, Clone, Debug, Eq, PartialEq)] #[repr(u32)]
 pub enum Error {
     NotFound = 101,               // unknown option id
-    InvalidArgs = 102,            // qty/strike_total/premium_total <= 0, or expiry <= now
+    InvalidArgs = 102,            // qty/strike_total/premium_total <= 0, or expiry <= now; v1.2: transfer to self (to == holder); v1.3: a party argument is the contract itself (backstop), or list_asset got a bad code or a non-account issuer
     AssetNotAllowed = 103,        // underlying not in the asset registry (constructor seed + list_asset since v1.3)
-    NotEligible = 104,            // writer/buyer not authorized on the underlying SAC, or writer has no quote trustline (§6)
-    ContractNotAuthorized = 105,  // the contract itself is not authorized to hold the underlying (checked at create_offer AND buy)
+    NotEligible = 104,            // writer/buyer not authorized on the underlying SAC, or writer has no quote trustline (§6); v1.2: transfer recipient not authorized on the underlying
+    ContractNotAuthorized = 105,  // the contract itself is not authorized to hold the underlying (checked at create_offer, buy and, v1.3.1, transfer)
     WrongState = 106,             // action not valid in the option's current State
     NotWriter = 107,              // caller is not the option's writer
     NotHolder = 108,              // caller is not the option's holder
-    Expired = 109,                // buy/exercise after expiry
+    Expired = 109,                // buy/exercise after expiry; v1.2: transfer at or after expiry
     NotExpired = 110,             // reclaim before expiry
-    SelfTrade = 111,              // writer tried to buy their own offer
+    SelfTrade = 111,              // writer tried to buy their own offer; v1.2: transfer to the writer
     Overflow = 112,               // checked i128 math failed
     InvalidConfig = 113,          // constructor: empty/duplicate/too many underlyings, or quote in underlyings
-    OpenListFull = 114,           // create_offer: MAX_OPEN (1000) offers are already in state Offered
-    CollateralShortfall = 115,    // create_offer/buy: SAC balance(contract) < open_collateral(token) for a token of this option
+    OpenListFull = 114,           // create_offer: this underlying's open book already holds MAX_OPEN_PER_ASSET (500) Offered ids (v1.3.1; v1.1-v1.3: global MAX_OPEN = 1000)
+    CollateralShortfall = 115,    // create_offer/buy and (v1.3.1) transfer: SAC balance(contract) < open_collateral(token) for a token of this option
     WriterOpenLimit = 116,        // v1.3 create_offer: this writer already has MAX_OPEN_PER_WRITER (50) offers in state Offered
     AlreadyListed = 117,          // v1.3 list_asset: the derived SAC is already listed (or is the quote token)
     AssetNotDeployed = 118,       // v1.3 list_asset: the canonical SAC for (code, issuer) is not deployed on this network
@@ -343,7 +343,8 @@ pub struct OfferPruned      { #[topic] pub id: u32, pub pruner: Address }   // v
   for that asset: PUT `exercise` and PUT `claim_delivery`, CALL `exercise` and CALL `reclaim` all fail until the
   issuer re-authorizes the contract. Writers can still `reclaim` PUT collateral (quote token) after expiry.
 - The contract never claims to override issuer control. README and UI disclose this.
-- **Open-list capacity.** `MAX_OPEN = 1000` bounds the instance entry; since v1.3 each writer is also capped at
+- **Open-list capacity.** `MAX_OPEN = 1000` bounded the single instance-storage open list in v1.1–v1.3 (removed in
+  v1.3.1, see the end of this bullet). Since v1.3 each writer is also capped at
   `MAX_OPEN_PER_WRITER = 50` open offers, offers cannot expire more than `MAX_TENOR` (2 years) out, and anyone can
   `prune_expired` unsold expired offers (collateral always returns to the writer). Before v1.3 one issuer-authorized
   writer could fill the book with dust offers (finding F-1). v1.3 alone does **not** close it: with permissionless
@@ -498,7 +499,11 @@ position token, impairment/refund, margin.
    for each id, plus `AssetAt(0..min(asset_count, MAX_PAGE))` and their `Listed` entries (keeper coverage of the registry).
 6. **`list_assets` order**: constructor underlyings in constructor order, then listings in `list_asset` order.
 7. Doc corrections applied in the same change: §2 `AssetNotAllowed` comment, §3 constructor sentence, §6 regulated-only
-   wording and F-1/F-1R status, §7.4 tenor bounds, §12 frontend wording.
+   wording and F-1/F-1R status, §7.4 tenor bounds, §12 frontend wording. Completed after the v1.3.1 gate review (doc
+   only, code unchanged): §2 `OptionData.underlying`, `InvalidArgs` (v1.3 backstop and `list_asset` input),
+   `ContractNotAuthorized` and `CollateralShortfall` (also `transfer`), `OpenListFull` (per-asset 500) comments, the v1.2
+   `transfer` meanings of `InvalidArgs`, `NotEligible`, `Expired` and `SelfTrade` restored, and the §6 open-list
+   capacity sentence put in the past tense.
 8. **`Reserved(token)` moves to persistent storage** (one entry per token, TTL extended on touch and by `extend_ttl` for
    the option's quote and underlying). Found by the v1.3 gate: with permissionless listing, per-token instance keys let
    anyone grow the single instance entry without bound.
