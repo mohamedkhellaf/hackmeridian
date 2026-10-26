@@ -43,6 +43,7 @@ scripts/deploy/smoke-testnet.sh --full          # V1.3 also fills maker2 to the 
 scripts/deploy/deploy.sh --throwaway            # second instance for destructive demos; OPTIONS_ID untouched
 scripts/deploy/issuer-demo-testnet.sh           # issuer freeze / de-authorize / clawback failure modes (real txs)
 scripts/deploy/extend-ttl.sh                    # TTL keeper: extend_ttl over every non-terminal option
+scripts/deploy/seed-demo-bids.sh --contract <C-id> --hours 72   # v1.5: two open investor bids on RWA + extend_bid_ttl
 ```
 
 Transaction hashes are printed as `TX <STEP> <hash>` and appended to `scripts/out/tx-log.tsv`.
