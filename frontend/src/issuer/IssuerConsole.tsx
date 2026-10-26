@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Account, Asset, Horizon } from '@stellar/stellar-sdk'
 import { config, explorerTx } from '../config'
 import { server } from '../stellar/rpc'
 import { describeError } from '../stellar/errors'
 import { parseAmount, formatAmount, shortAddress } from '../options/format'
-import { Banner, Button, Card, Dialog, Icon, Mono, StatusDot } from '../ui'
+import { Banner, Button, Card, Dialog, Mono, shortContractId } from '../ui'
 import {
   STROOPS_DECIMALS,
   buildClawbackTx,
@@ -12,7 +13,6 @@ import {
   buildSetAuthorizedTx,
   isAccountId,
   isContractId,
-  isValidAssetCode,
   missingFlags,
   sacClawbackOp,
   sacContractId,
@@ -21,13 +21,22 @@ import {
 } from './issuerTx'
 import type { IssuerFlags, TrustStatus } from './issuerTx'
 import { readSacAuthorized, submitClassic, submitSoroban } from './issuerNet'
-import { actionsFor, authStateFromSac, authStateFromTrust, flagItems, isNotFound, stateTone, targetKindLabel } from './issuerView'
+import { actionsFor, authStateFromSac, authStateFromTrust, isNotFound } from './issuerView'
 import type { AuthState } from './issuerView'
 import './issuer.css'
 
 const horizon = new Horizon.Server(config.horizonUrl)
+const expertContract = (id: string) => `https://stellar.expert/explorer/testnet/contract/${id}`
+const shortHash = (h: string) => `${h.slice(0, 4)}…${h.slice(-4)}`
 
 interface Props {
+  /** Asset code; the issuer is the connected account. */
+  code: string
+  /** The asset's SAC contract id as the app knows it. If it differs from code + connected account,
+   * the connected account is not this asset's issuer. */
+  contractId?: string
+  /** No options contract configured: read nothing from Testnet, sign nothing. */
+  mock?: boolean
   address: string | null
   sign: (xdr: string) => Promise<string>
   optionsContractId?: string
@@ -41,34 +50,71 @@ interface SessionAction {
   hash: string
 }
 
-const STATUS_TEXT: Record<TrustStatus, string> = {
-  none: 'No trustline for this asset',
-  authorized: 'Authorized',
-  'maintain-liabilities': 'Authorized to maintain liabilities only',
-  'not-authorized': 'Not authorized (frozen or pending approval)',
+interface RowStatus {
+  trustline: string
+  authorized: string
+  state: AuthState
+  balance?: string
+  error?: string
 }
 
-export function IssuerConsole({ address, sign, optionsContractId }: Props) {
-  const [code, setCode] = useState('RWA')
-  const [target, setTarget] = useState('')
-  const [amount, setAmount] = useState('')
+const AUTHORIZED_TEXT: Record<TrustStatus, string> = {
+  none: 'No',
+  authorized: 'Yes',
+  'maintain-liabilities': 'Liabilities only',
+  'not-authorized': 'No',
+}
+
+async function readRow(code: string, issuer: string, target: string): Promise<RowStatus> {
+  try {
+    if (isAccountId(target)) {
+      const acct = await horizon.loadAccount(target)
+      const t = trustStatus(acct.balances, code, issuer)
+      return {
+        trustline: t.status === 'none' ? 'None' : 'Yes',
+        authorized: AUTHORIZED_TEXT[t.status],
+        state: authStateFromTrust(t.status),
+        balance: t.balance,
+      }
+    }
+    const ok = await readSacAuthorized(server, sacContractId(code, issuer, config.networkPassphrase), target, config.networkPassphrase)
+    return { trustline: 'n/a', authorized: ok ? 'Yes' : 'No', state: authStateFromSac(ok) }
+  } catch (e) {
+    const error = describeError(e)
+    // Horizon 404: the account was never funded, so it cannot hold the asset.
+    if (isNotFound(error)) return { trustline: 'No account', authorized: 'No', state: 'no-trustline' }
+    return { trustline: 'Unknown', authorized: 'Unknown', state: 'unknown', error }
+  }
+}
+
+const onOff = (v: boolean | undefined) => (v ? 'On' : 'Off')
+const MOCK_ROW: RowStatus = { trustline: 'Mock', authorized: 'Mock', state: 'unknown' }
+const UNKNOWN_ROW: RowStatus = { trustline: 'Unknown', authorized: 'Unknown', state: 'unknown' }
+
+export function IssuerConsole({ code, contractId, mock = false, address, sign, optionsContractId }: Props) {
+  const [draft, setDraft] = useState('')
+  const [accounts, setAccounts] = useState<string[]>([])
   const [flagState, setFlagState] = useState<{ address: string; flags?: IssuerFlags; error?: string } | null>(null)
-  const [statusState, setStatusState] = useState<{ key: string; text: string; state: AuthState } | null>(null)
+  const [reads, setReads] = useState<{ key: string; rows: Record<string, RowStatus> }>({ key: '', rows: {} })
+  const [rev, setRev] = useState(0) // bumped after each issuer action so every row is read again
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<Outcome>(null)
   const [actions, setActions] = useState<SessionAction[]>([])
-  const [contractAuth, setContractAuth] = useState<{ key: string; ok: boolean | null } | null>(null)
-  const [confirmKey, setConfirmKey] = useState<string | null>(null) // clawback confirmation is tied to its inputs
+  const [confirm, setConfirm] = useState<{ kind: 'freeze' | 'clawback'; target: string } | null>(null)
+  const [amount, setAmount] = useState('')
   const [typed, setTyped] = useState('')
   const lock = useRef(false) // synchronous guard: state updates are too late to stop a double click
-  const typedRef = useRef<HTMLInputElement>(null)
+  const amountRef = useRef<HTMLInputElement>(null)
 
-  const codeOk = isValidAssetCode(code)
-  const targetKind = isAccountId(target) ? 'account' : isContractId(target) ? 'contract' : null
-  const sacId = address && codeOk ? sacContractId(code, address, config.networkPassphrase) : null
+  const sacId = address ? sacContractId(code, address, config.networkPassphrase) : null
+  const notIssuer = !mock && !!contractId && !!sacId && contractId !== sacId
+  const canAct = !mock && !notIssuer // rows are read from Testnet and actions can be signed
+  const rows = optionsContractId ? [optionsContractId, ...accounts.filter((a) => a !== optionsContractId)] : accounts
+  const rowsKey = rows.join(',')
+  const readKey = `${address}|${code}|${rev}`
 
   useEffect(() => {
-    if (!address) return
+    if (!address || mock) return
     let live = true
     horizon
       .loadAccount(address)
@@ -77,44 +123,21 @@ export function IssuerConsole({ address, sign, optionsContractId }: Props) {
     return () => {
       live = false
     }
-  }, [address])
-
-  const refreshStatus = useCallback(async () => {
-    if (!address || !codeOk || !targetKind) return
-    const key = `${code}|${target}`
-    const setStatus = (text: string, state: AuthState) => setStatusState({ key, text, state })
-    try {
-      if (targetKind === 'account') {
-        const acct = await horizon.loadAccount(target)
-        const t = trustStatus(acct.balances, code, address)
-        setStatus(`${STATUS_TEXT[t.status]}${t.balance ? ` · balance ${t.balance} ${code}` : ''}`, authStateFromTrust(t.status))
-      } else {
-        const ok = await readSacAuthorized(server, sacContractId(code, address, config.networkPassphrase), target, config.networkPassphrase)
-        setStatus(ok ? 'Contract is authorized on the SAC' : 'Contract is NOT authorized on the SAC', authStateFromSac(ok))
-      }
-    } catch (e) {
-      // Horizon 404 = account missing; SAC simulation errors carry the useful text.
-      setStatus(`Could not read status: ${describeError(e)}`, 'unknown')
-    }
-  }, [address, code, codeOk, target, targetKind])
+  }, [address, mock])
 
   useEffect(() => {
-    void refreshStatus()
-  }, [refreshStatus])
-
-  // Is the options contract authorized to hold this asset? Re-read after each issuer action.
-  const doneCount = actions.length
-  useEffect(() => {
-    if (!address || !sacId || !optionsContractId) return
+    if (!address || !rowsKey || !canAct) return
     let live = true
-    const key = `${sacId}|${optionsContractId}|${doneCount}`
-    readSacAuthorized(server, sacId, optionsContractId, config.networkPassphrase)
-      .then((ok) => live && setContractAuth({ key, ok }))
-      .catch(() => live && setContractAuth({ key, ok: null }))
+    for (const t of rowsKey.split(',')) {
+      void readRow(code, address, t).then((r) => {
+        if (!live) return
+        setReads((prev) => ({ key: readKey, rows: { ...(prev.key === readKey ? prev.rows : {}), [t]: r } }))
+      })
+    }
     return () => {
       live = false
     }
-  }, [address, sacId, optionsContractId, doneCount])
+  }, [address, code, rowsKey, readKey, canAct])
 
   async function run(label: string, record: { action: string; target: string }, fn: () => Promise<string>) {
     if (lock.current) return
@@ -130,14 +153,14 @@ export function IssuerConsole({ address, sign, optionsContractId }: Props) {
     } finally {
       lock.current = false
       setBusy(false)
-      setConfirmKey(null)
-      setTyped('')
-      void refreshStatus()
+      closeConfirm()
+      setRev((r) => r + 1)
     }
   }
 
-  const closeConfirm = () => {
-    setConfirmKey(null)
+  function closeConfirm() {
+    setConfirm(null)
+    setAmount('')
     setTyped('')
   }
 
@@ -147,9 +170,9 @@ export function IssuerConsole({ address, sign, optionsContractId }: Props) {
     return new Account(a.accountId(), a.sequenceNumber())
   }
 
-  const setAuth = (authorize: boolean) =>
-    run(`${authorize ? 'Authorize' : 'Revoke'} ${target.slice(0, 6)}…`, { action: authorize ? 'Authorize' : 'Freeze', target }, async () => {
-      if (targetKind === 'account') {
+  const setAuth = (target: string, authorize: boolean) =>
+    run(`${authorize ? 'Authorized' : 'Frozen'} ${shortAddress(target)}`, { action: authorize ? 'Authorize' : 'Freeze', target }, async () => {
+      if (isAccountId(target)) {
         const tx = buildSetAuthorizedTx(await source(), asset(), target, authorize, config.networkPassphrase)
         return submitClassic(horizon, tx, sign, config.networkPassphrase)
       }
@@ -158,14 +181,12 @@ export function IssuerConsole({ address, sign, optionsContractId }: Props) {
       return submitSoroban(server, tx, sign, config.networkPassphrase)
     })
 
-  const status = statusState?.key === `${code}|${target}` ? statusState : null
-  const clawKey = `${code}|${target}|${amount}`
-  const confirmClawback = confirmKey === clawKey
   const units = parseAmount(amount, STROOPS_DECIMALS)
+  const canClawback = !busy && units !== null && units > 0n
 
-  const clawback = () =>
-    run(`Clawback ${amount} ${code}`, { action: `Clawback ${amount.trim()} ${code}`, target }, async () => {
-      if (targetKind === 'account') {
+  const clawback = (target: string) =>
+    run(`Clawed back ${amount.trim()} ${code}`, { action: `Claw back ${amount.trim()} ${code}`, target }, async () => {
+      if (isAccountId(target)) {
         const tx = buildClawbackTx(await source(), asset(), target, amount.trim(), config.networkPassphrase)
         return submitClassic(horizon, tx, sign, config.networkPassphrase)
       }
@@ -175,174 +196,178 @@ export function IssuerConsole({ address, sign, optionsContractId }: Props) {
     })
 
   if (!address) {
-    return (
-      <Card title="Issuer console">
-        <p className="is-muted">Connect the asset issuer's account in your wallet (Testnet) to use the issuer console.</p>
-      </Card>
-    )
+    return <p className="is-muted">Connect the asset issuer's account in your wallet.</p>
   }
+
+  const addAccount = (e: FormEvent) => {
+    e.preventDefault()
+    const t = draft.trim()
+    if (!isAccountId(t) && !isContractId(t)) return
+    setAccounts((a) => (a.includes(t) ? a : [t, ...a]))
+    setDraft('')
+  }
+  const draftOk = isAccountId(draft) || isContractId(draft)
 
   const cur = flagState && flagState.address === address ? flagState : null
   const flags = cur?.flags ?? null
   const flagsError = cur?.error ?? null
   const missing = flags ? missingFlags(flags) : []
-  const ready = !busy && codeOk && targetKind !== null
-  const canClawback = ready && units !== null && units > 0n
-  const acts = actionsFor(status?.state ?? 'unknown')
-  const optAuth = contractAuth?.key === `${sacId}|${optionsContractId}|${doneCount}` ? contractAuth.ok : undefined
+  const flagValue = (v: boolean | undefined) => (mock ? 'Mock' : notIssuer ? 'Unknown' : !cur ? 'Loading' : flags ? onOff(v) : 'Unknown')
+  const rowStatus = (t: string): RowStatus | undefined => (mock ? MOCK_ROW : notIssuer ? UNKNOWN_ROW : reads.key === readKey ? reads.rows[t] : undefined)
+  const shownSac = mock ? null : (contractId ?? sacId)
+  const rowErrors = rows.flatMap((t) => {
+    const err = rowStatus(t)?.error
+    return err ? [{ t, err }] : []
+  })
   const typedOk = typed.trim().toUpperCase() === code.toUpperCase()
+  const confirmTarget = confirm?.target ?? ''
+  const confirmIsOptions = !!optionsContractId && confirmTarget === optionsContractId
+  const confirmBalance = confirm ? rowStatus(confirmTarget)?.balance : undefined
 
   return (
     <div className="is-layout">
-      <div className="is-col">
-        <Card
-          title="Authorization"
-          actions={
-            <label className="is-asset">
-              <span>Asset</span>
-              <input value={code} onChange={(e) => setCode(e.target.value.trim())} maxLength={12} aria-label="Asset code (issuer = connected account)" spellCheck={false} />
-            </label>
-          }
-        >
-          <div className="is-stack">
-            {!codeOk && <div className="is-error">Asset code must be 1 to 12 letters or digits.</div>}
-
-            <label className="is-field">
-              <span className="is-field-label">Account or contract address</span>
-              <span className="is-input">
-                <input value={target} onChange={(e) => setTarget(e.target.value.trim())} placeholder="G… or C…" spellCheck={false} aria-label="Target address" className="is-mono-input" />
-                {targetKindLabel(targetKind) && <span className="is-pill">{targetKindLabel(targetKind)}</span>}
-              </span>
-            </label>
-            {target && !targetKind && <div className="is-error">Not a valid account (G…) or contract (C…) address.</div>}
-
-            <div className="is-status">
-              <StatusDot tone={status ? stateTone(status.state) : 'neutral'} />
-              <span className="is-status-text">{status ? status.text : targetKind ? 'Reading status…' : 'Enter an address to read its status.'}</span>
-              {optionsContractId && (
-                <button type="button" className="is-link" onClick={() => setTarget(optionsContractId)} disabled={busy}>
-                  Use options contract
-                </button>
-              )}
+      <Card title="Flags" className="is-flags" flush>
+        <div className="is-flags-body">
+          <dl className="ui-kv">
+            <div>
+              <dt>Auth required</dt>
+              <dd>{flagValue(flags?.auth_required)}</dd>
             </div>
-
-            <div className="is-actions">
-              <Button variant="secondary" onClick={() => setAuth(true)} disabled={!ready || !acts.authorize}>
-                Authorize
-              </Button>
-              <Button variant="primary" onClick={() => setAuth(false)} disabled={!ready || !acts.freeze}>
-                Freeze {targetKind === 'contract' ? 'contract' : 'account'}
-              </Button>
+            <div>
+              <dt>Revocable</dt>
+              <dd>{flagValue(flags?.auth_revocable)}</dd>
             </div>
-            <p className="is-note">
-              A frozen holder cannot exercise. A frozen writer can still be exercised against, but cannot claim delivery or reclaim until authorized again.
-            </p>
-            {sacId && (
-              <p className="is-note">
-                {code} asset contract: <Mono className="is-break">{sacId}</Mono>. Contracts must be authorized on it to hold the asset.
-              </p>
+            <div>
+              <dt>Clawback</dt>
+              <dd>{flagValue(flags?.auth_clawback_enabled)}</dd>
+            </div>
+            {shownSac && (
+              <div>
+                <dt>Asset contract</dt>
+                <dd>
+                  <a href={expertContract(shownSac)} target="_blank" rel="noreferrer">
+                    <Mono>{shortContractId(shownSac)}</Mono>
+                  </a>
+                </dd>
+              </div>
             )}
-          </div>
-        </Card>
+          </dl>
+          {notIssuer && <Banner tone="warn">The connected account is not the {code} issuer.</Banner>}
+          {!notIssuer && flagsError && isNotFound(flagsError) && <Banner tone="warn">The connected account does not exist on Testnet.</Banner>}
+          {!notIssuer && flagsError && !isNotFound(flagsError) && <Banner tone="warn">Could not load flags: {flagsError}</Banner>}
+          {!notIssuer && flags && missing.length > 0 && <Banner tone="warn">Authorize, freeze and clawback need all three flags On.</Banner>}
+        </div>
+      </Card>
 
-        <Card className="is-danger-card">
-          <div className="is-stack">
-            <div className="is-danger-title">
-              <Icon name="alert" size={16} />
-              <h2>Clawback</h2>
-            </div>
-            <p className="is-note is-note--body">
-              Removes tokens from the target without its consent. Demo of issuer power: clawing back from the options contract leaves its open positions
-              under-collateralized; the Reserves page will show the shortfall.
-            </p>
-            <div className="is-claw-row">
-              <label className="is-input is-input--grow">
-                <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="10" aria-label="Clawback amount" />
-                <span className="is-unit">{code}</span>
-              </label>
-              <Button variant="danger" onClick={() => setConfirmKey(clawKey)} disabled={!canClawback}>
-                Review clawback
-              </Button>
-            </div>
-            {amount && !units && <div className="is-error">Enter a positive amount with at most 7 decimals.</div>}
-          </div>
-        </Card>
-      </div>
+      <div className="is-main">
+        <Card title="Accounts" flush>
+          <form className="is-add" onSubmit={addAccount}>
+            <input
+              className="is-input is-mono-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.trim())}
+              placeholder="G… or C…"
+              spellCheck={false}
+              aria-label="Target address"
+            />
+            <Button type="submit" size="sm" disabled={!draftOk}>
+              Add
+            </Button>
+          </form>
+          {draft && !draftOk && <p className="is-error is-pad">Not an account (G…) or contract (C…) address.</p>}
 
-      <div className="is-col">
-        <Card title={`${code} issuer flags`}>
-          <div className="is-stack">
-            {flagsError && isNotFound(flagsError) && (
-              <Banner tone="info">This account has not issued {code} on Testnet. Connect the issuer account to use the console.</Banner>
-            )}
-            {flagsError && !isNotFound(flagsError) && <Banner tone="warn">Could not load issuer flags: {flagsError}</Banner>}
-            {!cur && <p className="is-muted">Loading flags…</p>}
-            {flags && (
-              <ul className="is-flags">
-                {flagItems(flags).map((f) => (
-                  <li key={f.label} className={f.ok ? 'is-flag is-flag--ok' : 'is-flag is-flag--bad'}>
-                    <Icon name={f.ok ? 'check' : 'alert'} size={16} />
-                    <span>{f.label}</span>
-                    {!f.ok && <span className="is-flag-missing">missing</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {flags && missing.length > 0 && (
-              <Banner tone="warn">This account is missing {missing.join(', ')}. Authorization, freeze and clawback need all three flags on the issuer.</Banner>
-            )}
-            <div className="is-sep">
-              <span className="ui-label">Options contract</span>
-              <span className="is-status-text">
-                {!optionsContractId ? (
-                  <>
-                    <StatusDot tone="neutral" /> No options contract connected (mock mode)
-                  </>
-                ) : optAuth === undefined ? (
-                  <>
-                    <StatusDot tone="neutral" /> Reading…
-                  </>
-                ) : optAuth === null ? (
-                  <>
-                    <StatusDot tone="neutral" /> Could not read status
-                  </>
-                ) : optAuth ? (
-                  <>
-                    <StatusDot tone="ok" /> Authorized to hold {code}
-                  </>
-                ) : (
-                  <>
-                    <StatusDot tone="danger" /> Not authorized to hold {code}
-                  </>
-                )}
-              </span>
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Recent issuer actions" subtitle="This session only" flush={actions.length > 0}>
-          {actions.length === 0 ? (
-            <p className="is-muted">No issuer actions yet in this session.</p>
+          {rows.length === 0 ? (
+            <p className="is-muted is-pad">No accounts added.</p>
           ) : (
             <div className="ui-table-wrap">
-              <table className="ui-table">
+              <table className="ui-table is-table">
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th className="hide-sm">Trustline</th>
+                    <th>Authorized</th>
+                    <th>
+                      <span className="is-sr">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((t) => {
+                    const s = rowStatus(t)
+                    const acts = actionsFor(s?.state ?? 'unknown')
+                    const short = shortAddress(t)
+                    return (
+                      <tr key={t}>
+                        <td>
+                          <Mono title={t}>{short}</Mono>
+                          {t === optionsContractId && <span className="is-sub">Options contract</span>}
+                        </td>
+                        <td className="hide-sm">{s ? s.trustline : 'Reading'}</td>
+                        <td>{s ? s.authorized : 'Reading'}</td>
+                        <td className="is-row-actions">
+                          <div className="is-acts">
+                            <Button size="sm" onClick={() => setAuth(t, true)} disabled={busy || !canAct || !acts.authorize} aria-label={`Authorize ${short}`}>
+                              Authorize
+                            </Button>
+                            <Button size="sm" onClick={() => setConfirm({ kind: 'freeze', target: t })} disabled={busy || !canAct || !acts.freeze} aria-label={`Freeze ${short}`}>
+                              Freeze
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => setConfirm({ kind: 'clawback', target: t })}
+                              disabled={busy || !canAct || s?.state === 'no-trustline'}
+                              aria-label={`Claw back from ${short}`}
+                            >
+                              Claw back
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        {rowErrors.map(({ t, err }) => (
+          <Banner key={t} tone="warn">
+            Could not read {shortAddress(t)}: {err}
+          </Banner>
+        ))}
+        {busy && <Banner>Waiting for signature and confirmation.</Banner>}
+        {outcome && 'hash' in outcome && (
+          <Banner>
+            {outcome.label}.{' '}
+            <a href={explorerTx(outcome.hash)} target="_blank" rel="noreferrer">
+              <Mono>{shortHash(outcome.hash)}</Mono>
+            </a>
+          </Banner>
+        )}
+        {outcome && 'error' in outcome && <Banner tone="danger">{outcome.error}</Banner>}
+
+        {actions.length > 0 && (
+          <Card title="Recent actions" flush>
+            <div className="ui-table-wrap">
+              <table className="ui-table is-table">
                 <thead>
                   <tr>
                     <th>Action</th>
-                    <th>Target</th>
+                    <th>Account</th>
                     <th>Tx</th>
                   </tr>
                 </thead>
                 <tbody>
                   {actions.map((a) => (
                     <tr key={a.hash}>
-                      <td className="ui-left">{a.action}</td>
+                      <td>{a.action}</td>
                       <td>
                         <Mono>{shortAddress(a.target)}</Mono>
                       </td>
                       <td>
                         <a href={explorerTx(a.hash)} target="_blank" rel="noreferrer">
-                          {a.hash.slice(0, 4)}…{a.hash.slice(-4)}
+                          <Mono>{shortHash(a.hash)}</Mono>
                         </a>
                       </td>
                     </tr>
@@ -350,52 +375,107 @@ export function IssuerConsole({ address, sign, optionsContractId }: Props) {
                 </tbody>
               </table>
             </div>
-          )}
-        </Card>
-
-        {busy && <Banner tone="warn">Waiting for signature and confirmation…</Banner>}
-        {outcome && 'hash' in outcome && (
-          <Banner tone="ok">
-            {outcome.label} confirmed.{' '}
-            <a href={explorerTx(outcome.hash)} target="_blank" rel="noreferrer">
-              {outcome.hash.slice(0, 10)}… on stellar.expert
-            </a>
-          </Banner>
+          </Card>
         )}
-        {outcome && 'error' in outcome && <Banner tone="danger">{outcome.error}</Banner>}
       </div>
 
-      {confirmClawback && (
+      {confirm?.kind === 'freeze' && (
         <Dialog
-          title="Review clawback"
+          title={`Freeze ${shortAddress(confirmTarget)}`}
           onClose={() => !busy && closeConfirm()}
-          initialFocusRef={typedRef}
+          width={520}
           footer={
             <>
               <Button variant="secondary" onClick={closeConfirm} disabled={busy}>
                 Cancel
               </Button>
-              <Button variant="danger" onClick={clawback} disabled={!canClawback || !typedOk} loading={busy}>
-                {busy ? 'Submitting…' : 'Confirm clawback'}
+              <Button variant="danger" onClick={() => setAuth(confirmTarget, false)} loading={busy}>
+                Freeze
               </Button>
             </>
           }
         >
           <div className="is-stack">
-            <p className="is-confirm-text">
-              Claw back{' '}
-              <strong>
-                {units !== null ? formatAmount(units, STROOPS_DECIMALS, 7) : amount} {code}
-              </strong>{' '}
-              from <Mono className="is-break">{target}</Mono> ({targetKindLabel(targetKind)?.toLowerCase()}).
-            </p>
-            <p className="is-note is-note--body">This removes the tokens without the target's consent and cannot be undone.</p>
+            <dl className="ui-kv">
+              <div>
+                <dt>Asset</dt>
+                <dd>{code}</dd>
+              </div>
+              <div>
+                <dt>{isAccountId(confirmTarget) ? 'Account' : 'Contract'}</dt>
+                <dd>
+                  <Mono className="is-break">{confirmTarget}</Mono>
+                </dd>
+              </div>
+            </dl>
+            <Banner tone="danger">
+              {confirmIsOptions
+                ? `A frozen options contract cannot move ${code}, so no ${code} option can settle.`
+                : 'A frozen holder cannot exercise, and a frozen writer cannot claim delivery or reclaim.'}
+            </Banner>
+          </div>
+        </Dialog>
+      )}
+
+      {confirm?.kind === 'clawback' && (
+        <Dialog
+          title={`Claw back ${code}`}
+          onClose={() => !busy && closeConfirm()}
+          width={520}
+          initialFocusRef={amountRef}
+          footer={
+            <>
+              <Button variant="secondary" onClick={closeConfirm} disabled={busy}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={() => clawback(confirmTarget)} disabled={!canClawback || !typedOk} loading={busy}>
+                Claw back
+              </Button>
+            </>
+          }
+        >
+          <div className="is-stack">
+            <dl className="ui-kv">
+              <div>
+                <dt>From</dt>
+                <dd>
+                  <Mono className="is-break">{confirmTarget}</Mono>
+                </dd>
+              </div>
+              {confirmBalance !== undefined && (
+                <div>
+                  <dt>Balance</dt>
+                  <dd>
+                    {formatAmount(parseAmount(confirmBalance, STROOPS_DECIMALS) ?? 0n, STROOPS_DECIMALS, 7)} {code}
+                  </dd>
+                </div>
+              )}
+            </dl>
             <label className="is-field">
-              <span className="is-field-label">Type {code} to confirm</span>
-              <span className="is-input">
-                <input ref={typedRef} value={typed} onChange={(e) => setTyped(e.target.value)} spellCheck={false} autoComplete="off" aria-label="Type the asset code to confirm" />
+              <span className="is-field-label">Amount</span>
+              <span className="is-unit-row">
+                <input
+                  ref={amountRef}
+                  className="is-input"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="10"
+                  aria-label="Clawback amount"
+                />
+                <span className="is-unit">{code}</span>
               </span>
             </label>
+            {amount && !units && <p className="is-error">Enter a positive amount with at most 7 decimals.</p>}
+            <label className="is-field">
+              <span className="is-field-label">Type {code} to confirm</span>
+              <input className="is-input" value={typed} onChange={(e) => setTyped(e.target.value)} spellCheck={false} autoComplete="off" aria-label="Type the asset code to confirm" />
+            </label>
+            <Banner tone="danger">
+              {confirmIsOptions
+                ? 'This takes collateral from the options contract without consent and leaves its open positions short.'
+                : "This takes the tokens without the holder's consent and cannot be undone."}
+            </Banner>
           </div>
         </Dialog>
       )}

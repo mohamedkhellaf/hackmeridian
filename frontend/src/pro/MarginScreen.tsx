@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { parseAmount } from '../options/format'
-import { Banner, Button, Card, PageHeader, Stat, StatGrid, Tag } from '../ui'
-import { DASH, lots, usdx } from './format'
+import { Button, Card, Stat, StatGrid } from '../ui'
+import { DASH, lots } from './format'
 import { seriesLabel } from './helpers'
-import { Field, Unknown } from './parts'
+import { Field, Unknown, Usdx } from './parts'
+import { AMOUNT_HINT } from './copy'
 import { usePro } from './proCtx'
 import { USDX_DECIMALS } from './types'
 
@@ -18,90 +19,72 @@ export function MarginScreen() {
 
   return (
     <>
-      <PageHeader
-        title="Margin account"
-        subtitle="Collateral that backs the calls you write. Partial margin: it can be exhausted by a price jump, and then positions are taken over."
-      />
-
-      {!acct && (
-        <Banner tone="info">
-          {me} has no margin account at this point of the simulation. Deposit to open one, or switch the acting account or step in the simulation controls.
-        </Banner>
-      )}
-      {acct && acct.owed > 0n && (
-        <Banner tone="warn" title="Debt owed to the vault">
-          A takeover left a shortfall of {usdx(acct.owed)} USDx. It is collected from your free cash at takeovers, when your last expired position settles and before any withdrawal. Any part your
-          cash cannot cover stays recorded as unrecovered debt.
-        </Banner>
-      )}
-      {acct?.withdrawBlocked && (
-        <Banner tone="warn" title="Withdrawal blocked">
-          This account holds an expired position that is not settled yet. Withdrawals fail (SeriesExpired) until every expired book is settled.
-        </Banner>
-      )}
-
       <StatGrid columns={4}>
-        <Stat label="NLV" hint="Net liquidation value">
-          {req ? usdx(req.nlv) : <Unknown />}
-        </Stat>
-        <Stat label="MM" hint="Maintenance margin: NLV below this means takeover">
-          {req ? usdx(req.mm) : <Unknown />}
-        </Stat>
-        <Stat label="IM" hint="Initial margin: needed to sell or withdraw">
-          {req ? usdx(req.im) : <Unknown />}
-        </Stat>
-        <Stat label="Distance to liquidation" hint="NLV minus MM">
-          {acct?.cushion != null ? usdx(acct.cushion) : <Unknown />}
-        </Stat>
+        <Stat label="NLV (USDx)">{req ? <Usdx v={req.nlv} /> : <Unknown />}</Stat>
+        <Stat label="Maintenance margin (USDx)">{req ? <Usdx v={req.mm} /> : <Unknown />}</Stat>
+        <Stat label="Initial margin (USDx)">{req ? <Usdx v={req.im} /> : <Unknown />}</Stat>
+        <Stat label="Distance to MM (USDx)">{acct?.cushion != null ? <span className={below ? 'pro-bad' : undefined}><Usdx v={acct.cushion} /></span> : <Unknown />}</Stat>
       </StatGrid>
-      {acct?.cushion != null && (
-        <p className="pro-status">
-          <Tag tone={below ? 'warn' : 'ok'}>{below ? 'Below maintenance margin' : 'Above maintenance margin'}</Tag>
-          {below ? ' Anyone can take this account over to the vault.' : ' No takeover can be triggered at the latest snapshot.'}
-        </p>
-      )}
-      {acct && !req && <p className="pro-hint">Margin figures come from get_requirement. The fixtures have no current value for this account in this state, so they are not shown.</p>}
 
       <div className="pro-grid">
-        <Card title="Account" subtitle="Cash and debts in the Pro contract">
-          <dl className="pro-dl">
-            <dt>Cash in the contract</dt>
-            <dd>{acct ? `${usdx(acct.cash)} USDx` : DASH}</dd>
-            <dt>Debt owed to the vault</dt>
-            <dd>{acct ? `${usdx(acct.owed)} USDx` : DASH}</dd>
-            <dt>Wallet balance</dt>
-            <dd>{wallet != null ? `${usdx(wallet)} USDx` : DASH}</dd>
-            <dt>Open short calls</dt>
-            <dd>
-              {acct && acct.shorts.length > 0
-                ? acct.shorts.map((s) => (
-                    <div key={s.seriesId}>
-                      {lots(s.qty)} lots · {seriesLabel(model.series.find((x) => x.id === s.seriesId))}
-                    </div>
-                  ))
-                : 'None'}
-            </dd>
-          </dl>
+        <Card title="Account">
+          {!acct ? (
+            <p className="pro-muted">No margin account for {me}.</p>
+          ) : (
+            <dl className="ui-kv">
+              <div>
+                <dt>Status</dt>
+                <dd className={below ? 'pro-warn' : undefined}>{acct.cushion == null ? <Unknown why="No get_requirement value in this state" /> : below ? 'Below maintenance margin' : 'Above maintenance margin'}</dd>
+              </div>
+              <div>
+                <dt>Cash in contract</dt>
+                <dd>
+                  <Usdx v={acct.cash} /> USDx
+                </dd>
+              </div>
+              <div>
+                <dt>Owed to the vault</dt>
+                <dd className={acct.owed > 0n ? 'pro-bad' : undefined}>
+                  <Usdx v={acct.owed} /> USDx
+                </dd>
+              </div>
+              <div>
+                <dt>Wallet</dt>
+                <dd>{wallet != null ? <><Usdx v={wallet} /> USDx</> : DASH}</dd>
+              </div>
+              <div>
+                <dt>Short calls</dt>
+                <dd>
+                  {acct.shorts.length > 0
+                    ? acct.shorts.map((s) => (
+                        <div key={s.seriesId}>
+                          {lots(s.qty)} lots, {seriesLabel(model.series.find((x) => x.id === s.seriesId))}
+                        </div>
+                      ))
+                    : 'None'}
+                </dd>
+              </div>
+            </dl>
+          )}
         </Card>
 
-        <Card title="Deposit or withdraw" subtitle="USDx margin. Withdrawing needs NLV to stay at or above IM, and no unsettled expired position.">
+        <Card title="Deposit or withdraw">
           <div className="pro-form">
-            <Field label="Amount (USDx)" hint="Simulation: the amount is taken from the script, not from this field.">
-              <input className="pro-input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+            <Field label="Amount" unit="USDx" hint={amount && !parsed ? AMOUNT_HINT : undefined}>
+              <input inputMode="decimal" aria-label="Amount (USDx)" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
             </Field>
             <div className="pro-actions">
-              <Button variant="primary" onClick={() => void run('Deposit', client.deposit(me, parsed ?? 0n), 'Deposit recorded.')}>
+              <Button variant="primary" onClick={() => void run('Deposit', client.deposit(me, parsed ?? 0n), 'Deposited')}>
                 Deposit
               </Button>
-              <Button variant="secondary" disabled={acct?.withdrawBlocked} onClick={() => void run('Withdraw', client.withdraw(me, parsed ?? 0n), 'Withdrawal recorded.')}>
+              <Button variant="secondary" disabled={acct?.withdrawBlocked} onClick={() => void run('Withdraw', client.withdraw(me, parsed ?? 0n), 'Withdrawn')}>
                 Withdraw
               </Button>
             </div>
-            {amount && !parsed && <span className="pro-hint">Enter a number with at most 7 decimals.</span>}
+            {acct?.withdrawBlocked && <p className="pro-muted">Withdraw blocked: an expired position is not settled (SeriesExpired).</p>}
           </div>
         </Card>
       </div>
     </>
   )
-
 }

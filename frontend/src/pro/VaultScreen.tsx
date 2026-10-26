@@ -1,8 +1,9 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import { parseAmount } from '../options/format'
-import { Banner, Button, Card, PageHeader, Stat, StatGrid } from '../ui'
-import { DASH, lots, usdx } from './format'
-import { Field, Unknown, Who } from './parts'
+import { Button, Card, Stat, StatGrid } from '../ui'
+import { DASH, lots } from './format'
+import { Field, Unknown, Usdx, Who } from './parts'
+import { AMOUNT_HINT } from './copy'
 import { usePro } from './proCtx'
 import { USDX_DECIMALS } from './types'
 
@@ -15,92 +16,90 @@ export function VaultScreen() {
 
   return (
     <>
-      <PageHeader
-        title="Backstop vault"
-        subtitle="LP-funded capital that pays holders when a writer's margin falls short. It can lose money: its value is shown below, and LP capital cannot be withdrawn in this version."
-      />
-
       <StatGrid columns={4}>
-        <Stat label="Vault value" hint="Cash if no shorts, otherwise its NLV">
-          {v.value != null ? usdx(v.value) : <Unknown />}
+        <Stat label="Vault value (USDx)">{v.value != null ? <Usdx v={v.value} /> : <Unknown />}</Stat>
+        <Stat label="Cash (USDx)">
+          <Usdx v={v.cash} />
         </Stat>
-        <Stat label="Vault cash">{usdx(v.cash)}</Stat>
-        <Stat label="Reserved takeover payments" hint="Held for books the vault took over">
-          {usdx(v.reserved)}
+        <Stat label="Reserved for takeovers (USDx)">
+          <Usdx v={v.reserved} />
         </Stat>
-        <Stat label="Debts owed by writers" hint="Takeover shortfalls to collect">
-          {usdx(v.debtsOwed)}
+        <Stat label="Owed by writers (USDx)">
+          <Usdx v={v.debtsOwed} />
         </Stat>
       </StatGrid>
-      {v.shorts.length > 0 && (
-        <Banner tone="warn" title="The vault holds short calls">
-          {v.shorts.map((s) => `${lots(s.qty)} lots on series #${s.seriesId}`).join(', ')}. Their losses are in the vault value above and are paid pro rata at settlement.
-        </Banner>
-      )}
 
       <div className="pro-grid">
-        <Card title="Provide LP capital" subtitle="Deposit only. No withdrawal in v0 (WithdrawLocked).">
+        <Card title="LP deposit">
           <div className="pro-form">
-            <Field label="Amount (USDx)" hint="Simulation: the amount is taken from the script, not from this field.">
-              <input className="pro-input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+            <Field label="Amount" unit="USDx" hint={amount && !parsed ? AMOUNT_HINT : undefined}>
+              <input inputMode="decimal" aria-label="Amount (USDx)" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
             </Field>
-            <Button variant="primary" onClick={() => void run('LP deposit', client.lpDeposit(me, parsed ?? 0n), 'LP deposit recorded.')}>
-              Deposit to the vault
-            </Button>
-            <Banner tone="info">
-              Known limit: a deposit made before a keeper takes over an insolvent writer can enter a loss that is not visible yet. LP deposits are refused while the vault value is zero or below.
-            </Banner>
+            <div className="pro-actions">
+              <Button variant="primary" onClick={() => void run('LP deposit', client.lpDeposit(me, parsed ?? 0n), 'Deposited to the vault')}>
+                Deposit to the vault
+              </Button>
+            </div>
+            <p className="pro-muted">No LP withdrawal in v0 (WithdrawLocked).</p>
           </div>
         </Card>
 
-        <Card title="LP shares" subtitle={`Total ${lots(v.totalShares)} shares`}>
-          <dl className="pro-dl">
-            {v.lpShares.length === 0 && (
-              <>
-                <dt>LPs</dt>
-                <dd>None yet</dd>
-              </>
-            )}
+        <Card title="LP shares">
+          <dl className="ui-kv">
             {v.lpShares.map((l) => (
-              <Fragment key={l.lp}>
+              <div key={l.lp}>
                 <dt>
                   <Who id={l.lp} />
                 </dt>
                 <dd>{lots(l.shares)}</dd>
-              </Fragment>
+              </div>
             ))}
-            <dt>You ({me})</dt>
-            <dd>{mine ? lots(mine.shares) : DASH}</dd>
+            <div>
+              <dt>Total</dt>
+              <dd>{lots(v.totalShares)}</dd>
+            </div>
+            <div>
+              <dt>You ({me})</dt>
+              <dd>{mine ? lots(mine.shares) : DASH}</dd>
+            </div>
+            <div>
+              <dt>Vault short calls</dt>
+              <dd className={v.shorts.length > 0 ? 'pro-warn' : undefined}>
+                {v.shorts.length > 0 ? v.shorts.map((s) => `${lots(s.qty)} lots, series ${s.seriesId}`).join('; ') : 'None'}
+              </dd>
+            </div>
           </dl>
         </Card>
       </div>
 
-      <Card title="Shortfalls and deficits per series" subtitle="A shortfall is what writer margin did not cover. The vault pays pro rata; what it cannot pay is the deficit, a cut on holders." flush>
+      <Card title="Series" flush>
         <div className="ui-table-wrap">
           <table className="ui-table">
             <thead>
               <tr>
-                <th className="ui-left">Series</th>
-                <th>Shortfall</th>
-                <th>Paid by the vault</th>
-                <th>Deficit</th>
+                <th className="num">Series</th>
+                <th className="num">Shortfall (USDx)</th>
+                <th className="num hide-sm">Paid by vault (USDx)</th>
+                <th className="num">Deficit (USDx)</th>
                 <th>State</th>
               </tr>
             </thead>
             <tbody>
               {model.series.length === 0 && (
                 <tr>
-                  <td className="ui-left" colSpan={5}>
-                    No series yet.
-                  </td>
+                  <td colSpan={5}>No series listed.</td>
                 </tr>
               )}
               {model.series.map((s) => (
                 <tr key={s.id}>
-                  <td className="ui-left ui-strong">#{s.id}</td>
-                  <td>{usdx(s.shortfall)}</td>
-                  <td>{usdx(s.vaultPaid)}</td>
-                  <td className={s.deficit != null && s.deficit > 0n ? 'pro-bad' : undefined}>{s.deficit != null ? usdx(s.deficit) : 'After settlement'}</td>
+                  <td className="num">{s.id}</td>
+                  <td className="num">
+                    <Usdx v={s.shortfall} />
+                  </td>
+                  <td className="num hide-sm">
+                    <Usdx v={s.vaultPaid} />
+                  </td>
+                  <td className={s.deficit != null && s.deficit > 0n ? 'num pro-bad' : 'num'}>{s.deficit != null ? <Usdx v={s.deficit} /> : <span className="pro-muted">After settlement</span>}</td>
                   <td>{s.closed ? 'Closed' : s.settlementPrice != null ? 'Settling' : 'Open'}</td>
                 </tr>
               ))}
@@ -109,29 +108,29 @@ export function VaultScreen() {
         </div>
       </Card>
 
-      <Card title="Debts owed to the vault" subtitle="Takeover shortfalls still unrecovered from writers." flush>
+      <Card title="Debts owed to the vault" flush>
         <div className="ui-table-wrap">
           <table className="ui-table">
             <thead>
               <tr>
-                <th className="ui-left">Writer</th>
-                <th>Owed</th>
+                <th>Writer</th>
+                <th className="num">Owed (USDx)</th>
               </tr>
             </thead>
             <tbody>
               {v.debtors.length === 0 && (
                 <tr>
-                  <td className="ui-left" colSpan={2}>
-                    None at this point of the simulation.
-                  </td>
+                  <td colSpan={2}>No debts.</td>
                 </tr>
               )}
               {v.debtors.map((d) => (
                 <tr key={d.writer}>
-                  <td className="ui-left">
+                  <td>
                     <Who id={d.writer} />
                   </td>
-                  <td className="pro-bad">{usdx(d.owed)} USDx</td>
+                  <td className="num pro-bad">
+                    <Usdx v={d.owed} />
+                  </td>
                 </tr>
               ))}
             </tbody>

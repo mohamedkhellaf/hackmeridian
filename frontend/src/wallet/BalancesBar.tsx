@@ -1,6 +1,5 @@
 import { formatDisplay } from '../options/format'
 import type { TokenBalance } from '../stellar/tokens'
-import { Icon } from '../ui'
 
 export interface BalanceToken {
   contractId: string
@@ -8,50 +7,30 @@ export interface BalanceToken {
   decimals: number
 }
 
-// Why a balance is unavailable; shown as a tooltip next to "—" instead of inline text.
+// Why a balance is unavailable, shown in place of the amount.
 const REASON: Partial<Record<TokenBalance['status'], string>> = {
-  mock: 'Mock token: no on-chain balance',
-  unfunded: 'Account not funded on Testnet',
-  'no-trustline': 'No trustline for this asset',
+  mock: 'Mock token',
+  unfunded: 'Account not funded',
+  'no-trustline': 'No trustline',
   'not-authorized': 'Not authorized by the issuer',
-  error: 'Balance unavailable',
+  error: 'Unavailable',
 }
 
-/**
- * Token balances. `inline` is the desktop top-bar group (balances + small refresh icon);
- * `list` is the stacked variant used inside the wallet menu (the menu has its own Refresh button).
- * Only render it in real mode.
- */
-export function BalancesBar({
-  tokens,
-  balances,
-  loading,
-  onRefresh,
-  variant = 'inline',
-}: {
-  tokens: BalanceToken[]
-  balances: Record<string, TokenBalance>
-  loading?: boolean
-  onRefresh?: () => void
-  variant?: 'inline' | 'list'
-}) {
+/** Token balances as `code amount` rows, for the wallet menu. Only render it in real mode. */
+export function BalancesBar({ tokens, balances, loading }: { tokens: BalanceToken[]; balances: Record<string, TokenBalance>; loading?: boolean }) {
   return (
-    <div className={`balances-bar balances-bar--${variant}`} aria-busy={loading}>
+    <div className="balances-bar" aria-busy={loading}>
       {tokens.map((t) => {
         const b = balances[t.contractId]
         const bal = b?.balance
-        const tip = bal != null ? undefined : ((b && (b.error || REASON[b.status])) ?? (loading ? 'Loading…' : 'Balance unavailable'))
+        const reason = (b && REASON[b.status]) ?? (loading ? 'Loading' : 'Unavailable')
         return (
-          <span key={t.contractId} className="balance" title={tip}>
-            <strong>{t.code}</strong> {bal != null ? formatDisplay(bal, t.decimals) : <span className="balance-na">—</span>}
-          </span>
+          <div key={t.contractId} className="balance" title={bal == null ? b?.error : undefined}>
+            <span className="balance-code">{t.code}</span>
+            <span className={bal != null ? 'balance-amount' : 'balance-amount ui-label'}>{bal != null ? formatDisplay(bal, t.decimals) : reason}</span>
+          </div>
         )
       })}
-      {onRefresh && variant === 'inline' ? (
-        <button type="button" className="balances-refresh" aria-label="Refresh balances" title="Refresh balances" onClick={onRefresh} disabled={loading}>
-          <Icon name="refresh" size={14} />
-        </button>
-      ) : null}
     </div>
   )
 }

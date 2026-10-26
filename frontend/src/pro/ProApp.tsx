@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Banner, Button, Card, Tag } from '../ui'
-import { PRO_BANNER_PUBLISHER, PRO_BANNER_TESTNET, PRO_SIMULATED } from './copy'
+import { Banner, Button, Card, PageHeader, Segmented } from '../ui'
+import { PRO_SIMULATED } from './copy'
 import { FixtureProClient } from './FixtureProClient'
 import { LiquidationsScreen } from './LiquidationsScreen'
 import { MarginScreen } from './MarginScreen'
@@ -15,7 +15,6 @@ import { VaultScreen } from './VaultScreen'
 import { proErrorName } from './errors'
 import './pro.css'
 
-
 function useProRoute(): ProRoute {
   const [route, setRoute] = useState<ProRoute>(() => parseProRoute(window.location.hash))
   useEffect(() => {
@@ -26,85 +25,98 @@ function useProRoute(): ProRoute {
   return route
 }
 
-function Banners({ simulated }: { simulated: boolean }) {
-  return (
-    <div className="pro-banners" role="note" aria-label="Strata Pro notices">
-      {simulated && <span className="pro-sim">{PRO_SIMULATED}</span>}
-      <span>{PRO_BANNER_TESTNET}</span>
-      <span className="pro-banner-sub">{PRO_BANNER_PUBLISHER}</span>
-    </div>
-  )
-}
-
 function Outcome() {
   const { outcome, clearOutcome } = usePro()
   if (!outcome) return null
+  const head = outcome.ok ? outcome.text : `${outcome.label} refused${outcome.name ? `: ${outcome.name}${outcome.code ? ` (${outcome.code})` : ''}` : ''}. ${outcome.text}`
   return (
-    <Banner tone={outcome.ok ? 'ok' : 'danger'} title={outcome.ok ? `${outcome.label}: done` : `${outcome.label}: refused${outcome.name ? ` (${outcome.name}${outcome.code ? `, ${outcome.code}` : ''})` : ''}`}>
-      <span>{outcome.text}</span>
-      {outcome.note && <span className="pro-note"> {outcome.note}</span>}{' '}
-      <button type="button" className="pro-link" onClick={clearOutcome}>
+    <Banner tone={outcome.ok ? 'neutral' : 'danger'} className="pro-outcome">
+      <span>
+        {head}
+        {/* The replayed step shows in the Simulation card; the note is kept only when nothing was replayed. */}
+        {outcome.note && !outcome.ok && outcome.code == null && <span className="pro-muted"> {outcome.note}</span>}
+      </span>
+      <Button variant="ghost" size="sm" onClick={clearOutcome}>
         Dismiss
-      </button>
+      </Button>
     </Banner>
   )
 }
 
-/** Simulation controls: scenario, step, acting account and the log. Shown only while running on fixtures. */
+/** Scenario, step, acting account and the recent steps. Shown only while running on fixtures. */
 function SimControls() {
   const { sim, model, me, setMe } = usePro()
   if (!sim) return null
   const last = model.history.slice(-6).reverse()
   return (
-    <Card title="Simulation controls" subtitle="Fixture replay of packages/risk/fixtures/pro_v0.json. Nothing here is on-chain.">
+    <Card title="Simulation">
       <div className="pro-sim-grid">
         <label className="pro-field">
-          <span className="ui-label">Scenario</span>
-          <select className="pro-input" value={sim.scenarioName} onChange={(e) => sim.setScenario(e.target.value)} aria-label="Scenario">
-            {sim.scenarioNames.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+          <span className="pro-label">Scenario</span>
+          <span className="pro-input">
+            <select value={sim.scenarioName} onChange={(e) => sim.setScenario(e.target.value)} aria-label="Scenario">
+              {sim.scenarioNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </span>
         </label>
         <label className="pro-field">
-          <span className="ui-label">
+          <span className="pro-label">
             Step {sim.position} of {sim.stepCount}
           </span>
           <input type="range" min={0} max={sim.stepCount} value={sim.position} onChange={(e) => sim.moveTo(Number(e.target.value))} aria-label="Simulation step" />
         </label>
         <label className="pro-field">
-          <span className="ui-label">Acting as</span>
-          <select className="pro-input" value={me} onChange={(e) => setMe(e.target.value)} aria-label="Acting as">
-            {sim.parties.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          <span className="pro-label">Acting as</span>
+          <span className="pro-input">
+            <select value={me} onChange={(e) => setMe(e.target.value)} aria-label="Acting as">
+              {sim.parties.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </span>
         </label>
-        <div className="pro-field">
-          <span className="ui-label">Step</span>
-          <div className="pro-actions">
-            <Button size="sm" variant="secondary" disabled={sim.position === 0} onClick={() => sim.moveTo(sim.position - 1)}>
-              Back
-            </Button>
-            <Button size="sm" variant="secondary" disabled={sim.position >= sim.stepCount} onClick={() => sim.moveTo(sim.position + 1)}>
-              Next
-            </Button>
-          </div>
+        <div className="pro-actions">
+          <Button size="sm" variant="secondary" disabled={sim.position === 0} onClick={() => sim.moveTo(sim.position - 1)}>
+            Back
+          </Button>
+          <Button size="sm" variant="secondary" disabled={sim.position >= sim.stepCount} onClick={() => sim.moveTo(sim.position + 1)}>
+            Next
+          </Button>
         </div>
       </div>
-      <ul className="pro-log" aria-label="Recent steps">
-        {last.length === 0 && <li>No step applied yet.</li>}
-        {last.map((h) => (
-          <li key={h.index}>
-            <span className="pro-num">#{h.index + 1}</span> {h.op}
-            {h.actor ? ` · ${h.actor}` : ''} {h.ok ? <Tag tone="ok">ok</Tag> : <Tag tone="warn">{`${proErrorName(h.code ?? 0)} ${h.code}`}</Tag>}
-          </li>
-        ))}
-      </ul>
+      <div className="ui-table-wrap pro-log">
+        <table className="ui-table" aria-label="Recent steps">
+          <thead>
+            <tr>
+              <th className="num">Step</th>
+              <th>Call</th>
+              <th>Account</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {last.length === 0 && (
+              <tr>
+                <td colSpan={4}>No step applied yet.</td>
+              </tr>
+            )}
+            {last.map((h) => (
+              <tr key={h.index}>
+                <td className="num">{h.index + 1}</td>
+                <td>{h.op}</td>
+                <td>{h.actor ?? ''}</td>
+                <td className={h.ok ? undefined : 'pro-warn'}>{h.ok ? 'Ok' : `${proErrorName(h.code ?? 0)} (${h.code})`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Card>
   )
 }
@@ -124,33 +136,36 @@ function Screen({ route }: { route: ProRoute }) {
   }
 }
 
+/** Strata Pro inside the main AppShell at `#/pro/...`. One disclosure banner, sub-navigation as a segmented control. */
 export default function ProApp() {
   const route = useProRoute()
   const sim = useMemo(() => new FixtureProClient(), [])
+  const title = PRO_NAV.find((n) => n.route === route)?.label ?? 'Pro'
   return (
     <ProProvider client={sim} sim={sim} defaultMe="MAKER_A">
       <div className="pro">
-        <Banners simulated />
-        <div className="pro-head">
-          <span className="pro-badge">PRO · experimental</span>
-          <nav className="pro-nav" aria-label="Pro">
-            {PRO_NAV.map((n) => (
-              <a key={n.route} href={proHref(n.route)} className={n.route === route ? 'is-on' : undefined} aria-current={n.route === route ? 'page' : undefined}>
-                {n.label}
-              </a>
-            ))}
-          </nav>
-        </div>
+        <Banner tone="warn">{PRO_SIMULATED}</Banner>
+        <PageHeader
+          title={title}
+          actions={
+            <div className="pro-subnav">
+              <Segmented
+                label="Pro"
+                options={PRO_NAV.map((n) => ({ value: n.route, label: n.label }))}
+                value={route}
+                onChange={(r) => {
+                  window.location.hash = proHref(r)
+                }}
+              />
+            </div>
+          }
+        />
         <OracleStrip />
         <Outcome />
         <div className="pro-screen">
           <Screen route={route} />
         </div>
         <SimControls />
-        <p className="pro-footnote">
-          Strata Pro is experimental and partially collateralized: payouts are paid from the writer's margin, then the vault, and can be reduced. Roles: the admin lists series; the publisher posts prices and the
-          settlement price and decides every liquidation, early exercise and payout. Parameters are illustrative.
-        </p>
       </div>
     </ProProvider>
   )

@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { config, explorerTx } from '../config'
+import { useEffect, useMemo, useState } from 'react'
+import { explorerTx } from '../config'
 import type { OptionsClient } from '../options/client'
 import type { CollateralHealth, OptionOffer } from '../options/types'
-import { requiredCollateral } from '../options/types'
-import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
+import { formatDisplay, shortAddress, strikePerUnit } from '../options/format'
 import { exerciseFeasibility, premiumUnaffordable } from '../options/feasibility'
 import { useBalances } from '../wallet/useBalances'
 import { PayoffChart } from '../payoff/PayoffChart'
@@ -12,23 +10,11 @@ import { fmtNum, fmtSigned, riskLines, strikeOf, legOf } from '../payoff/buyerPa
 import { shortfallFor } from '../reserves/reserves'
 import { ShortfallBanner } from '../reserves/ShortfallWarning'
 import type { TxOutcome } from '../state/useStrata'
-import { Button, Dialog, Icon, Mono, PayoffSketch, Sediment, Tag } from '../ui'
+import { Banner, Button, Dialog, Mono } from '../ui'
+import { formatCountdown, formatExpiryShort } from './series'
 import './market.css'
 
-type CheckState = 'pending' | 'ok' | 'fail' | 'unknown' | 'warn'
-
-function Check({ state, children }: { state: CheckState; children: ReactNode }) {
-  return (
-    <li className={`mk-check mk-check--${state}`}>
-      <span className="mk-check-icon" aria-hidden="true">
-        {state === 'ok' && <Icon name="check" size={16} strokeWidth={1.8} />}
-        {(state === 'fail' || state === 'warn') && <Icon name="alert" size={16} strokeWidth={1.6} />}
-        {(state === 'pending' || state === 'unknown') && <span className="mk-check-dot" />}
-      </span>
-      <span>{children}</span>
-    </li>
-  )
-}
+type CheckState = 'pending' | 'ok' | 'fail' | 'unknown'
 
 export function BuyDialog({
   offer,
@@ -47,7 +33,7 @@ export function BuyDialog({
   /** Runs the purchase; resolves with the outcome (the hook keeps this dialog mounted). */
   onConfirm: () => Promise<TxOutcome | null>
   onCancel: () => void
-  /** Called when this dialog displays the successful outcome itself (bottom sheet), so the app can drop the duplicate toast. */
+  /** Called when this dialog displays the successful outcome itself, so the app can drop the duplicate toast. */
   onOutcomeShown?: () => void
 }) {
   const [openCheck, setOpenCheck] = useState<CheckState>('pending')
@@ -56,7 +42,6 @@ export function BuyDialog({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ hash: string; mock: boolean } | null>(null)
-  const agreeRef = useRef<HTMLInputElement>(null)
   // "Assumed price": a what-if input, never a market price (the contract has no oracle). Defaults to the strike.
   const strikeNum = strikeOf(legOf(offer))
   const [assumedText, setAssumedText] = useState(() => String(Number(strikeNum.toFixed(4))))
@@ -92,17 +77,17 @@ export function BuyDialog({
   const tokens = useMemo(() => [offer.underlying, offer.quote], [offer.underlying, offer.quote])
   const { balances } = useBalances(me, tokens)
   const feasibility = exerciseFeasibility(offer, balances[u.contractId], balances[q.contractId])
-  const cannotPay = premiumUnaffordable(offer, balances[q.contractId])
-  const qty = `${formatDisplay(offer.underlyingQty, u.decimals)} ${u.code}`
-  const strike = `${formatDisplay(offer.totalStrike, q.decimals)} ${q.code}`
+  const quoteBal = balances[q.contractId]
+  const cannotPay = premiumUnaffordable(offer, quoteBal)
+  const kind = offer.kind === 'put' ? 'Put' : 'Call'
   const premium = formatDisplay(offer.totalPremium, q.decimals)
-  const col = requiredCollateral(offer)
-  const locked = `${formatDisplay(col.amount, col.token.decimals)} ${col.token.code} locked`
-  const kindWord = offer.kind === 'put' ? 'sell' : 'buy'
+  // Display only, exact in bigint: premium per one unit of underlying.
+  const premiumUnit =
+    offer.underlyingQty === 0n ? '–' : formatDisplay((offer.totalPremium * 10n ** BigInt(u.decimals)) / offer.underlyingQty, q.decimals)
   const blocked = openCheck === 'fail' || eligCheck === 'fail' || cannotPay
   const short = shortfallFor(offer, health)
   const risk = riskLines(offer, assumed)
-  const where = client.isMock ? 'in the mock contract' : 'on-chain'
+  const title = `Buy ${u.code} ${offer.kind}`
 
   const close = () => {
     if (!submitting) onCancel()
@@ -115,8 +100,8 @@ export function BuyDialog({
     setSubmitting(false)
     if (res?.ok) {
       setDone({ hash: res.hash, mock: res.mock })
-      // On phones the confirmation is a bottom sheet that already shows the tx; the toast would overlap it.
-      if (window.matchMedia('(max-width: 640px)').matches) onOutcomeShown?.()
+      // The confirmed step already shows the tx, so the app drops its duplicate toast (phones and desktop).
+      onOutcomeShown?.()
     } else setError(res?.error ?? 'The purchase could not be submitted.')
   }
 
@@ -128,7 +113,7 @@ export function BuyDialog({
   if (done) {
     return (
       <Dialog
-        title="Purchase confirmed"
+        title={title}
         width={460}
         onClose={onCancel}
         footer={
@@ -137,164 +122,84 @@ export function BuyDialog({
               Back to markets
             </Button>
             <Button variant="primary" onClick={goPortfolio}>
-              View in portfolio
+              View in positions
             </Button>
           </>
         }
       >
-        <div className="mk-done">
-          <span className="mk-done-icon" aria-hidden="true">
-            <Icon name="check" size={24} strokeWidth={2} />
-          </span>
-          <h3 className="mk-done-title ui-display">
-            You hold a {u.code} {offer.kind}
-          </h3>
-          <p className="mk-muted">
-            You can {kindWord} {qty} for {strike} at any time until {formatExpiry(offer.expiry)}.
-          </p>
-        </div>
-        <dl className="mk-rows">
-          <div>
-            <dt>Premium paid</dt>
-            <dd>
-              {premium} {q.code}
-            </dd>
-          </div>
-          <div>
-            <dt>Maker</dt>
-            <dd>
-              <Mono>{shortAddress(offer.writer)}</Mono>
-            </dd>
-          </div>
-          <div>
-            <dt>Collateral</dt>
-            <dd>{locked}</dd>
-          </div>
-          <div>
-            <dt>Transaction</dt>
-            <dd>
-              {done.mock ? (
-                <Mono>{done.hash.slice(0, 12)}… (mock)</Mono>
-              ) : (
-                <a className="ui-mono" href={explorerTx(done.hash)} target="_blank" rel="noreferrer">
-                  {done.hash.slice(0, 12)}… <Icon name="external" size={12} />
-                </a>
-              )}
-            </dd>
-          </div>
-        </dl>
+        <p className="mk-done">Bought. Position {offer.id.toString()}</p>
+        {done.hash && (
+          <dl className="ui-kv">
+            <div>
+              <dt>Transaction</dt>
+              <dd>
+                {done.mock ? (
+                  <>
+                    <Mono title={done.hash}>{done.hash.slice(0, 12)}…</Mono> <span className="mk-muted">(mock)</span>
+                  </>
+                ) : (
+                  <a className="ui-mono" href={explorerTx(done.hash)} target="_blank" rel="noreferrer" title={done.hash}>
+                    {done.hash.slice(0, 12)}…
+                  </a>
+                )}
+              </dd>
+            </div>
+          </dl>
+        )}
       </Dialog>
     )
   }
 
   return (
     <Dialog
-      title="Review purchase"
+      title={title}
       width={520}
       onClose={close}
-      initialFocusRef={agreeRef}
       footer={
         <>
           <Button variant="secondary" onClick={close} disabled={submitting} aria-label="Cancel purchase">
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            loading={submitting}
-            disabled={!agreed || blocked}
-            onClick={() => void confirm()}
-          >
-            {submitting ? 'Confirm in wallet…' : `Sign and buy for ${premium} ${q.code}`}
+          <Button variant="primary" loading={submitting} disabled={!agreed || blocked} onClick={() => void confirm()}>
+            {submitting ? 'Confirm in wallet…' : `Buy for ${premium} ${q.code}`}
           </Button>
         </>
       }
     >
-      <div className="mk-review-head">
-        <div className="mk-thumb mk-thumb--sm">
-          <Sediment seed={u.code} size="thumb" tone={offer.kind === 'put' ? 'amber' : 'blue'} />
+      <dl className="ui-kv">
+        <div>
+          <dt>Underlying</dt>
+          <dd>{u.code}</dd>
         </div>
-        <div className="mk-review-main">
-          <div className="mk-review-title">
-            <span className="mk-code">{u.code}</span> <Tag tone={offer.kind}>{offer.kind.toUpperCase()}</Tag>
-          </div>
-          <div className="mk-muted-sm">
-            Strike {strikePerUnit(offer)} {q.code} · Expires {formatExpiry(offer.expiry)}
-          </div>
+        <div>
+          <dt>Kind</dt>
+          <dd>{kind}</dd>
         </div>
-        <PayoffSketch kind={offer.kind} strikeLabel={strikePerUnit(offer)} asset={u.code} compact className="mk-payoff" />
-      </div>
-
-      <div className="mk-hero">
-        <span className="mk-label">You pay now</span>
-        <span className="mk-hero-amount ui-num">
-          {premium} <span className="mk-hero-unit">{q.code}</span>
-        </span>
-        <span className="mk-muted mk-hero-note">
-          For the right to {kindWord} <b>{qty}</b> for <b>{strike}</b> at any time until expiry.
-        </span>
-      </div>
-
-      {short.map((t) => (
-        <ShortfallBanner key={t.contractId} token={t} />
-      ))}
-
-      <section className="po-section" aria-label="Payoff and risk">
-        <span className="mk-label">If you hold to expiry</span>
-        <div className="po-controls">
-          <label className="mk-label" htmlFor="assumed-price">
-            Assumed price ({q.code} per {u.code})
-          </label>
-          <div className="po-controls-row">
-            <input
-              type="range"
-              aria-label="Assumed price slider"
-              min={strikeNum * 0.5}
-              max={strikeNum * 1.5}
-              step={strikeNum / 200}
-              value={Math.min(Math.max(assumed, strikeNum * 0.5), strikeNum * 1.5)}
-              onChange={(e) => setAssumedText(String(Number(Number(e.target.value).toFixed(4))))}
-            />
-            <input
-              id="assumed-price"
-              className="po-num"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="any"
-              value={assumedText}
-              onChange={(e) => setAssumedText(e.target.value)}
-            />
-          </div>
-          <span className="po-hint">A what-if value you choose, starting at the strike. The contract has no oracle: this is not a market price.</span>
+        <div>
+          <dt>Qty</dt>
+          <dd className="num">
+            {formatDisplay(offer.underlyingQty, u.decimals)} {u.code}
+          </dd>
         </div>
-        <PayoffChart offer={offer} assumed={assumed} />
-        <dl className="mk-rows po-risk">
-          <div>
-            <dt>Premium (max loss)</dt>
-            <dd>
-              {fmtNum(risk.maxLoss)} {q.code} · {fmtNum(risk.premiumPerUnit)} / {u.code}
-            </dd>
-          </div>
-          <div>
-            <dt>Break-even</dt>
-            <dd>
-              {fmtNum(risk.breakeven)} {q.code} / {u.code}
-            </dd>
-          </div>
-          <div>
-            <dt>Max gain</dt>
-            <dd>{risk.maxGain === null ? 'Unlimited' : `${fmtNum(risk.maxGain)} ${q.code}`}</dd>
-          </div>
-          <div>
-            <dt>P&amp;L at assumed price {fmtNum(assumed)} (hypothetical)</dt>
-            <dd className={risk.pnlAtAssumed >= 0 ? 'po-pos' : 'po-neg'} data-testid="pnl-at-assumed">
-              {fmtSigned(risk.pnlAtAssumed)} {q.code}
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <dl className="mk-rows">
+        <div>
+          <dt>Strike</dt>
+          <dd className="num">
+            {strikePerUnit(offer)} {q.code} per {u.code}, {formatDisplay(offer.totalStrike, q.decimals)} {q.code} total
+          </dd>
+        </div>
+        <div>
+          <dt>Expiry</dt>
+          <dd>
+            {formatExpiryShort(offer.expiry)} <span className="mk-muted">{formatCountdown(offer.expiry)}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Premium</dt>
+          <dd className="num">
+            {premiumUnit} {q.code} per {u.code}, {premium} {q.code} total
+            <span className="mk-note">Paid to the maker now. Not refundable.</span>
+          </dd>
+        </div>
         <div>
           <dt>Maker</dt>
           <dd>
@@ -302,76 +207,96 @@ export function BuyDialog({
           </dd>
         </div>
         <div>
-          <dt>Collateral backing this option</dt>
-          <dd>
-            {locked}
-            {config.optionsContractId && (
-              <a className="mk-verify" href={`https://stellar.expert/explorer/testnet/contract/${config.optionsContractId}`} target="_blank" rel="noreferrer">
-                Verify <Icon name="external" size={12} />
-              </a>
-            )}
+          <dt>Offer</dt>
+          <dd className={openCheck === 'fail' ? 'mk-bad' : undefined}>
+            {openCheck === 'ok' && 'Open'}
+            {openCheck === 'pending' && 'Checking'}
+            {openCheck === 'fail' && 'No longer open. Pick another offer.'}
+            {openCheck === 'unknown' && 'Could not re-check. The contract rejects the purchase if it is gone.'}
           </dd>
         </div>
         <div>
-          <dt>Exercise window</dt>
-          <dd>Now → {formatExpiry(offer.expiry)}</dd>
-        </div>
-        <div>
-          <dt>Settlement</dt>
-          <dd>Physical, atomic delivery vs payment</dd>
-        </div>
-        <div>
-          <dt>Network fee</dt>
-          <dd className="mk-muted">Shown in your wallet before signing</dd>
+          <dt>Your account</dt>
+          <dd className={eligCheck === 'fail' ? 'mk-bad' : undefined}>
+            {eligCheck === 'ok' && `Authorized by the ${u.code} issuer`}
+            {eligCheck === 'pending' && 'Checking'}
+            {eligCheck === 'fail' && `Not authorized by the ${u.code} issuer. The purchase would fail with NotEligible.`}
+            {eligCheck === 'unknown' && 'Could not check'}
+          </dd>
         </div>
       </dl>
 
-      <div className="mk-checks">
-        <span className="mk-label">Pre-trade checks</span>
-        <ul>
-          <Check state={openCheck}>
-            {openCheck === 'ok' && `Offer is still open ${where}`}
-            {openCheck === 'pending' && 'Checking that the offer is still open…'}
-            {openCheck === 'fail' && 'This offer is no longer open. Close this dialog and pick another.'}
-            {openCheck === 'unknown' && 'Could not re-check the offer; the contract will reject the purchase if it is gone.'}
-          </Check>
-          <Check state={eligCheck}>
-            {eligCheck === 'ok' && `Your account is authorized by the ${u.code} issuer`}
-            {eligCheck === 'pending' && `Checking ${u.code} issuer authorization…`}
-            {eligCheck === 'fail' && `Your account is not authorized by the ${u.code} issuer; the purchase would fail with NotEligible.`}
-            {eligCheck === 'unknown' && `Could not check ${u.code} issuer authorization.`}
-          </Check>
-          {feasibility.level === 'warn' && <Check state="warn">{feasibility.message}</Check>}
-          <Check state={openCheck === 'ok' ? 'ok' : openCheck === 'fail' ? 'fail' : 'pending'}>
-            {openCheck === 'fail' ? 'Collateral is no longer locked for this offer' : 'Collateral is fully locked in the contract'}
-          </Check>
-        </ul>
-      </div>
+      <section className="po-section" aria-label="Payoff">
+        <label className="po-label" htmlFor="assumed-price">
+          Assumed price ({q.code} per {u.code})
+        </label>
+        <div className="po-controls-row">
+          <input
+            type="range"
+            aria-label="Assumed price slider"
+            min={strikeNum * 0.5}
+            max={strikeNum * 1.5}
+            step={strikeNum / 200}
+            value={Math.min(Math.max(assumed, strikeNum * 0.5), strikeNum * 1.5)}
+            onChange={(e) => setAssumedText(String(Number(Number(e.target.value).toFixed(4))))}
+          />
+          <input
+            id="assumed-price"
+            className="po-num"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            value={assumedText}
+            onChange={(e) => setAssumedText(e.target.value)}
+          />
+        </div>
+        <PayoffChart offer={offer} assumed={assumed} />
+        <dl className="ui-kv">
+          <div>
+            <dt>Break-even</dt>
+            <dd className="num">
+              {fmtNum(risk.breakeven)} {q.code} per {u.code}
+            </dd>
+          </div>
+          <div>
+            <dt>Max loss</dt>
+            <dd className="num">
+              {fmtNum(risk.maxLoss)} {q.code}
+            </dd>
+          </div>
+          <div>
+            <dt>Max gain</dt>
+            <dd className="num">{risk.maxGain === null ? 'Unlimited' : `${fmtNum(risk.maxGain)} ${q.code}`}</dd>
+          </div>
+          <div>
+            <dt>P&amp;L at {fmtNum(assumed)}</dt>
+            <dd className="num" data-testid="pnl-at-assumed">
+              {fmtSigned(risk.pnlAtAssumed)} {q.code}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
-      <div className="mk-terms">
-        <p>Your premium is paid to the maker immediately at purchase. It is not refunded if the option expires worthless or if settlement is blocked by issuer action.</p>
-        <p>
-          Physically settled. Issuer controls on regulated assets (freeze, clawback) can block settlement; the collateral lock does not protect against issuer
-          action.
-        </p>
-      </div>
+      <p className="mk-muted mk-issuer">
+        The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.
+      </p>
+
+      {short.map((t) => (
+        <ShortfallBanner key={t.contractId} token={t} />
+      ))}
+      {feasibility.level === 'warn' && <Banner tone="warn">{feasibility.message}</Banner>}
+      {cannotPay && quoteBal?.balance != null && (
+        <Banner tone="danger">
+          Need {premium} {q.code}, wallet has {formatDisplay(quoteBal.balance, q.decimals)}.
+        </Banner>
+      )}
+      {error && <Banner tone="danger">{error}</Banner>}
 
       <label className="mk-agree">
-        <input ref={agreeRef} type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} disabled={submitting} />
-        <span>I understand the premium is non-refundable and the issuer risks above.</span>
+        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} disabled={submitting} />
+        <span>I understand the terms above.</span>
       </label>
-
-      {cannotPay && (
-        <p className="mk-error" role="alert">
-          Your {q.code} balance is lower than the {premium} {q.code} premium, so this purchase is disabled.
-        </p>
-      )}
-
-      {error && (
-        <p className="mk-error" role="alert">
-          {error}
-        </p>
-      )}
     </Dialog>
   )
 }

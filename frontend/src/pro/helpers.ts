@@ -2,13 +2,14 @@ import { DASH, duration, usdx } from './format'
 import type { ProModel, SeriesView } from './types'
 
 export function seriesLabel(s: SeriesView | undefined): string {
-  return s ? `Series ${s.id} · strike ${usdx(s.strike, 2)}` : DASH
+  return s ? `Series ${s.id}, strike ${usdx(s.strike)}` : DASH
 }
 
-export function seriesStatus(s: SeriesView, now: number): { label: string; tone: 'ok' | 'warn' | 'neutral' | 'call' } {
-  if (s.closed) return { label: 'Closed', tone: 'neutral' }
-  if (now >= s.expiry) return s.settlementPrice == null ? { label: 'Expired, no price yet', tone: 'warn' } : { label: 'Settling', tone: 'warn' }
-  return { label: 'Live', tone: 'call' }
+/** Series state word, and whether it needs an action (shown in the warn tone). */
+export function seriesStatus(s: SeriesView, now: number): { label: string; warn: boolean } {
+  if (s.closed) return { label: 'Closed', warn: false }
+  if (now >= s.expiry) return s.settlementPrice == null ? { label: 'Expired', warn: true } : { label: 'Settling', warn: true }
+  return { label: 'Live', warn: false }
 }
 
 export function snapshotAge(model: ProModel, s: SeriesView): number | null {

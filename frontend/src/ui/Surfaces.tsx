@@ -1,11 +1,9 @@
 import { useId } from 'react'
 import type { HTMLAttributes, ReactNode } from 'react'
-import { Icon } from './Icon'
 
-/** Bordered surface. `header` renders a title row (title left, `actions` right) above the body. */
+/** Flat bordered box for one discrete object (a form, an order review). Optional title row with actions at right. */
 export function Card({
   title,
-  subtitle,
   actions,
   flush,
   className,
@@ -13,19 +11,15 @@ export function Card({
   ...rest
 }: Omit<HTMLAttributes<HTMLElement>, 'title'> & {
   title?: ReactNode
-  subtitle?: ReactNode
   actions?: ReactNode
   /** Remove body padding (use when the body is a full-bleed `.ui-table`). */
   flush?: boolean
 }) {
   return (
-    <section className={['ui-card', className].filter(Boolean).join(' ')} {...rest}>
+    <section className={['ui-card', flush && 'ui-card--flush', className].filter(Boolean).join(' ')} {...rest}>
       {(title || actions) && (
         <header className="ui-card-header">
-          <div className="ui-card-heading">
-            {title && <h2 className="ui-card-title">{title}</h2>}
-            {subtitle && <p className="ui-card-sub">{subtitle}</p>}
-          </div>
+          {title && <h2 className="ui-card-title">{title}</h2>}
           {actions && <div className="ui-card-actions">{actions}</div>}
         </header>
       )}
@@ -34,30 +28,23 @@ export function Card({
   )
 }
 
-/** Page title block used at the top of every view. */
-export function PageHeader({ title, subtitle, actions }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode }) {
+/** Page title: h1 left, actions right. First child of every view. */
+export function PageHeader({ title, actions }: { title: ReactNode; actions?: ReactNode }) {
   return (
     <div className="ui-page-header">
-      <div>
-        <h1>{title}</h1>
-        {subtitle && <p className="ui-page-sub">{subtitle}</p>}
-      </div>
+      <h1>{title}</h1>
       {actions && <div className="ui-page-actions">{actions}</div>}
     </div>
   )
 }
 
-/** KPI strip: a bordered grid of `Stat`s separated by 1px rules. Collapses to one column on phones. */
+/** A row of `Stat`s with one hairline under it. One column on phones. */
 export function StatGrid({ children, columns = 3 }: { children: ReactNode; columns?: 2 | 3 | 4 }) {
-  return (
-    <div className={`ui-stat-grid ui-stat-grid--${columns}`}>
-      {children}
-    </div>
-  )
+  return <div className={`ui-stat-grid ui-stat-grid--${columns}`}>{children}</div>
 }
 
-/** One KPI. Exposed as a labelled group so tests and screen readers can address it by its label. */
-export function Stat({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
+/** Label above value. A `role="group"` named by its label, so tests and screen readers can address it. */
+export function Stat({ label, children }: { label: string; children: ReactNode }) {
   const id = useId()
   return (
     <div className="ui-stat" role="group" aria-labelledby={id}>
@@ -65,32 +52,17 @@ export function Stat({ label, children, hint }: { label: string; children: React
         {label}
       </span>
       <span className="ui-stat-value">{children}</span>
-      {hint && <span className="ui-stat-hint">{hint}</span>}
     </div>
   )
 }
 
-export type BannerTone = 'warn' | 'ok' | 'danger' | 'info'
+export type BannerTone = 'warn' | 'danger' | 'neutral'
 
-/** Inline banner. danger uses role=alert, others role=note. Text carries the meaning, colour is secondary. */
-export function Banner({
-  tone = 'info',
-  children,
-  className,
-  title,
-}: {
-  tone?: BannerTone
-  children: ReactNode
-  className?: string
-  title?: ReactNode
-}) {
+/** One-line notice with a 2px left border in the tone colour. danger is role=alert, others role=note. */
+export function Banner({ tone = 'neutral', children, className }: { tone?: BannerTone; children: ReactNode; className?: string }) {
   return (
     <div className={['ui-banner', `ui-banner--${tone}`, className].filter(Boolean).join(' ')} role={tone === 'danger' ? 'alert' : 'note'}>
-      <Icon name={tone === 'ok' ? 'check' : 'alert'} size={15} className="ui-banner-icon" />
-      <div className="ui-banner-body">
-        {title && <strong className="ui-banner-title">{title}</strong>}
-        {children}
-      </div>
+      {children}
     </div>
   )
 }

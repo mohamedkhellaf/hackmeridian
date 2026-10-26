@@ -7,29 +7,42 @@ body.present .content {
 }
 body.present .shell-footer {
   font-size: 0.8em;
+  padding-bottom: 64px;
 }
 
 .present-caption {
   position: fixed;
-  left: 50%;
+  left: 16px;
+  right: 16px;
   bottom: 12px;
-  transform: translateX(-50%);
   z-index: 1000;
   display: flex;
   gap: 16px;
   align-items: baseline;
-  max-width: calc(100vw - 32px);
-  padding: 8px 18px;
-  border-radius: 999px;
-  background: rgba(20, 20, 28, 0.82);
-  color: #fff;
-  font-size: 16px;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
   pointer-events: none;
 }
 .present-title {
   font-weight: 600;
 }
 .present-meta {
-  opacity: 0.6;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Keep the caption above the mobile tab bar (48px plus its top border). */
+@media (max-width: 768px) {
+  .present-caption {
+    bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+  body.present .shell-footer {
+    padding-bottom: calc(124px + env(safe-area-inset-bottom));
+  }
 }

@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode, RefObject } from 'react'
 import { Icon } from './Icon'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /**
- * Modal dialog. Centered on desktop, bottom sheet on <= 640px (CSS only).
+ * Modal dialog. Centered on desktop, bottom sheet on <= 640px (CSS only). The body opens scrolled to the top.
  * Escape and backdrop click call `onClose`; focus moves inside on open, is trapped with Tab, and is restored on close.
  * Mount it conditionally: `{open && <Dialog ...>}`.
  */
@@ -30,6 +31,7 @@ export function Dialog({
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
   useEffect(() => {
     onCloseRef.current = onClose
@@ -37,7 +39,9 @@ export function Dialog({
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
-    ;(initialFocusRef?.current ?? closeRef.current ?? panelRef.current)?.focus()
+    ;(initialFocusRef?.current ?? closeRef.current ?? panelRef.current)?.focus({ preventScroll: true })
+    // Open at the top of the body even when the first focusable element sits further down.
+    if (bodyRef.current) bodyRef.current.scrollTop = 0
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
@@ -68,7 +72,8 @@ export function Dialog({
     }
   }, [initialFocusRef])
 
-  return (
+  // Portal to <body> so a sticky/stacked ancestor (the top bar) cannot trap the dialog under the tab bar.
+  return createPortal(
     <div className="ui-dialog-backdrop" onClick={() => onClose()}>
       <div
         ref={panelRef}
@@ -80,7 +85,6 @@ export function Dialog({
         style={{ maxWidth: width }}
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="ui-dialog-grabber" aria-hidden="true" />
         <div className="ui-dialog-head">
           <h2 id={titleId} className="ui-dialog-title">
             {title}
@@ -89,9 +93,10 @@ export function Dialog({
             <Icon name="close" />
           </button>
         </div>
-        <div className="ui-dialog-body">{children}</div>
+        <div ref={bodyRef} className="ui-dialog-body">{children}</div>
         {footer && <div className="ui-dialog-footer">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

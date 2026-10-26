@@ -14,7 +14,7 @@ export const SCENES: readonly Scene[] = [
   { id: 'exercise', title: '5. Exercise: atomic delivery-versus-payment', start: 80 },
   { id: 'claim', title: '6. Writer claims the delivered asset', start: 110 },
   { id: 'issuer', title: '7. Issuer freezes the holder: exercise fails (limitation)', start: 125 },
-  { id: 'collateral', title: '8. Collateral panel: full backing, clawback warning', start: 155 },
+  { id: 'collateral', title: '8. Collateral page: owed and held per token, clawback shortfall', start: 155 },
   { id: 'close', title: '9. What is real, what is fictional', start: 170 },
 ]
 
