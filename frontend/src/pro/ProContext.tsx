@@ -18,10 +18,11 @@ export function ProProvider({ client, sim, defaultMe, children }: { client: ProC
         : {
             label,
             ok: false,
-            text: r.code === 0 ? 'Not available in this simulation.' : proErrorMessage(r.code),
-            code: r.code === 0 ? null : r.code,
-            name: r.name,
-            note: r.note ?? null,
+            // code 0: no scripted step (fixtures); code < 0: not a contract refusal (wallet, network), the note says why.
+            text: r.code === 0 ? 'Not available in this simulation.' : r.code < 0 ? (r.note ?? 'The transaction failed.') : proErrorMessage(r.code),
+            code: r.code <= 0 ? null : r.code,
+            name: r.code < 0 ? null : r.name,
+            note: r.code < 0 ? null : (r.note ?? null),
           },
     )
     return r
