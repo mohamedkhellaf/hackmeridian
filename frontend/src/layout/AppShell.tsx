@@ -4,6 +4,7 @@ import { Button, Dialog, Icon, Mono, StatusDot } from '../ui'
 import { shortAddress } from '../options/format'
 import { hrefFor, NAV_TABS, NAV_TRADE, NAV_TRANSPARENCY, PRO_ENABLED } from './routes'
 import type { NavItem, Route } from './routes'
+import type { NetworkStatus } from './useNetworkStatus'
 import './layout.css'
 
 export const DEMO_TEXT = 'Demo environment on Stellar Testnet. Assets and makers are fictional; no real funds are involved.'
@@ -126,6 +127,35 @@ export function WalletChip({
   )
 }
 
+/** Slim status bar at the foot of the main column (desktop only; hidden on phones to keep the tab bar clear). */
+export function StatusBar({ mock, contractId, network }: { mock: boolean; contractId?: string; network?: NetworkStatus | null }) {
+  if (mock || !contractId) {
+    return (
+      <div className="statusbar" role="contentinfo" aria-label="Network status">
+        <StatusDot tone="warn" />
+        <span>Mock mode · no contract</span>
+      </div>
+    )
+  }
+  const rpc = network?.rpc ?? 'unknown'
+  return (
+    <div className="statusbar" role="contentinfo" aria-label="Network status">
+      <span>Stellar Testnet</span>
+      <span aria-hidden="true">·</span>
+      <span>ledger {network?.ledger != null ? network.ledger.toLocaleString('en-US') : '…'}</span>
+      <span aria-hidden="true">·</span>
+      <span className="statusbar-rpc">
+        <StatusDot tone={rpc === 'ok' ? 'ok' : rpc === 'degraded' ? 'warn' : 'neutral'} />
+        RPC {rpc === 'ok' ? 'ok' : rpc === 'degraded' ? 'degraded' : 'checking'}
+      </span>
+      <span aria-hidden="true">·</span>
+      <span>
+        contract <Mono title={contractId}>{shortAddress(contractId)}</Mono>
+      </span>
+    </div>
+  )
+}
+
 export interface AppShellProps {
   route: Route
   /** Count shown on the Portfolio link/tab: actions waiting for the connected wallet. */
@@ -139,6 +169,8 @@ export interface AppShellProps {
    * `ok` = held covers reserved for every token. Omit (null) when unknown or in mock mode.
    */
   backing?: { ok: boolean; ledger: number | null } | null
+  /** Real mode only: RPC reachability and latest ledger for the status bar. */
+  network?: NetworkStatus | null
   /** Token balances for the top bar. */
   balances?: ReactNode
   /** Wallet chip / connect button. */
@@ -151,7 +183,7 @@ export interface AppShellProps {
  * Desktop: left sidebar + top bar + content. Phones (<= 768px): sidebar hidden, bottom tab bar
  * (Markets, Write, Portfolio, Reserves) and an Issuer shortcut in the top bar.
  */
-export function AppShell({ route, portfolioBadge, mock, contractId, backing, balances, wallet, children }: AppShellProps) {
+export function AppShell({ route, portfolioBadge, mock, contractId, backing, network, balances, wallet, children }: AppShellProps) {
   return (
     <div className="shell">
       <div className="demo-banner">
@@ -227,6 +259,7 @@ export function AppShell({ route, portfolioBadge, mock, contractId, backing, bal
               against issuer action.
             </footer>
           )}
+          <StatusBar mock={mock} contractId={contractId} network={network} />
         </div>
       </div>
 

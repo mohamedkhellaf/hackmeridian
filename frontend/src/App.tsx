@@ -4,6 +4,7 @@ import { config } from './config'
 import { BuyDialog } from './market/BuyDialog'
 import { AppShell, WalletChip } from './layout/AppShell'
 import { useHashRoute } from './layout/routes'
+import { useNetworkStatus } from './layout/useNetworkStatus'
 import { useReadAt } from './reserves/useReadAt'
 import { useStrata } from './state/useStrata'
 import { Banner, NoticeToast } from './ui'
@@ -11,6 +12,7 @@ import { BalancesBar } from './wallet/BalancesBar'
 import { IssuerView } from './views/IssuerView'
 import { MarketsView } from './views/MarketsView'
 import { PortfolioView } from './views/PortfolioView'
+import { ProtectView } from './views/ProtectView'
 import { ReservesView } from './views/ReservesView'
 import { WriteView } from './views/WriteView'
 import './App.css'
@@ -23,6 +25,7 @@ function App() {
   const [route] = useHashRoute()
   const { wallet, me } = s
   const { ledger } = useReadAt(s.collateral, s.health, !s.isMock)
+  const network = useNetworkStatus(!s.isMock)
   const backing = !s.isMock && s.health.length > 0 ? { ok: s.health.every((h) => h.held >= h.reserved), ledger } : null
 
   // Real mode only: in mock mode the demo banner already says the data is fictional.
@@ -45,6 +48,7 @@ function App() {
         mock={s.isMock}
         contractId={config.optionsContractId}
         backing={backing}
+        network={s.isMock ? null : network}
         balances={
           !s.isMock && me && s.assets ? (
             <BalancesBar
@@ -80,6 +84,9 @@ function App() {
             health={s.health}
             mock={s.isMock}
           />
+        )}
+        {route === 'protect' && (
+          <ProtectView assets={s.assets} offers={s.market} me={me} balances={s.balances.balances} mock={s.isMock} busy={s.busy} onBuy={s.setBuying} />
         )}
         {route === 'write' && <WriteView assets={s.assets} client={s.client} me={me} busy={s.busy} onSubmit={s.writeOffer} />}
         {route === 'portfolio' && <PortfolioView me={me} rows={s.positions} actionFor={s.actionFor} health={s.health} />}

@@ -8,11 +8,13 @@
 # Reads option_count, calls get_option for every id and collects the ids whose state is Offered, Active or
 # Exercised (terminal Settled/Expired/Cancelled options hold no funds and are left to expire). Then calls
 # extend_ttl(ids) from strata-deployer in batches of 20; with no live option it still sends one extend_ttl([]),
-# which extends the contract instance and code (contract-abi.md §8). extend_ttl only bumps entries whose TTL is below
-# 7 days (to 30 days), so re-running is harmless: same calls, no state change. Every call is submitted with
-# --send=yes (the CLI skips calls it simulates as read-only, which extend_ttl is while every TTL is above 7 days).
-# Prints every tx hash
-# ("TX EXTEND_TTL_<n> <hash>", also appended to scripts/out/tx-log.tsv); full output in scripts/out/extend-ttl-*.log.
+# which extends the contract instance and code (contract-abi.md §8). On v1.3.1 each call also covers, per id, the
+# underlying's Listed and OpenFor entries and the writer's WriterOpen entry, plus the first 50 registry entries
+# (AssetAt and their Listed; §13.5); a 20-id batch stays far below the testnet footprint limit (400 entries).
+# extend_ttl only bumps entries whose TTL is below 7 days (to 30 days), so re-running is harmless: same calls, no
+# state change. Every call is submitted with --send=yes (the CLI skips calls it simulates as read-only, which
+# extend_ttl is while every TTL is above 7 days). Prints every tx hash ("TX EXTEND_TTL_<n> <hash>", also appended
+# to scripts/out/tx-log.tsv); full output in scripts/out/extend-ttl-*.log.
 set -uo pipefail
 
 # shellcheck source=../lib/common.sh
@@ -22,7 +24,7 @@ require_tools stellar jq
 BATCH=20
 case "${1:-}" in
   -h | --help)
-    sed -n '2,15p' "$0"
+    sed -n '2,17p' "$0"
     exit 0
     ;;
 esac

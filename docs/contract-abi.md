@@ -1,6 +1,6 @@
 # `options` contract ABI (locked)
 
-**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11.** This file is the data and function contract between the
+**Status: LOCKED by Dev 2 on 2026-10-25 18:30 Lisbon; §6, §8 and §10 clarified 19:25 after static analysis; v1.1 hardening (error renumber 101+, two appended codes, three extra preconditions) decided 19:26, see §10; v1.2 additions (transfer, get_options, OptionTransferred, SEP-55 meta) decided 20:05, see §11; v1.3 (permissionless listing, per-writer cap, prune_expired, tenor cap, backstop) decided 22:10, see §12; v1.3.1 corrections (pruner argument, transfer guards, per-asset open books, keeper coverage) decided 2026-10-26 00:20, see §13.** This file is the data and function contract between the
 Soroban contract (`contracts/options/`), the frontend (Dev 3) and the financial packages (Dev 1).
 Workers must not rename, add, remove or reorder anything in sections 2–5 without asking Dev 2.
 The compiled contract spec (`stellar contract bindings typescript`) is authoritative once deployed; any
@@ -40,7 +40,7 @@ pub enum State {
 #[contracttype] #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptionData {
     pub id: u32,
-    pub underlying: Address,      // SAC of the tokenized asset (allowlisted in the constructor)
+    pub underlying: Address,      // SAC of the tokenized asset (in the asset registry: constructor seed + list_asset since v1.3)
     pub quote: Address,           // SAC of the quote token (USDx), same for every option
     pub option_type: OptionType,
     pub qty: i128,                // total underlying quantity (> 0)
@@ -61,10 +61,10 @@ pub struct Config {
 #[contracterror] #[derive(Copy, Clone, Debug, Eq, PartialEq)] #[repr(u32)]
 pub enum Error {
     NotFound = 101,               // unknown option id
-    InvalidArgs = 102,            // qty/strike_total/premium_total <= 0, or expiry <= now; v1.2: transfer to self (to == holder)
-    AssetNotAllowed = 103,        // underlying not in the constructor allowlist
+    InvalidArgs = 102,            // qty/strike_total/premium_total <= 0, or expiry <= now; v1.2: transfer to self (to == holder); v1.3: a party argument is the contract itself (backstop), or list_asset got a bad code or a non-account issuer
+    AssetNotAllowed = 103,        // underlying not in the asset registry (constructor seed + list_asset since v1.3)
     NotEligible = 104,            // writer/buyer not authorized on the underlying SAC, or writer has no quote trustline (§6); v1.2: transfer recipient not authorized on the underlying
-    ContractNotAuthorized = 105,  // the contract itself is not authorized to hold the underlying (checked at create_offer AND buy)
+    ContractNotAuthorized = 105,  // the contract itself is not authorized to hold the underlying (checked at create_offer, buy and, v1.3.1, transfer)
     WrongState = 106,             // action not valid in the option's current State
     NotWriter = 107,              // caller is not the option's writer
     NotHolder = 108,              // caller is not the option's holder
@@ -73,8 +73,12 @@ pub enum Error {
     SelfTrade = 111,              // writer tried to buy their own offer; v1.2: transfer to the writer
     Overflow = 112,               // checked i128 math failed
     InvalidConfig = 113,          // constructor: empty/duplicate/too many underlyings, or quote in underlyings
-    OpenListFull = 114,           // create_offer: MAX_OPEN (1000) offers are already in state Offered
-    CollateralShortfall = 115,    // create_offer/buy: SAC balance(contract) < open_collateral(token) for a token of this option
+    OpenListFull = 114,           // create_offer: this underlying's open book already holds MAX_OPEN_PER_ASSET (500) Offered ids (v1.3.1; v1.1-v1.3: global MAX_OPEN = 1000)
+    CollateralShortfall = 115,    // create_offer/buy and (v1.3.1) transfer: SAC balance(contract) < open_collateral(token) for a token of this option
+    WriterOpenLimit = 116,        // v1.3 create_offer: this writer already has MAX_OPEN_PER_WRITER (50) offers in state Offered
+    AlreadyListed = 117,          // v1.3 list_asset: the derived SAC is already listed (or is the quote token)
+    AssetNotDeployed = 118,       // v1.3 list_asset: the canonical SAC for (code, issuer) is not deployed on this network
+    TenorOutOfRange = 119,        // v1.3 create_offer: expiry > now + MAX_TENOR (2 years)
 }
 ```
 
@@ -117,6 +121,15 @@ pub fn extend_ttl(env: Env, ids: Vec<u32>) -> Result<(), Error>;
 // v1.2 additions (see §11)
 pub fn transfer(env: Env, holder: Address, to: Address, id: u32) -> Result<(), Error>;
 pub fn get_options(env: Env, from: u32, limit: u32) -> Vec<OptionData>;
+// v1.3 additions (see §12)
+pub fn list_asset(env: Env, lister: Address, code: String, issuer: Address) -> Result<Address, Error>;
+pub fn is_listed(env: Env, token: Address) -> bool;
+pub fn list_assets(env: Env, from: u32, limit: u32) -> Vec<Address>;
+pub fn asset_count(env: Env) -> u32;
+pub fn prune_expired(env: Env, pruner: Address, ids: Vec<u32>) -> Result<u32, Error>;   // v1.3.1: pruner added
+pub fn writer_open_count(env: Env, writer: Address) -> u32;
+// v1.3.1 additions (see §13)
+pub fn list_open_for(env: Env, asset: Address, from: u32, limit: u32) -> Vec<u32>;
 ```
 
 Check order inside every state-changing function is fixed: **auth → NotFound → ownership (NotWriter/NotHolder)
@@ -126,16 +139,23 @@ A failure anywhere reverts everything (transaction is the atomicity boundary).
 ### `__constructor(quote, underlyings)`
 Runs once at deploy. Stores the quote SAC and the underlying allowlist. `InvalidConfig` (deploy fails) if
 `underlyings` is empty, has more than 8 entries, contains duplicates, or contains `quote`.
-**No admin, no upgrade, no way to change the allowlist after deploy.**
+**No admin, no upgrade.** The constructor seeds the asset registry; since v1.3 `list_asset` extends it permissionlessly (§12).
 
 ### `create_offer(writer, underlying, option_type, qty, strike_total, premium_total, expiry) -> id`
 - `writer.require_auth()`.
-- `AssetNotAllowed` unless `underlying` is in the allowlist.
+- `InvalidArgs` if `writer == current_contract_address()` (v1.3 backstop; the same check applies to `buyer` in `buy`,
+  `holder` in `exercise`/`transfer` and `to` in `transfer`).
+- `AssetNotAllowed` unless `is_listed(underlying)` (v1.3: the registry seeded by the constructor and extended by `list_asset`;
+  before v1.3 this was the constructor vector).
 - `InvalidArgs` unless `qty > 0 && strike_total > 0 && premium_total > 0 && expiry > now`.
 - `NotEligible` unless `is_eligible(underlying, writer)` **and** `is_eligible(quote, writer)` (a writer with no quote
   trustline could neither receive the premium nor claim CALL proceeds); `ContractNotAuthorized` unless
   `is_eligible(underlying, contract)` (an unauthorized contract could not receive the PUT delivery later).
-- `OpenListFull` if `list_open()` already holds `MAX_OPEN = 1000` ids.
+- `TenorOutOfRange` if `expiry > now + MAX_TENOR` (v1.3; `MAX_TENOR = 63_072_000` seconds, 2 years). Checked right after
+  `InvalidArgs`.
+- `OpenListFull` if this underlying's open book already holds `MAX_OPEN_PER_ASSET = 500` ids (v1.3.1; before that, a single
+  global list of `MAX_OPEN = 1000`).
+- `WriterOpenLimit` if `writer_open_count(writer) >= MAX_OPEN_PER_WRITER = 50` (v1.3; checked right after `OpenListFull`).
 - `CollateralShortfall` if, for the option's quote or underlying token, `balance(contract) < open_collateral(token)`
   (an earlier issuer clawback left a pooled deficit; no new exposure is accepted on that token, see §6).
 - Pulls collateral from the writer: PUT `quote.transfer(writer, contract, strike_total)`;
@@ -191,18 +211,53 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
 - `holder.require_auth()`; `NotFound`; `NotHolder` unless `Some(holder) == option.holder`; `WrongState` unless `Active`;
   `Expired` unless `now < expiry`; `InvalidArgs` if `to == holder`; `SelfTrade` if `to == writer`;
   `NotEligible` unless `is_eligible(underlying, to)` (the new holder must be able to settle: deliver the underlying
-  for a PUT, receive it for a CALL).
+  for a PUT, receive it for a CALL); then (v1.3.1) `ContractNotAuthorized` unless `is_eligible(underlying, contract)` and
+  `CollateralShortfall` if `balance(contract) < open_collateral(token)` for the option's quote or underlying, so a
+  position cannot be handed to a new participant while the escrow cannot settle it (§6).
 - Sets `holder = Some(to)`. State stays `Active`; collateral, reserved totals and `list_open` are untouched.
   **No tokens move**: any payment for the position is settled outside this call (a separate quote-token payment, or a
   future on-chain position market). Emits `OptionTransferred`. The previous holder can no longer exercise.
 
+### `list_asset(lister, code, issuer)` (v1.3)
+Permissionless listing of a classic Stellar asset as an underlying. No admin anywhere.
+- `lister.require_auth()` (accountability only; anyone may list).
+- `InvalidArgs` unless `code` is 1–12 characters of `[A-Za-z0-9]` and `issuer` is an account (`G…`) address.
+- Derives the **canonical SAC address** of the classic asset `(code, issuer)` with the SDK deployer
+  (`env.deployer().with_stellar_asset(asset_xdr).deployed_address()`), so only a genuine Stellar asset can ever be listed;
+  a custom or malicious token contract cannot be, because the address is computed, not supplied.
+- `AlreadyListed` if the SAC is already in the registry, or if it is the quote token (checked before the deployment probe).
+- `AssetNotDeployed` unless that SAC is deployed (probe with `token::Client::try_decimals`); anyone can deploy a SAC with
+  `stellar contract asset deploy`, so this is a one-time prerequisite, not a permission.
+- Stores `Key::Listed(sac) = true`, appends `Key::AssetAt(asset_count) = sac`, increments `asset_count`. Emits `AssetListed`.
+  Returns the SAC address. Listing does **not** authorize anything: a regulated asset's issuer must still authorize the
+  escrow contract (`ContractNotAuthorized` otherwise) and each counterparty (`NotEligible`).
+- The quote token stays the constructor's `USDx`; per-offer quote tokens are not in v1.3.
+
+### `prune_expired(pruner, ids)` (v1.3, signature corrected in v1.3.1)
+Anyone may finish the bookkeeping of expired unsold offers; nobody can gain from it.
+- `pruner.require_auth()` (accountability for the `OfferPruned` event only; any account may prune); backstop applies. For each id in order: `NotFound` if unknown; otherwise skipped (not an error) unless state is `Offered` and
+  `now >= expiry`. For each eligible id: returns the collateral to the **writer** with `try_transfer`; if that transfer
+  fails (writer frozen on a CALL's underlying) the id is skipped and nothing about it changes; otherwise reserved total −=
+  collateral, `list_open` −= id, `writer_open_count(writer) −= 1`, `state = Expired`, event `OfferPruned { id, pruner }` with the authenticated `pruner`.
+- Returns the number of options pruned. Live offers (`now < expiry`) are never touched; only the writer can `cancel_offer`.
+
 ### Views
+- `is_listed(token)` (v1.3): `true` iff `token` is in the registry (constructor underlyings plus `list_asset`).
+- `list_assets(from, limit)` (v1.3): registry addresses in listing order, same paging rule as `get_options`
+  (`MAX_PAGE = 50`). `asset_count()`: number of listed assets. Clients should build their asset list from this, not
+  from `config().underlyings`, which stays the constructor-time list for compatibility.
+- `writer_open_count(writer)` (v1.3): number of this writer's options currently in state `Offered`.
 - `get_options(from, limit)` (v1.2): the stored `OptionData` for ids `from, from+1, …` in id order, stopping at
   `option_count()` and after at most `min(limit, MAX_PAGE = 50)` entries. Returns an empty `Vec` when
   `from >= option_count()` or `limit == 0`. Never fails. Clients page with `from += returned.len()`.
 - `get_option(id)`: the stored `OptionData` or `NotFound`. Pure read.
-- `list_open()`: ids whose state is `Offered`, oldest first. May include offers past `expiry`; clients filter by
-  `expiry` before showing them as purchasable. The list lives in instance storage, so it is bounded (see §10).
+- `list_open_for(asset, from, limit)` (v1.3.1): ids in state `Offered` for one underlying, oldest first, paged (`MAX_PAGE`).
+- `list_open()`: ids whose state is `Offered`, oldest first (v1.3.1: concatenation of the per-asset books of the **first
+  `MAX_PAGE` (50) registry assets** in registry order, truncated to 200 ids, so its reads stay bounded under permissionless
+  listing; books of later-listed assets are reachable only through `list_assets` + `list_open_for`, which clients must use
+  for a complete view). May include offers past `expiry`; clients filter by
+  `expiry` before showing them as purchasable. Since v1.3.1 the books are persistent per-asset lists capped at
+  `MAX_OPEN_PER_ASSET` (§13); before that a single instance-storage list capped at 1000 (§10).
 - `option_count()`: number of options ever created (next id).
 - `open_collateral(token)`: total units of `token` the contract must currently hold for non-terminal options:
   locked collateral of `Offered`/`Active` options plus unclaimed proceeds of `Exercised` options. Clients compare
@@ -217,7 +272,9 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
   non-issuer `G` account with no trustline reads `false`; on an AUTH_REVOCABLE asset a revoked trustline or contract
   balance reads `false`.
 - `extend_ttl(ids)`: anyone may call. Extends the contract instance and code TTL and the persistent entry of every
-  id in `ids` (`NotFound` for an unknown id). See §8.
+  id in `ids` (`NotFound` for an unknown id); since v1.3.1 also each listed option's `Listed(underlying)`,
+  `WriterOpen(writer)`, `OpenFor(underlying)`, `Reserved(quote)` and `Reserved(underlying)` entries, plus the first
+  `MAX_PAGE` registry index entries (§13.5, §13.8). See §8.
 
 ## 4. Lifecycle
 
@@ -225,7 +282,7 @@ Runs once at deploy. Stores the quote SAC and the underlying allowlist. `Invalid
                      create_offer (writer locks collateral)
                                   │
                                   ▼
-            cancel_offer ◄──── Offered ────► reclaim (now >= expiry)
+            cancel_offer ◄──── Offered ────► reclaim (now >= expiry) / prune_expired by anyone (v1.3)
              (Cancelled)          │                (Expired)
                                   │ buy (premium buyer → writer, PROVISIONAL)
                                   ▼
@@ -255,13 +312,17 @@ pub struct OfferCancelled { #[topic] pub id: u32 }
 pub struct OptionReclaimed{ #[topic] pub id: u32 }
 pub struct DeliveryClaimed{ #[topic] pub id: u32 }
 pub struct OptionTransferred { #[topic] pub id: u32, pub from: Address, pub to: Address }   // v1.2
+pub struct AssetListed      { #[topic] pub sac: Address, pub code: String, pub issuer: Address, pub lister: Address }  // v1.3
+pub struct OfferPruned      { #[topic] pub id: u32, pub pruner: Address }   // v1.3
 ```
 
 ## 6. Eligibility and issuer actions (what the contract does and does not promise)
 
-- Underlyings are classic assets with `AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED`, exposed through
-  their SAC. The quote token `USDx` has a separate issuer with no flags.
-- **The issuer must authorize the contract address on every underlying SAC before any offer can be created**
+- The demo underlyings (RWA, BOND, EQTY) are classic assets with `AUTH_REQUIRED | AUTH_REVOCABLE | AUTH_CLAWBACK_ENABLED`,
+  exposed through their SAC. Since v1.3 anyone can list any classic asset; an unflagged asset needs no issuer action at
+  all (everyone with a trustline is eligible, and the escrow is authorized by default). The quote token `USDx` has a
+  separate issuer with no flags.
+- **For an AUTH_REQUIRED underlying, the issuer must authorize the contract address on its SAC before any offer can be created**
   (`set_authorized(contract, true)`; verified in the spike, SAC error #11 otherwise). `scripts/setup-testnet` does it.
 - Eligibility is the asset's own rule: `is_eligible` reads the SAC trustline authorization. The contract adds no
   KYC list of its own.
@@ -275,23 +336,20 @@ pub struct OptionTransferred { #[topic] pub id: u32, pub from: Address, pub to: 
   partial happens inside one call (a failing SAC transfer, #10, reverts the whole call). The deficit is visible as
   `open_collateral(token) > balance(contract)` and the UI must show it as a warning for **every** option on that
   token. While a deficit exists on a token, `create_offer` and `buy` involving that token fail with
-  `CollateralShortfall`, so no new offer can be listed or bought into the hole; existing positions keep settling
-  first-come-first-served. **`transfer` (v1.2) is deliberately not guarded** by `CollateralShortfall` or
-  `ContractNotAuthorized` (§3): during a deficit an existing `Active` position can still be handed to a new
-  account, possibly against an off-chain payment, and that account then carries the first-come-first-served
-  shortfall risk. The UI must show the deficit warning before any transfer or off-chain sale of a position.
-  There is **no** `Impaired` state, refund or pro-rata logic (AGENTS.md). `USDx` is unflagged, so PUT strike
-  collateral is not exposed to clawback.
+  `CollateralShortfall`, so the hole cannot spread to new participants; existing positions keep settling
+  first-come-first-served. There is **no** `Impaired` state, refund or pro-rata logic (AGENTS.md). `USDx` is
+  unflagged, so PUT strike collateral is not exposed to clawback.
 - Issuer de-authorization of the **contract address** itself blocks every SAC transfer into or out of the contract
   for that asset: PUT `exercise` and PUT `claim_delivery`, CALL `exercise` and CALL `reclaim` all fail until the
   issuer re-authorizes the contract. Writers can still `reclaim` PUT collateral (quote token) after expiry.
 - The contract never claims to override issuer control. README and UI disclose this.
-- **Open-list capacity is global.** `MAX_OPEN = 1000` bounds the instance entry but not any one writer: an
-  issuer-authorized writer can list 1000 dust offers (1 unit each, far expiry) and every other maker then gets
-  `OpenListFull` until that writer cancels, or until other accounts buy the dust offers (1 unit of premium each)
-  after the issuer de-authorizes the writer, which blocks re-listing (de-authorization alone frees no slot). Only
-  issuer-authorized accounts can write, so this is an availability limitation of the demo deployment, not a
-  fund-safety issue. Planned v1.3: per-writer cap, anyone-may-prune expired `Offered` ids, tenor bounds.
+- **Open-list capacity.** `MAX_OPEN = 1000` bounded the single instance-storage open list in v1.1–v1.3 (removed in
+  v1.3.1, see the end of this bullet). Since v1.3 each writer is also capped at
+  `MAX_OPEN_PER_WRITER = 50` open offers, offers cannot expire more than `MAX_TENOR` (2 years) out, and anyone can
+  `prune_expired` unsold expired offers (collateral always returns to the writer). Before v1.3 one issuer-authorized
+  writer could fill the book with dust offers (finding F-1). v1.3 alone does **not** close it: with permissionless
+  listing, sybil writers on a self-listed unflagged asset can fill the global list for free (F-1R). v1.3.1 (§13) moves
+  the book to per-asset lists capped at `MAX_OPEN_PER_ASSET = 500`, so dust can only crowd out its own asset's book.
 
 ## 7. PROVISIONAL decisions and blocker questions for Dev 1 (`PRODUCT_SPEC.md` absent at lock time)
 
@@ -301,7 +359,7 @@ goes through Dev 2.
 1. **Premium timing/refund:** paid buyer → writer inside `buy`, non-refundable. (Code comment `PROVISIONAL`.)
 2. **Self-trade:** the writer cannot buy their own offer (`SelfTrade`).
 3. **Zero premium / zero strike:** rejected (`InvalidArgs`); all three amounts must be `> 0`.
-4. **Expiry bounds:** only `expiry > now` is enforced; no minimum or maximum tenor.
+4. **Expiry bounds:** `expiry > now` and, since v1.3, `expiry <= now + MAX_TENOR` (2 years); no minimum tenor.
 5. **Unsold expired offers:** writer may use either `cancel_offer` or `reclaim`; both return the collateral.
 6. **Impaired/refund logic:** not implemented (AGENTS.md: not approved until specified and proven).
 7. **Holder transfer:** implemented in v1.2 as a free transfer to an eligible address (no payment leg). **Position token:** not implemented.
@@ -313,17 +371,26 @@ enum Key {
     Quote,              // instance: Address
     Underlyings,        // instance: Vec<Address>
     Next,               // instance: u32 (next id)
-    Open,               // instance: Vec<u32> (ids in state Offered)
-    Reserved(Address),  // instance: i128 per token (see open_collateral)
+    Reserved(Address),  // persistent: i128 per token, v1.3.1 (was instance until v1.3); TTL extended on every state-changing path that touches it and by extend_ttl
     Opt(u32),           // persistent: OptionData
+    OpenFor(Address),   // persistent: Vec<u32>, v1.3.1 per-asset open book (replaces instance Key::Open)
+    Listed(Address),    // persistent: bool, v1.3 asset registry membership (seeded by the constructor)
+    AssetAt(u32),       // persistent: Address, v1.3 registry index for paging
+    AssetCount,         // instance: u32, v1.3
+    WriterOpen(Address),// persistent: u32, v1.3 count of this writer's Offered options
 }
-const MAX_OPEN: u32 = 1000;        // cap on ids in Key::Open (instance storage is one 64 KB entry)
+const MAX_OPEN_PER_ASSET: u32 = 500;   // v1.3.1 cap per underlying's open book (v1.3 and before: global MAX_OPEN = 1000)
 const MAX_PAGE: u32 = 50;          // get_options page cap (v1.2)
+const MAX_OPEN_PER_WRITER: u32 = 50;   // v1.3
+const MAX_TENOR: u64 = 63_072_000;     // v1.3, 2 years in seconds
 const DAY_LEDGERS: u32 = 17_280;
 const TTL_THRESHOLD: u32 = 7 * DAY_LEDGERS;
 const TTL_EXTEND_TO: u32 = 30 * DAY_LEDGERS;
 ```
 
+Instance storage holds only `Quote`, `Underlyings`, `Next` and `AssetCount` (v1.3.1); every other key is persistent.
+Registry and per-writer entries get their TTL extended whenever they are read on a state-changing path (v1.3), and
+`Reserved` entries whenever a state-changing path touches them (v1.3.1).
 Every state-changing function extends the contract instance **and code** TTL (`instance().extend_ttl` does both
 in soroban-sdk 28) and the touched option's persistent TTL with `(TTL_THRESHOLD, TTL_EXTEND_TO)`. `extend_ttl(ids)`
 does the same for the instance/code and for every listed option, so a keeper can keep idle options alive.
@@ -381,12 +448,6 @@ key the error map by name (codes 101–115); everything else is unchanged. The v
 ## 11. v1.2 additions (decided 2026-10-25 20:05 by Dev 2 with GO on P1 scope; deployed 2026-10-25 20:32 UTC as `CAJ2WJP4CUM2GGRB2A5P2M2H5GI45CTZSECV7SL3RTQMGYEKZ7ZDGBAX`)
 
 Additive only: two functions, one event, one constant. No error code, type or existing signature changes.
-`transfer` reuses four existing codes with a new trigger: `InvalidArgs` (to self), `NotEligible` (recipient),
-`Expired` and `SelfTrade` (to the writer); §2 lists both meanings. The per-case docs embedded in the deployed
-contract spec (`stellar contract info interface`) predate `transfer` and still give only the v1.1 meaning, so error
-maps should follow §2 and §3, not the generated bindings' comments. Changing them would change the wasm hash and
-needs a redeploy, so they stay as deployed. `transfer` runs no `CollateralShortfall` or `ContractNotAuthorized`
-check; see §6 for what that means during a deficit.
 
 1. **`transfer(holder, to, id)`** — P1 "transfer of option ownership" (§3, §4). Free transfer to an eligible new holder;
    no payment leg on-chain.
@@ -402,3 +463,50 @@ check; see §6 for what that means during a deficit.
 
 Not in v1.2, deliberately: position token (second token system, untestable before freeze), impairment/refund logic
 (economics unspecified, AGENTS.md precondition), partial exercise, multi-leg.
+
+## 12. v1.3: open-book hardening and permissionless asset listing (decided 2026-10-25 22:10 by Dev 2; deployed 2026-10-25 23:06 UTC as `CAMY4ZKY7JLKZMONDOTVHDSXWLMDSLERFS7YJEH5JYZDIKV5HOAT2KRJ`)
+
+Additive: six functions, two events, four error codes (116–119), one lifecycle edge, four storage keys. No existing
+signature, type or event changes; `Config` keeps its constructor-time meaning.
+
+1. **Permissionless listing** (`list_asset`, `is_listed`, `list_assets`, `asset_count`, event `AssetListed`): any classic
+   Stellar asset becomes an eligible underlying by deriving its canonical SAC address on chain. The only permission that
+   matters stays the issuer's (for flagged assets): it must authorize the escrow and the counterparties on its asset.
+   Custom token contracts can never be listed. The frontend should read the asset list from `list_assets`.
+2. **Per-writer open cap** (`WriterOpenLimit`, `writer_open_count`), **tenor cap** (`TenorOutOfRange`) and
+   **`prune_expired`** (event `OfferPruned`): addresses finding F-1 for issuer-gated assets; the sybil variant F-1R
+   remains until v1.3.1 (§6, §13).
+3. **Backstop**: the contract's own address is rejected as any party (`InvalidArgs`); the host already rejects it, the
+   contract now says so itself.
+4. **Testnet demo**: a third fictional asset `EQTY` (tokenized equity label, same regulated issuer) is NOT in the
+   constructor; the smoke run lists it with `list_asset`, the issuer authorizes the escrow, and a PUT on `EQTY` settles.
+
+Deliberately not in v1.3: per-offer quote tokens (needs a `create_offer` signature change), delisting (no admin),
+position token, impairment/refund, margin.
+
+## 13. v1.3.1 corrections (decided 2026-10-26 00:20 by Dev 2 from the v1.3 gate; one redeploy; deployed 2026-10-26 00:50 UTC as `CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE`)
+
+1. **`prune_expired(pruner, ids)`**: caller argument with `require_auth`, so `OfferPruned.pruner` is a real identity (v1.3
+   emitted the contract's own address). Backstop applies to `pruner`.
+2. **`transfer` gains the incoming-participant guards** `ContractNotAuthorized` and `CollateralShortfall` after
+   `NotEligible` (§3). A frozen holder may still transfer (its own tokens never move).
+3. **Per-asset open books** (fix for F-1R): `Key::OpenFor(asset)` persistent, capped at `MAX_OPEN_PER_ASSET = 500`;
+   `OpenListFull` is per asset; new view `list_open_for(asset, from, limit)`; `list_open()` keeps its signature and returns
+   the per-asset books of the first `MAX_PAGE` registry assets concatenated in registry order, truncated to 200 ids (bounded
+   reads; complete views go through `list_assets` + `list_open_for`). Instance `Key::Open` and `MAX_OPEN` are removed.
+4. **`list_asset` check order**: `AlreadyListed` before `AssetNotDeployed`.
+5. **`extend_ttl(ids)`** also extends `Listed(option.underlying)`, `WriterOpen(option.writer)` and `OpenFor(option.underlying)`
+   for each id, plus `AssetAt(0..min(asset_count, MAX_PAGE))` and their `Listed` entries (keeper coverage of the registry).
+6. **`list_assets` order**: constructor underlyings in constructor order, then listings in `list_asset` order.
+7. Doc corrections applied in the same change: §2 `AssetNotAllowed` comment, §3 constructor sentence, §6 regulated-only
+   wording and F-1/F-1R status, §7.4 tenor bounds, §12 frontend wording. Completed after the v1.3.1 gate review (doc
+   only, code unchanged): §2 `OptionData.underlying`, `InvalidArgs` (v1.3 backstop and `list_asset` input),
+   `ContractNotAuthorized` and `CollateralShortfall` (also `transfer`), `OpenListFull` (per-asset 500) comments, the v1.2
+   `transfer` meanings of `InvalidArgs`, `NotEligible`, `Expired` and `SelfTrade` restored, and the §6 open-list
+   capacity sentence put in the past tense.
+8. **`Reserved(token)` moves to persistent storage** (one entry per token, TTL extended on touch and by `extend_ttl` for
+   the option's quote and underlying). Found by the v1.3 gate: with permissionless listing, per-token instance keys let
+   anyone grow the single instance entry without bound.
+
+No new error codes. Signature changes: `prune_expired` (new first argument), `list_open_for` added. Everything else is
+unchanged. Deployment of v1.3.1 replaces the v1.3 id in the Deployed contracts table.

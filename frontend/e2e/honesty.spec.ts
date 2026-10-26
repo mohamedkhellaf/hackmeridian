@@ -17,6 +17,8 @@ test('reserves page is honest about mock data and shows owed vs held', async ({ 
   await expect(page.getByRole('region', { name: 'USDx reserves' })).toContainText('Fully backed')
   await expect(page.getByRole('heading', { level: 1, name: /Owed equals held/ })).toBeVisible()
   await expect(page.getByRole('region', { name: 'USDx reserves' }).getByRole('img', { name: /held/i })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'USDx backing ratio' })).toContainText('100.0%')
+  await expect(page.getByRole('list', { name: 'Footnotes' }).getByRole('listitem')).toHaveCount(6)
   await expect(page.getByText('How to verify this yourself')).toBeVisible()
   await expect(page.getByText(/not a guarantee against issuer action/)).toBeVisible()
 })
