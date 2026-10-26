@@ -1,227 +1,156 @@
+/* Issuer page. Flags card left, accounts right on desktop; one column on phones. */
 .is-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: 16px;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: start;
 }
-.is-col {
+.is-main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
 }
-.is-col:first-child {
-  flex: 999 1 520px;
+.is-flags-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 12px 12px;
 }
-.is-col:nth-child(2) {
-  flex: 1 1 320px;
+.is-top-banner {
+  margin-bottom: 16px;
 }
 .is-stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
+
 .is-muted {
-  margin: 0;
   color: var(--muted);
   font-size: 13px;
 }
 .is-error {
   color: var(--danger);
-  font-size: 12.5px;
-}
-.is-note {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-.is-note--body {
   font-size: 13px;
-  color: var(--text);
-  line-height: 1.55;
+}
+.is-pad {
+  padding: 0 12px 12px;
 }
 .is-break {
   word-break: break-all;
 }
-
-.is-asset {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
+.is-sub {
+  margin-left: 8px;
   color: var(--muted);
+  font-size: 12px;
 }
-.is-asset input {
-  width: 110px;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-sm);
-  background: transparent;
+.is-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.is-select,
+.is-input {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg);
   color: var(--text);
-  font-weight: 600;
+  font-size: 13px;
+}
+.is-select {
+  min-width: 96px;
+}
+.is-select:focus-visible,
+.is-input:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+.is-input {
+  width: 100%;
+  min-width: 0;
+}
+.is-mono-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.is-add {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+}
+.is-add .is-input {
+  flex: 1 1 auto;
+}
+
+.is-table th,
+.is-table td,
+.is-table td:not(:first-child) {
+  text-align: left;
+}
+.is-table td.is-row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.is-acts {
+  display: inline-flex;
+  gap: 6px;
 }
 
 .is-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .is-field-label {
-  font-size: 13px;
-  color: var(--text-2);
+  font-size: 12px;
+  color: var(--muted);
 }
-.is-input {
+.is-unit-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-md);
-  background: var(--surface-sunken);
-  padding: 0 14px;
-  height: 46px;
-}
-.is-input:focus-within {
-  border-color: var(--link);
-}
-.is-input input {
-  flex: 1;
-  min-width: 0;
-  background: transparent;
-  border: 0;
-  outline: none;
-  color: var(--text-strong);
-  font-size: 14.5px;
-}
-.is-input input.is-mono-input {
-  font-family: var(--font-mono);
-  font-size: 13.5px;
-}
-.is-input--grow {
-  flex: 1 1 200px;
+  gap: 8px;
 }
 .is-unit {
   color: var(--muted);
-  font-size: 13.5px;
-}
-.is-pill {
-  font-size: 11.5px;
-  color: var(--text-2);
-  border: 1px solid var(--border-2);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.is-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--row-line);
-  border-radius: var(--r-md);
-  padding: 12px 14px;
   font-size: 13px;
-  flex-wrap: wrap;
-}
-.is-status-text {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text);
-  min-width: 0;
-}
-.is-status > .is-status-text {
-  flex: 1 1 200px;
-}
-.is-link {
-  margin-left: auto;
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--link);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.is-link:hover:not(:disabled) {
-  color: var(--link-hover);
-}
-.is-link:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.is-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
-.is-danger-card {
-  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
-}
-.is-danger-card .ui-card-body {
-  padding-top: 20px;
-}
-.is-danger-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--danger);
-}
-.is-danger-title h2 {
-  font-size: 15px;
-  color: var(--text);
-}
-.is-claw-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.is-confirm-text {
-  margin: 0;
-  line-height: 1.55;
-  font-size: 14px;
-}
-
-.is-flags {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.is-flag {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--text);
-}
-.is-flag--ok svg {
-  color: var(--ok);
-}
-.is-flag--bad svg {
-  color: var(--warn);
-}
-.is-flag-missing {
-  color: var(--warn);
-  font-size: 12px;
-}
-.is-sep {
-  border-top: 1px solid var(--row-line);
-  padding-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-@media (max-width: 640px) {
-  .is-actions > button {
-    flex: 1 1 140px;
+@media (max-width: 900px) {
+  .is-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .is-claw-row > button {
-    flex: 1 1 100%;
+}
+/* Phones: Trustline drops out (hide-sm in ui.css) and the three actions stack in the last cell. */
+@media (max-width: 640px) {
+  .is-acts {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .is-sub {
+    display: block;
+    margin-left: 0;
+  }
+  /* These tables sit inside bordered cards: keep the card gutter that the phone table rule removes. */
+  .is-table th:first-child,
+  .is-table td:first-child {
+    padding-left: 12px;
+  }
+  .is-table th:last-child,
+  .is-table td:last-child {
+    padding-right: 12px;
+  }
+  .is-table td.is-row-actions {
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 }

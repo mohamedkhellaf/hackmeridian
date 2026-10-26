@@ -5,15 +5,13 @@ import { formatExpiry } from '../options/format'
 import { MAX_OPEN_PER_WRITER, requiredCollateral } from '../options/types'
 import type { NewOffer, OptionKind, OptionOffer, SupportedAssets } from '../options/types'
 import { money, moneyWith, nowMs } from '../portfolio/positions'
-import { AssetBadge, Button, Chip, Icon, PayoffSketch } from '../ui'
+import { Banner, Button, Card, Segmented } from '../ui'
 import { useBalances } from '../wallet/useBalances'
 import { buildOffer } from './buildOffer'
 import { lowestOpenInSeries, premiumPerUnitText } from './lowestOffer'
 import './write.css'
 
-const DAY = 86400
-const PRESETS = [1, 3, 7, 14] as const
-type Preset = (typeof PRESETS)[number] | 'custom'
+const DEFAULT_TENOR_MS = 3 * 86400 * 1000
 
 /** datetime-local wants local time without zone: YYYY-MM-DDTHH:mm */
 function toLocalInput(ms: number): string {
@@ -22,14 +20,10 @@ function toLocalInput(ms: number): string {
   return d.toISOString().slice(0, 16)
 }
 
-const KINDS: { kind: OptionKind; title: string; text: (quote: string, asset: string) => string }[] = [
-  { kind: 'put', title: 'Cash-secured put', text: (q) => `Lock ${q}. You may have to buy the asset at the strike.` },
-  { kind: 'call', title: 'Covered call', text: (_q, a) => `Lock ${a}. You may have to sell it at the strike.` },
+const KINDS = [
+  { value: 'put' as const, label: 'Put' },
+  { value: 'call' as const, label: 'Call' },
 ]
-
-function Unit({ children }: { children: string }) {
-  return <span className="wr-unit">{children}</span>
-}
 
 export function WriteOfferForm({
   assets,
@@ -49,13 +43,8 @@ export function WriteOfferForm({
   const [qty, setQty] = useState('5')
   const [strike, setStrike] = useState('10')
   const [premium, setPremium] = useState('2')
-  const [preset, setPreset] = useState<Preset>(3)
-  // The moment the chosen preset counts from; refreshed on preset change and after a publish.
-  const [anchor, setAnchor] = useState(() => nowMs())
-  const [custom, setCustom] = useState(() => toLocalInput(nowMs() + 3 * DAY * 1000))
+  const [expiry, setExpiry] = useState(() => toLocalInput(nowMs() + DEFAULT_TENOR_MS))
   const [submitting, setSubmitting] = useState(false)
-
-  const expiry = preset === 'custom' ? custom : toLocalInput(anchor + preset * DAY * 1000)
 
   const eligKey = me ? `${underlyingId}:${me}` : null
   const [elig, setElig] = useState<{ key: string; ok: boolean } | null>(null)
@@ -115,11 +104,8 @@ export function WriteOfferForm({
   const lowest = offer ? lowestOpenInSeries(listed, offer, assets.quote) : null
   const perUnit = offer ? premiumPerUnitText(offer, assets.quote.decimals) : null
 
-  const balanceOf = (contractId: string): bigint | null => {
-    const b = balances[contractId]
-    return b && b.status === 'ok' ? b.balance : null
-  }
-  const collBalance = collateral ? balanceOf(collateral.token.contractId) : null
+  const balance = collateral ? balances[collateral.token.contractId] : undefined
+  const collBalance = balance && balance.status === 'ok' ? balance.balance : null
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -128,209 +114,112 @@ export function WriteOfferForm({
     const ok = await onSubmit(offer)
     setSubmitting(false)
     setOpenTick((t) => t + 1)
-    if (ok) {
-      setAnchor(nowMs())
-      setCustom(toLocalInput(nowMs() + 3 * DAY * 1000))
-    }
+    if (ok) setExpiry(toLocalInput(nowMs() + DEFAULT_TENOR_MS))
   }
-
-  const pickPreset = (p: Preset) => {
-    if (p === 'custom') setCustom(toLocalInput(anchor + (preset === 'custom' ? 0 : preset) * DAY * 1000))
-    setAnchor(nowMs())
-    setPreset(p)
-  }
-
-  const receiveIfExercised = offer
-    ? kind === 'put'
-      ? moneyWith(offer.underlyingQty, offer.underlying)
-      : moneyWith(offer.totalStrike, assets.quote)
-    : null
 
   return (
-    <form className="wr" onSubmit={(e) => void submit(e)}>
-      <section className="wr-main">
-        <div className="wr-kinds" role="radiogroup" aria-label="Option type">
-          {KINDS.map((k) => (
-            <button
-              key={k.kind}
-              type="button"
-              role="radio"
-              aria-checked={kind === k.kind}
-              className={kind === k.kind ? 'wr-kind is-on' : 'wr-kind'}
-              onClick={() => setKind(k.kind)}
-            >
-              <span className="wr-kind-title">{k.title}</span>
-              <span className="wr-kind-text">{k.text(quoteCode, underlyingCode)}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="wr-field" role="radiogroup" aria-label="Underlying asset">
-          <span className="wr-label">Underlying asset</span>
-          <div className="wr-assets">
-            {assets.underlyings.map((u) => {
-              const bal = balanceOf(u.contractId)
-              return (
-                <button
-                  key={u.contractId}
-                  type="button"
-                  role="radio"
-                  aria-checked={u.contractId === underlyingId}
-                  className={u.contractId === underlyingId ? 'wr-asset is-on' : 'wr-asset'}
-                  onClick={() => setUnderlyingId(u.contractId)}
-                >
-                  <AssetBadge code={u.code} size={26} />
-                  <span className="wr-asset-text">
-                    <span className="wr-asset-code">{u.code}</span>
-                    {bal !== null && <span className="wr-asset-sub">Balance {money(bal, u.decimals)}</span>}
-                  </span>
-                </button>
-              )
-            })}
+    <Card>
+      <form className="wr" onSubmit={(e) => void submit(e)}>
+        <div className="wr-fields">
+          <div className="wr-field">
+            <span className="wr-label">Kind</span>
+            <Segmented label="Kind" options={KINDS} value={kind} onChange={setKind} />
           </div>
-        </div>
 
-        <div className="wr-two">
+          <label className="wr-field">
+            <span className="wr-label">Asset</span>
+            <span className="wr-input">
+              <select value={underlyingId} onChange={(e) => setUnderlyingId(e.target.value)}>
+                {assets.underlyings.map((u) => (
+                  <option key={u.contractId} value={u.contractId}>
+                    {u.code}
+                  </option>
+                ))}
+              </select>
+              <span className="wr-unit" aria-hidden="true" />
+            </span>
+          </label>
+
           <label className="wr-field">
             <span className="wr-label">Quantity</span>
             <span className="wr-input">
               <input inputMode="decimal" aria-label={`Quantity (${underlyingCode})`} value={qty} onChange={(e) => setQty(e.target.value)} />
-              <Unit>{underlyingCode}</Unit>
+              <span className="wr-unit">{underlyingCode}</span>
             </span>
           </label>
+
           <label className="wr-field">
             <span className="wr-label">Strike per {underlyingCode}</span>
             <span className="wr-input">
               <input inputMode="decimal" aria-label={`Strike per ${underlyingCode} (${quoteCode})`} value={strike} onChange={(e) => setStrike(e.target.value)} />
-              <Unit>{quoteCode}</Unit>
+              <span className="wr-unit">{quoteCode}</span>
+            </span>
+          </label>
+
+          <label className="wr-field">
+            <span className="wr-label">Premium, total</span>
+            <span className="wr-input">
+              <input inputMode="decimal" aria-label={`Premium, total (${quoteCode})`} value={premium} onChange={(e) => setPremium(e.target.value)} />
+              <span className="wr-unit">{quoteCode}</span>
+            </span>
+          </label>
+
+          <label className="wr-field">
+            <span className="wr-label">Expiry</span>
+            <span className="wr-input">
+              <input type="datetime-local" aria-label="Expiry" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+              <span className="wr-unit" aria-hidden="true" />
             </span>
           </label>
         </div>
 
-        <label className="wr-field">
-          <span className="wr-label">Premium you ask, total</span>
-          <span className="wr-input">
-            <input inputMode="decimal" aria-label={`Premium, total (${quoteCode})`} value={premium} onChange={(e) => setPremium(e.target.value)} />
-            <Unit>{quoteCode}</Unit>
-          </span>
-          {perUnit && (
-            <span className="wr-help">
-              {perUnit} {quoteCode} per {underlyingCode}.
-              {lowest && (
-                <>
-                  {' '}
-                  Lowest open offer in this series: {premiumPerUnitText(lowest, assets.quote.decimals)}.
-                </>
-              )}
-            </span>
-          )}
-        </label>
-
-        <div className="wr-field">
-          <span className="wr-label">Expiry</span>
-          <div className="wr-expiry">
-            {PRESETS.map((d) => (
-              <Chip key={d} selected={preset === d} onClick={() => pickPreset(d)}>
-                {d} {d === 1 ? 'day' : 'days'}
-              </Chip>
-            ))}
-            <Chip selected={preset === 'custom'} onClick={() => pickPreset('custom')}>
-              Custom
-            </Chip>
-            {offer && <span className="wr-resolved">{formatExpiry(offer.expiry)}</span>}
-          </div>
-          {preset === 'custom' && (
-            <span className="wr-input wr-input--wide">
-              <input type="datetime-local" aria-label="Custom expiry" value={custom} onChange={(e) => setCustom(e.target.value)} />
-            </span>
-          )}
-        </div>
-      </section>
-
-      <aside className="wr-summary" aria-label="Order summary">
-        <h2 className="wr-summary-title">Order summary</h2>
-        <div className="wr-hero">
-          <span className="wr-label">Collateral locked now</span>
-          <span className="wr-hero-value">
-            {collateral ? money(collateral.amount, collateral.token.decimals) : '—'}
-            {collateral && <span className="wr-hero-unit"> {collateral.token.code}</span>}
-          </span>
-          <span className="wr-help">Returned to you if the offer is cancelled or expires unexercised.</span>
-        </div>
-
-        {offer && (
-          <div className="wr-sketch">
-            <PayoffSketch kind={kind} strikeLabel={strike.trim() || '0'} asset={underlyingCode} />
-          </div>
-        )}
-
-        <dl className="wr-rows">
-          <div className="wr-row">
-            <dt>Premium you receive at purchase</dt>
-            <dd className={offer ? 'wr-pos' : undefined}>{offer ? `+${moneyWith(offer.totalPremium, assets.quote)}` : '—'}</dd>
-          </div>
-          <div className="wr-row">
-            <dt>If exercised, you receive</dt>
-            <dd>{receiveIfExercised ?? '—'}</dd>
-          </div>
-          <div className="wr-row">
-            <dt>Total strike</dt>
-            <dd>{offer ? moneyWith(offer.totalStrike, assets.quote) : '—'}</dd>
-          </div>
-          {collateral && collBalance !== null && (
-            <div className="wr-row">
-              <dt>{collateral.token.code} balance after</dt>
-              <dd>
-                {money(collBalance, collateral.token.decimals)} → {collBalance >= collateral.amount ? money(collBalance - collateral.amount, collateral.token.decimals) : 'insufficient'}
-              </dd>
+        <div className="wr-summary" role="group" aria-label="Order summary">
+          <dl className="ui-kv">
+            <div>
+              <dt>Collateral to lock</dt>
+              <dd>{collateral ? moneyWith(collateral.amount, collateral.token) : ''}</dd>
             </div>
-          )}
-        </dl>
+            <div>
+              <dt>Premium received</dt>
+              <dd>{offer ? `${moneyWith(offer.totalPremium, assets.quote)} (${perUnit} per ${underlyingCode})` : ''}</dd>
+            </div>
+            <div>
+              <dt>Expiry</dt>
+              <dd>{offer ? formatExpiry(offer.expiry) : ''}</dd>
+            </div>
+            {lowest && (
+              <div>
+                <dt>Lowest open offer in this series</dt>
+                <dd>
+                  {premiumPerUnitText(lowest, assets.quote.decimals)} {quoteCode} per {underlyingCode}
+                </dd>
+              </div>
+            )}
+            {collateral && collBalance !== null && (
+              <div>
+                <dt>{collateral.token.code} balance after</dt>
+                <dd className={collBalance < collateral.amount ? 'wr-short' : undefined}>
+                  {collBalance >= collateral.amount
+                    ? money(collBalance - collateral.amount, collateral.token.decimals)
+                    : `Need ${moneyWith(collateral.amount, collateral.token)}, wallet has ${money(collBalance, collateral.token.decimals)}`}
+                </dd>
+              </div>
+            )}
+          </dl>
 
-        <ul className="wr-checks">
-          {eligible === false ? (
-            <li className="wr-check is-bad" role="alert">
-              <Icon name="alert" size={16} />
-              Your account is not authorized by this asset's issuer; the transaction will likely fail with NotEligible.
-            </li>
-          ) : eligible === true ? (
-            <li className="wr-check is-ok">
-              <Icon name="check" size={16} />
-              You are authorized to hold {underlyingCode}
-            </li>
-          ) : (
-            <li className="wr-check">
-              <Icon name="alert" size={16} />
-              {me ? `Checking authorization for ${underlyingCode}…` : `Connect a wallet to check authorization for ${underlyingCode}`}
-            </li>
+          {'error' in draft && <p className="wr-error">{draft.error}</p>}
+          {eligible === false && <Banner tone="danger">The {underlyingCode} issuer has not authorized your account. The offer would fail with NotEligible.</Banner>}
+          {atCap && (
+            <Banner tone="warn">
+              You have {opened} of {MAX_OPEN_PER_WRITER} open offers. Cancel one or wait for one to sell or expire.
+            </Banner>
           )}
-          {opened !== null && (
-            <li className={atCap ? 'wr-check is-bad' : 'wr-check'} role={atCap ? 'alert' : undefined}>
-              <Icon name={atCap ? 'alert' : 'check'} size={16} />
-              {opened}/{MAX_OPEN_PER_WRITER} open offers{atCap ? '. Cancel one or wait for it to sell or expire before publishing another.' : ''}
-            </li>
-          )}
-          {'error' in draft ? (
-            <li className="wr-check is-bad">
-              <Icon name="alert" size={16} />
-              {draft.error}
-            </li>
-          ) : (
-            <li className="wr-check is-ok">
-              <Icon name="check" size={16} />
-              Strike × quantity is an exact amount
-            </li>
-          )}
-        </ul>
 
-        <Button type="submit" variant="primary" size="lg" fullWidth loading={submitting} disabled={disabled || !offer || atCap}>
-          {submitting ? 'Locking collateral…' : collateral ? `Lock ${moneyWith(collateral.amount, collateral.token)} and publish` : 'Lock collateral and publish'}
-        </Button>
-        <p className="wr-help">
-          You sign once in your wallet. The premium is yours at purchase and is not refunded to the buyer. The buyer gets the right to{' '}
-          {kind === 'put' ? `sell you ${underlyingCode} at the strike` : `buy your ${underlyingCode} at the strike`} until expiry.
-        </p>
-      </aside>
-    </form>
+          <Button type="submit" variant="primary" fullWidth loading={submitting} disabled={disabled || !offer || atCap}>
+            {kind === 'put' ? 'Write put' : 'Write call'}
+          </Button>
+        </div>
+      </form>
+    </Card>
   )
 }

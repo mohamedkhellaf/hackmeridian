@@ -1,35 +1,43 @@
 import { expect, test } from '@playwright/test'
 import { connect, goTo, openApp } from './helpers.ts'
 
-test('protect: pick asset, name a floor, review the best matching put in the buy dialog', async ({ page }) => {
+test('protect: pick asset, name a floor, buy a matching put in the buy dialog', async ({ page }) => {
   await openApp(page)
   await connect(page)
   await goTo(page, 'Protect')
   await expect(page.getByRole('heading', { name: 'Protect', level: 1 })).toBeVisible()
 
-  await page.getByRole('button', { name: /FUND/ }).click()
+  await page.getByRole('combobox', { name: 'Asset' }).selectOption({ label: 'FUND' })
+  // Every funded FUND put is listed before a floor is typed (two in the seed); the floor only filters.
+  const rows = page.getByRole('table', { name: 'Matching puts' }).getByTestId('protect-match')
+  await expect(rows).toHaveCount(2)
   await page.getByLabel('Quantity of FUND').fill('50')
   await page.getByLabel(/^Floor price in/).fill('10')
-  await expect(page.getByText(/Protect 50.00 FUND below 10.00 USDx/)).toBeVisible()
 
-  // Two seeded FUND puts at strike 10; the 1.80 USDx one is cheapest per unit and highlighted.
-  const rows = page.getByTestId('protect-match')
+  // Two seeded FUND puts at strike 10; the 1.80 USDx one (0.36 per unit) is listed first.
   await expect(rows).toHaveCount(2)
-  await expect(rows.first()).toContainText('best premium')
   await expect(rows.first()).toContainText('0.36')
-  await expect(rows.first()).toContainText('Covers 5.00 of your 50.00 FUND')
+  await expect(rows.first()).toContainText('1.80')
+  await expect(rows.first()).toContainText('GMAK…BBBB')
 
   // Too high a floor: honest empty state, no fake offers.
   await page.getByLabel(/^Floor price in/).fill('12')
-  await expect(page.getByText('No funded put matches these filters.')).toBeVisible()
+  await expect(page.getByText('No funded put matches.')).toBeVisible()
   await expect(rows).toHaveCount(0)
   await page.getByLabel(/^Floor price in/).fill('10')
+  await expect(rows).toHaveCount(2)
 
-  // Step 03 reuses the existing BuyDialog.
-  await page.getByRole('button', { name: 'Review and buy' }).click()
-  const dialog = page.getByRole('dialog')
-  await expect(dialog).toContainText('You pay now')
-  await expect(dialog).toContainText('1.80 USDx')
+  // Expiry window: both puts expire in 3 days, so a 2-day window has none.
+  await page.getByLabel('Expires within days').fill('2')
+  await expect(page.getByText('No funded put matches.')).toBeVisible()
+  await page.getByLabel('Expires within days').fill('')
+  await expect(rows).toHaveCount(2)
+
+  // The row action reuses the existing BuyDialog.
+  await rows.first().getByRole('button', { name: 'Buy put on 5.00 FUND from GMAK…BBBB' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Buy FUND put' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Buy for 1.80 USDx' })).toBeDisabled()
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
 })

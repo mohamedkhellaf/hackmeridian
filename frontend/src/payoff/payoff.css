@@ -1,9 +1,6 @@
+/* Payoff chart and assumed-price control (Buy dialog). Tokens only (see src/index.css). */
 .po-chart {
   margin: 0;
-  padding: 12px 12px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--raised-2);
 }
 .po-svg {
   display: block;
@@ -12,26 +9,27 @@
   overflow: visible;
 }
 .po-svg text {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
   fill: var(--muted);
 }
-.po-tick {
-  font-size: 10.5px;
-}
+.po-tick,
 .po-axis {
-  font-size: 10.5px;
-  letter-spacing: 0.02em;
+  font-size: 11px;
 }
 .po-mark {
-  font-size: 10px;
+  font-size: 11px;
   fill: var(--text-2) !important;
+}
+.po-line {
+  stroke: var(--text);
 }
 .po-grid {
   stroke: var(--row-line);
   stroke-width: 1;
 }
 .po-zero {
-  stroke: var(--muted);
+  stroke: var(--border);
   stroke-width: 1;
 }
 .po-strike {
@@ -40,98 +38,48 @@
   stroke-dasharray: 2 4;
 }
 .po-assumed {
-  stroke: var(--text);
-  stroke-width: 1.25;
-  stroke-dasharray: 5 4;
+  stroke: var(--text-2);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
 }
 .po-caption {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 12px;
   color: var(--muted);
 }
 
-.po-controls {
+.po-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 12px 0;
+  gap: 8px;
+  margin: 16px 0;
+}
+.po-label {
+  font-size: 12px;
+  color: var(--muted);
 }
 .po-controls-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.po-controls input[type='range'] {
+.po-controls-row input[type='range'] {
   flex: 1;
   min-width: 0;
-  accent-color: var(--text);
+  accent-color: var(--accent);
 }
 .po-num {
-  width: 110px;
-  padding: 8px 10px;
-  font-family: var(--font-mono);
+  width: 96px;
+  height: 30px;
+  padding: 0 8px;
   font-variant-numeric: tabular-nums;
   text-align: right;
   color: var(--text);
-  background: var(--raised);
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r);
 }
-.po-hint {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.po-risk {
-  margin: 0 0 4px;
-}
-.po-risk > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--row-line);
-  font-size: 13.5px;
-}
-.po-risk dt {
-  color: var(--text-2);
-}
-.po-risk dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.po-pos {
-  color: var(--ok);
-}
-.po-neg {
-  color: var(--danger);
-}
-
-.po-deliver {
-  margin: 0 0 12px;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.po-deliver li {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md, var(--r-sm));
-  background: var(--raised-2);
-  font-size: 14px;
-}
-.po-deliver b {
-  font-family: var(--font-mono);
-  font-weight: 500;
-}
-
-.po-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 16px 0;
+.po-num:focus {
+  outline: none;
+  border-color: var(--accent);
 }

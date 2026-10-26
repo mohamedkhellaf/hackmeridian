@@ -73,7 +73,7 @@ Fill the evidence column before recording. "Test" = automated test name, "tx" = 
 | Exercise is atomic delivery-versus-payment | `exercise` in one transaction (ABI section 3); spike on-chain revert proof tx `a005ab41...` (`research/decision/20_rwa_options_spike.md`); tx of scene 5 | TODO scene 5 tx hash |
 | Writer claims delivery after exercise | `claim_delivery` (ABI section 3); scene 6 tx | TODO tx hash |
 | Frozen holder cannot exercise, clear message, nothing moves | ABI section 6; spike results (e) and (d+); error text for SAC #11 in `frontend/src/stellar/errors.ts` ("Token balance is deauthorized...") | TODO scene 7 recording; Dev 2 contract test |
-| Collateral panel shows backing and warns on clawback | `open_collateral` vs SAC balance, ABI section 3 and 6; `frontend/src/maker/CollateralPanel.tsx` | warning only if staged; say so |
+| Collateral page shows owed vs held per token and flags a clawback shortfall | `open_collateral` vs SAC balance, ABI section 3 and 6; `frontend/src/views/ReservesView.tsx` | warning only if staged; say so |
 | Works on any eligible asset the issuer allows | Constructor allowlist (AGENTS.md architecture); claim must stay "eligible, supported" | wording check by Dev 1 |
 | Testnet, fictional assets | Deployed contracts table; asset labels | true by construction |
 

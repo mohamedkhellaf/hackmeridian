@@ -26,7 +26,7 @@ Pace: about 140 words per minute, with room for pauses and transaction waits. **
 
 | # | Time | On screen | Voice-over |
 |---|---|---|---|
-| 1 | 0:00–0:16 | Markets page, hero with the sediment imagery. No wallet yet. | "Stellar already carries tokenized funds, bonds and stocks. / But most of them come with **no risk tools**. If you hold one, you can't easily buy **protection** against it falling, / or earn a premium on what you hold." |
+| 1 | 0:00–0:16 | Markets page, the offers table. No wallet yet. | "Stellar already carries tokenized funds, bonds and stocks. / But most of them come with **no risk tools**. If you hold one, you can't easily buy **protection** against it falling, / or earn a premium on what you hold." |
 | 2 | 0:16–0:30 | Stay on Markets; open "How settlement works". | "This is **Strata**: fully collateralized options for eligible tokenized assets on Stellar. / Puts and calls, **physically settled**, and every one is backed **in full** before anyone can buy it. Everything you'll see runs on **Testnet**, with fictional assets." |
 | 3 | 0:30–0:50 | Wallet: Maker A. **Write**: PUT on RWA, qty 5, total strike 50 USDx, premium 1 USDx. Sign. StrataBar shows the locked layer. | "A market maker writes a put on **RWA**, a fictional fund token: / five RWA, fifty USDx total strike. When they sign, the **full fifty USDx** moves into the contract. / No margin. No leverage." |
 | 4 | 0:50–1:02 | Wallet: Maker B. Same put, premium 0.8 USDx. Sign. Back to Markets: two quotes on one series. | "A second maker posts the same put for **less**: zero point eight USDx instead of one. / Both offers are funded on-chain. These are real offers, not a mock order book." |
@@ -99,11 +99,11 @@ If the app is not on v1.3.1, cut the EQTY paragraph (about 18 words) or say "We'
 
 ## 5. Pitch deck outline (10 slides)
 
-Use visual identity v2 throughout (Fraunces headings, Schibsted body, Plex Mono for numbers and hashes; sediment layers; StrataBar).
+Use the frontend style in `frontend/STYLE.md` throughout (IBM Plex Sans, Plex Mono only for ids and hashes, flat tables, no decoration).
 
 | # | Title | Bullets | Visual |
 |---|---|---|---|
-| 1 | **Strata** | Fully collateralized options for eligible tokenized assets on Stellar. Testnet MVP, HackMeridian 2026, Genesis / Stellar Unlocked. | Logo over sediment layers; live URL and repo URL in Plex Mono |
+| 1 | **Strata** | Fully collateralized options for eligible tokenized assets on Stellar. Testnet MVP, HackMeridian 2026, Genesis / Stellar Unlocked. | Wordmark on the dark ground; live URL and repo URL in Plex Mono |
 | 2 | **Tokenized, but unhedgeable** | Funds, bonds and stocks are being issued on Stellar. Holders have few ways to buy downside protection or earn yield by writing options. Risk tools that ignore issuer rules can't touch regulated assets. | One token icon with an empty "protection" slot beside it |
 | 3 | **What Strata does** | Makers lock the full worst-case obligation up front. Investors buy puts (protection) or calls. Exercise swaps tokens at the strike, atomically. | Three-step strip: Lock → Buy → Exercise, StrataBar under "Lock" |
 | 4 | **Demo: a protective put on RWA** | Two funded quotes: 1.0 vs 0.8 USDx. Investor buys the cheaper one. Exercise: 5 RWA in, 50 USDx out, one tx. | Screenshots: Markets with two quotes; Portfolio `active`; stellar.expert tx page |

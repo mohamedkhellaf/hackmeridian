@@ -64,7 +64,7 @@ export function useStrata() {
     try {
       const { hash } = await fn()
       ok = true
-      setNotice({ kind: 'ok', text: `${label} confirmed`, hash, mock: client.isMock })
+      setNotice({ kind: 'ok', text: label, hash, mock: client.isMock })
       return { ok: true, hash, mock: client.isMock }
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e)
@@ -86,7 +86,7 @@ export function useStrata() {
   const busy = busyId !== null
   const dismissNotice = useCallback(() => setNotice(null), [])
 
-  const writeOffer = (offer: NewOffer) => run(-1n, 'Offer published', () => client.createOffer(offer, me!))
+  const writeOffer = (offer: NewOffer) => run(-1n, 'Offer written', () => client.createOffer(offer, me!))
 
   /**
    * Confirm the purchase open in the buy dialog. The dialog stays mounted (`buying` is not cleared) so it can show the
@@ -95,7 +95,7 @@ export function useStrata() {
   const confirmBuy = async (): Promise<TxOutcome | null> => {
     const o = buying
     if (!o || !me) return null
-    return runDetailed(o.id, 'Purchase', () => client.buy(o.id, me))
+    return runDetailed(o.id, 'Bought', () => client.buy(o.id, me))
   }
 
   /** The next action the connected wallet can take on a position, if any. */
@@ -105,25 +105,25 @@ export function useStrata() {
       return {
         label: busyId === o.id ? 'Exercising…' : 'Exercise',
         disabled: busy,
-        onClick: () => void run(o.id, 'Exercise', () => client.exercise(o.id, me)),
+        onClick: () => void run(o.id, 'Exercised', () => client.exercise(o.id, me)),
       }
     if (o.writer === me && o.state === 'exercised')
       return {
         label: busyId === o.id ? 'Claiming…' : 'Claim delivery',
         disabled: busy,
-        onClick: () => void run(o.id, 'Claim delivery', () => client.claimDelivery(o.id, me)),
+        onClick: () => void run(o.id, 'Delivery claimed', () => client.claimDelivery(o.id, me)),
       }
     if (o.writer === me && o.state === 'expired')
       return {
-        label: busyId === o.id ? 'Reclaiming…' : 'Reclaim collateral',
+        label: busyId === o.id ? 'Reclaiming…' : 'Reclaim',
         disabled: busy,
-        onClick: () => void run(o.id, 'Reclaim', () => client.reclaim(o.id, me)),
+        onClick: () => void run(o.id, 'Reclaimed', () => client.reclaim(o.id, me)),
       }
     if (o.writer === me && o.state === 'offered')
       return {
-        label: busyId === o.id ? 'Cancelling…' : 'Cancel',
+        label: busyId === o.id ? 'Cancelling…' : 'Cancel offer',
         disabled: busy,
-        onClick: () => void run(o.id, 'Cancel', () => client.cancelOffer(o.id, me)),
+        onClick: () => void run(o.id, 'Cancelled', () => client.cancelOffer(o.id, me)),
       }
     return undefined
   }
