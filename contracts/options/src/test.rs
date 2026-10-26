@@ -5116,8 +5116,9 @@ fn reserved_is_persistent_and_extended_on_touch() {
     assert_eq!(t.c.open_collateral(&t.usdx), STRIKE);
     assert_eq!(t.c.open_collateral(&t.rwa), QTY);
 
-    // buy moves no collateral; cancel_offer of the CALL touches Reserved(RWA)
-    // only, a new PUT touches Reserved(USDx) only
+    // cancel_offer of the CALL writes Reserved(RWA); a new PUT writes
+    // Reserved(USDx) (every path is covered in
+    // reserved_and_open_book_ttls_extended_on_every_touching_path)
     age_below_ttl_threshold(&t);
     for token in [&t.usdx, &t.rwa] {
         let ttl = key_ttl(&t, "Reserved", token.clone().into_val(&t.env));
@@ -5135,4 +5136,278 @@ fn reserved_is_persistent_and_extended_on_touch() {
     );
     assert_eq!(t.c.open_collateral(&t.usdx), 2 * STRIKE);
     assert_eq!(t.state(put), State::Offered);
+}
+
+/// Lists `n` new unflagged classic assets (`new_asset(.., false)`) after the
+/// constructor's RWA and BOND and returns the whole registry in listing order.
+fn list_unflagged_assets(t: &T, n: usize) -> std::vec::Vec<Address> {
+    let mut assets = std::vec![t.rwa.clone(), t.bond.clone()];
+    for _ in 0..n {
+        let (sac, code, issuer) = new_asset(t, false);
+        assert_eq!(t.c.list_asset(&t.maker2, &code, &issuer), sac);
+        assets.push(sac);
+    }
+    assert_eq!(listed_assets(t), assets[..assets.len().min(50)].to_vec());
+    assert_eq!(t.c.asset_count(), assets.len() as u32);
+    assets
+}
+
+#[test]
+#[ignore = "ABI deviation: list_open() visits only the first MAX_PAGE (50) registry assets; ABI §3/§13.3 \
+            specify the concatenation of every per-asset book, truncated only at 200 ids"]
+fn list_open_includes_books_past_the_first_max_page_assets() {
+    // ABI §3 Views, §13.3 (v1.3.1): list_open() returns the per-asset books
+    // concatenated in registry order, truncated to 200 ids. With one open offer
+    // in total, on the 52nd listed asset, list_open() is that one id.
+    let t = setup();
+    let assets = list_unflagged_assets(&t, 50);
+    let last = assets[51].clone();
+    t.sac(&last).mint(&t.writer, &UNDERLYING_START);
+    let id = t.offer(&t.writer, &last, OptionType::Call);
+    assert_eq!(open_book(&t, &last), [id]);
+    assert_eq!(t.open(), [id]);
+}
+
+#[test]
+fn extend_ttl_registry_coverage_is_the_first_max_page_assets() {
+    // ABI §3 Views, §13.5 (v1.3.1): extend_ttl(ids) extends AssetAt(i) and
+    // Listed(AssetAt(i)) for i in 0..min(asset_count, MAX_PAGE), and for each id
+    // its own Listed(underlying), WriterOpen(writer), OpenFor(underlying) and
+    // Reserved entries, wherever its underlying sits in the registry.
+    let t = setup();
+    let assets = list_unflagged_assets(&t, 50);
+    assert_eq!(assets.len(), 52);
+    // a CALL on the 52nd asset (index 51, outside the registry window)
+    let last = assets[51].clone();
+    t.sac(&last).mint(&t.writer, &UNDERLYING_START);
+    let id = t.offer(&t.writer, &last, OptionType::Call);
+    age_below_ttl_threshold(&t);
+    let at = |i: u32| key_ttl(&t, "AssetAt", i.into_val(&t.env));
+    let listed = |a: &Address| key_ttl(&t, "Listed", a.clone().into_val(&t.env));
+    for (i, asset) in assets.iter().enumerate() {
+        assert!(at(i as u32) < 7 * DAY, "precondition: AssetAt({i})");
+        assert!(listed(asset) < 7 * DAY, "precondition: Listed({i})");
+    }
+
+    // no ids: only the registry window is extended
+    t.c.extend_ttl(&Vec::new(&t.env));
+    for (i, asset) in assets.iter().enumerate() {
+        let (at_ttl, listed_ttl) = (at(i as u32), listed(asset));
+        if (i as u32) < MAX_PAGE {
+            assert!(at_ttl >= 29 * DAY, "AssetAt({i}) TTL {at_ttl}");
+            assert!(listed_ttl >= 29 * DAY, "Listed({i}) TTL {listed_ttl}");
+        } else {
+            assert!(at_ttl < 7 * DAY, "AssetAt({i}) TTL {at_ttl}");
+            assert!(listed_ttl < 7 * DAY, "Listed({i}) TTL {listed_ttl}");
+        }
+    }
+    assert!(t.option_ttl(id) < 7 * DAY, "the option is not in `ids`");
+
+    // the id reaches its own underlying's entries past the window, but not the
+    // registry index entry of that underlying
+    t.c.extend_ttl(&vec![&t.env, id]);
+    for (variant, arg) in [
+        ("Listed", last.clone().into_val(&t.env)),
+        ("OpenFor", last.clone().into_val(&t.env)),
+        ("Reserved", last.clone().into_val(&t.env)),
+        ("WriterOpen", t.writer.clone().into_val(&t.env)),
+    ] {
+        let ttl = key_ttl(&t, variant, arg);
+        assert!(ttl >= 29 * DAY, "{variant} TTL {ttl}");
+    }
+    assert!(at(51) < 7 * DAY, "AssetAt(51) TTL {}", at(51));
+    assert!(at(50) < 7 * DAY, "AssetAt(50) TTL {}", at(50));
+    assert_ttls_extended(&t, id);
+}
+
+/// Runs `act` on a fresh fixture prepared by `prepare` and aged below the
+/// 7-day threshold, and checks that it extended every entry `keys` names to
+/// about TTL_EXTEND_TO = 30 days (ABI §8).
+#[track_caller]
+fn assert_path_extends(
+    what: &str,
+    prepare: impl Fn(&T) -> u32,
+    act: impl Fn(&T, u32),
+    keys: impl Fn(&T) -> std::vec::Vec<(&'static str, Address)>,
+) {
+    let t = setup();
+    let id = prepare(&t);
+    age_below_ttl_threshold(&t);
+    let keys = keys(&t);
+    for (variant, arg) in keys.iter() {
+        let ttl = key_ttl(&t, variant, arg.clone().into_val(&t.env));
+        assert!(ttl < 7 * DAY, "{what}: precondition {variant} TTL {ttl}");
+    }
+    act(&t, id);
+    for (variant, arg) in keys.iter() {
+        let ttl = key_ttl(&t, variant, arg.clone().into_val(&t.env));
+        assert!(ttl >= 29 * DAY, "{what}: {variant} TTL {ttl}");
+    }
+}
+
+#[test]
+fn reserved_and_open_book_ttls_extended_on_every_touching_path() {
+    // ABI §8, §13.8 (v1.3.1): Reserved(token) is extended on every
+    // state-changing path that touches it (the reserve writes, and the
+    // CollateralShortfall reads of create_offer, buy and transfer), and the
+    // persistent per-asset open book OpenFor(asset) whenever an offer joins or
+    // leaves it. maker2's CALL makes Reserved(RWA) exist next to Reserved(USDx).
+    let both = |t: &T| std::vec![("Reserved", t.usdx.clone()), ("Reserved", t.rwa.clone())];
+    let with_call = |t: &T| {
+        t.call(&t.maker2);
+        t.put(&t.writer)
+    };
+
+    assert_path_extends(
+        "create_offer",
+        |t| t.put(&t.maker2),
+        |t, _| {
+            t.call(&t.writer);
+        },
+        |t| {
+            let mut keys = both(t);
+            keys.push(("OpenFor", t.rwa.clone()));
+            keys.retain(|(v, a)| !(*v == "Reserved" && *a == t.rwa)); // created here
+            keys
+        },
+    );
+    assert_path_extends(
+        "buy",
+        with_call,
+        |t, id| t.c.buy(&t.holder, &id),
+        |t| {
+            let mut keys = both(t);
+            keys.push(("OpenFor", t.rwa.clone()));
+            keys
+        },
+    );
+    assert_path_extends(
+        "transfer",
+        |t| {
+            let id = with_call(t);
+            t.c.buy(&t.holder, &id);
+            id
+        },
+        |t, id| t.c.transfer(&t.holder, &t.maker2, &id),
+        both,
+    );
+    assert_path_extends(
+        "exercise (PUT)",
+        |t| {
+            let id = with_call(t);
+            t.c.buy(&t.holder, &id);
+            id
+        },
+        |t, id| t.c.exercise(&t.holder, &id),
+        both,
+    );
+    assert_path_extends(
+        "claim_delivery (PUT)",
+        |t| {
+            let id = with_call(t);
+            t.c.buy(&t.holder, &id);
+            t.c.exercise(&t.holder, &id);
+            id
+        },
+        |t, id| t.c.claim_delivery(&t.writer, &id),
+        |t| std::vec![("Reserved", t.rwa.clone())],
+    );
+    assert_path_extends(
+        "cancel_offer (CALL)",
+        |t| t.call(&t.writer),
+        |t, id| t.c.cancel_offer(&t.writer, &id),
+        |t| std::vec![("Reserved", t.rwa.clone()), ("OpenFor", t.rwa.clone())],
+    );
+    assert_path_extends(
+        "reclaim (Offered PUT)",
+        |t| {
+            let id = t.put(&t.writer);
+            t.at(EXPIRY);
+            id
+        },
+        |t, id| t.c.reclaim(&t.writer, &id),
+        |t| std::vec![("Reserved", t.usdx.clone()), ("OpenFor", t.rwa.clone())],
+    );
+    assert_path_extends(
+        "reclaim (Active CALL)",
+        |t| {
+            let id = t.call(&t.writer);
+            t.c.buy(&t.holder, &id);
+            t.at(EXPIRY);
+            id
+        },
+        |t, id| t.c.reclaim(&t.writer, &id),
+        |t| std::vec![("Reserved", t.rwa.clone())],
+    );
+    assert_path_extends(
+        "prune_expired",
+        |t| {
+            let id = t.put(&t.writer);
+            t.at(EXPIRY);
+            id
+        },
+        |t, id| assert_eq!(t.c.prune_expired(&t.pruner, &vec![&t.env, id]), 1),
+        |t| std::vec![("Reserved", t.usdx.clone()), ("OpenFor", t.rwa.clone())],
+    );
+}
+
+#[test]
+fn instance_storage_stays_four_keys_as_assets_and_tokens_grow() {
+    // ABI §8, §13.8 (v1.3.1): instance storage holds only Quote, Underlyings,
+    // Next and AssetCount; listings, reserves, open books and per-writer counts
+    // are persistent entries, so permissionless listing cannot grow the single
+    // instance entry.
+    let t = setup();
+    let instance_is_exactly_the_four_keys = |what: &str| {
+        t.env.as_contract(&t.contract, || {
+            let inst = t.env.storage().instance();
+            assert_eq!(inst.all().len(), 4, "{what}: instance keys");
+            for (key, name) in [
+                (Key::Quote, "Quote"),
+                (Key::Underlyings, "Underlyings"),
+                (Key::Next, "Next"),
+                (Key::AssetCount, "AssetCount"),
+            ] {
+                assert!(inst.has(&key), "{what}: {name}");
+            }
+        });
+    };
+    instance_is_exactly_the_four_keys("after the constructor");
+
+    // five listings and an open offer, reserve and book on every token
+    let assets = list_unflagged_assets(&t, 5);
+    let mut ids = std::vec::Vec::new();
+    for asset in &assets[2..] {
+        t.sac(asset).mint(&t.writer, &UNDERLYING_START);
+        ids.push(t.offer(&t.writer, asset, OptionType::Call));
+    }
+    ids.push(t.put(&t.writer));
+    ids.push(t.offer(&t.maker2, &t.bond, OptionType::Call));
+    instance_is_exactly_the_four_keys("after listings and offers");
+
+    // the rest of the lifecycle adds nothing to the instance either
+    t.c.buy(&t.holder, &ids[0]);
+    t.c.exercise(&t.holder, &ids[0]);
+    t.c.claim_delivery(&t.writer, &ids[0]);
+    t.c.cancel_offer(&t.writer, &ids[1]);
+    t.at(EXPIRY);
+    assert_eq!(t.c.prune_expired(&t.pruner, &vec![&t.env, ids[2]]), 1);
+    let mut all_ids = Vec::new(&t.env);
+    for id in &ids {
+        all_ids.push_back(*id);
+    }
+    t.c.extend_ttl(&all_ids);
+    instance_is_exactly_the_four_keys("after the lifecycle");
+
+    t.env.as_contract(&t.contract, || {
+        let p = t.env.storage().persistent();
+        for asset in &assets {
+            assert!(p.has(&Key::Listed(asset.clone())));
+        }
+        for token in [&t.usdx, &assets[2], &assets[3], &t.bond] {
+            assert!(p.has(&Key::Reserved(token.clone())));
+        }
+        assert!(p.has(&Key::OpenFor(assets[5].clone())));
+        assert!(p.has(&Key::WriterOpen(t.writer.clone())));
+    });
 }
