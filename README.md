@@ -2,13 +2,13 @@
 
 Options on tokenized Stellar assets: one place to write, buy and resell puts and calls. Fully collateralized by default; uncovered calls on margin are allowed, marked, and carry a warning.
 
-HackMeridian 2026, Lisbon · Genesis path · Stellar Unlocked track · Testnet only, fictional assets, unaudited.
+HackMeridian 2026, Lisbon · Genesis path · Stellar Unlocked track.
 
 | | |
 |---|---|
 | App | https://hackmeridian-psi.vercel.app |
 | Covered options contract (v1.5) | [`CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`](https://stellar.expert/explorer/testnet/contract/CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6) |
-| Margin contract (uncovered calls, v0.3.2, experimental) | [`CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) · [evidence](docs/pro-testnet-evidence.md) |
+| Margin contract (uncovered calls, v0.3.2) | [`CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN`](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) · [evidence](docs/pro-testnet-evidence.md) |
 | Spec · ABI · evidence | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) · [docs/contract-abi.md](docs/contract-abi.md) · [docs/contract-testnet-evidence.md](docs/contract-testnet-evidence.md) |
 | Demo video · deck | added at submission |
 
@@ -20,7 +20,7 @@ Tokenized funds, bonds and equities exist on Stellar. Many are regulated: the is
 
 A market maker writes a put or a call on an eligible asset and locks the full collateral in the contract: the total strike for a put, the total underlying for a call. An investor buys it, paying the premium to the writer. The holder may exercise any time before expiry; the contract swaps tokens for payment in one transaction. If any leg fails, nothing moves.
 
-Two ways to back a call live in the same product. **Covered** (default): the writer locks the full strike or the full underlying before the sale; the holder's only risk is issuer action. **Margin** (experimental, separate contract): the writer posts partial margin in USDx, the option settles in cash at a published price, and a vault funded by liquidity providers backstops liquidations. Choosing Margin when posting an offer opens a risk warning the user must acknowledge, and every margin screen repeats it:  that payouts can be reduced and any deficit is shown. The two contracts share no storage or balance, so a margin loss can never touch covered collateral.
+Two ways to back a call live in the same product. **Covered** (default): the writer locks the full strike or the full underlying before the sale; the holder's only risk is issuer action. **Margin** (separate contract): the writer posts partial margin in USDx, the option settles in cash at a published price, and a vault funded by liquidity providers backstops liquidations. Choosing Margin when posting an offer opens a risk warning the user must acknowledge, and every margin screen repeats it:  that payouts can be reduced and any deficit is shown. The two contracts share no storage or balance, so a margin loss can never touch covered collateral.
 
 - Eligibility is the asset's own `AUTH_REQUIRED` trustline authorization, read from the Stellar Asset Contract. The issuer keeps every power; the contract checks them, it does not replace them.
 - Anyone can list a classic asset by `(code, issuer)`. The contract derives the canonical SAC. The issuer still decides who may hold it, including the escrow.
@@ -30,7 +30,7 @@ Two ways to back a call live in the same product. **Covered** (default): the wri
 
 This works for any Stellar asset whose issuer permits it, not for every token. Freeze and clawback remain the issuer's powers and can block settlement (see [Limits](#limits)).
 
-Demo assets: `RWA`, `BOND`, `EQTY` (auth required, revocable, clawback enabled) and the quote token `USDx`. All fictional, all Testnet.
+Demo assets: `RWA`, `BOND`, `EQTY` (auth required, revocable, clawback enabled) and the quote token `USDx`.
 
 ## Stellar Unlocked
 
@@ -64,7 +64,7 @@ Tests: 146 unit, 18 property-based invariants (collateral conservation, no doubl
 | | ID |
 |---|---|
 | options v1.5 | `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6` |
-| margin contract v0.3.2 (uncovered calls; experimental, separate contract and identities) | `CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN` |
+| margin contract v0.3.2 (uncovered calls; separate contract and identities) | `CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN` |
 | RWA SAC | `CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U` |
 | BOND SAC | `CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP` |
 | EQTY SAC (listed with `list_asset`) | `CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU` |
@@ -142,7 +142,6 @@ Stack: Rust, soroban-sdk 28, proptest · Stellar CLI 28.1 · TypeScript, React 1
 - Quotes are indicative until an on-chain funded offer is confirmed. The demo makers are our own Testnet accounts. There is no order book depth and no pricing model.
 - Resale prices are set by holders: one ask per option, no matching, no writer buy-back.
 - Soroban storage expires; `extend_ttl` is public and a keeper script runs it.
-- Testnet, fictional assets, unaudited.
 
 ## Built at the event
 
@@ -151,7 +150,7 @@ Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after
 ## Next
 
 - Position tokens. Resale exists on-chain; a token would make options tradable on the Stellar DEX and usable as collateral elsewhere.
-- Margin (uncovered calls; the contract crate is called `pro`): experimental. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, 24 negative tests), deployed on Testnet and run end to end with every amount matching the model ([docs/pro-testnet-evidence.md](docs/pro-testnet-evidence.md)). In the app under Margin (`#/pro`) behind a build flag, against the live contract, with the warning that payouts can be reduced and any deficit is shown. The price feed and settlement price are published by the team; it is a demo oracle, not a market. It shares no storage or balance with the options contract. Next: show covered and uncovered offers in one Markets list with the badge and warning in the buy dialog, a real oracle, liquidation incentives, audit.
+- Margin (uncovered calls; the contract crate is called `pro`): specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, 24 negative tests), deployed on Testnet and run end to end with every amount matching the model ([docs/pro-testnet-evidence.md](docs/pro-testnet-evidence.md)). In the app under Margin (`#/pro`) behind a build flag, against the live contract, with the warning that payouts can be reduced and any deficit is shown. The price feed and settlement price are published by the team; it is a demo oracle, not a market. It shares no storage or balance with the options contract. Next: show covered and uncovered offers in one Markets list with the badge and warning in the buy dialog, a real oracle, liquidation incentives, audit.
 - Issuer onboarding for real tokenized assets. The contract already respects their rules; the rest is legal and operational.
 - An RFQ layer for makers; the on-chain funded offer stays the only executable quote.
 
