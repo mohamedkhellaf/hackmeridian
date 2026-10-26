@@ -26,6 +26,9 @@ v0.3 (4e revue) : le paiement d'une reprise par le vault reste réservé aux boo
 porteurs au règlement avant toute mutualisation ; le déficit de reprise devient une dette du vendeur envers le vault
 (`owed`), soldée avant tout retrait ; le premier dépôt LP est refusé si le vault vaut <= 0 avec des positions.
 
+v0.3.1 (5e revue) : la dette de reprise est prélevée sur le cash du vendeur dès le règlement de son dernier book
+échu (sans attendre un retrait) ; elle passe aussi avant le paiement d'une nouvelle reprise.
+
 Conventions de risque (publiées par le publieur, bornées par le contrat) :
 - `ra[w]`  : perte par lot COURT dans le scénario w (16 scénarios, ordre de strata_risk.ScanConfig),
              arrondie vers le haut ; négative = gain du court.
@@ -366,11 +369,7 @@ class ProModel:
         if any(q and not self._live(sid) for sid, q in a.shorts.items()):
             raise ProError("SeriesExpired")          # dette échue non réglée : aucun retrait avant settle
         if a.owed:                                   # la dette de reprise passe avant tout retrait
-            paid = min(a.cash, a.owed)
-            a.cash -= paid
-            a.owed -= paid
-            self.accounts[VAULT].cash += paid
-            self.events.append(("DebtRepaid", who, paid))
+            self._repay(who)
             if amount > a.cash:
                 raise ProError("InvalidArgs")
         if any(a.shorts.values()):
@@ -541,7 +540,8 @@ class ProModel:
             raise ProError("NotLiquidable")
         # prix de reprise : mark + bonus, arrondi vers le bas (ne jamais extraire plus que la règle)
         x = sum(chk(q * self.snaps[sid].mark * (BPS + self.cfg.bonus_bps)) // BPS for sid, q in live.items())
-        pay = min(x, max(w.cash - r["expired"], 0))   # la dette échue garde la priorité sur le cash
+        # la dette échue, puis la dette de reprise envers le vault, gardent la priorité sur le cash
+        pay = min(x, max(w.cash - r["expired"] - w.owed, 0))
         deficit = x - pay
         if taker != VAULT and deficit > 0:
             raise ProError("InsolventTakeover")      # seuls les comptes solvables vont aux repreneurs privés
@@ -653,7 +653,18 @@ class ProModel:
         if b.owner != VAULT:
             a.books.remove(bid)
         self.events.append(("BookSettled", bid, b.owner, due, from_owner, due - from_owner))
+        if b.owner != VAULT and a.owed and not any(q and not self._live(sid) for sid, q in a.shorts.items()):
+            self._repay(b.owner)                      # dernier book échu réglé : la dette de reprise est prélevée
         return {"due": due, "from_owner": from_owner, "shortfall": due - from_owner}
+
+    def _repay(self, who: str):
+        a = self.acct(who)
+        paid = min(a.cash, a.owed)
+        if paid:
+            a.cash -= paid
+            a.owed -= paid
+            self.accounts[VAULT].cash += paid
+            self.events.append(("DebtRepaid", who, paid))
 
     def _book_due(self, bid: int) -> int:
         b = self.books[bid]

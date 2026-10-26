@@ -4,9 +4,19 @@ Owner: Dev 2 (contract). Spec owner: Dev 1. Status: **experimental track, spec +
 
 **The executable spec is `packages/risk/pro_v0_model.py` (v0.3).** Every function below exists there with the same checks, in the same order, with the same errors. The brief and the model must agree. If Dev 2 finds that a behavior is unsafe or unbuildable on-chain, Dev 2 may deviate. Dev 1 then updates the model and the fixtures to match before the contract merges. The model never overrides on-chain safety. Background and calibration: `docs/pro-architecture.md`.
 
-**Done means:** `contracts/pro` replays every scenario in `packages/risk/fixtures/pro_v0.json` (14 scenarios, 335 steps) with identical results, error codes and state. **Replay is necessary, not sufficient**: the fixtures do not cover every bound or error, so contract tests must also include the negative tests listed in §7. A Testnet run covers fill → early exercise → price move → vault liquidation → settlement → claim, with the transaction hashes recorded in `docs/contract-testnet-evidence.md`. Until then, every public claim says **specified and simulated**.
+**Done means:** `contracts/pro` replays every scenario in `packages/risk/fixtures/pro_v0.json` (15 scenarios, 559 steps) with identical results, error codes and state. **Replay is necessary, not sufficient**: the fixtures do not cover every bound or error, so contract tests must also include the negative tests listed in §7. A Testnet run covers fill → early exercise → price move → vault liquidation → settlement → claim, with the transaction hashes recorded in `docs/contract-testnet-evidence.md`. Until then, every public claim says **specified and simulated**.
 
 ## 0. What changed
+
+### v0.3.1 (fifth review of PR #30, head `54d8b74`)
+
+| Round-5 item | v0.3.1 resolution |
+|---|---|
+| Takeover debt uncollectible when the writer's cash ≤ `owed` (repaid only inside a `withdraw` that otherwise succeeds) | `settle(book)` collects `min(cash, owed)` into vault cash as soon as the writer's **last expired book** is settled (holders have been paid from that cash first). `withdraw` still repays first. Any part the cash cannot cover stays recorded as `owed`. Dev 2's probe at S_T = 140: the vault collects 5,235.59 at settlement and 2,668.67 stays owed (was 0 collected). New scenario `takeover_debt_cash_short`. |
+| Low: a private takeover paid its bonus ahead of the vault debt | `liquidate` pays `min(x, cash − expired − owed)`: the debt to the vault ranks ahead of a new takeover. Scenario `takeover_debt_cash_short` shows a private takeover refused (`InsolventTakeover`) where the cash would cover the takeover only by spending money owed to the vault. |
+| Brief §4 cited the round-2 footprint figures | §4 now carries addendum 2's measured table. |
+
+Mutation check on v0.3.1: the 18 round-4 mutants plus "debt not collected at the last expired settle" and "takeover payment ignores `owed`" all change the fixtures or fail the generator. The only one left is the equivalent "settle total including live books".
 
 ### v0.3 (fourth review of PR #30, head `09c6f26`)
 
@@ -113,15 +123,20 @@ Config and roles are immutable in v0.2. Scenario `limits_and_staleness` uses `ma
 | `Pos(u32)` | persistent | `{ series_id, holder, book: u32, qty, settled, exercised, paid, deficit }` |
 | `Lp(Address)` | persistent | shares (no withdrawal in v0) |
 
-Bounds and worst-case footprint per call. Dev 2 measured the v0.1 shape at every bound with a soroban-sdk 28 crate (round-2 review): `liquidate` 18 writes / 69 footprint entries, `exercise` 7 / 49, `buy` 10 / 51, against Testnet limits of 200 writes, 400 footprint entries and 16 KB of events per transaction. Reads for a vault-owned requirement are higher than the table suggests (up to 16 snapshots + 16 series):
+Measured footprint at the caps (Dev 2, addendum 2 of the round-2 review). Dev 2 built a soroban-sdk 28 Wasm mirror of this brief with real USDx SAC transfers and SDK limit enforcement on, at 8 series / 16 books per account, 16 live series and a vault short in all 16. Testnet limits are 400 keys, 200 writes and 16,384 event bytes per transaction:
 
-| Call | Entries read (worst) | Entries written (worst) |
-|---|---|---|
-| `buy` | offer, series, writer acct, ≤ 8 snaps (requirement), book, config | offer, series, acct, vault acct, book, pos, 2 SAC balances |
-| `exercise` | pos, book, series, owner acct, ≤ 8 snaps + ≤ 8 series | pos, book, series, owner acct, SAC balance ×2 |
-| `liquidate` | writer acct, taker acct, ≤ 8 snaps + ≤ 8 series, ≤ 16 books | 2 accts, ≤ 16 books |
-| `settle(book)` | book, series, owner acct, ≤ 16 books + their series (pro-rata total) | book, series, owner acct |
-| `settle_vault` / `claim` | O(1) | O(1) |
+| Entrypoint at cap | Keys (≤ 400) | Writes (≤ 200) | Events (bytes) | Instructions |
+|---|---|---|---|---|
+| `liquidate` → vault, 16 books moved | 52 | 18 | 268 | 11.7M |
+| `liquidate`, private taker | 30 | 11 | 308 | 7.7M |
+| `buy` (16 books scanned) | 43 | 10 | 536 | 4.8M |
+| `exercise`, 16-series owner | 42 | 7 | 524 | 4.9M |
+| `withdraw` | 24 | 4 | 396 | 3.1M |
+| `lp_deposit` | 40 | 6 | ≤ 432 | ≤ 8.4M |
+| `settle` / `settle_vault` / `claim` | 5 / 4 / ≤ 10 | 3 / 3 / ≤ 6 | ≤ 480 | ≤ 1.9M |
+| `liquidate` at cap after 40 idle days (auto-restore) | 52 (18 disk) | 18 | 268 | 13.3M |
+
+Fitted bounds: `liquidate` keys = B + 2·Lv + 4, writes = B + 2. The measurement predates v0.3, which adds one field each to `Book`, `Acct` and `VaultAcct` and the `owed` repayment inside `settle`/`withdraw` (one more account write). Re-measure after the build. Contract tests must assert reads ≤ 400 and writes ≤ 200 at every cap.
 
 - `MAX_SERIES_PER_ACCOUNT = 8`, `MAX_BOOKS_PER_ACCOUNT = 16` (`TooManyPositions = 220` beyond).
 - `MAX_LIVE_SERIES = 16` series not yet closed (`TooManySeries` at `list_series`).
@@ -189,7 +204,7 @@ exercise(holder, pos_id) -> {due, spot}  // American, whole position. Order: Not
 liquidate(caller, writer, taker: Option<Address>)   // None = vault, anyone; Some(t): t == caller, auth
                                          // live = writer's shorts on series with now < expiry; none -> NotLiquidable
                                          // nlv < mm required; x = Σ_live floor(q·mark·(BPS+bonus)/BPS)
-                                         // pay = min(x, max(cash − expired, 0)); deficit = x − pay
+                                         // pay = min(x, max(cash − expired − owed, 0)); deficit = x − pay
                                          // private taker: RoleNotAllowed, deficit > 0 -> InsolventTakeover,
                                          //   TooManySeries / OiCapExceeded / TooManyPositions (books)
                                          // move live shorts + live books (owner = taker); expired books stay
@@ -203,6 +218,7 @@ settle(book_id)                          // anyone. NotFound, NoSettlementPrice,
                                          // from_owner = due if cash ≥ total else floor(due·cash/total)
                                          // vault-owned book: from_owner = min(due, reserve), excess → vault cash;
                                          // shortfall = due − from_owner
+                                         // after the owner's last expired book: move min(cash, owed) → vault cash
 settle_vault(series_id)                  // anyone. needs price, all books settled (open_books == 0), once.
                                          // vault_paid = min(series.shortfall, vault cash); series closed
 claim(holder, pos_id) -> {due, paid, deficit}   // holder only; series closed; pays the caller only
@@ -287,7 +303,7 @@ Never cut:
 - **The publisher is trusted.** Its spot and settlement price decide liquidations, early exercises and payouts. The §5 bounds only reject inconsistent snapshots. The demo feed and the settlement price are operated by the team.
 - **Early exercise is paid at the publisher's spot** (snapshot ≤ 120 s old), not at a live market price. It is refused when the vault owns the position (paid at expiry, pro rata), when the writer is unhealthy (taken over first) or while the writer has expired debt without a price.
 - The vault always takes over an account below MM, even when that pushes the vault below its own margin or below zero. Within a series the vault pays pro rata; across series it pays in `settle_vault` order.
-- **Vault takeovers ring-fence the writer's payment per book; the takeover shortfall is the writer's debt to the vault**, repaid before any withdrawal but not counted in the vault's value until repaid. The first LP takes any fee income earned before the first deposit.
+- **Vault takeovers ring-fence the writer's payment per book; the takeover shortfall is the writer's debt to the vault**, collected from the writer's cash when its last expired book settles (and before any withdrawal); any part its cash cannot cover stays a recorded, unrecovered debt, not counted in the vault's value. The debt ranks ahead of any later takeover payment. The first LP takes any fee income earned before the first deposit.
 - **LP capital cannot be withdrawn in v0.** A deposit is priced at the vault's value, which does not include writers that are insolvent but not yet taken over: a deposit made in that window (before the keeper acts) buys into a hidden loss. New deposits are refused while the vault's value is ≤ 0.
 - The payoff is not guaranteed beyond writer margin plus vault cash. Holders can take a haircut, which is shown as `deficit`.
 - Settlement uses one price, not a TWAP. If the window closes with no price, the series never closes and keeps one of the 16 live-series slots; margin and claims stay locked. A price ≥ 2^120 would overflow and lock the series. v1 needs a bounded or two-step settlement price, an overflow guard, a fallback oracle, publisher key rotation and a permissionless close for expired zero-OI series. A stale snapshot on any series of a writer blocks early exercise against that writer (publisher liveness).

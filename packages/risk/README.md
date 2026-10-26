@@ -11,6 +11,6 @@ Python 3 + numpy. Owner: Dev 1.
 | `pro_v0_model.py` | **Integer reference model of a future `contracts/pro`, v0.3** (American cash-settled calls, books, pull claims, no LP withdrawal) — the executable spec |
 | `gen_pro_fixtures.py` | Builds `fixtures/pro_v0.json` (deterministic; fails if the model breaks its own expectations); `make_snapshot()` is what the publisher runs |
 | `fuzz_pro_model.py` | Random operation sequences with invariants checked after every step (`python fuzz_pro_model.py`, deterministic) |
-| `fixtures/pro_v0.json` | 14 scenarios / 335 steps a future contract must replay (necessary, not sufficient: see brief §7) |
+| `fixtures/pro_v0.json` | 15 scenarios / 559 steps a future contract must replay (necessary, not sufficient: see brief §7) |
 
 Parameters are illustrative, not calibrated on real market data. See `docs/pro-architecture.md` and `docs/pro-v0-brief-dev2.md`.

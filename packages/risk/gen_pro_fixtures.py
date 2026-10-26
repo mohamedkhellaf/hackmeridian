@@ -508,11 +508,11 @@ def s_negative_paths():
     return r
 
 
-def s_takeover_debt():
-    r = Recorder("takeover_debt",
+def s_takeover_debt(s1_price: int = 112, name: str = "takeover_debt"):
+    r = Recorder(name,
                  "Reprise par le vault avec déficit (borne prudente d'une dette échue non cotée) : le déficit devient une "
-                 "dette du vendeur, soldée avant tout retrait (revue 4, point B).")
-    r.fund(MAKER_A=100_000, ALICE=50_000, BOB=50_000, LP1=60_000)
+                 f"dette du vendeur, prélevée sur son cash au règlement de son dernier book échu (prix final {s1_price}).")
+    r.fund(MAKER_A=200_000, MAKER_B=400_000, ALICE=50_000, BOB=50_000, CAROL=50_000, LP1=60_000)
     r.step("lp_deposit", "LP1", 50_000 * SCALE)
     s1 = r.step("list_series", "ADMIN", K, EXPIRY)
     s2 = r.step("list_series", "ADMIN", K, EXPIRY + 30 * DAY)
@@ -524,14 +524,45 @@ def s_takeover_debt():
     r.publish(s2, 135.0)
     out = r.step("liquidate", "MAKER_A", "MAKER_A", VAULT, note="le vendeur déclenche sa propre reprise : sans gain")
     assert out["deficit"] > 0 and r.m.acct("MAKER_A").owed == out["deficit"]
-    r.step("publish_settlement", "PUBLISHER", s1, 112 * SCALE)
-    settle_all(r, s1)
+    r.step("publish_settlement", "PUBLISHER", s1, s1_price * SCALE)
     owed = r.m.acct("MAKER_A").owed
-    r.step("withdraw", "MAKER_A", 1 * SCALE, note="solde d'abord la dette de reprise envers le vault")
-    assert r.m.acct("MAKER_A").owed == 0 and owed > 0
-    r.step("withdraw", "MAKER_A", r.m.acct("MAKER_A").cash)
-    r.step("lp_deposit", "LP1", 1_000 * SCALE, note="vault reconstitué par le remboursement")
+    vault_before = r.m.accounts[VAULT].cash
+    settle_all(r, s1, note="dernier book échu de A réglé : la dette de reprise est prélevée sur son cash")
+    a = r.m.acct("MAKER_A")
+    collected = owed - a.owed
+    if a.owed == 0:
+        assert collected == owed
+        r.step("withdraw", "MAKER_A", 1 * SCALE, note="dette déjà soldée : le reste est retirable")
+        r.step("withdraw", "MAKER_A", a.cash)
+        r.step("lp_deposit", "LP1", 1_000 * SCALE, note="vault reconstitué par le remboursement")
+    else:
+        assert a.cash == 0 and collected > 0
+        r.view("MAKER_A", "cash < dette : tout le cash est prélevé, le reste reste dû (créance irrécouvrable affichée)")
+        r.step("withdraw", "MAKER_A", 1, expect="InvalidArgs", note="plus de cash : rien à retirer")
+        # la dette restante passe avant le paiement d'une reprise privée ultérieure
+        a = r.m.acct("MAKER_A")                      # un échec restaure l'état : relire le compte
+        owed = a.owed
+        open_short_at_im(r, "MAKER_A", "CAROL", s2, 200, extra=owed)
+        spot = 135.0
+        while True:                                  # prix où le prix de reprise dépasse le cash hors dette
+            spot += 0.5
+            r.advance(3_600)
+            r.publish(s2, spot)
+            req = r.m.requirement("MAKER_A")
+            x = 200 * r.m.snaps[s2].mark * (BPS + r.m.cfg.bonus_bps) // BPS
+            if req["nlv"] < req["mm"] and x > r.m.acct("MAKER_A").cash - owed:
+                break
+        assert x <= r.m.acct("MAKER_A").cash, "le pas de prix a dépassé la fenêtre"
+        r.step("deposit", "MAKER_B", 300_000 * SCALE)
+        r.step("liquidate", "MAKER_B", "MAKER_A", "MAKER_B", expect="InsolventTakeover",
+               note="le cash couvrirait la reprise, mais pas après la dette envers le vault : elle passe avant")
+        out = r.step("liquidate", "KEEPER", "MAKER_A", VAULT, note="le vault reprend ; la dette grossit du déficit")
+        assert out["deficit"] > 0 and r.m.acct("MAKER_A").owed == owed + out["deficit"]
     return r
+
+
+def s_takeover_debt_short():
+    return s_takeover_debt(140, "takeover_debt_cash_short")
 
 
 def s_margin_boundaries():
@@ -601,11 +632,11 @@ def s_taker_oi_cap():
 
 SCENARIOS = [s_happy_path, s_insufficient_margin, s_snapshot_bounds, s_liquidation_private, s_gap_to_vault,
              s_settlement_deficit, s_limits_and_staleness, s_american_exercise, s_review_regressions,
-             s_writer_cash_pro_rata, s_negative_paths, s_takeover_debt, s_margin_boundaries, s_taker_oi_cap]
+             s_writer_cash_pro_rata, s_negative_paths, s_takeover_debt, s_takeover_debt_short, s_margin_boundaries, s_taker_oi_cap]
 
 
 if __name__ == "__main__":
-    out = {"version": "pro-v0.3", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
+    out = {"version": "pro-v0.3.1", "units": {"amount": "USDx, 7 décimales (1 USDx = 10_000_000)", "qty": "lots entiers",
                                           "time": "secondes Unix"},
            "scenario_order": "index 0..13 : prix {0,+1/3,-1/3,+2/3,-2/3,+1,-1} x U, vol {x1.25, x0.75} ; 14 : +ext ; 15 : -ext",
            "errors": ERRORS, "scenarios": [f().dump() for f in SCENARIOS]}
