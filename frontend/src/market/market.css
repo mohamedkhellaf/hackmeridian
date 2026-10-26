@@ -525,3 +525,7 @@
   font-size: 13.5px;
   line-height: 1.55;
 }
+.mk-check--warn,
+.mk-check--warn .mk-check-icon {
+  color: var(--warn, var(--text-2));
+}

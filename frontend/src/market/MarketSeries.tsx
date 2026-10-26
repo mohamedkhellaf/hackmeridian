@@ -4,6 +4,7 @@ import { ShortfallNotice } from '../reserves/ShortfallWarning'
 import { requiredCollateral } from '../options/types'
 import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
 import { Button, Mono, PayoffSketch, Sediment, Tag } from '../ui'
+import { implausibleTerms } from '../options/feasibility'
 import { formatCountdown, groupSeries } from './series'
 import './market.css'
 
@@ -26,6 +27,8 @@ function lockedAmount(o: OptionOffer): string {
   const c = requiredCollateral(o)
   return `${formatDisplay(c.amount, c.token.decimals)} ${c.token.code}`
 }
+
+const CHECK_TITLE = 'Premium is at least the total strike — check the terms before buying.'
 
 export function MarketSeries({
   offers,
@@ -115,7 +118,12 @@ export function MarketSeries({
                             <span className={barClass} />
                             <span>
                               <Mono>{shortAddress(o.writer)}</Mono>
-                              {o.writer === me && ' (you)'}
+                              {o.writer === me && ' (you)'}{' '}
+                              {implausibleTerms(o) && (
+  <Tag tone="warn" title={CHECK_TITLE}>
+    Check terms
+  </Tag>
+)}
                               <span className="ui-sub">{best ? 'Maker · Best price' : 'Maker'}</span>
                             </span>
                           </span>
@@ -163,7 +171,12 @@ export function MarketSeries({
                       </span>
                       <span className="mk-offer-sub">
                         Maker <Mono>{shortAddress(o.writer)}</Mono>
-                        {o.writer === me && ' (you)'}
+                        {o.writer === me && ' (you)'}{' '}
+                        {implausibleTerms(o) && (
+  <Tag tone="warn" title={CHECK_TITLE}>
+    Check terms
+  </Tag>
+)}
                       </span>
                     </div>
                     <Button size="md" variant={best || n === 1 ? 'primary' : 'secondary'} onClick={() => onBuy(o)} {...buyProps(o)}>
