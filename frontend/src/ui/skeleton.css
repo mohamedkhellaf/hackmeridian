@@ -1,0 +1,33 @@
+/* First-load skeletons: same geometry as real tables, subtle shimmer (static under reduced motion). */
+.ui-view-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ui-skel {
+  display: block;
+  max-width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--raised) 0%, var(--surface-hover) 50%, var(--raised) 100%);
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s ease-in-out infinite;
+}
+.ui-skel-err {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+@keyframes ui-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-skel {
+    animation: none;
+  }
+}

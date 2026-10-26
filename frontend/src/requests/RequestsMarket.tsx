@@ -150,7 +150,7 @@ export function FillDialog({
   return (
     <Dialog
       title={title}
-      width={500}
+      width={560}
       onClose={close}
       footer={
         <>
@@ -164,12 +164,6 @@ export function FillDialog({
       }
     >
       {header}
-      <p className="rq-copy" data-testid="fill-line">
-        You lock {amt(coll.amount, coll.token)} and receive {amt(b.totalPremium, q)} now.
-      </p>
-      <p className="rq-copy">
-        <strong>You become the writer. The collateral stays locked until exercise or expiry.</strong>
-      </p>
       <dl className="ui-kv">
         <div>
           <dt>Kind</dt>
@@ -196,9 +190,7 @@ export function FillDialog({
         <div>
           <dt>Premium you receive</dt>
           <dd className="num">
-            {amt(b.totalPremium, q)} ({perUnit(b.totalPremium, b)} per {u.code})
-            <span className="mk-note">Set by the buyer, escrowed in the contract, paid to you on fill.</span>
-          </dd>
+            {amt(b.totalPremium, q)} ({perUnit(b.totalPremium, b)} per {u.code})          </dd>
         </div>
         <div>
           <dt>Buyer</dt>

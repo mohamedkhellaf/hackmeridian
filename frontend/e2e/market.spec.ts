@@ -4,6 +4,15 @@ import { expectOpenOffers, goTo, offerRows, openApp } from './helpers.ts'
 const chain = (page: Page) => page.getByRole('table', { name: 'Option chain' })
 const chainRows = (page: Page) => chain(page).locator('tbody tr')
 
+test('a loading skeleton precedes the data and no count or empty state shows meanwhile', async ({ page }) => {
+  await page.goto('/')
+  const loading = page.getByRole('status', { name: 'Loading Markets' })
+  await expect(loading).toBeVisible()
+  await expect(loading.getByText(/open offers?/)).toHaveCount(0)
+  await expect(page.getByRole('table', { name: 'Offers' })).toBeVisible()
+  await expect(loading).toHaveCount(0)
+})
+
 test('chain shows strikes with the best premium and maker count per side', async ({ page }) => {
   await openApp(page)
   await expectOpenOffers(page, 4)

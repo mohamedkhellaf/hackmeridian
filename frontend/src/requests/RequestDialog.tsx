@@ -111,7 +111,7 @@ export function RequestDialog({
   return (
     <Dialog
       title={title}
-      width={520}
+      width={560}
       onClose={() => !submitting && onClose()}
       footer={
         <>
@@ -125,8 +125,7 @@ export function RequestDialog({
       }
     >
       {header}
-      <form id={formId} className="wr" onSubmit={(e) => void submit(e)}>
-        <p className="rq-lead">You set the price. A maker who accepts your terms fills the bid and becomes the writer.</p>
+      <form id={formId} className="wr wr--stack" onSubmit={(e) => void submit(e)}>
         <div className="wr-fields">
           <div className="wr-field">
             <span className="wr-label">Kind</span>

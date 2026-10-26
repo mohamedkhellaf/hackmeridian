@@ -38,8 +38,6 @@ test('buyer posts a funded bid, a maker fills it, both sides see the position', 
   await page.getByRole('button', { name: /^Put at 10\.00/ }).first().click()
   await rows.getByRole('button', { name: 'Sell to bid 0' }).click()
   const fill = page.getByRole('dialog', { name: 'Fill FUND put request' })
-  await expect(fill.getByTestId('fill-line')).toHaveText('You lock 50.00 USDx and receive 2.00 USDx now.')
-  await expect(fill).toContainText('You become the writer. The collateral stays locked until exercise or expiry.')
   await expect(fill.locator('dl div').filter({ hasText: /^Collateral you lock/ })).toContainText('50.00 USDx')
   await expect(fill.locator('dl div').filter({ hasText: /^Premium you receive/ })).toContainText('2.00 USDx')
   await expect(fill.locator('dl div').filter({ hasText: /^Request/ })).toHaveText(/^Request\s*Open$/)
