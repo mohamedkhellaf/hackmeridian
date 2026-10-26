@@ -3,16 +3,24 @@
 #
 #   scripts/deploy/smoke-testnet.sh             # P0 (PUT lifecycle, expected failures, expiry, competition), then P0+,
 #                                               # then V1.2 (holder transfer, paged reads; needs contract v1.2+),
-#                                               # then V1.3 (EQTY listing, prune_expired, tenor cap; needs v1.3)
+#                                               # then V1.3 + V1.3.1 (EQTY listing, prune_expired(pruner, ids), tenor
+#                                               # cap, per-asset open books via list_open_for; needs contract v1.3.1)
 #   scripts/deploy/smoke-testnet.sh --p0-only   # stop after P0
-#   scripts/deploy/smoke-testnet.sh --no-v13    # skip V1.3 (for a v1.2 contract)
-#   scripts/deploy/smoke-testnet.sh --full      # V1.3 also fills maker2 to the 50-offer writer cap, expects #116 on
-#                                               # the 51st, then cancels them (~100 extra txs, ~2 test XLM, 10-20 min)
+#   scripts/deploy/smoke-testnet.sh --no-v13    # skip V1.3 and V1.3.1 (for a v1.2 or v1.3 contract)
+#   scripts/deploy/smoke-testnet.sh --full      # V1.3 also fills maker2 to the 50-offer per-WRITER cap, expects #116
+#                                               # on the 51st, reads the multi-page RWA book, then cancels the dust
+#                                               # (~100 extra txs, ~2 test XLM, 10-20 min)
 #
 # Reads OPTIONS_ID (written by deploy.sh), the SAC ids and the role public keys from scripts/out/testnet.env.
 # Re-runnable: every run creates fresh offers and takes each option id from create_offer's return value.
 # V1.3 lists EQTY (not in the constructor) with list_asset and has the issuer authorize the escrow on it; both are
 # one-time steps per contract, so on a re-run V13_LIST and V13_FAIL_CONTRACT_NOT_AUTHORIZED are reported as SKIP.
+# V1.3 calls prune_expired with the v1.3.1 signature (pruner first, signed by strata-maker2), so the V1.3 section
+# needs a v1.3.1 contract; the V1.3-0 probe fails on older ones. V1.3.1 checks the per-asset open books: list_open_for
+# paging, list_open = the books concatenated in registry order (first 200), and every book = exactly the Offered
+# options of its asset according to get_options. The per-ASSET cap (#114 OpenListFull at 500 ids per underlying)
+# would take 10 issuer-authorized writers at the 50-offer writer cap (~1000 txs); it is covered by the contract unit
+# tests (contracts/options/src/test.rs), not on testnet. --full demonstrates the per-WRITER cap (#116) only.
 # Expected failures are simulated with --send=no (no fee, no state change) and pass only with the exact contract
 # error code from docs/contract-abi.md §2. Every submitted transaction prints "TX <label> <hash>" and is appended
 # to scripts/out/tx-log.tsv. The whole output is also saved to scripts/out/smoke-<UTC time>.log.
@@ -32,7 +40,7 @@ while [[ $# -gt 0 ]]; do
     --no-v13) RUN_V13=0 ;;
     --full) RUN_FULL=1 ;;
     -h | --help)
-      sed -n '2,19p' "$0"
+      sed -n '2,27p' "$0"
       exit 0
       ;;
     *) die "unknown argument: $1 (usage: $0 [--p0-only | --no-v13 | --full])" ;;
@@ -68,8 +76,9 @@ COMP_PREM=8000000     # maker2's competing premium, 0.8 USDx
 EXP_SECS=45           # tenor of the offer used for the expiry path
 
 # ---------- results ----------
-declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [PRE]=0) NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [PRE]=0)
-declare -A NSKIP=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [PRE]=0)
+declare -A NPASS=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
+declare -A NFAIL=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
+declare -A NSKIP=([P0]=0 [P0+]=0 [V1.2]=0 [V1.3]=0 [V1.3.1]=0 [PRE]=0)
 GROUP=PRE
 SUMMARY=()
 pass() {
@@ -86,6 +95,14 @@ skip() {
   NSKIP[$GROUP]=$((NSKIP[$GROUP] + 1))
   SUMMARY+=("$GROUP|$1|SKIP|$2")
   echo "   -- SKIP $1: $2"
+}
+# in_group <group> <cmd> [args...]: run one check function with its PASS/FAIL/SKIP rows counted under <group>.
+in_group() {
+  local saved="$GROUP" rc=0
+  GROUP="$1"
+  "${@:2}" || rc=$?
+  GROUP="$saved"
+  return "$rc"
 }
 section() { printf '\n==================== %s ====================\n' "$*"; }
 
@@ -559,6 +576,10 @@ paging() {
 MAX_TENOR=63072000      # 2 years in seconds
 MAX_OPEN_PER_WRITER=50  # open (Offered) offers per writer
 PRUNE_SECS=45           # tenor of the offer used for the prune path
+# v1.3.1 (contract-abi.md §3, §8, §13)
+MAX_PAGE=50             # page cap of get_options, list_assets and list_open_for
+MAX_OPEN_PER_ASSET=500  # ids per underlying's open book (#114 OpenListFull beyond; unit-tested, not reached here)
+LIST_OPEN_MAX=200       # list_open() returns the per-asset books concatenated in registry order, truncated to this
 
 # expect_eq <label> <got> <want> <what>
 expect_eq() {
@@ -615,6 +636,192 @@ v13_probe() {
   fi
   fail V13_INTERFACE "asset_count() unreadable: $O is not a v1.3 contract (use --no-v13 against older contracts)"
   return 1
+}
+
+# The V1.3 section calls prune_expired(pruner, ids), which only v1.3.1 has; list_open_for is the v1.3.1 marker.
+v131_probe() {
+  local page
+  page="$(view "$O" list_open_for --asset "$RWA_SAC" --from 0 --limit 1)"
+  if jq -e 'type == "array" and length <= 1' <<<"$page" >/dev/null 2>&1; then
+    pass V131_INTERFACE "list_open_for(RWA, 0, 1) = $page: $O exposes the v1.3.1 interface"
+    return 0
+  fi
+  fail V131_INTERFACE "list_open_for unreadable ('${page:-}'): $O is older than v1.3.1 and its prune_expired has no pruner argument (use --no-v13 against older contracts)"
+  return 1
+}
+
+# ---------- v1.3.1 per-asset open books ----------
+# asset_sym <SAC>: RWA/BOND/EQTY for the demo SACs, an abbreviated id otherwise.
+asset_sym() {
+  case "$1" in
+    "$RWA_SAC") echo RWA ;;
+    "$BOND_SAC") echo BOND ;;
+    "$EQTY_SAC") echo EQTY ;;
+    *) echo "${1:0:4}…${1: -4}" ;;
+  esac
+}
+# json_append <json array> <json array>: prints the concatenation. The first goes through stdin (it may grow); the
+# second goes on the jq command line, so keep it to one page or one open book.
+json_append() { jq -c --argjson b "$2" '. + $b' <<<"$1"; }
+# open_book <asset SAC>: the asset's complete open book, read with list_open_for page by page until a page shorter
+# than MAX_PAGE. Prints a JSON array of ids. Returns 1 on a read failure or a page that is not an id array.
+open_book() {
+  local a="$1" from=0 page n all='[]' i
+  for ((i = 0; i <= MAX_OPEN_PER_ASSET / MAX_PAGE; i++)); do
+    page="$(view "$O" list_open_for --asset "$a" --from "$from" --limit "$MAX_PAGE")" || return 1
+    n="$(jq 'if type == "array" and all(.[]; type == "number") then length else error("not an id array") end' \
+      <<<"$page" 2>/dev/null)" || return 1
+    all="$(json_append "$all" "$page")"
+    if ((n < MAX_PAGE)); then
+      printf '%s\n' "$all"
+      return 0
+    fi
+    from=$((from + n))
+  done
+  return 1
+}
+# registry: every listed asset in registry order (list_assets paged up to asset_count). Prints a JSON array.
+registry() {
+  local count from=0 page n all='[]'
+  count="$(view "$O" asset_count | num)"
+  [[ "$count" =~ ^[0-9]+$ ]] || return 1
+  while ((from < count)); do
+    page="$(view "$O" list_assets --from "$from" --limit "$MAX_PAGE")" || return 1
+    n="$(jq length <<<"$page" 2>/dev/null)"
+    [[ "$n" =~ ^[0-9]+$ ]] && ((n > 0)) || return 1
+    all="$(json_append "$all" "$page")"
+    from=$((from + n))
+  done
+  printf '%s\n' "$all"
+}
+# all_options: every stored OptionData (get_options paged up to option_count). Prints a JSON array.
+all_options() {
+  local count from=0 page n all='[]'
+  count="$(view "$O" option_count | num)"
+  [[ "$count" =~ ^[0-9]+$ ]] || return 1
+  while ((from < count)); do
+    page="$(view "$O" get_options --from "$from" --limit "$MAX_PAGE")" || return 1
+    n="$(jq length <<<"$page" 2>/dev/null)"
+    [[ "$n" =~ ^[0-9]+$ ]] && ((n > 0)) || return 1
+    all="$(json_append "$all" "$page")"
+    from=$((from + n))
+  done
+  printf '%s\n' "$all"
+}
+# book_has <label> <asset SAC> <id> <yes|no> <when>: passes iff <id> is (yes) / is not (no) in the asset's open book.
+book_has() {
+  local label="$1" a="$2" id="$3" want="$4" when="$5" sym book got=no
+  sym="$(asset_sym "$a")"
+  book="$(open_book "$a")" || {
+    fail "$label" "list_open_for($sym) unreadable $when"
+    return 1
+  }
+  in_list "$book" "$id" && got=yes
+  if [[ "$got" == "$want" ]]; then
+    if [[ "$want" == yes ]]; then pass "$label" "#$id is in $sym's open book $when"; else pass "$label" "#$id is not in $sym's open book $when"; fi
+    return 0
+  fi
+  fail "$label" "#$id in $sym's open book: $got, wanted $want $when (book $book)"
+  return 1
+}
+# v131_consistency <suffix>: for every registry asset, list_open_for (all pages) holds exactly the ids of the options
+# in state Offered on that asset, oldest first, according to get_options over every id; and list_open() equals those
+# books concatenated in registry order, truncated to LIST_OPEN_MAX ids (contract-abi.md §3, §13.3).
+v131_consistency() {
+  local sfx="$1" reg opts want a sym book w concat='[]' bad="" counts="" extra lo
+  reg="$(registry)" || {
+    fail "V131_BOOKS_$sfx" "asset_count/list_assets unreadable"
+    return 1
+  }
+  opts="$(all_options)" || {
+    fail "V131_BOOKS_$sfx" "option_count/get_options unreadable"
+    return 1
+  }
+  want="$(jq -c '[.[] | select((.state | if type == "string" then . elif type == "object" then (keys[0]) else tostring end) == "Offered")]
+    | group_by(.underlying) | map({key: .[0].underlying, value: (map(.id) | sort)}) | from_entries' <<<"$opts")"
+  for a in $(jq -r '.[]' <<<"$reg"); do
+    sym="$(asset_sym "$a")"
+    book="$(open_book "$a")" || {
+      bad+=" $sym:list_open_for-unreadable"
+      continue
+    }
+    w="$(jq -c --arg a "$a" '.[$a] // []' <<<"$want")"
+    [[ "$book" == "$w" ]] || bad+=" $sym:list_open_for=$book,offered=$w"
+    counts+=" $sym=$(jq length <<<"$book")"
+    concat="$(json_append "$concat" "$book")"
+  done
+  extra="$(jq -c --argjson r "$reg" 'keys - $r' <<<"$want")"
+  [[ "$extra" == "[]" ]] || bad+=" offered-options-on-unlisted-assets:$extra"
+  echo "   $(jq length <<<"$opts") options read with get_options; open books:${counts:- none}"
+  if [[ -z "$bad" ]]; then
+    pass "V131_BOOKS_$sfx" "every list_open_for book = the Offered options of its asset, oldest first:$counts"
+  else
+    fail "V131_BOOKS_$sfx" "mismatch:$bad"
+  fi
+  lo="$(view "$O" list_open)"
+  echo "   list_open() = ${lo:-unreadable}"
+  expect_eq "V131_LIST_OPEN_CONCAT_$sfx" "$(jq -c . <<<"$lo" 2>/dev/null)" \
+    "$(jq -c --argjson n "$LIST_OPEN_MAX" '.[0:$n]' <<<"$concat")" \
+    "list_open() vs the books concatenated in registry order (first $LIST_OPEN_MAX ids)"
+}
+# V1.3.1-1, while the prune-path offer P_ID (an Offered RWA PUT, possibly past expiry) is open: list_open_for paging
+# rules, list_open starts with RWA's first page (RWA is registry entry 0), P_ID is in RWA's book and not in BOND's,
+# then the full consistency check.
+v131_books() {
+  local page n lo book len got
+  page="$(view "$O" list_open_for --asset "$RWA_SAC" --from 0 --limit "$MAX_PAGE")"
+  echo "   list_open_for(RWA, 0, $MAX_PAGE) = ${page:-unreadable}"
+  n="$(jq 'if type == "array" and all(.[]; type == "number") then length else error("not an id array") end' \
+    <<<"$page" 2>/dev/null)"
+  if [[ "$n" =~ ^[0-9]+$ ]] && ((n <= MAX_PAGE)); then
+    pass V131_OPEN_FOR_PAGE "list_open_for(RWA, 0, $MAX_PAGE) returned $n ids"
+  else
+    fail V131_OPEN_FOR_PAGE "list_open_for(RWA, 0, $MAX_PAGE) = '${page:-}'; wanted an array of at most $MAX_PAGE ids"
+    return 1
+  fi
+  if jq -e '. == unique' <<<"$page" >/dev/null 2>&1; then
+    pass V131_OPEN_FOR_ORDER "ids strictly ascending (oldest first)"
+  else
+    fail V131_OPEN_FOR_ORDER "list_open_for(RWA, 0, $MAX_PAGE) = $page is not strictly ascending"
+  fi
+  lo="$(view "$O" list_open)"
+  echo "   list_open() = ${lo:-unreadable}"
+  expect_eq V131_LIST_OPEN_PREFIX "$(jq -c --argjson n "$n" '.[0:$n]' <<<"$lo" 2>/dev/null)" "$(jq -c . <<<"$page")" \
+    "list_open()[0:$n] vs list_open_for(RWA, 0, $MAX_PAGE) (RWA is registry entry 0)"
+  if [[ -n "$P_ID" ]]; then
+    book_has V131_OPEN_FOR_HAS_OFFER "$RWA_SAC" "$P_ID" yes "(prune-path PUT, unsold; expired offers stay until pruned)"
+    book_has V131_OPEN_FOR_OTHER_ASSET "$BOND_SAC" "$P_ID" no "(it is an RWA offer)"
+  else
+    fail V131_OPEN_FOR_HAS_OFFER "not checked: the prune-path offer was not created"
+  fi
+  book="$(open_book "$RWA_SAC")"
+  len="$(jq length <<<"$book" 2>/dev/null)"
+  if [[ "$len" =~ ^[0-9]+$ ]]; then
+    got="$(view "$O" list_open_for --asset "$RWA_SAC" --from "$len" --limit "$MAX_PAGE")"
+    expect_eq V131_OPEN_FOR_PAST_END "$(jq -c . <<<"$got" 2>/dev/null)" "[]" \
+      "list_open_for(RWA, from = book length $len, $MAX_PAGE)"
+    got="$(view "$O" list_open_for --asset "$RWA_SAC" --from 0 --limit 1000)"
+    expect_eq V131_OPEN_FOR_CAP "$(jq length <<<"$got" 2>/dev/null)" "$((len < MAX_PAGE ? len : MAX_PAGE))" \
+      "length of list_open_for(RWA, 0, 1000) (book $len ids, MAX_PAGE $MAX_PAGE)"
+  else
+    fail V131_OPEN_FOR_PAST_END "RWA open book unreadable"
+  fi
+  got="$(view "$O" list_open_for --asset "$USDX_SAC" --from 0 --limit "$MAX_PAGE")"
+  expect_eq V131_OPEN_FOR_UNLISTED "$(jq -c . <<<"$got" 2>/dev/null)" "[]" \
+    "list_open_for(USDx, 0, $MAX_PAGE) (the quote token is never an underlying)"
+  v131_consistency OPEN
+}
+# The v1.3.1 OfferPruned event carries the authenticated pruner (v1.3 emitted the contract's own id). Reads ERR and
+# HASH of the last send.
+prune_event_pruner() {
+  local line ev got
+  line="$(grep -m1 'offer_pruned' <<<"$ERR" || true)"
+  got="$(grep -oE 'pruner: "?[GC][A-Z2-7]{55}' <<<"$line" | grep -oE '[GC][A-Z2-7]{55}' | head -1 || true)"
+  # Fallback for a CLI that prints the event body as raw ScVal JSON: the part after "Event:" (the line itself starts
+  # with the emitting contract id) must name maker2 and not the contract.
+  ev="${line#*Event:}"
+  if [[ -z "$got" && -n "$line" && "$ev" == *"$MAKER2"* && "$ev" != *"$O"* ]]; then got="$MAKER2"; fi
+  expect_eq V131_PRUNE_EVENT_PRUNER "$got" "$MAKER2" "OfferPruned.pruner in tx $HASH (maker2 signed as pruner)"
 }
 
 # prune path, part 1: maker1 PUT on RWA expiring in PRUNE_SECS that nobody buys.
@@ -758,7 +965,7 @@ v13_tenor() {
 
 # prune_expired on a live offer: returns 0, moves nothing, the offer stays Offered; the writer then cancels it.
 prune_live() {
-  local exp id open
+  local exp id
   exp=$(($(date +%s) + 3600))
   send PRUNE_LIVE_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" --option_type Put \
     --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" --premium_total "$PUT_PREM" --expiry "$exp" || return 1
@@ -770,24 +977,20 @@ prune_live() {
   echo "   live option id $id, expiry $exp (now+3600s)"
   snap_reset
   snapshot "PRUNE_LIVE before prune_expired [#$id]" "$RWA_SAC" RWA
-  send PRUNE_LIVE "$ID_MAKER2" prune_expired --ids "[$id]"
-  expect_eq PRUNE_LIVE_RET "$RESULT" 0 "prune_expired([$id]) on a live offer, return value"
+  send PRUNE_LIVE "$ID_MAKER2" prune_expired --pruner "$MAKER2" --ids "[$id]"
+  expect_eq PRUNE_LIVE_RET "$RESULT" 0 "prune_expired(pruner=maker2, [$id]) on a live offer, return value"
   expect_option PRUNE_LIVE_STATE "$id" Offered
   snapshot "PRUNE_LIVE after prune_expired [#$id]" "$RWA_SAC" RWA
   check_deltas PRUNE_LIVE_BAL ""
-  open="$(view "$O" list_open)"
-  if in_list "$open" "$id"; then
-    pass PRUNE_LIVE_OPEN "#$id still in list_open"
-  else
-    fail PRUNE_LIVE_OPEN "#$id missing from list_open ${open:-unreadable}"
-  fi
+  book_has PRUNE_LIVE_OPEN "$RWA_SAC" "$id" yes "after prune_expired on the live offer"
   echo "   cleanup: only the writer can withdraw a live offer"
-  send PRUNE_LIVE_CANCEL "$ID_MAKER1" cancel_offer --writer "$MAKER1" --id "$id"
+  send PRUNE_LIVE_CANCEL "$ID_MAKER1" cancel_offer --writer "$MAKER1" --id "$id" &&
+    in_group V1.3.1 book_has V131_OPEN_FOR_CANCELLED "$RWA_SAC" "$id" no "after cancel_offer"
 }
 
 # prune path, part 2: after expiry maker2 (not the writer) prunes maker1's unsold offer; collateral returns to maker1.
 prune_finish() {
-  local w0 w1 open count
+  local w0 w1 count
   [[ -n "$P_ID" ]] || {
     fail PRUNE_EXPIRED "skipped: the prune offer was not created"
     return 1
@@ -800,13 +1003,15 @@ prune_finish() {
   w0="$(woc "$MAKER1")"
   snap_reset
   snapshot "PRUNE before prune_expired [#$P_ID]" "$RWA_SAC" RWA
-  send PRUNE_EXPIRED "$ID_MAKER2" prune_expired --ids "[$P_ID]" || return 1
+  send PRUNE_EXPIRED "$ID_MAKER2" prune_expired --pruner "$MAKER2" --ids "[$P_ID]" || return 1
   if grep -qi 'offer_pruned' <<<"$ERR"; then
     pass PRUNE_EVENT "offer_pruned event in tx $HASH"
   else
     fail PRUNE_EVENT "no offer_pruned event in the CLI output of tx $HASH"
   fi
-  expect_eq PRUNE_EXPIRED_RET "$RESULT" 1 "prune_expired([$P_ID]) sent by maker2 (not the writer), return value"
+  in_group V1.3.1 prune_event_pruner
+  expect_eq PRUNE_EXPIRED_RET "$RESULT" 1 \
+    "prune_expired(pruner=maker2, [$P_ID]) signed by maker2 (not the writer), return value"
   expect_option PRUNE_EXPIRED_STATE "$P_ID" Expired
   snapshot "PRUNE after prune_expired [#$P_ID]" "$RWA_SAC" RWA
   check_deltas PRUNE_EXPIRED_BAL "m1Q=$PUT_STRIKE ctrQ=-$PUT_STRIKE ocQ=-$PUT_STRIKE"
@@ -816,24 +1021,22 @@ prune_finish() {
   else
     fail PRUNE_EXPIRED_WOC "writer_open_count(maker1) unreadable before prune_expired: '$w0'"
   fi
-  open="$(view "$O" list_open)"
-  if [[ -n "$open" ]] && ! in_list "$open" "$P_ID"; then
-    pass PRUNE_EXPIRED_OPEN "#$P_ID gone from list_open"
-  else
-    fail PRUNE_EXPIRED_OPEN "#$P_ID still in list_open ${open:-unreadable}"
-  fi
-  sim_ok PRUNE_AGAIN_SIM "$ID_MAKER2" prune_expired --ids "[$P_ID]" &&
-    expect_eq PRUNE_AGAIN_RET "$SIM_RESULT" 0 "prune_expired([$P_ID]) again (simulated), return value"
+  book_has PRUNE_EXPIRED_OPEN "$RWA_SAC" "$P_ID" no "after prune_expired"
+  sim_ok PRUNE_AGAIN_SIM "$ID_MAKER2" prune_expired --pruner "$MAKER2" --ids "[$P_ID]" &&
+    expect_eq PRUNE_AGAIN_RET "$SIM_RESULT" 0 "prune_expired(pruner=maker2, [$P_ID]) again (simulated), return value"
   count="$(view "$O" option_count | num)"
   if [[ "$count" =~ ^[0-9]+$ ]]; then
-    expect_fail PRUNE_FAIL_NOT_FOUND 101 NotFound "$ID_MAKER2" prune_expired --ids "[$((count + 1000))]"
+    expect_fail PRUNE_FAIL_NOT_FOUND 101 NotFound "$ID_MAKER2" prune_expired --pruner "$MAKER2" \
+      --ids "[$((count + 1000))]"
   else
     fail PRUNE_FAIL_NOT_FOUND "option_count unreadable: '$count'"
   fi
 }
 
-# --full: maker2 fills its MAX_OPEN_PER_WRITER open offers with dust, the next create_offer fails with #116, then
-# maker2 cancels every dust offer. An EXIT trap cancels them too if the run dies halfway.
+# --full: maker2 fills its MAX_OPEN_PER_WRITER open offers with dust, the next create_offer fails with #116 (the
+# per-WRITER cap), the multi-page RWA book is checked, then maker2 cancels every dust offer. An EXIT trap cancels them
+# too if the run dies halfway. The per-ASSET cap (#114 at MAX_OPEN_PER_ASSET ids per underlying) is out of reach for
+# one writer (MAX_OPEN_PER_ASSET / MAX_OPEN_PER_WRITER = 10 writers); it is covered by the contract unit tests.
 CAP_IDS=()
 CAP_CANCELLED=0
 CAP_CANCEL_FAILED=0
@@ -851,6 +1054,26 @@ cap_cleanup() {
     fi
   done
   CAP_IDS=()
+}
+# --full, maker2 at the writer cap: RWA's open book holds at least MAX_PAGE ids, so list_open_for has to be paged. The
+# first page is full, every dust id is in the book, and the books still match get_options and list_open.
+cap_book_check() {
+  local first n book len missing
+  first="$(view "$O" list_open_for --asset "$RWA_SAC" --from 0 --limit "$MAX_PAGE")"
+  n="$(jq length <<<"$first" 2>/dev/null)"
+  book="$(open_book "$RWA_SAC")" || {
+    fail V131_CAP_BOOK "RWA open book unreadable"
+    return 1
+  }
+  len="$(jq length <<<"$book")"
+  missing="$(printf '%s\n' "${CAP_IDS[@]}" | jq -cs --argjson b "$book" '. - $b')"
+  echo "   RWA open book: $len ids read in $((len / MAX_PAGE + 1)) list_open_for pages; first page $n ids"
+  if [[ "$missing" == "[]" && "$n" == "$((len < MAX_PAGE ? len : MAX_PAGE))" ]]; then
+    pass V131_CAP_BOOK "all ${#CAP_IDS[@]} dust ids are in RWA's $len-id book ($((len / MAX_PAGE + 1)) pages, first page $n ids)"
+  else
+    fail V131_CAP_BOOK "first page ${n:-unreadable} ids of a $len-id book; dust ids missing from the book: $missing"
+  fi
+  v131_consistency CAP
 }
 v13_writer_cap() {
   local w0 w1 w2 need i exp n range=""
@@ -886,6 +1109,7 @@ v13_writer_cap() {
       --underlying "$RWA_SAC" --option_type Put --qty 1 --strike_total 1 --premium_total 1 --expiry "$exp"
     sim_ok CAP_OTHER_WRITER_SIM "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" \
       --option_type Put --qty 1 --strike_total 1 --premium_total 1 --expiry "$exp"
+    in_group V1.3.1 cap_book_check
   else
     fail CAP_FAIL_WRITER_LIMIT "not checked: maker2 is not at the cap (writer_open_count = ${w1:-unreadable})"
   fi
@@ -961,8 +1185,8 @@ fi
 
 if [[ $RUN_V13 == 1 ]]; then
   GROUP=V1.3
-  section "V1.3-0 interface probe"
-  if v13_probe; then
+  section "V1.3-0 interface probe (v1.3 and v1.3.1)"
+  if v13_probe && in_group V1.3.1 v131_probe; then
     section "V1.3-1 prune path, part 1: maker1 offer expiring in ${PRUNE_SECS}s that nobody buys"
     prune_create || echo "   prune path stopped"
     section "V1.3-2 permissionless listing of EQTY (list_asset; not in the constructor)"
@@ -976,9 +1200,13 @@ if [[ $RUN_V13 == 1 ]]; then
     v13_tenor
     section "V1.3-5 prune_expired leaves a live offer alone"
     prune_live || echo "   live prune path stopped"
-    section "V1.3-1 prune path, part 2: maker2 prunes maker1's expired offer"
+    section "V1.3.1-1 per-asset open books: list_open_for paging, list_open, get_options (prune offer still open)"
+    in_group V1.3.1 v131_books || echo "   open-book checks stopped"
+    section "V1.3-1 prune path, part 2: maker2 (pruner) prunes maker1's expired offer"
     prune_finish || echo "   prune path stopped"
-    section "V1.3-6 per-writer open cap (MAX_OPEN_PER_WRITER = 50)"
+    section "V1.3.1-2 per-asset open books after the prune"
+    in_group V1.3.1 v131_consistency PRUNED
+    section "V1.3-6 per-writer open cap (MAX_OPEN_PER_WRITER = 50; the per-asset cap of 500 is unit-tested only)"
     if [[ $RUN_FULL == 1 ]]; then
       v13_writer_cap || echo "   writer-cap path stopped"
     else
@@ -1013,12 +1241,17 @@ require_ran P0 P0_PUT_CREATE P0_PUT_BUY P0_PUT_EXERCISE P0_PUT_CLAIM P0_PUT_CLAI
   PRUNE_LIVE_STATE PRUNE_LIVE_BAL PRUNE_LIVE_CANCEL PRUNE_EXPIRED PRUNE_EVENT PRUNE_EXPIRED_RET PRUNE_EXPIRED_STATE \
   PRUNE_EXPIRED_BAL PRUNE_EXPIRED_WOC PRUNE_EXPIRED_OPEN PRUNE_AGAIN_RET PRUNE_FAIL_NOT_FOUND CAP_FILL
 [[ $RUN_FULL != 1 ]] || require_ran V1.3 CAP_FAIL_WRITER_LIMIT CAP_OTHER_WRITER_SIM CAP_CLEANUP
+[[ $RUN_V13 != 1 ]] || require_ran V1.3.1 V131_INTERFACE V131_OPEN_FOR_CANCELLED V131_OPEN_FOR_PAGE V131_OPEN_FOR_ORDER \
+  V131_LIST_OPEN_PREFIX V131_OPEN_FOR_HAS_OFFER V131_OPEN_FOR_OTHER_ASSET V131_OPEN_FOR_PAST_END V131_OPEN_FOR_CAP \
+  V131_OPEN_FOR_UNLISTED V131_BOOKS_OPEN V131_LIST_OPEN_CONCAT_OPEN V131_PRUNE_EVENT_PRUNER V131_BOOKS_PRUNED \
+  V131_LIST_OPEN_CONCAT_PRUNED
+[[ $RUN_FULL != 1 ]] || require_ran V1.3.1 V131_CAP_BOOK V131_BOOKS_CAP V131_LIST_OPEN_CONCAT_CAP
 
 section "SUMMARY"
-printf '%-5s %-32s %-5s %s\n' GROUP CHECK RESULT DETAIL
+printf '%-6s %-32s %-5s %s\n' GROUP CHECK RESULT DETAIL
 for row in "${SUMMARY[@]}"; do
   IFS='|' read -r g l r d <<<"$row"
-  printf '%-5s %-32s %-5s %s\n' "$g" "$l" "$r" "$d"
+  printf '%-6s %-32s %-5s %s\n' "$g" "$l" "$r" "$d"
 done
 echo
 verdict() { if ((NFAIL[$1] == 0)); then echo PASS; else echo FAIL; fi; }
@@ -1028,9 +1261,11 @@ if [[ $RUN_P0PLUS == 1 ]]; then echo "P0+: $(verdict P0+) (${NPASS[P0+]} passed,
 if [[ $RUN_P0PLUS == 1 ]]; then echo "V1.2: $(verdict V1.2) (${NPASS[V1.2]} passed, ${NFAIL[V1.2]} failed)"; else echo "V1.2: not run (--p0-only)"; fi
 if [[ $RUN_V13 == 1 ]]; then
   echo "V1.3: $(verdict V1.3) (${NPASS[V1.3]} passed, ${NFAIL[V1.3]} failed, ${NSKIP[V1.3]} skipped)"
+  echo "V1.3.1: $(verdict V1.3.1) (${NPASS[V1.3.1]} passed, ${NFAIL[V1.3.1]} failed)"
 else
   echo "V1.3: not run (--p0-only or --no-v13)"
+  echo "V1.3.1: not run (--p0-only or --no-v13)"
 fi
 echo "log: $SMOKE_LOG"
-total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2] + NFAIL[V1.3]))
+total_fail=$((NFAIL[PRE] + NFAIL[P0] + NFAIL[P0+] + NFAIL[V1.2] + NFAIL[V1.3] + NFAIL[V1.3.1]))
 exit $((total_fail > 0 ? 1 : 0))

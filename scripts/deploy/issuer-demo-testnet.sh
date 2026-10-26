@@ -12,9 +12,11 @@
 #   A2 contract de-authorized on RWA -> buy fails with #105 ContractNotAuthorized; cancel_offer (USDx) still works
 #   A3 writer frozen on RWA  -> holder still exercises and is paid; claim_delivery fails with SAC #11 until unfrozen
 # Part B, on a THROWAWAY instance deployed with `deploy.sh --throwaway` (never the main id):
-#   issuer claws back 1 RWA from the contract -> open_collateral(RWA) > balance(contract); buy and a new RWA
-#   create_offer fail with #115 CollateralShortfall; a BOND offer still works; issuer repairs by sending 1 RWA back
-#   to the contract (SAC transfer from the issuer, mint as fallback) -> buy succeeds.
+#   the investor buys a 1 RWA covered CALL first; then the issuer claws back 1 RWA from the contract ->
+#   open_collateral(RWA) > balance(contract); buy, a new RWA create_offer and (v1.3.1) the investor's transfer of the
+#   CALL to maker2 fail with #115 CollateralShortfall; a BOND offer still works; issuer repairs by sending 1 RWA back
+#   to the contract (SAC transfer from the issuer, mint as fallback) -> the transfer and the buy succeed.
+#   The transfer guard needs a v1.3.1 wasm (the build of this checkout, or --wasm); v1.3 and older accept the transfer.
 # CLAWBACK IS NEVER RUN AGAINST THE MAIN DEMO CONTRACT: the pooled deficit is permanent until the issuer repairs it.
 #
 # Expected failures are simulated with --send=no (no fee, no state change) and pass only with the exact error code.
@@ -81,6 +83,9 @@ CALL_QTY=30000000     # 3 RWA locked in the throwaway contract
 CALL_STRIKE=300000000 # 30 USDx
 CALL_PREM=5000000     # 0.5 USDx
 CLAW=10000000         # 1 RWA clawed back from the throwaway contract, then repaid
+XFER_QTY=10000000     # 1 RWA covered CALL the investor holds through the clawback (v1.3.1 transfer guard)
+XFER_STRIKE=100000000 # 10 USDx
+XFER_PREM=1000000     # 0.1 USDx
 
 # ---------- results ----------
 GROUPS_ORDER=(PRE A1 A2 A3 B CLEANUP)
@@ -244,6 +249,22 @@ expect_state() {
     return 0
   fi
   fail "$1" "#$2 state=$st, wanted $3"
+  return 1
+}
+# expect_holder <label> <id> <State> <holder G>: state and holder of option <id> on $O.
+expect_holder() {
+  local st h
+  show_option "$2" || {
+    fail "$1" "get_option($2) failed"
+    return 1
+  }
+  st="$(opt_state "$OPT_JSON")"
+  h="$(jq -r '.holder // "" | if type == "string" then . else tostring end' <<<"$OPT_JSON" 2>/dev/null)"
+  if [[ "$st" == "$3" && "$h" == "$4" ]]; then
+    pass "$1" "#$2 state=$st holder=$h"
+    return 0
+  fi
+  fail "$1" "#$2 state=$st holder=${h:-none}, wanted state=$3 holder=$4"
   return 1
 }
 # expect_eligible <label> <token SAC> <symbol> <who-name> <address> <true|false>: is_eligible on $O.
@@ -425,10 +446,11 @@ a3_writer_frozen() {
 }
 
 REPAIR_METHOD=""
-# part_b_clawback: deploy a throwaway instance, CALL on RWA, clawback 1 RWA from the contract, #115 guards,
-# BOND still works, issuer repairs, buy succeeds.
+# part_b_clawback: deploy a throwaway instance, an Offered CALL and an investor-held CALL on RWA, clawback 1 RWA from
+# the contract, #115 guards on buy / create_offer / transfer (v1.3.1), BOND still works, issuer repairs, transfer
+# and buy succeed.
 part_b_clawback() {
-  local prev env_t idc idb exp dlog l h
+  local prev env_t idc idx idb exp dlog l h want
   prev="${THROWAWAY_OPTIONS_ID:-}"
   dlog="$(mktemp)"
   echo "-> deploying a throwaway instance: scripts/deploy/deploy.sh --throwaway ${WASM_ARGS[*]}"
@@ -458,9 +480,17 @@ part_b_clawback() {
   new_id B_CALL_CREATE_ID || return 1
   idc="$RESULT"
   echo "   throwaway option #$idc: covered CALL 3 RWA (collateral 3 RWA in the contract), strike_total 30 USDx"
+  send B_XFER_CALL_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$RWA_SAC" --option_type Call \
+    --qty "$XFER_QTY" --strike_total "$XFER_STRIKE" --premium_total "$XFER_PREM" --expiry "$exp" || return 1
+  new_id B_XFER_CALL_CREATE_ID || return 1
+  idx="$RESULT"
+  send B_XFER_CALL_BUY "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$idx" || return 1
+  expect_holder B_XFER_CALL_ACTIVE "$idx" Active "$INVESTOR" || return 1
+  echo "   throwaway option #$idx: covered CALL 1 RWA, bought by the investor before the clawback (transfer guard)"
+  want=$((CALL_QTY + XFER_QTY))
   collateral "$T" "$RWA_SAC"
   echo "   RWA: open_collateral=$OC balance(throwaway)=$BAL"
-  if [[ "$OC" == "$CALL_QTY" && "$BAL" == "$CALL_QTY" ]]; then pass B_COLLATERAL_FULL "open_collateral=$OC balance=$BAL"; else fail B_COLLATERAL_FULL "open_collateral=$OC balance=$BAL, wanted $CALL_QTY each"; fi
+  if [[ "$OC" == "$want" && "$BAL" == "$want" ]]; then pass B_COLLATERAL_FULL "open_collateral=$OC balance=$BAL"; else fail B_COLLATERAL_FULL "open_collateral=$OC balance=$BAL, wanted $want each"; fi
 
   # The one irreversible issuer action of this script, guarded to the throwaway instance.
   if [[ "$T" == "$MAIN" || "$T" == "$OPTIONS_ID" ]]; then
@@ -479,6 +509,10 @@ part_b_clawback() {
   expect_fail B_FAIL_CREATE_SHORTFALL 115 CollateralShortfall "$ID_MAKER2" create_offer --writer "$MAKER2" \
     --underlying "$RWA_SAC" --option_type Call --qty "$CLAW" --strike_total 100000000 --premium_total 1000000 \
     --expiry "$exp"
+  # v1.3.1: a position cannot be handed to a new participant while the escrow cannot settle it (maker2 is eligible
+  # on RWA and not the writer, so #115 is the first check that fails; contract-abi.md §3 transfer, §13.2).
+  expect_fail B_FAIL_TRANSFER_SHORTFALL 115 CollateralShortfall "$ID_INVESTOR" transfer --holder "$INVESTOR" \
+    --to "$MAKER2" --id "$idx"
   send B_BOND_PUT_CREATE "$ID_MAKER1" create_offer --writer "$MAKER1" --underlying "$BOND_SAC" --option_type Put \
     --qty "$PUT_QTY" --strike_total "$PUT_STRIKE" --premium_total "$PUT_PREM" --expiry "$exp"
   idb="$RESULT"
@@ -500,6 +534,9 @@ part_b_clawback() {
   collateral "$T" "$RWA_SAC"
   echo "   RWA after repair: open_collateral=$OC balance(throwaway)=$BAL"
   if [[ "$OC" =~ ^[0-9]+$ && "$BAL" =~ ^[0-9]+$ ]] && ((BAL >= OC)); then pass B_DEFICIT_REPAIRED "open_collateral=$OC balance=$BAL"; else fail B_DEFICIT_REPAIRED "open_collateral=$OC balance=$BAL"; fi
+  if send B_TRANSFER_AFTER_REPAIR "$ID_INVESTOR" transfer --holder "$INVESTOR" --to "$MAKER2" --id "$idx"; then
+    expect_holder B_TRANSFER_AFTER_REPAIR_STATE "$idx" Active "$MAKER2"
+  fi
   send B_BUY_AFTER_REPAIR "$ID_INVESTOR" buy --buyer "$INVESTOR" --id "$idc" || return 1
   expect_state B_BUY_AFTER_REPAIR_STATE "$idc" Active
   if [[ "$idb" =~ ^[0-9]+$ ]]; then
@@ -542,8 +579,9 @@ if [[ $RUN_A == 1 ]]; then
   require_ran A2 A2_FAIL_BUY_CONTRACT_DEAUTH A2_CANCEL A2_CONTRACT_ELIGIBLE_AGAIN
   require_ran A3 A3_HOLDER_PAID A3_FAIL_CLAIM_FROZEN_WRITER A3_CLAIM A3_CLAIM_STATE
 fi
-[[ $RUN_B != 1 ]] || require_ran B B_ISSUER_CLAWBACK B_DEFICIT_VISIBLE B_FAIL_BUY_SHORTFALL B_FAIL_CREATE_SHORTFALL \
-  B_BOND_PUT_CREATE B_ISSUER_REPAIR B_DEFICIT_REPAIRED B_BUY_AFTER_REPAIR
+[[ $RUN_B != 1 ]] || require_ran B B_XFER_CALL_BUY B_XFER_CALL_ACTIVE B_ISSUER_CLAWBACK B_DEFICIT_VISIBLE \
+  B_FAIL_BUY_SHORTFALL B_FAIL_CREATE_SHORTFALL B_FAIL_TRANSFER_SHORTFALL B_BOND_PUT_CREATE B_ISSUER_REPAIR \
+  B_DEFICIT_REPAIRED B_TRANSFER_AFTER_REPAIR B_TRANSFER_AFTER_REPAIR_STATE B_BUY_AFTER_REPAIR
 
 section "SUMMARY"
 printf '%-7s %-34s %-5s %s\n' GROUP CHECK RESULT DETAIL
