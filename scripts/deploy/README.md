@@ -211,6 +211,7 @@ scripts/deploy/deploy-pro.sh                     # identities (friendbot), stell
 DRY_RUN=1 scripts/deploy/deploy-pro.sh           # print every command; send and write nothing
 python3 scripts/deploy/pro-snapshot.py --series-id 0 --strike 110 --expiry <unix> --spot 100 --seq 1   # publish_risk snap JSON
 scripts/deploy/pro-demo.sh [--expiry-minutes 15] [--settlement-price 175]   # evidence run, ~20 min, real txs
+scripts/deploy/pro-refresh-risk.sh [--spot 110]   # fresh publish_risk on the live demo series 1 (run every few minutes while recording)
 ```
 
 `deploy-pro.sh` writes `PRO_ID`, `PRO_DEPLOY_TX`, `PRO_WASM_SHA256` and the `PRO_*` public keys to
@@ -218,4 +219,4 @@ scripts/deploy/pro-demo.sh [--expiry-minutes 15] [--settlement-price 175]   # ev
 records list_series, publish_risk, deposit, buy, exercise, publish_risk at the higher price, liquidation to the vault,
 publish_settlement, settle, settle_vault and claim as `| op | tx hash |` rows in that file. Step-by-step instructions,
 the exact sequence and amounts, and troubleshooting (friendbot, trustlines, `StaleSnapshot`, `SettlementWindowClosed`)
-are in `docs/pro-testnet-runbook.md`.
+are in `docs/pro-testnet-runbook.md`; keeping the UI demo series fresh is its section 6.
