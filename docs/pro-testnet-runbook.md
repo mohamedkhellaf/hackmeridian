@@ -105,3 +105,8 @@ Also update `docs/pro-testnet-evidence.md` by hand only to add commentary; the t
   October 28 (the deploy's default TTL covers that; extend only if the frontend reads old series).
 - Do not publish the `strata-pro-*` or issuer secrets anywhere; `scripts/out/` is git-ignored and `env_set` refuses
   to write anything shaped like a secret seed.
+
+## Known limits of this build (from the Dev 2 security pass, no action needed for judging)
+
+- Persistent entries (accounts, offers, LP shares) are extended on every write but are not covered by `extend_ttl`; they live 30 days after their last write, which covers judging (28 Oct). Series, snapshots, books, positions, the vault and the instance are covered by `extend_ttl`.
+- `get_requirement` for a writer with an expired, unpriced short reads the latest snapshot of every series ever listed on the deployment (the model's `_latest_snap`). Fine for the demo (a handful of series); a v1 item for long-lived deployments. See brief §10 "Contract build notes".
