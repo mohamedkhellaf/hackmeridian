@@ -14,7 +14,7 @@ HackMeridian 2026, Lisbon · Genesis path · Stellar Unlocked track.
 
 ## Problem
 
-Tokenized funds, bonds and equities exist on Stellar. Many are regulated: the issuer decides who may hold them and can freeze or claw back. None of them has a way to hedge. A holder who expects a drawdown can only sell. Options elsewhere settle in cash via an oracle, run on margin, or ignore issuer rules, which disqualifies them for regulated assets.
+About $4B of tokenized funds, Treasury-backed tokens and government bonds already live on Stellar (Spiko, Franklin Templeton's BENJI, Ondo's USDY, WisdomTree, [stellar.org](https://stellar.org/solutions/real-world-assets)). Stocks are coming: DTCC plans to bring tokenized US stocks, ETFs and Treasuries to Stellar in the first half of 2027 ([CoinDesk](https://www.coindesk.com/business/2026/05/27/dtcc-plans-to-bring-tokenized-assets-to-stellar-in-latest-wall-street-blockchain-push)). Many of these assets are regulated: the issuer decides who may hold them and can freeze or claw back. None of them has a way to hedge. A holder who expects a drawdown can only sell. Options elsewhere settle in cash via an oracle, run on margin, or ignore issuer rules, which disqualifies them for regulated assets.
 
 ## What StellSec does
 
