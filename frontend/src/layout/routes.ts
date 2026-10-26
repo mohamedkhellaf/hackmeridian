@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 export type Route = 'markets' | 'protect' | 'write' | 'portfolio' | 'reserves' | 'issuer' | 'pro'
 
-/** StellSec Pro is mounted only when the build sets VITE_ENABLE_PRO=1. */
+/** The margin section (code name `pro`) is mounted only when the build sets VITE_ENABLE_PRO=1. */
 export const PRO_ENABLED = import.meta.env.VITE_ENABLE_PRO === '1'
 
 export interface NavItem {
@@ -17,7 +17,7 @@ export const NAV: NavItem[] = [
   { route: 'portfolio', label: 'Positions' },
   { route: 'reserves', label: 'Collateral' },
   { route: 'issuer', label: 'Issuer' },
-  ...(PRO_ENABLED ? [{ route: 'pro' as const, label: 'Pro' }] : []),
+  ...(PRO_ENABLED ? [{ route: 'pro' as const, label: 'Margin' }] : []),
 ]
 
 const ROUTES: Route[] = NAV.map((n) => n.route)

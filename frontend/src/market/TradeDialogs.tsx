@@ -8,7 +8,11 @@ import { RequestDialog } from '../requests/RequestDialog'
 import type { NewBid } from '../requests/types'
 import type { TxOutcome } from '../state/runTx'
 import { Button, Dialog, Mono, Segmented, Tag } from '../ui'
+import { PRO_ENABLED } from '../layout/routes'
 import type { BookRow } from './book'
+import { MARGIN_TRADE_HREF } from './marginAck'
+import { CollateralChoiceCards, MarginWarningDialog } from './MarginWarning'
+import type { CollateralChoice } from './MarginWarning'
 import { formatCountdown } from './series'
 
 export type Prefill = Partial<{ kind: OptionKind; underlyingId: string; qty: string; strike: string; premium: string; expiryMs: number }>
@@ -62,6 +66,8 @@ export function TradeDialog({
     ...(mode === 'sell' || bidsEnabled ? [{ value: 'post' as const, label: postLabel }] : []),
   ]
   const [tab, setTab] = useState<'take' | 'post'>(tabs[0].value)
+  // Sell / post only, and only when the margin section is built in. Full collateral is the default.
+  const [collateral, setCollateral] = useState<CollateralChoice>('full')
   const title = `${mode === 'buy' ? 'Buy' : 'Sell'} ${series}`
   const header = tabs.length > 1 ? <Segmented label={`${mode === 'buy' ? 'Buy' : 'Sell'} mode`} options={tabs} value={tab} onChange={setTab} /> : null
 
@@ -84,10 +90,22 @@ export function TradeDialog({
       />
     )
 
+  if (mode === 'sell' && tab === 'post' && PRO_ENABLED && collateral === 'margin')
+    return (
+      <MarginWarningDialog
+        onCancel={() => setCollateral('full')}
+        onContinue={() => {
+          onClose()
+          window.location.hash = MARGIN_TRADE_HREF
+        }}
+      />
+    )
+
   if (mode === 'sell' && tab === 'post')
     return (
       <Dialog title={title} width={560} onClose={onClose}>
         {header}
+        {PRO_ENABLED && <CollateralChoiceCards value={collateral} onChange={setCollateral} />}
         <WriteOfferForm
           plain
           initial={initial}

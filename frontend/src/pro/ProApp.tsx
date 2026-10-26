@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { config } from '../config'
+import { hasMarginAck } from '../market/marginAck'
+import { MarginWarningDialog } from '../market/MarginWarning'
 import { Banner, Button, Card, PageHeader, Segmented } from '../ui'
 import { useFreighter } from '../wallet/useFreighter'
 import { PRO_ONCHAIN, PRO_SIMULATED } from './copy'
@@ -144,14 +146,14 @@ function LiveStatus({ client, connected }: { client: SorobanProClient; connected
   const status = useSyncExternalStore(client.subscribe.bind(client), () => client.getStatus())
   return (
     <>
-      {status.error && <Banner tone="danger">Reading the Pro contract failed: {status.error}</Banner>}
+      {status.error && <Banner tone="danger">Reading the margin contract failed: {status.error}</Banner>}
       {!connected && <Banner tone="neutral">Connect a wallet to deposit, trade or claim.</Banner>}
     </>
   )
 }
 
 /**
- * StellSec Pro inside the main AppShell at `#/pro/...`. One disclosure banner, sub-navigation as a segmented control.
+ * The margin section (StellSec, experimental) inside the main AppShell at `#/pro/...`. One disclosure banner, sub-navigation as a segmented control.
  * Runs on the live contract when the build sets VITE_PRO_CONTRACT_ID, otherwise on fixtures.
  */
 export default function ProApp() {
@@ -169,7 +171,9 @@ export default function ProApp() {
   useEffect(() => live?.start(), [live])
   const client = live ?? sim!
   const me = live ? (address ?? '') : 'MAKER_A'
-  const title = PRO_NAV.find((n) => n.route === route)?.label ?? 'Pro'
+  // The default-risk warning shows once per session, whether the user came from Sell or from the navigation.
+  const [acked, setAcked] = useState(hasMarginAck)
+  const title = PRO_NAV.find((n) => n.route === route)?.label ?? 'Margin'
   return (
     <ProProvider key={me} client={client} sim={sim} defaultMe={me}>
       <div className="pro">
@@ -180,7 +184,7 @@ export default function ProApp() {
           actions={
             <div className="pro-subnav">
               <Segmented
-                label="Pro"
+                label="Margin sections"
                 options={PRO_NAV.map((n) => ({ value: n.route, label: n.label }))}
                 value={route}
                 onChange={(r) => {
@@ -197,6 +201,14 @@ export default function ProApp() {
         </div>
         <SimControls />
       </div>
+      {!acked && (
+        <MarginWarningDialog
+          onContinue={() => setAcked(true)}
+          onCancel={() => {
+            window.location.hash = '#/markets'
+          }}
+        />
+      )}
     </ProProvider>
   )
 }
