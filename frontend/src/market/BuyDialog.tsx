@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { config, explorerTx } from '../config'
 import type { OptionsClient } from '../options/client'
 import type { CollateralHealth, OptionOffer } from '../options/types'
 import { requiredCollateral } from '../options/types'
 import { formatDisplay, formatExpiry, shortAddress, strikePerUnit } from '../options/format'
+import { exerciseFeasibility, premiumUnaffordable } from '../options/feasibility'
+import { useBalances } from '../wallet/useBalances'
 import { PayoffChart } from '../payoff/PayoffChart'
 import { fmtNum, fmtSigned, riskLines, strikeOf, legOf } from '../payoff/buyerPayoff'
 import { shortfallFor } from '../reserves/reserves'
@@ -13,14 +15,14 @@ import type { TxOutcome } from '../state/useStrata'
 import { Button, Dialog, Icon, Mono, PayoffSketch, Sediment, Tag } from '../ui'
 import './market.css'
 
-type CheckState = 'pending' | 'ok' | 'fail' | 'unknown'
+type CheckState = 'pending' | 'ok' | 'fail' | 'unknown' | 'warn'
 
 function Check({ state, children }: { state: CheckState; children: ReactNode }) {
   return (
     <li className={`mk-check mk-check--${state}`}>
       <span className="mk-check-icon" aria-hidden="true">
         {state === 'ok' && <Icon name="check" size={16} strokeWidth={1.8} />}
-        {state === 'fail' && <Icon name="alert" size={16} strokeWidth={1.6} />}
+        {(state === 'fail' || state === 'warn') && <Icon name="alert" size={16} strokeWidth={1.6} />}
         {(state === 'pending' || state === 'unknown') && <span className="mk-check-dot" />}
       </span>
       <span>{children}</span>
@@ -87,13 +89,17 @@ export function BuyDialog({
 
   const u = offer.underlying
   const q = offer.quote
+  const tokens = useMemo(() => [offer.underlying, offer.quote], [offer.underlying, offer.quote])
+  const { balances } = useBalances(me, tokens)
+  const feasibility = exerciseFeasibility(offer, balances[u.contractId], balances[q.contractId])
+  const cannotPay = premiumUnaffordable(offer, balances[q.contractId])
   const qty = `${formatDisplay(offer.underlyingQty, u.decimals)} ${u.code}`
   const strike = `${formatDisplay(offer.totalStrike, q.decimals)} ${q.code}`
   const premium = formatDisplay(offer.totalPremium, q.decimals)
   const col = requiredCollateral(offer)
   const locked = `${formatDisplay(col.amount, col.token.decimals)} ${col.token.code} locked`
   const kindWord = offer.kind === 'put' ? 'sell' : 'buy'
-  const blocked = openCheck === 'fail' || eligCheck === 'fail'
+  const blocked = openCheck === 'fail' || eligCheck === 'fail' || cannotPay
   const short = shortfallFor(offer, health)
   const risk = riskLines(offer, assumed)
   const where = client.isMock ? 'in the mock contract' : 'on-chain'
@@ -335,6 +341,7 @@ export function BuyDialog({
             {eligCheck === 'fail' && `Your account is not authorized by the ${u.code} issuer; the purchase would fail with NotEligible.`}
             {eligCheck === 'unknown' && `Could not check ${u.code} issuer authorization.`}
           </Check>
+          {feasibility.level === 'warn' && <Check state="warn">{feasibility.message}</Check>}
           <Check state={openCheck === 'ok' ? 'ok' : openCheck === 'fail' ? 'fail' : 'pending'}>
             {openCheck === 'fail' ? 'Collateral is no longer locked for this offer' : 'Collateral is fully locked in the contract'}
           </Check>
@@ -353,6 +360,12 @@ export function BuyDialog({
         <input ref={agreeRef} type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} disabled={submitting} />
         <span>I understand the premium is non-refundable and the issuer risks above.</span>
       </label>
+
+      {cannotPay && (
+        <p className="mk-error" role="alert">
+          Your {q.code} balance is lower than the {premium} {q.code} premium, so this purchase is disabled.
+        </p>
+      )}
 
       {error && (
         <p className="mk-error" role="alert">
