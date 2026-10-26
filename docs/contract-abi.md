@@ -481,7 +481,7 @@ signature, type or event changes; `Config` keeps its constructor-time meaning.
 Deliberately not in v1.3: per-offer quote tokens (needs a `create_offer` signature change), delisting (no admin),
 position token, impairment/refund, margin.
 
-## 13. v1.3.1 corrections (decided 2026-10-26 00:20 by Dev 2 from the v1.3 gate; one redeploy)
+## 13. v1.3.1 corrections (decided 2026-10-26 00:20 by Dev 2 from the v1.3 gate; one redeploy; deployed 2026-10-26 00:50 UTC as `CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE`)
 
 1. **`prune_expired(pruner, ids)`**: caller argument with `require_auth`, so `OfferPruned.pruner` is a real identity (v1.3
    emitted the contract's own address). Backstop applies to `pruner`.
