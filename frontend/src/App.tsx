@@ -18,6 +18,17 @@ function App() {
   const [route] = useHashRoute()
   const { wallet, me } = s
 
+  // Real mode only: in mock mode the demo banner already says the data is fictional.
+  const menuBalances =
+    !s.isMock && me && s.assets ? (
+      <BalancesBar
+        variant="list"
+        tokens={s.balanceTokens.map((t) => ({ contractId: t.contractId, code: t.code, decimals: t.decimals }))}
+        balances={s.balances.balances}
+        loading={s.balances.loading}
+      />
+    ) : null
+
   return (
     <>
       <PresentationMode />
@@ -27,7 +38,7 @@ function App() {
         mock={s.isMock}
         contractId={config.optionsContractId}
         balances={
-          me && s.assets ? (
+          !s.isMock && me && s.assets ? (
             <BalancesBar
               tokens={s.balanceTokens.map((t) => ({ contractId: t.contractId, code: t.code, decimals: t.decimals }))}
               balances={s.balances.balances}
@@ -36,7 +47,16 @@ function App() {
             />
           ) : null
         }
-        wallet={<WalletChip address={me} walletName={wallet.walletName} onConnect={() => void wallet.connect()} onDisconnect={wallet.disconnect} />}
+        wallet={
+          <WalletChip
+            address={me}
+            walletName={wallet.walletName}
+            onConnect={() => void wallet.connect()}
+            onDisconnect={wallet.disconnect}
+            balances={menuBalances}
+            onRefresh={menuBalances ? () => void s.refreshBalances() : undefined}
+          />
+        }
       >
         {wallet.wrongNetwork && <Banner tone="danger">{wallet.networkMessage ?? 'Your wallet is not on Testnet. Switch network in the wallet.'}</Banner>}
         {wallet.error && <Banner tone="danger">{wallet.error}</Banner>}
@@ -59,7 +79,7 @@ function App() {
         {route === 'issuer' && <IssuerView address={wallet.address} sign={wallet.sign} optionsContractId={config.optionsContractId} />}
       </AppShell>
 
-      {s.buying && me && <BuyDialog offer={s.buying} client={s.client} me={me} onCancel={() => s.setBuying(null)} onConfirm={s.confirmBuy} />}
+      {s.buying && me && <BuyDialog offer={s.buying} client={s.client} me={me} onCancel={() => s.setBuying(null)} onConfirm={s.confirmBuy} onOutcomeShown={s.dismissNotice} />}
 
       <NoticeToast notice={s.notice} onDismiss={s.dismissNotice} />
     </>
