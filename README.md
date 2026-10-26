@@ -12,8 +12,11 @@ HackMeridian 2026 · Lisbon, 25–26 October · Genesis path · **Stellar Unlock
 | Contract ABI (locked) | [docs/contract-abi.md](docs/contract-abi.md) |
 | Every Testnet transaction we claim | [docs/contract-testnet-evidence.md](docs/contract-testnet-evidence.md) |
 | Demo script | [docs/demo-script.md](docs/demo-script.md) |
+| Demo video · pitch deck | added at submission |
 
 > Testnet only. Every asset is fictional. The code is unaudited. Nothing here is investment advice or a production offer.
+
+**Contents:** [The problem](#the-problem) · [What Strata does](#what-strata-does) · [Who it is for](#who-it-is-for) · [Why Stellar Unlocked](#why-this-is-stellar-unlocked) · [Proof on Testnet](#proof-on-testnet) · [Try it](#try-it) · [How to use the app](#how-to-use-the-app) · [How it works](#how-it-works) · [Contract reference](#contract-reference) · [What can go wrong](#what-can-go-wrong-and-what-we-promise-instead) · [Hackathon progress](#hackathon-progress) · [Where this goes](#where-this-goes) · [Team](#team)
 
 ---
 
@@ -39,6 +42,15 @@ Two demo market makers publish competing funded offers on-chain. An investor who
 
 Strata works for **any Stellar asset whose issuer permits it**, not for every token automatically. Real tokenized assets need their issuer's cooperation and legal permission. Freeze and clawback remain the issuer's powers and can block settlement; we disclose exactly what happens below.
 
+## Who it is for
+
+| User | What they get | Where in the app |
+|---|---|---|
+| **Holder of a tokenized asset** who fears a drawdown | Buys a put: the right to sell at the strike until expiry, backed in full on-chain. | **Protect** (easy mode: pick what you hold, see the puts that cover it) and **Markets** |
+| **Market maker** | Earns the premium for writing puts and calls, with collateral locked only for the life of the offer. Competes on price in a shared series. | **Write**, **Portfolio** |
+| **Asset issuer** | Keeps every power: authorizes holders and the escrow, can freeze or claw back, and sees the effect on each option. Nothing in Strata bypasses the issuer. | **Issuer** console |
+| **Anyone** | Verifies the backing: what the contract owes vs what it holds, per token, read at a ledger. | **Reserves** |
+
 ---
 
 ## Why this is "Stellar Unlocked"
@@ -51,7 +63,7 @@ The track asks for projects that get something new out of Stellar's core protoco
 | **Stellar Asset Contract bridge** | The Soroban contract moves classic assets through the SAC and reads `authorized(address)` to decide eligibility, so one contract serves fund, bond and equity tokens alike. Listing a new asset is deriving its SAC address on-chain. |
 | **Soroban atomic cross-contract calls** | Delivery-versus-payment in a single invocation, with `require_auth`, checked `i128` math and no partial states. Issuer actions during the hackathon were recorded failing cleanly on chain, with balances unchanged. |
 
-An exercise costs well under 0.01 XLM in fees. The frontend signs through the Stellar Wallets Kit (Freighter and others) and talks to Stellar RPC; the issuer console issues real `SetTrustLineFlags` and `Clawback` operations.
+Measured on chain: an exercise cost 79,873 stroops, which is 0.008 XLM ([`f2ad8d0e…10a5`](https://stellar.expert/explorer/testnet/tx/f2ad8d0e70ba15e5b487bd41b9d888a27fc8ba0d5551debe1fd4581560a210a5)); writing an offer 0.031 XLM, buying 0.003 XLM, claiming delivery 0.001 XLM. The frontend signs through the Stellar Wallets Kit (Freighter and others) and talks to Stellar RPC; the issuer console issues real `SetTrustLineFlags` and `Clawback` operations.
 
 ---
 
@@ -111,24 +123,60 @@ npm run dev             # also: npm test · npm run e2e · npm run build
 
 ---
 
+## How to use the app
+
+**As a market maker**
+1. Connect a wallet (Freighter or any Stellar Wallets Kit wallet) on Testnet.
+2. **Write**: choose the underlying, PUT or CALL, quantity, total strike, premium and expiry. The form shows the collateral that will be locked and your remaining open-offer allowance.
+3. Sign once. `create_offer` pulls the collateral into the contract and the offer appears in **Markets** as a funded quote.
+4. In **Portfolio**, cancel an unsold offer, reclaim collateral after expiry, or claim the delivered asset after a holder exercises.
+
+**As an investor**
+1. **Protect** lists the assets you hold and the puts that cover them. **Markets** shows every series with competing makers and the best price.
+2. Open an offer. The dialog shows the premium, your eligibility on the underlying, a hypothetical payoff sketch and a check that exercise is feasible with your balances.
+3. Sign. The premium goes to the writer and the option is yours. **Portfolio** shows it `Active` with a countdown.
+4. Exercise any time before expiry. One transaction swaps the tokens. The transaction link opens on stellar.expert.
+5. Optionally transfer the option to another eligible address.
+
+**As an issuer**
+1. Connect the issuer account. The console shows the asset's flags and the holders' trustline states.
+2. Authorize, freeze or claw back on an account or on the escrow contract. Each action is a real `SetTrustLineFlags` or `Clawback` operation.
+3. Watch **Reserves** and **Portfolio** reflect it: a frozen holder's exercise fails with a clear message and nothing moves.
+
+---
+
 ## How it works
 
+```mermaid
+flowchart LR
+  subgraph Users
+    M[Market maker]
+    I[Investor]
+    X[Asset issuer]
+  end
+  subgraph App["frontend/ (React, Stellar Wallets Kit, Stellar RPC)"]
+    UI[Markets · Protect · Write · Portfolio · Reserves · Issuer]
+  end
+  subgraph Chain["Stellar Testnet"]
+    C["contracts/options (Soroban)<br/>holds collateral · tracks reserves per token<br/>no admin · no oracle · no upgrade"]
+    SAC["Stellar Asset Contracts<br/>RWA · BOND · EQTY · USDx"]
+    L["Classic ledger<br/>AUTH_REQUIRED · AUTH_REVOCABLE · CLAWBACK"]
+  end
+  M & I --> UI --> C
+  C -- transfer / balance / authorized --> SAC --> L
+  X -- set_trust_line_flags · clawback --> L
 ```
- Maker (writer)             Options contract (Soroban)                Investor (holder)
- ───────────────            ──────────────────────────                ─────────────────
- create_offer  ──collateral──►  Offered  ◄── funded, visible in Markets
-                                  │  buy: premium buyer → writer, holder set
-                                  ▼
-                                Active  ──transfer──► new eligible holder
-                                  │
-         ┌────────────────────────┼─────────────────────────┐
-         ▼ exercise (one tx)      ▼ expiry                  ▼ (Offered only)
-   Exercised: put = underlying   Expired: writer reclaims   Cancelled / pruned:
-   in, strike out; call = strike collateral                 collateral back
-   in, underlying out
-         │ claim_delivery
-         ▼
-   writer receives delivered asset
+
+```mermaid
+stateDiagram-v2
+  [*] --> Offered: create_offer (collateral locked)
+  Offered --> Active: buy (premium → writer)
+  Offered --> Cancelled: cancel_offer (writer)
+  Offered --> Expired: reclaim (writer) / prune_expired (anyone)
+  Active --> Active: transfer (to an eligible holder)
+  Active --> Exercised: exercise (atomic delivery vs payment)
+  Active --> Expired: reclaim after expiry
+  Exercised --> Settled: claim_delivery (writer)
 ```
 
 - `contracts/options/` — `#![no_std]` Soroban. Holds collateral, tracks `open_collateral` per token, enforces `require_auth` on every state change, checked `i128` only, immutable constructor allowlist plus a runtime asset registry, per-asset open books (max 500) and a per-writer cap (50) so one maker cannot crowd a book, 2-year tenor limit, `prune_expired` callable by anyone, `extend_ttl` callable by anyone. No admin, no upgrade.
@@ -137,6 +185,29 @@ npm run dev             # also: npm test · npm run e2e · npm run build
 - `scripts/` — reproducible Testnet setup, deployment and demos. `docs/` — locked ABI, evidence, demo script, UI spec.
 
 Decisions a reader should know, each with its reasoning in [PRODUCT_SPEC.md](PRODUCT_SPEC.md): premium is paid at purchase and never refunded (D1); a writer cannot buy their own offer (D2); expiry must fall within two years (D4); no "impaired" state and no refund after issuer action (D6); transfer is free and only to an eligible address (D7).
+
+---
+
+## Contract reference
+
+Full ABI with types, events and storage: [docs/contract-abi.md](docs/contract-abi.md). Amounts are exact integer token units (`i128`); timestamps are ledger seconds.
+
+| Function | Who signs | Effect |
+|---|---|---|
+| `create_offer(writer, kind, underlying, quote, qty, strike_total, premium_total, expiry)` | writer | Pulls the collateral (strike for a put, underlying for a call) and opens the offer. Rejects ineligible writers, unlisted assets, a full book, a writer at the cap, bad amounts or tenor, and any token the contract already holds less of than it owes. |
+| `buy(buyer, id)` | buyer | Pays the premium to the writer; buyer becomes holder. Rejects the writer itself, ineligible buyers and expired offers. |
+| `exercise(holder, id)` | holder | Put: underlying in, strike out. Call: strike in, underlying out. One invocation; any failure reverts all of it. |
+| `claim_delivery(writer, id)` | writer | Writer collects what the holder delivered. |
+| `cancel_offer(writer, id)` · `reclaim(writer, id)` | writer | Collateral back before sale, or after expiry. |
+| `prune_expired(pruner, ids)` | anyone | Returns collateral of expired unsold offers to their writers and frees the book. |
+| `transfer(holder, to, id)` | holder | Hands an active option to another eligible address. |
+| `list_asset(lister, code, issuer)` | anyone | Derives the canonical SAC for a classic asset and adds it to the registry. |
+| `extend_ttl(ids)` | anyone | Bumps storage rent for the instance and the given options. |
+| `get_option`, `get_options(from, limit)`, `list_open`, `list_open_for(asset, …)`, `option_count`, `open_collateral(token)`, `is_eligible(token, who)`, `is_listed`, `list_assets`, `asset_count`, `writer_open_count`, `config` | read-only | Everything the UI shows comes from these. |
+
+Errors are numbered 101–119 and decoded in the UI: `NotFound` 101, `InvalidArgs` 102, `AssetNotAllowed` 103, `NotEligible` 104, `ContractNotAuthorized` 105, `WrongState` 106, `NotWriter` 107, `NotHolder` 108, `Expired` 109, `NotExpired` 110, `SelfTrade` 111, `Overflow` 112, `InvalidConfig` 113, `OpenListFull` 114, `CollateralShortfall` 115, `WriterOpenLimit` 116, `AlreadyListed` 117, `AssetNotDeployed` 118, `TenorOutOfRange` 119.
+
+**Tech stack:** Rust, `soroban-sdk` 28, `#![no_std]`, `proptest` for invariants · Stellar CLI 28.1 · TypeScript, React 19, Vite, `@stellar/stellar-sdk`, Stellar Wallets Kit (Freighter and others), Stellar RPC and Horizon · Vitest, Playwright · GitHub Actions CI (contracts, frontend, e2e) · Vercel.
 
 ---
 
@@ -150,20 +221,18 @@ Decisions a reader should know, each with its reasoning in [PRODUCT_SPEC.md](PRO
 
 ---
 
-## Built during the event
+## Hackathon progress
 
-Everything in this repository was written between 11:00 on Sunday 25 October and the submission, starting from an empty scaffold: 61 commits and 30 merged pull requests, all in the public history.
+Everything here was built between 11:00 on Sunday 25 October and the submission, from an empty scaffold, in 61 commits and 30 merged pull requests on this repository. The idea was chosen at the venue after a structured committee process ([WINNING_IDEAS.md](WINNING_IDEAS.md), [research/decision/](research/decision/)) and a Testnet spike that proved put exercise, issuer freeze and clawback against a contract balance before any product code was written ([20_rwa_options_spike.md](research/decision/20_rwa_options_spike.md)).
 
-| When (Lisbon) | Milestone |
-|---|---|
-| Sun 14:00–17:00 | Idea committee: 12 proposals, debates, independent scoring, Testnet spikes. Decision record in [WINNING_IDEAS.md](WINNING_IDEAS.md) and [research/decision/](research/decision/). |
-| Sun 17:00 | Spike proves put exercise, issuer freeze and clawback against a contract balance on Testnet ([20_rwa_options_spike.md](research/decision/20_rwa_options_spike.md)). |
-| Sun 19:06 | **v1** deployed. Cash-secured put, covered call, two assets on one contract. |
-| Sun 19:38 · 20:32 | **v1.1** hardening; **v1.2** holder transfer, paged reads, issuer-action evidence, invariant and negative test suites. |
-| Sun 23:06 · Mon 00:50 | **v1.3** permissionless `list_asset`, per-writer cap, `prune_expired`, tenor cap; **v1.3.1** per-asset books and transfer guards after a five-reviewer gate. EQTY listed and traded on chain. |
-| Mon 01:00–06:00 | Frontend redesign, multi-wallet connect, Protect easy mode, Reserves attestation, payoff charts, product spec and payoff package. |
+What exists at submission:
 
-We used AI coding agents throughout, in bounded lanes with human owners for financial semantics, contract safety and UX, and every merged claim is backed by a test or a Testnet transaction. The process is documented in [AGENTS.md](AGENTS.md).
+- **Contract**: four deployed iterations on Testnet, each recorded with its deploy transaction. v1 (puts, calls, two assets on one contract) → v1.1 (hardening after an audit pass) → v1.2 (holder transfer, paged reads, invariant and negative suites) → v1.3 / v1.3.1 (permissionless listing, per-asset books, per-writer cap, tenor limit, third-party prune, transfer guards, after a five-reviewer gate). 202 tests.
+- **Issuer scenarios on chain**: freeze, revoke and clawback against holders and against the escrow, with the contract's behaviour recorded transaction by transaction.
+- **App**: six screens wired to the live contract, multi-wallet connect, payoff charts, exercise-feasibility checks, collateral attestation, issuer console, Vitest and Playwright suites in CI.
+- **Product spec** with seven reasoned decisions and acceptance tests, a locked ABI, a payoff package, and a specified (not deployed) margin product as the next step.
+
+We used AI coding agents throughout, in bounded lanes with human owners for financial semantics, contract safety and UX. Every merged claim is backed by a test or a Testnet transaction; the rules are in [AGENTS.md](AGENTS.md).
 
 ## Where this goes
 
