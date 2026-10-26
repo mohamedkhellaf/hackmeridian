@@ -1310,6 +1310,9 @@ impl OptionsContract {
     /// Compare with the SAC `balance(contract)`: a lower balance means an issuer clawback hit the
     /// contract. Returns 0 for unknown tokens.
     pub fn open_collateral(env: Env, token: Address) -> i128 {
+        // v1.5: for the quote token this also includes the escrowed premiums of `Open` bids
+        // (ABI §15). Plain comment, not a doc comment, so the deployed v1.5 wasm (whose contract
+        // spec carries the doc text above) is unchanged.
         reserved(&env, &token)
     }
 

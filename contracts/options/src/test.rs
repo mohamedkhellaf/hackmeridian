@@ -6119,3 +6119,68 @@ fn bid_expired_active_option_reclaimed_by_writer() {
     assert_eq!(t.bals(&t.writer).usdx, w0.usdx + PREMIUM);
     assert_eq!(t.c.open_collateral(&t.rwa), 0);
 }
+
+#[test]
+fn bid_prune_failing_refund_skips_only_that_id() {
+    let t = setup();
+    let frozen = t.bid_by(&t.holder, &t.rwa, OptionType::Put, START + 100);
+    let other = t.bid_by(&t.maker2, &t.rwa, OptionType::Call, START + 100);
+    // the issuer freezes the first buyer on USDx, so its refund transfer fails
+    t.usdx_flags.set_flag(IssuerFlags::RevocableFlag);
+    t.sac(&t.usdx).set_authorized(&t.holder, &false);
+    t.at(START + 100);
+    let holder0 = t.bal(&t.usdx, &t.holder);
+    let maker0 = t.bal(&t.usdx, &t.maker2);
+    assert_eq!(t.c.prune_bids(&t.pruner, &vec![&t.env, frozen, other]), 1);
+    assert_eq!(
+        t.env.events().all().filter_by_contract(&t.contract),
+        [BidPruned {
+            id: other,
+            pruner: t.pruner.clone(),
+        }
+        .to_xdr(&t.env, &t.contract)]
+    );
+    assert_eq!(t.c.get_bid(&frozen).state, BidState::Open);
+    assert_eq!(t.c.get_bid(&other).state, BidState::Expired);
+    assert_eq!(t.bal(&t.usdx, &t.holder), holder0);
+    assert_eq!(t.bal(&t.usdx, &t.maker2), maker0 + PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.usdx), PREMIUM);
+    assert_eq!(t.bal(&t.usdx, &t.contract), PREMIUM);
+    assert_eq!(t.c.buyer_open_count(&t.holder), 1);
+    assert_eq!(
+        t.c.list_open_bids_for(&t.rwa, &0, &50),
+        vec![&t.env, frozen]
+    );
+    // once re-authorized the same prune refunds it
+    t.sac(&t.usdx).set_authorized(&t.holder, &true);
+    assert_eq!(t.c.prune_bids(&t.pruner, &vec![&t.env, frozen, other]), 1);
+    assert_eq!(t.bal(&t.usdx, &t.holder), holder0 + PREMIUM);
+    assert_eq!(t.c.open_collateral(&t.usdx), 0);
+    // a pruned bid can be neither filled nor cancelled
+    assert_err(t.c.try_fill_bid(&t.writer, &frozen), Error::BidNotOpen);
+    assert_err(t.c.try_cancel_bid(&t.holder, &frozen), Error::BidNotOpen);
+}
+
+#[test]
+fn bid_fill_and_cancel_on_cancelled_or_unknown_bid() {
+    let t = setup();
+    let id = t.bid(OptionType::Put);
+    t.c.cancel_bid(&t.holder, &id);
+    assert_err(t.c.try_fill_bid(&t.writer, &id), Error::BidNotOpen);
+    assert_err(t.c.try_fill_bid(&t.writer, &99), Error::NotFound);
+    assert_err(t.c.try_cancel_bid(&t.holder, &99), Error::NotFound);
+    assert_err(t.c.try_fill_bid(&t.contract, &id), Error::InvalidArgs);
+    assert_err(
+        t.c.try_create_bid(
+            &t.contract,
+            &OptionType::Put,
+            &t.rwa,
+            &t.usdx,
+            &QTY,
+            &STRIKE,
+            &PREMIUM,
+            &EXPIRY,
+        ),
+        Error::InvalidArgs,
+    );
+}
