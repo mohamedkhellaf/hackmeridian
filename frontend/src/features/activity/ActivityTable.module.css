@@ -1,0 +1,56 @@
+@layer features {
+  .table :where(th, td) {
+    vertical-align: top;
+  }
+
+  .table :where(tbody) :where(th, td) {
+    padding-block: var(--s-12);
+  }
+
+  .what {
+    white-space: normal;
+    min-width: 14rem;
+  }
+
+  .label {
+    display: block;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .sub {
+    display: block;
+    margin-top: var(--s-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 420;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .state {
+    white-space: normal;
+    min-width: 16rem;
+    max-width: 24rem;
+  }
+
+  .note {
+    display: block;
+    margin-top: var(--s-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 420;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .cell {
+    white-space: nowrap;
+  }
+
+  /* The copy button is taller than a line of text: pull the hash up so its text sits on the row's first line. */
+  .hash {
+    display: inline-flex;
+    margin-top: calc(var(--s-4) * -1);
+  }
+}

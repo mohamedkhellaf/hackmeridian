@@ -1,0 +1,171 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+    container-type: inline-size;
+  }
+
+  .label {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    color: var(--muted);
+  }
+
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-8);
+  }
+
+  .option {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+    min-height: var(--touch);
+    padding: var(--s-12) var(--s-16);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color var(--dur-hover) var(--ease-enter);
+
+    &:hover {
+      border-color: var(--control);
+    }
+
+    &[data-selected] {
+      border-color: var(--text);
+      outline: 1px solid var(--text);
+    }
+
+    &:has(.input:focus-visible) {
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  .input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .glyph {
+    flex: none;
+    color: var(--text);
+  }
+
+  .name {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .lead {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  .line {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .money {
+    margin-top: auto;
+    padding-top: var(--s-8);
+    border-top: 1px solid var(--hairline);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+  }
+
+  .moneyLabel {
+    font-size: var(--label-size);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+    margin-inline-end: var(--s-4);
+  }
+
+  /* The secondary intent: one quiet row, no card. */
+  .option[data-quiet] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-12);
+    padding: var(--s-8) var(--s-16);
+    border-style: dashed;
+    border-color: var(--rule);
+    background: transparent;
+
+    & .name {
+      font-family: var(--font-sans);
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      font-weight: var(--ui-weight);
+    }
+
+    & .line {
+      color: var(--muted);
+    }
+
+    & .money {
+      display: none;
+    }
+
+    &[data-selected] {
+      border-style: solid;
+      border-color: var(--text);
+      background: var(--surface);
+    }
+  }
+
+  /* Narrow: the cards become rows, and only the chosen one keeps its sentence. */
+  @container (max-width: 39.99rem) {
+    .cards {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-6);
+    }
+
+    .option:not([data-quiet]) {
+      padding: var(--s-12);
+
+      &:not([data-selected]) .line,
+      &:not([data-selected]) .money {
+        display: none;
+      }
+    }
+
+    .option[data-quiet]:not([data-selected]) .line {
+      display: none;
+    }
+  }
+}

@@ -1,0 +1,14 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  /* The closing figure is the kit's large key-value item; the section rule above it is the ticket's. */
+  .total {
+    padding-top: var(--s-8);
+    border-top: 1px solid var(--rule);
+  }
+}

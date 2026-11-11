@@ -1,0 +1,142 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .sentence {
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .terms {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .contractWords {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .subheading {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+
+  .body {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .suggestions {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .suggestion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+    padding-block: var(--s-8);
+    border-top: 1px solid var(--hairline);
+
+    &:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+  }
+
+  .suggestionText {
+    min-width: 0;
+  }
+
+  .suggestionTerms {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .suggestionDetail {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+  }
+
+  .own {
+    display: grid;
+    grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+    gap: var(--s-8) var(--s-24);
+    align-items: end;
+    margin-top: var(--s-4);
+  }
+
+  .premium {
+    min-width: 0;
+  }
+
+  .reference {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-4);
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+  }
+
+  @container (max-width: 35.99rem) {
+    .suggestion {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .own {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+}

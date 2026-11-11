@@ -22,6 +22,11 @@ interface ButtonLook {
 }
 
 export interface ButtonProps extends ButtonLook, Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> {
+  /**
+   * `danger` on a `quiet` button sets it in the danger ink without a border: a destructive action in a dense
+   * row, where a column of outlined danger buttons would shout. The confirmation it opens uses `variant="danger"`.
+   */
+  tone?: 'default' | 'danger'
   /** Shows a spinner, sets `aria-busy` and blocks activation while keeping focus on the button. */
   loading?: boolean
   /** Why the button is disabled. Shown as a tooltip and read by screen readers; the button stays focusable. */
@@ -43,6 +48,7 @@ export function Button({
   loading = false,
   disabled = false,
   disabledReason,
+  tone = 'default',
   className,
   children,
   type = 'button',
@@ -64,6 +70,7 @@ export function Button({
       aria-describedby={cx(rest['aria-describedby'], reason ? reasonId : undefined) || undefined}
       className={cx(styles.root, className)}
       data-variant={variant}
+      data-tone={tone === 'danger' ? 'danger' : undefined}
       data-size={size}
       data-full-width={fullWidth || undefined}
       data-loading={loading || undefined}

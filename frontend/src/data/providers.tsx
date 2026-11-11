@@ -20,6 +20,8 @@ import { ACTIVITY_KEY_PREFIX, activityStore } from './tx/activityStore'
 import { OptionsClientContext } from './useOptionsClient'
 import type { OptionsClientHandle } from './useOptionsClient'
 
+const WRONG_NETWORK_FALLBACK = 'Your wallet is not on Testnet. Switch the network in the wallet.'
+
 /**
  * Provides one Covered client for the whole session. Must sit inside `<WalletProvider>`.
  *
@@ -41,7 +43,8 @@ export function OptionsClientProvider({ children, source }: { children: ReactNod
   const client = useSyncExternalStore(src.subscribe, src.peek, src.peek)
   const error = useSyncExternalStore(src.subscribe, src.error, src.error)
   const me = wallet.address
-  const value = useMemo<OptionsClientHandle>(() => ({ getClient: src.get, client, isMock: isMockMode(), error, me }), [src, client, error, me])
+  const wrongNetwork = wallet.wrongNetwork ? (wallet.networkMessage ?? WRONG_NETWORK_FALLBACK) : null
+  const value = useMemo<OptionsClientHandle>(() => ({ getClient: src.get, client, isMock: isMockMode(), error, me, wrongNetwork }), [src, client, error, me, wrongNetwork])
   return <OptionsClientContext.Provider value={value}>{children}</OptionsClientContext.Provider>
 }
 

@@ -3,7 +3,7 @@
 StellSec is a clearing desk that has nothing to hide. The interface reads like a broker's paperwork: term sheet,
 contract note, reconciliation. Numbers come before adjectives; every sentence says who acts and by when. This file
 replaces `STYLE.md`. Every change under `frontend/` is checked against it. The living specimens are at `/design`
-(`/design.html` in dev); the API of each component is in `src/ui/README.md`.
+(components, then charts); the API of each component is in `src/ui/README.md`.
 
 ## 1. Principles
 
@@ -139,19 +139,25 @@ navigation and where they replace a word in a tight row. Status icons always sit
   for losses. Time is `13 Nov 2026, 08:00 UTC`, local time secondary, countdown `2 d 4 h`.
 - Empty states are one line and at most one action. Proof is a truncated id with copy and an explorer link.
 
+### No disclaimer taglines
+
+The interface does not carry tagline-style disclaimers: no "Testnet only", "Fictional assets", "No real funds" or
+"Unaudited" as slogans, status rules, chips or banners (`BANNED_TAGLINES` in `src/core/disclosures.ts`). The footer
+carries a conventional legal notice; the network name appears once, as a state indicator in the top bar; limits are
+explained in sentences where they matter to a decision (the ticket review, the asset About tab, Learn).
+
 ### Required sentences (verbatim, one home each; the strings live in `src/core/disclosures.ts`)
 
 | Sentence | Home |
 |---|---|
-| `Stellar Testnet. Fictional assets and makers. No real funds.` | App footer, every app route |
-| `Mock data, not read from a chain.` | App footer, mock mode only |
+| The legal notice (`LEGAL_NOTICE`, after `COPYRIGHT_NOTICE`) | App footer, every route |
 | `The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.` | Ticket review (buy, fill, resale buy); asset About tab |
 | `Paid to the maker now. Not refundable.` (resale: `Set by the seller. Paid to the seller now.`) | Next to the premium in the buy review |
 | `Hypothetical payoff at expiry. Not a quote.` | Caption of every payoff figure |
 | `Clawback shortfall on X: payouts are first come, first served until the balance runs out, with no refund, and new trades are refused.` | Reserves, and any ticket for that token |
 | `You escrow X now; refunded if you cancel or it expires.` | Bid ticket |
 | `Set the wallet to Testnet. StellSec never asks for your secret key or recovery phrase.` | Connect dialog |
-| Margin banner, warning bullets and collateral cards | Margin screens, unchanged |
+| Margin banner (`marginBanner`), warning bullets and collateral cards | Margin screens |
 
 The landing "Limits" section and the asset "Risks" block may restate limits in their own words. The gallery does
 not reuse these sentences as specimens.

@@ -35,7 +35,7 @@ export function OgCard() {
         />
       </div>
       <footer className={styles.cardFoot}>
-        <span>Fictional assets and makers. No real funds. Unaudited.</span>
+        <span>Options on tokenized assets, on Stellar.</span>
         <span>Collateral is locked in the contract before you pay.</span>
       </footer>
     </div>

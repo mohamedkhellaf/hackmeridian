@@ -23,6 +23,25 @@ export function lowestOpenInSeries(offers: OptionOffer[], draft: NewOffer, quote
   return best
 }
 
+/** A series named by its terms, before any quantity exists. */
+export interface SeriesTermsRef {
+  underlying: TokenInfo
+  kind: NewOffer['kind']
+  /** Strike for one whole unit of underlying, in quote units. */
+  strikePerUnit: bigint
+  /** Unix seconds; the series is the UTC day. */
+  expiry: number
+}
+
+/**
+ * The cheapest open offer of a series named by its terms: what a form shows before a quantity is typed.
+ * The same rule as `lowestOpenInSeries` (a one-unit draft at that strike stands for the series).
+ */
+export function lowestOpenInSeriesOf(offers: OptionOffer[], series: SeriesTermsRef, quote: TokenInfo): OptionOffer | null {
+  const oneUnit = 10n ** BigInt(series.underlying.decimals)
+  return lowestOpenInSeries(offers, { kind: series.kind, underlying: series.underlying, underlyingQty: oneUnit, totalStrike: series.strikePerUnit, totalPremium: 0n, expiry: series.expiry }, quote)
+}
+
 /** Premium per unit of underlying as display text, e.g. "0.40". */
 export function premiumPerUnitText(o: Sized & { totalPremium: bigint }, quoteDecimals: number): string {
   return perUnitText(o.totalPremium, o, quoteDecimals)

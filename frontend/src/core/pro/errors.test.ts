@@ -26,7 +26,10 @@ describe('Pro error map', () => {
     expect(proErrorMessage(225)).toMatch(/settlement price/)
     expect(proErrorMessage(224)).toMatch(/taken over first/)
     expect(proErrorMessage(222)).toMatch(/quantity times the latest mark/)
-    expect(proErrorMessage(209)).toMatch(/initial margin/)
+    // The same words as the Margin screens: opening requirement (IM), liquidation level (MM), publisher price.
+    expect(proErrorMessage(209)).toMatch(/opening requirement \(IM\)/)
+    expect(proErrorMessage(224)).toMatch(/liquidation level \(MM\)/)
+    expect(proErrorMessage(223)).toMatch(/publisher price/)
     expect(proErrorMessage(215)).toMatch(/cannot be withdrawn/)
   })
 

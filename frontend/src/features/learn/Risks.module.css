@@ -1,0 +1,49 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+  }
+
+  .risk {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
+  .title {
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .text {
+    max-width: var(--measure);
+    color: var(--text-2);
+  }
+
+  .table {
+    padding-block: var(--s-8);
+  }
+
+  /* Margin is fenced off: a well with a dashed rule above it, so it never reads as part of the Covered rules. */
+  .margin {
+    border-top: 1px dashed var(--control);
+    border-radius: 0 0 var(--r-card) var(--r-card);
+  }
+
+  .marginText {
+    max-width: var(--measure);
+    color: var(--text);
+  }
+
+  .marginList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: var(--measure);
+    margin: 0;
+    padding-inline-start: var(--s-20);
+    color: var(--text-2);
+  }
+}

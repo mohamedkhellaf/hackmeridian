@@ -1,0 +1,126 @@
+@layer features {
+  .table {
+    --strike-w: calc(var(--s-72) + var(--s-16));
+  }
+
+  .strikeCol {
+    width: var(--strike-w);
+  }
+
+  .headKind {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    color: var(--text-2);
+  }
+
+  .strikeHead {
+    color: var(--text-2);
+  }
+
+  /* A row is one target: the tone of a selected or in-the-money row runs across its three cells. */
+  .row {
+    cursor: pointer;
+
+    &[data-itm] > td {
+      background: var(--sunken);
+    }
+
+    &[data-selected] > td,
+    &[data-selected] > th {
+      background: var(--accent-tint);
+    }
+  }
+
+  .cell {
+    padding: 0;
+  }
+
+  .button {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    min-height: calc(var(--row-h) - 1px);
+    padding: 0 var(--s-12);
+    border-radius: 0;
+    color: var(--text);
+    white-space: nowrap;
+
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      box-shadow: none;
+    }
+  }
+
+  .request {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .none {
+    color: var(--muted);
+  }
+
+  .bidWord {
+    margin-inline-end: var(--s-4);
+    color: var(--muted);
+    font-size: var(--caption-size);
+  }
+
+  .strike {
+    padding-inline: var(--s-8);
+    background: var(--sunken);
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .count {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    white-space: normal;
+  }
+
+  /* The reference price between two strikes. */
+  .ruleSide,
+  .ruleMid {
+    position: relative;
+    height: var(--s-20);
+    padding: 0;
+    border-bottom: 1px solid var(--hairline);
+    line-height: 0;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset-inline: 0;
+      top: 50%;
+      border-top: 1px dashed var(--text);
+    }
+  }
+
+  .ruleMid {
+    background: var(--sunken);
+  }
+
+  .tag {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0 var(--s-6);
+    border-radius: var(--r-tag);
+    background: var(--primary);
+    color: var(--primary-fg);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+}

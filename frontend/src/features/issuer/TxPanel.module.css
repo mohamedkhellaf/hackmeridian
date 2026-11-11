@@ -1,0 +1,9 @@
+@layer features {
+  /* The heading carries figures and an address: it wraps rather than pushing the action off the sheet. */
+  .root {
+    & h2 {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+  }
+}

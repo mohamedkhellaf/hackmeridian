@@ -1,5 +1,6 @@
 import { Drawer as BaseDrawer } from '@base-ui/react/drawer'
 import { useId } from 'react'
+import type { ReactNode } from 'react'
 import type { OverlayProps } from './Dialog'
 import { cx } from './internal/cx'
 import { OverlayFrame } from './internal/OverlayFrame'
@@ -8,15 +9,33 @@ import styles from './Drawer.module.css'
 
 const PARTS = { Title: BaseDrawer.Title, Description: BaseDrawer.Description, Close: BaseDrawer.Close }
 
-export type DrawerProps = OverlayProps
+export interface DrawerProps extends OverlayProps {
+  /**
+   * `page`: on phones the drawer is a full page (no scrim edge, no shadow) and its footer is the 64 px action
+   * bar, outside the scroller, so nothing in the body can sit under it. From 768 px it is the usual panel.
+   */
+  presentation?: 'panel' | 'page'
+}
 
 /**
  * A panel that slides in from the right (420 px). It carries the order ticket between 768 and 1199 px.
  * Modal: focus is trapped, Escape closes it, focus returns to the opener. It can be swiped away to the right;
  * the close button is the alternative to the gesture.
  */
-export function Drawer(props: DrawerProps) {
-  return <SlidingPanel {...props} placement="right" />
+export function Drawer({ presentation = 'panel', ...props }: DrawerProps) {
+  return <SlidingPanel {...props} placement="right" page={presentation === 'page'} />
+}
+
+/**
+ * An area inside a `Drawer` or a `Sheet` where a drag belongs to the content (a chart's price handle, a slider)
+ * and never swipes the panel away.
+ */
+export function SwipeIgnore({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={className} data-base-ui-swipe-ignore="">
+      {children}
+    </div>
+  )
 }
 
 export type SheetProps = OverlayProps
@@ -42,7 +61,8 @@ function SlidingPanel({
   closeLabel = 'Close',
   className,
   placement,
-}: OverlayProps & { placement: 'right' | 'bottom' }) {
+  page = false,
+}: OverlayProps & { placement: 'right' | 'bottom'; page?: boolean }) {
   const titleId = useId()
   const bodyId = useId()
   return (
@@ -58,6 +78,7 @@ function SlidingPanel({
           <BaseDrawer.Popup
             className={cx(styles.popup, className)}
             data-placement={placement}
+            data-page={page || undefined}
             initialFocus={resolveInitialFocus(initialFocus, titleId, bodyId)}
             finalFocus={finalFocus}
           >
@@ -71,6 +92,7 @@ function SlidingPanel({
                 titleId={titleId}
                 bodyId={bodyId}
                 handle={placement === 'bottom'}
+                bar={page}
               >
                 {children}
               </OverlayFrame>

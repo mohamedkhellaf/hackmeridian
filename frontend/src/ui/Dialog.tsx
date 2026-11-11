@@ -20,8 +20,11 @@ export interface OverlayProps {
   footer?: ReactNode
   /** Where focus goes on open. Focus is trapped while open and returns to the opener on close. */
   initialFocus?: InitialFocus
-  /** Where focus returns on close, when the opener is gone (a row that was removed). */
-  finalFocus?: RefObject<HTMLElement | null>
+  /**
+   * Where focus returns on close, when the opener is gone (a row that was removed). `false` leaves focus alone:
+   * the caller moves it itself (to a result region that holds a button, where a ref would land on the button).
+   */
+  finalFocus?: RefObject<HTMLElement | null> | false
   /** `false` stops a press outside from closing it (a typed confirmation). Escape and the close button still work. */
   dismissible?: boolean
   closeLabel?: string

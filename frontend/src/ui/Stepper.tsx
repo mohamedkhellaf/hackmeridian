@@ -63,6 +63,49 @@ function StepMark({ status, busy }: { status: StepStatus; busy?: boolean }) {
   )
 }
 
+export interface TrailStep {
+  label: ReactNode
+  status: 'done' | 'current' | 'upcoming'
+}
+
+export interface StepTrailProps {
+  /** Names the sequence ("Steps of the ticket"). */
+  label: string
+  steps: ReadonlyArray<TrailStep>
+  className?: string
+}
+
+const TRAIL_WORD: Record<TrailStep['status'], string> = { done: 'done', current: 'current step', upcoming: 'not started' }
+
+/** The state of a step as a shape: a ticked ring, a filled ring, a dashed ring. The word is read out beside it. */
+function TrailMark({ status }: { status: TrailStep['status'] }) {
+  return (
+    <svg className={styles.trailMark} viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false" data-status={status}>
+      <circle cx="7" cy="7" r="6" className={styles.trailRing} />
+      {status === 'done' ? <path d="M4.2 7.2 6.2 9.2 9.9 5" className={styles.trailTick} /> : null}
+      {status === 'current' ? <circle cx="7" cy="7" r="3" className={styles.trailDot} /> : null}
+    </svg>
+  )
+}
+
+/**
+ * Where the user is in a short flow, on one line: "Terms, Review, Sign, Receipt". Not a control: the steps move
+ * with the flow's own actions. For a sequence with details under each step use `Stepper`.
+ */
+export function StepTrail({ label, steps, className }: StepTrailProps) {
+  return (
+    <ol className={cx(styles.trail, className)} aria-label={label}>
+      {steps.map((step, i) => (
+        <li key={i} className={styles.trailStep} data-status={step.status} aria-current={step.status === 'current' ? 'step' : undefined}>
+          <TrailMark status={step.status} />
+          <span>{step.label}</span>
+          <span className="ui-vh">, {TRAIL_WORD[step.status]}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 /** A sequence of steps, in order, with the state of each in words as well as shape. */
 export function Stepper({ label, steps, className }: StepperProps) {
   return (
@@ -111,10 +154,11 @@ const AT: Record<TxState, { stage: TxStage; status: StepStatus }> = {
 export interface TxStepperProps {
   state: TxState
   /**
-   * Where a `failed` transaction stopped. `check`: refused before anything was sent, no fee. `submit`: the
-   * network did not accept it. `confirm` (default): included and refused by the contract, fee charged.
+   * Where a `failed` transaction stopped. `check`: refused before anything was sent, no fee. `sign`: the wallet
+   * could not sign. `submit`: the network did not accept it. `confirm` (default): included and refused by the
+   * contract, fee charged.
    */
-  failedAt?: 'check' | 'submit' | 'confirm'
+  failedAt?: TxStage
   /** The transaction link, shown from the moment a hash exists (pending and after). Usually a `TxLink`. */
   hash?: ReactNode
   /** What the current state means and what to do, in one or two sentences. Supplied by the feature. */
@@ -129,7 +173,7 @@ export interface TxStepperProps {
  * The three failure stages always read differently: nothing was sent, outcome unknown, fee charged.
  */
 export function TxStepper({ state, failedAt = 'confirm', hash, children, label = 'Transaction progress', className }: TxStepperProps) {
-  const at = state === 'failed' ? { stage: failedAt as TxStage, status: 'failed' as StepStatus } : AT[state]
+  const at = state === 'failed' ? { stage: failedAt, status: 'failed' as StepStatus } : AT[state]
   const atIndex = STAGES.indexOf(at.stage)
   const steps: StepItem[] = STAGES.map((stage, i) => {
     if (i < atIndex) return { label: STAGE_LABEL[stage].done, status: 'done' }

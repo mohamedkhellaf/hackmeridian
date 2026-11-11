@@ -1,0 +1,32 @@
+@layer features {
+  .summary {
+    margin: 0;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .stepper {
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .stepper p {
+    margin: 0;
+  }
+
+  .cause {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .primary {
+    flex: 1 1 auto;
+    width: auto;
+
+    @media (pointer: coarse) {
+      min-height: calc(var(--touch) + var(--s-4));
+    }
+  }
+}

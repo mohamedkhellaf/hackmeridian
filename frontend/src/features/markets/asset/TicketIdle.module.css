@@ -1,0 +1,52 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  /* The lines of the order to come: labels with nothing written on them yet. */
+  .blank {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+
+    & > div:last-child {
+      border-bottom: 0;
+    }
+
+    & > div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-16);
+      min-height: var(--row-h-compact);
+      padding-block: var(--s-6);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    & dt {
+      color: var(--muted);
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+    }
+
+    & dd {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+      font-weight: var(--figure-weight);
+      color: var(--text-2);
+    }
+  }
+
+  .line {
+    flex: 0 1 6rem;
+    align-self: flex-end;
+    height: 1px;
+    margin-bottom: var(--s-4);
+    border-bottom: 1px dashed var(--control);
+  }
+}

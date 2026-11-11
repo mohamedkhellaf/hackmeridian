@@ -66,6 +66,27 @@
     text-wrap: pretty;
   }
 
+  /* The closing figure of a term sheet: a section rule above it when it follows other terms, a larger figure. */
+  .item[data-size='lg'] {
+    & .label {
+      font-weight: 500;
+      color: var(--text-2);
+    }
+
+    & .figure {
+      font-size: var(--figure-lg-size);
+      line-height: var(--figure-lg-line);
+      overflow-wrap: normal;
+      white-space: nowrap;
+    }
+  }
+
+  .root[data-variant='ruled'] .item + .item[data-size='lg'] {
+    margin-top: var(--s-4);
+    padding-top: var(--s-12);
+    border-top-color: var(--rule);
+  }
+
   .root[data-layout='stacked'] {
     & .item {
       flex-direction: column;

@@ -1,0 +1,51 @@
+@layer features {
+  .root {
+    display: grid;
+    gap: var(--s-12);
+    min-width: 0;
+    padding-top: var(--s-24);
+    border-top: 1px solid var(--rule);
+    /* The "Other dates" link lands here, under the sticky top bar. */
+    scroll-margin-top: var(--s-72);
+
+    &:focus-visible {
+      box-shadow: none;
+    }
+  }
+
+  .intro {
+    max-width: var(--measure);
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .reasons {
+    display: grid;
+    gap: var(--s-4);
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .reason {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-8);
+
+    & > dt {
+      color: var(--text-2);
+      font-weight: 500;
+    }
+
+    & > dd {
+      margin: 0;
+    }
+  }
+
+  .count {
+    color: var(--muted);
+    font-weight: 450;
+  }
+}

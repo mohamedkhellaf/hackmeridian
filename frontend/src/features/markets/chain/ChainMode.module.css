@@ -1,0 +1,54 @@
+@layer features {
+  .root {
+    display: grid;
+    gap: var(--s-32);
+    min-width: 0;
+  }
+
+  .chain {
+    display: grid;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .controls {
+    display: grid;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .caption,
+  .legend,
+  .hint {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .hint {
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+
+    & > svg {
+      color: var(--warn);
+    }
+  }
+
+  .skeleton {
+    display: grid;
+    gap: var(--s-16);
+  }
+}

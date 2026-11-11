@@ -1,0 +1,132 @@
+@layer features {
+  .desktop {
+    min-width: 0;
+
+    @media (max-width: 767.98px) {
+      display: none;
+    }
+  }
+
+  .phone {
+    display: none;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+
+    @media (max-width: 767.98px) {
+      display: block;
+    }
+  }
+
+  /* Fixed columns: below this width the table scrolls inside its wrap instead of squeezing its figures. */
+  .table {
+    min-width: 62rem;
+  }
+
+  .option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    vertical-align: middle;
+  }
+
+  .sub {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  /* A sentence in a cell may take two lines; figures never wrap. */
+  .wrap {
+    display: block;
+    white-space: normal;
+    text-wrap: pretty;
+  }
+
+  .none {
+    color: var(--muted);
+  }
+
+  .actions {
+    display: inline-flex;
+    gap: var(--s-8);
+  }
+
+  .phoneItem {
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+  }
+
+  .phoneRow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-height: var(--touch);
+    padding-block: var(--s-12);
+    color: var(--text);
+    text-decoration: none;
+
+    &:not([data-plain]) {
+      @media (hover: hover) {
+        &:hover .phoneTitle {
+          text-decoration: underline;
+          text-underline-offset: 0.2em;
+        }
+      }
+    }
+  }
+
+  .phoneLine {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .phoneTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    min-width: 0;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 600;
+  }
+
+  .phoneWhere {
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 400;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .phoneWhen {
+    flex: none;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .phoneAction {
+    display: flex;
+    padding-top: var(--s-8);
+  }
+}

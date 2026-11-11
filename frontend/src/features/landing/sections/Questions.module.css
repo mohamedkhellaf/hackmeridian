@@ -1,0 +1,35 @@
+@layer features {
+  .list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--s-40);
+    margin: 0;
+    border-top: 1px solid var(--rule);
+
+    @media (max-width: 767.98px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    padding-block: var(--s-20);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .question {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: 600;
+  }
+
+  .answer {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+}

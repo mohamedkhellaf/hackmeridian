@@ -1,0 +1,68 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  /* Where the list lives: said once, set apart by a rule on its left rather than by a tinted panel. */
+  .local {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    max-width: 44rem;
+    padding-inline-start: var(--s-12);
+    border-inline-start: 2px solid var(--rule);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .localLine {
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-16);
+    min-height: var(--control-h-sm);
+  }
+
+  .count {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .wallet {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-8);
+    color: var(--muted);
+  }
+
+  /* When the count line takes the whole row, the action keeps to the right edge, as on a wide screen. */
+  .clear {
+    margin-inline-start: auto;
+  }
+
+  @media (max-width: 767.98px) {
+    .clear {
+      min-height: var(--touch);
+    }
+  }
+}

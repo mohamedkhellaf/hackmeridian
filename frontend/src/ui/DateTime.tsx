@@ -74,6 +74,21 @@ export function Countdown({
     return () => clearTimeout(timer)
   }, [now, left])
 
+  // A sleeping tab or a device that wakes up has a stale clock until the next tick, which can be a minute away:
+  // read the time again as soon as the page is looked at.
+  useEffect(() => {
+    if (now !== undefined) return
+    const reread = () => {
+      if (document.visibilityState === 'visible') setClock(Date.now())
+    }
+    document.addEventListener('visibilitychange', reread)
+    window.addEventListener('focus', reread)
+    return () => {
+      document.removeEventListener('visibilitychange', reread)
+      window.removeEventListener('focus', reread)
+    }
+  }, [now])
+
   if (left <= 0) {
     return (
       <span className={cx(styles.countdown, className)} role="timer" data-state="expired">

@@ -22,6 +22,10 @@ import type { Ask, CollateralHealth, NewOffer, OptionOffer, TokenInfo, TxResult 
 /** The mock contract's own account in the demo ledger (what holds the collateral). */
 export const MOCK_CONTRACT = 'C_MOCK_OPTIONS'
 
+/** The list reads `failNextRead` can stage a failure for. */
+export const MOCK_LIST_READS = ['listOptions', 'listBids', 'listAsks'] as const
+export type MockListRead = (typeof MOCK_LIST_READS)[number]
+
 /** Read delay of `listOptions`, and the whole duration of a write (the four stage delays add up to it). */
 export const MOCK_READ_MS = 150
 const STAGE_MS = { checking: 150, signing: 150, submitting: 100, pending: 200 } as const
@@ -49,6 +53,7 @@ export class MockOptionsClient implements OptionsClient {
   private readonly defaults: Record<string, bigint>
   // Demo switch (see failNextWith) and the transactions it left undecided.
   private nextFailure: TxErrorKind | null = null
+  private readFailures = new Map<MockListRead, number>()
   private undecided = new Map<string, () => void>()
   // How every mock transaction that got a hash ended, for checkTx.
   private outcomes = new Map<string, TxCheck>()
@@ -103,6 +108,34 @@ export class MockOptionsClient implements OptionsClient {
    */
   failNextWith(kind: TxErrorKind | null): void {
     this.nextFailure = kind
+  }
+
+  /**
+   * Demo and test switch: the next `times` calls of a list read reject, the way an unreachable RPC does, then
+   * reads work again. Without `method`, any of the three list reads counts. `failNextRead(undefined, 0)` clears it.
+   */
+  failNextRead(method?: MockListRead, times = 1): void {
+    if (method) this.readFailures.set(method, Math.max(0, times))
+    else for (const m of MOCK_LIST_READS) this.readFailures.set(m, Math.max(0, times))
+  }
+
+  private failRead(method: MockListRead): void {
+    const left = this.readFailures.get(method) ?? 0
+    if (left <= 0) return
+    this.readFailures.set(method, left - 1)
+    throw new Error('The mock chain did not answer (demo switch).')
+  }
+
+  /**
+   * Demo and test switch: takes `units` of one token away from the contract's own balance, as an issuer clawback
+   * would. `collateralHealth()` then reports `held < reserved` for it: the clawback shortfall state (Reserves, the
+   * ticket's notice, refused trades). The amount is capped at what the contract holds.
+   */
+  clawBack(tokenContractId: string, units: bigint): void {
+    const token = [this.quote, ...this.underlyings].find((t) => t.contractId === tokenContractId)
+    if (!token || units <= 0n) return
+    const held = this.balanceOf(MOCK_CONTRACT, token)
+    this.setBalance(MOCK_CONTRACT, token, units >= held ? 0n : held - units)
   }
 
   /**
@@ -208,6 +241,7 @@ export class MockOptionsClient implements OptionsClient {
 
   async listOptions() {
     await delay(MOCK_READ_MS)
+    this.failRead('listOptions')
     return this.options.map((o) => this.withExpiry(o))
   }
 
@@ -358,6 +392,7 @@ export class MockOptionsClient implements OptionsClient {
 
   async listAsks(): Promise<Ask[]> {
     await delay(100)
+    this.failRead('listAsks')
     const out: Ask[] = []
     for (const id of [...this.asks.keys()].sort((a, b) => byId({ id: a }, { id: b }))) {
       const a = this.liveAsk(id)
@@ -429,6 +464,7 @@ export class MockOptionsClient implements OptionsClient {
 
   async listBids(): Promise<Bid[]> {
     await delay(100)
+    this.failRead('listBids')
     return this.bids.map((b) => this.bidWithExpiry(b))
   }
 

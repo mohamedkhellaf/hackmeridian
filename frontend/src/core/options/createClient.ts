@@ -23,7 +23,17 @@ export const isMockMode = (): boolean => !import.meta.env.VITE_OPTIONS_CONTRACT_
  * keep the client (its token and asset caches then survive a wallet switch).
  */
 export function createOptionsClient(wallet: WalletSigner): Promise<OptionsClient> {
-  if (!import.meta.env.VITE_OPTIONS_CONTRACT_ID) return (mock ??= import('./mockClient').then((m): OptionsClient => new m.MockOptionsClient()))
+  if (!import.meta.env.VITE_OPTIONS_CONTRACT_ID) {
+    if (mock === null) {
+      const loading = import('./mockClient').then((m): OptionsClient => new m.MockOptionsClient())
+      mock = loading
+      // A failed load of the chunk is not kept: the next call tries again, so "Try again" on a page can recover.
+      loading.catch(() => {
+        if (mock === loading) mock = null
+      })
+    }
+    return mock
+  }
   const contractId = config.optionsContractId
   if (!contractId) return Promise.reject(new Error('VITE_OPTIONS_CONTRACT_ID is set but empty.'))
   return import('./sorobanClient').then((m): OptionsClient => new m.SorobanOptionsClient(contractId, wallet))

@@ -1,0 +1,36 @@
+@layer features {
+  .root {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-16) var(--s-32);
+    padding-block: var(--s-16);
+    border-block: 1px solid var(--rule);
+
+    @media (max-width: 767.98px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s-16);
+    }
+  }
+
+  .sums {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .sum {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
+  }
+
+  /* The unit once, small, after the figure: the same rank as the unit of a Stat. */
+  .unit {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: 500;
+    color: var(--muted);
+  }
+}

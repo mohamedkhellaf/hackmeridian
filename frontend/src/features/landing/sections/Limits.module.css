@@ -1,0 +1,45 @@
+@layer features {
+  .table {
+    table-layout: fixed;
+  }
+
+  .exists,
+  .missing {
+    width: 50%;
+    height: auto;
+    padding-block: var(--s-12);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    white-space: normal;
+    vertical-align: top;
+    text-wrap: pretty;
+  }
+
+  .exists {
+    padding-inline-start: 0;
+    color: var(--text-2);
+  }
+
+  /* What is missing carries the weight of the row. */
+  .missing {
+    padding-inline-end: 0;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .table th:first-child {
+    padding-inline-start: 0;
+  }
+
+  .table th:last-child {
+    padding-inline-end: 0;
+  }
+
+  .more {
+    margin-top: var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+  }
+}

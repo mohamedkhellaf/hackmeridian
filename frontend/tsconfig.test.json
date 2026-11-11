@@ -1,0 +1,11 @@
+{
+  /* Unit tests (Vitest, Node environment): the app's compiler options plus the Node types. A test may read a file
+     with node:fs; the modules it imports from src are checked here a second time, under the same strictness. */
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.testhelper.ts"],
+  "exclude": []
+}

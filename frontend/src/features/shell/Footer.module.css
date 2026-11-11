@@ -1,0 +1,110 @@
+@layer features {
+  .footer {
+    flex: none;
+  }
+
+  /* The rule above the footer spans the text block, as the one under the top bar does. */
+  .inner {
+    --footer-pad-start: max(var(--gutter), env(safe-area-inset-left, 0px));
+    --footer-pad-end: max(var(--gutter), env(safe-area-inset-right, 0px));
+
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-16) var(--s-56);
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--s-20) var(--footer-pad-end) var(--s-32) var(--footer-pad-start);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset-inline: var(--footer-pad-start) var(--footer-pad-end);
+      top: 0;
+      border-top: 1px solid var(--hairline);
+    }
+  }
+
+  .notice {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    /* Small print keeps the reading measure of the design system. */
+    flex: 0 1 var(--measure);
+    min-width: 0;
+  }
+
+  .copyright {
+    display: flex;
+    align-items: center;
+    min-height: var(--s-24);
+    color: var(--text-2);
+  }
+
+  .legal {
+    text-wrap: pretty;
+  }
+
+  .aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-6);
+    flex: none;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-20);
+
+    & a {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--s-24);
+    }
+  }
+
+  .contract {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2) var(--s-8);
+  }
+
+  /* Tablet and phones: one column, in reading order: copyright, notice, links, contract. */
+  @media (max-width: 899.98px) {
+    .inner {
+      flex-direction: column;
+    }
+
+    .notice {
+      flex-basis: auto;
+    }
+
+    .aside {
+      align-items: flex-start;
+    }
+  }
+
+  /* Phones: links tall enough to press. */
+  @media (max-width: 767.98px) {
+    .inner {
+      gap: var(--s-12);
+      padding-block: var(--s-16) var(--s-24);
+    }
+
+    .links {
+      gap: 0 var(--s-20);
+
+      & a {
+        min-height: var(--touch);
+      }
+    }
+  }
+}

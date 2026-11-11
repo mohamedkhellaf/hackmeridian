@@ -1,0 +1,89 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+    min-width: 0;
+  }
+
+  .reserves {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    min-width: 0;
+  }
+
+  .sectionHead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  /* The answer in one sentence, before the figures. */
+  .summary {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text-2);
+  }
+
+  /*
+   * The figure, its reading notes, the statement and the limits. One column until there is room for the notes
+   * beside the figure; in one column the statement comes straight after the figure and the notes follow.
+   */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'figure'
+      'table'
+      'notes'
+      'limits';
+    gap: var(--s-24);
+    align-items: start;
+  }
+
+  .figure {
+    grid-area: figure;
+    min-width: 0;
+  }
+
+  .notes {
+    grid-area: notes;
+    min-width: 0;
+  }
+
+  .table {
+    grid-area: table;
+    min-width: 0;
+  }
+
+  .limits {
+    grid-area: limits;
+    min-width: 0;
+  }
+
+  .hidden {
+    margin-top: var(--s-8);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  @media (min-width: 1200px) {
+    .layout {
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      grid-template-areas:
+        'figure notes'
+        'table table'
+        'limits limits';
+      gap: var(--s-24) var(--s-40);
+    }
+  }
+}

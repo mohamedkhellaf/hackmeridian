@@ -1,0 +1,185 @@
+@layer features {
+  .root {
+    min-width: 0;
+  }
+
+  .note {
+    --note-pad: var(--s-24);
+
+    @media (max-width: 767.98px) {
+      --note-pad: var(--s-16);
+    }
+  }
+
+  /* The three terms: typeset like the blanks of a form. */
+  .terms {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: var(--s-16) var(--s-20);
+    margin: 0;
+    padding-block: var(--s-12) var(--s-12);
+    border-top: 1px solid var(--hairline);
+
+    @container (max-width: 30rem) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+      padding-block: var(--s-4) 0;
+    }
+  }
+
+  .meta {
+    min-height: var(--caption-line);
+    padding-bottom: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+
+    @container (max-width: 30rem) {
+      padding-top: var(--s-8);
+      border-top: 1px solid var(--hairline);
+    }
+
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .moved {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .chart {
+    padding-top: var(--s-12);
+  }
+
+  /* The two outcomes, equal in size: with the put, and without. */
+  .outcomes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    margin: var(--s-12) 0 0;
+    border-top: 1px solid var(--hairline);
+
+    @container (max-width: 30rem) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .outcome {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+    padding: var(--s-12) var(--s-16) var(--s-12) 0;
+
+    & + & {
+      padding-inline: var(--s-16) 0;
+      border-inline-start: 1px solid var(--hairline);
+    }
+
+    @container (max-width: 30rem) {
+      padding-inline: 0;
+
+      & + & {
+        padding-inline: 0;
+        border-inline-start: 0;
+        border-top: 1px solid var(--hairline);
+      }
+    }
+  }
+
+  .outcomeLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .outcomeFigure {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--landing-figure-size);
+    line-height: var(--landing-figure-line);
+    font-weight: 560;
+    letter-spacing: var(--h2-track);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    white-space: nowrap;
+
+    &[data-secondary] {
+      color: var(--text-2);
+    }
+  }
+
+  .outcomeUnit {
+    line-height: 1;
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    font-weight: 500;
+    letter-spacing: normal;
+    color: var(--text-2);
+  }
+
+  /* Two lines are kept, so the note does not change height while the price is dragged. */
+  .outcomeNote {
+    min-height: calc(var(--caption-line) * 2);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .verdict {
+    font-weight: 500;
+    color: var(--text-2);
+
+    &[data-direction='more'] {
+      color: var(--gain);
+    }
+
+    &[data-direction='less'] {
+      color: var(--loss);
+    }
+  }
+
+  .triangle {
+    display: inline-block;
+    margin-inline-end: var(--s-4);
+    font-size: 0.72em;
+    translate: 0 -0.08em;
+  }
+
+  .source {
+    flex: 1 1 16rem;
+    min-width: 0;
+    min-height: calc(var(--ui-line) * 2);
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--ui-line);
+    font-feature-settings: 'zero';
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .sourceLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-h);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+
+  .under {
+    max-width: 62ch;
+    margin-top: var(--s-12);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+}

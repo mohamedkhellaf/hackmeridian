@@ -1,0 +1,107 @@
+@layer features {
+  .term {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+  }
+
+  .label {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .value {
+    position: relative;
+    display: inline-flex;
+    align-items: baseline;
+    align-self: flex-start;
+    gap: var(--s-6);
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding-block: 0 var(--s-2);
+    border-bottom: 1px solid transparent;
+    border-radius: var(--r-tag) var(--r-tag) 0 0;
+    white-space: nowrap;
+  }
+
+  .figure {
+    font-family: var(--font-serif);
+    font-size: var(--landing-term-size);
+    line-height: var(--landing-term-line);
+    font-weight: 560;
+    letter-spacing: var(--h2-track);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .unit {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    color: var(--text-2);
+  }
+
+  /* A term that can be changed is underlined in ink, like a blank filled in on a form, and carries a caret. */
+  .value[data-editable] {
+    border-bottom-color: var(--control);
+    transition: border-color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover {
+        border-bottom-color: var(--text);
+      }
+    }
+
+    &:has(.native:focus-visible) {
+      border-bottom-color: transparent;
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  .caret {
+    align-self: center;
+    color: var(--muted);
+  }
+
+  /* The real control: invisible, over the whole term, tall enough for a finger. */
+  .native {
+    position: absolute;
+    inset: calc(var(--s-6) * -1) calc(var(--s-4) * -1);
+    width: calc(100% + var(--s-8));
+    min-height: var(--touch);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 1rem;
+    opacity: 0;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .native:focus-visible {
+    box-shadow: none;
+  }
+
+  /* A narrow note sets each term on one ruled line: the label on the left, the value on the right. */
+  @container (max-width: 30rem) {
+    .term {
+      flex-direction: row;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-16);
+      min-height: var(--touch);
+      padding-block: var(--s-6);
+    }
+
+    .value {
+      align-self: baseline;
+    }
+  }
+}

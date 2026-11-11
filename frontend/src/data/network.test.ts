@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BANNED_TAGLINES, BANNED_WORDS, findBannedWords } from '../core/disclosures'
 import { LEDGER_STALE_MS, NETWORK_STATE_LABEL, networkState } from './network'
 
 describe('networkState', () => {
@@ -19,6 +20,8 @@ describe('networkState', () => {
     expect(networkState({ mock: false, hasData: true, isError: false, readAt: at - LEDGER_STALE_MS - 1, nowMs: at })).toBe('delayed')
   })
   it('has a word for every state', () => {
-    expect(NETWORK_STATE_LABEL).toEqual({ mock: 'Mock data', connecting: 'Connecting', ok: 'Online', delayed: 'Delayed', down: 'Offline' })
+    expect(NETWORK_STATE_LABEL).toEqual({ mock: 'Mock data', connecting: 'Connecting', ok: 'RPC ok', delayed: 'RPC slow', down: 'RPC down' })
+    // A state word beside the network name, never a slogan.
+    for (const word of Object.values(NETWORK_STATE_LABEL)) expect(findBannedWords(word, [...BANNED_WORDS, ...BANNED_TAGLINES])).toEqual([])
   })
 })

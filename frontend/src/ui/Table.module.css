@@ -106,6 +106,46 @@
     color: var(--text);
   }
 
+  /* A table of sentences: wrapping cells on the first line of their row, a serif naming column, flush edges. */
+  .table[data-prose] {
+    & .td {
+      height: auto;
+      padding-block: var(--s-8);
+      vertical-align: top;
+      white-space: normal;
+      text-wrap: pretty;
+      font-size: var(--body-size);
+      line-height: var(--body-line);
+      font-weight: var(--body-weight);
+      color: var(--text-2);
+    }
+
+    & .rowHeader {
+      font-family: var(--font-serif);
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    & .th:first-child,
+    & .td:first-child {
+      padding-inline-start: 0;
+    }
+
+    & .th:last-child,
+    & .td:last-child {
+      padding-inline-end: 0;
+    }
+
+    @container (max-width: 30rem) {
+      & .td {
+        font-size: var(--ui-size);
+        line-height: var(--ui-line);
+      }
+    }
+  }
+
   .tr {
     &[data-selected] > .td {
       background: var(--accent-tint);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, applySettings, createSettingsStore, parseSettings } from './settings'
+import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, applySettings, createSettingsStore, initSettings, parseSettings, settingsStore } from './settings'
 import type { Settings, SettingsStorage } from './settings'
 
 function memory(initial?: string): SettingsStorage & { value: string | null } {
@@ -94,6 +94,9 @@ describe('settings store', () => {
     const none = createSettingsStore({ storage: null, apply: () => {} })
     none.set({ mode: 'chain' })
     expect(none.get().mode).toBe('chain')
+    // Nothing to follow: a reload keeps the choice made on this page.
+    none.reload()
+    expect(none.get().mode).toBe('chain')
 
     const broken: SettingsStorage = {
       getItem: () => {
@@ -106,6 +109,8 @@ describe('settings store', () => {
     const store = createSettingsStore({ storage: broken, apply: () => {} })
     expect(store.get()).toEqual(DEFAULT_SETTINGS)
     store.set({ theme: 'dark' })
+    expect(store.get().theme).toBe('dark')
+    store.reload()
     expect(store.get().theme).toBe('dark')
   })
 })
@@ -128,6 +133,28 @@ describe('applySettings', () => {
       applySettings({ ...DEFAULT_SETTINGS, theme: 'light', pnl: 'mono' })
       expect(Object.fromEntries(attrs)).toEqual({ 'data-theme': 'light', 'data-pnl': 'mono' })
     } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('initSettings', () => {
+  it('is safe without a document or storage and returns the defaults', () => {
+    expect(typeof document).toBe('undefined')
+    expect(initSettings()).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('reads storage again and writes the attributes even when nothing changed', () => {
+    const attrs = new Map<string, string>()
+    const root = { setAttribute: (k: string, v: string) => void attrs.set(k, v), removeAttribute: (k: string) => void attrs.delete(k), getAttribute: (k: string) => attrs.get(k) ?? null }
+    vi.stubGlobal('document', { documentElement: root })
+    try {
+      settingsStore.set({ theme: 'dark', density: 'compact' })
+      attrs.clear() // as if the page had been rendered without them
+      expect(initSettings()).toMatchObject({ theme: 'dark', density: 'compact', pnl: 'default' })
+      expect(Object.fromEntries(attrs)).toEqual({ 'data-theme': 'dark', 'data-density': 'compact' })
+    } finally {
+      settingsStore.reset()
       vi.unstubAllGlobals()
     }
   })

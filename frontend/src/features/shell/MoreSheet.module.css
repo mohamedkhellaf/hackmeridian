@@ -1,0 +1,65 @@
+@layer features {
+  .links {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    border-block: 1px solid var(--hairline);
+    list-style: none;
+
+    & > li + li {
+      border-top: 1px solid var(--hairline);
+    }
+  }
+
+  .link {
+    display: flex;
+    align-items: center;
+    gap: var(--s-12);
+    min-height: var(--s-56);
+    padding-inline: var(--s-12) var(--s-8);
+    border-inline-start: 2px solid transparent;
+    color: var(--text);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 500;
+    text-decoration: none;
+
+    &:active {
+      background: var(--pressed);
+    }
+
+    &:focus-visible {
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    /* The page that is open now: an ink bar on the leading edge and the word in full weight. */
+    &[aria-current] {
+      border-inline-start-color: var(--text);
+      font-weight: 650;
+    }
+  }
+
+  .linkText {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chevron {
+    color: var(--muted);
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+}

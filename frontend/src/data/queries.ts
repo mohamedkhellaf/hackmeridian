@@ -8,8 +8,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient, UseQueryResult } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { fetchAssetFacts } from '../core/assetfacts/assetFacts'
-import type { AssetFacts } from '../core/assetfacts/assetFacts'
+import { fetchAssetFacts, fetchHolderStatus, mockAssetFacts } from '../core/assetfacts/assetFacts'
+import type { AssetFacts, HolderStatus } from '../core/assetfacts/assetFacts'
 import type { OptionsClient } from '../core/options/client'
 import { isMockMode } from '../core/options/createClient'
 import type { Ask, CollateralHealth, CollateralLine, OptionOffer, SupportedAssets, TokenInfo } from '../core/options/types'
@@ -229,18 +229,40 @@ export function useLedger(opts: ReadOptions = {}): UseQueryResult<LatestLedger> 
 }
 
 /**
- * Issuer flags, issuer account and asset record of a token, from the RPC and Horizon. Disabled for mock tokens
- * (they have no issuer account): `data` stays undefined and `fetchStatus` is `idle`.
+ * Issuer flags, issuer account and asset record of a token, from the RPC and Horizon. A mock token has no issuer
+ * account: it answers with fixture flags marked `mock: true` (no counts), so the demo can show a power on and off.
  */
-export function useAssetFacts(token: { contractId: string; code: string } | null | undefined, opts: ReadOptions = {}): UseQueryResult<AssetFacts> {
+export function useAssetFacts(token: { contractId: string; code: string; issuer?: string | null } | null | undefined, opts: ReadOptions = {}): UseQueryResult<AssetFacts> {
   const id = token?.contractId
   const code = token?.code ?? ''
+  const issuer = token?.issuer ?? null
   return useQuery({
     queryKey: keys.assetFacts(id ?? NONE),
-    queryFn: () => fetchAssetFacts(id!, code),
+    queryFn: () => (isMockToken(id!) ? Promise.resolve(mockAssetFacts(code, issuer)) : fetchAssetFacts(id!, code)),
     staleTime: STALE_MS.facts,
     refetchInterval: intervalOf(opts.cadence ?? 'off'),
-    enabled: (opts.enabled ?? true) && !!id && !isMockToken(id),
+    enabled: (opts.enabled ?? true) && !!id,
+  })
+}
+
+/**
+ * The trustline of `address` for a classic asset, from Horizon: `authorized`, `maintain-only`, `unauthorized`,
+ * `no-trustline`, `unfunded`, or `issuer`. Disabled without an issuer or an address, and for mock tokens.
+ * For "can this account trade the asset" use `useEligibility` (the contract's own answer); this one explains why not.
+ */
+export function useHolderStatus(
+  token: { contractId: string; code: string; issuer?: string | null } | null | undefined,
+  address: string | null | undefined,
+  opts: ReadOptions = {},
+): UseQueryResult<HolderStatus> {
+  const code = token?.code ?? ''
+  const issuer = token?.issuer ?? ''
+  return useQuery({
+    queryKey: keys.holderStatus(code || NONE, issuer || NONE, address ?? NONE),
+    queryFn: () => fetchHolderStatus(code, issuer, address!),
+    staleTime: STALE_MS.slow,
+    refetchInterval: intervalOf(opts.cadence ?? 'off'),
+    enabled: (opts.enabled ?? true) && !!token && !!issuer && !!address && !isMockToken(token.contractId),
   })
 }
 

@@ -11,6 +11,9 @@ export interface SegmentedOption<V extends string = string> {
   icon?: ReactNode
   /** A second, smaller line inside the segment (days left under an expiry date). */
   detail?: ReactNode
+  /** A count after the label (offers on an expiry), with its meaning for screen readers ("4 offers"). */
+  count?: number
+  countLabel?: string
   disabled?: boolean
 }
 
@@ -68,7 +71,17 @@ export function Segmented<V extends string = string>({
           >
             {option.icon ? <span className={styles.icon}>{option.icon}</span> : null}
             <span className={styles.text}>
-              <span>{option.label}</span>
+              {option.count === undefined ? (
+                <span>{option.label}</span>
+              ) : (
+                <span className={styles.labelRow}>
+                  <span>{option.label}</span>
+                  <span className={styles.count} aria-hidden={option.countLabel ? true : undefined}>
+                    {option.count}
+                  </span>
+                  {option.countLabel ? <span className="ui-vh">, {option.countLabel}</span> : null}
+                </span>
+              )}
               {option.detail ? <span className={styles.detail}>{option.detail}</span> : null}
             </span>
           </BaseRadio.Root>

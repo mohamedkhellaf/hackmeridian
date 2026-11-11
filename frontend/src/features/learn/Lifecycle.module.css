@@ -1,0 +1,60 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+  }
+
+  .spine {
+    max-width: var(--measure);
+  }
+
+  .state {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    margin-top: var(--s-6);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .forkIntro {
+    max-width: var(--measure);
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Two ways it can end, side by side when there is room: equal weight to the exercise and to the lapse. */
+  .fork {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-24);
+  }
+
+  @container (min-width: 40rem) {
+    .fork {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s-32);
+    }
+  }
+
+  .branch {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--rule);
+  }
+
+  .branchTitle {
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+}

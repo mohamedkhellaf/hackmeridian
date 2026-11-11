@@ -98,6 +98,13 @@ export function expiryFromDayKey(day: string): number | null {
 
 /** Default number of strike rows. */
 export const DEFAULT_LADDER_COUNT = 7
+
+/**
+ * Strike rows of the app's standard grid. The default of seven spans only 3 to 7.5 % either side of the
+ * reference; nine rows reach 4 to 10 % and still fit a phone screen. One number for every view (the chain, the
+ * guided chips, the index, the books and the ticket), because the ladder decides which orders are standard.
+ */
+export const LADDER_ROWS = 9
 /** A standard strike has at most this many significant digits. */
 export const MAX_STRIKE_SIGNIFICANT_DIGITS = 3
 /** Strikes and premiums are quoted on 0.01 of the quote token. */

@@ -1,6 +1,7 @@
 // The words for a transaction's state, in one place, so the ticket, a row button, a toast and the Activity list
 // say the same thing. Three situations are always told apart (brief 6.3): nothing was sent, the outcome is
 // unknown, the network fee was charged.
+import { refusedOnSend } from '../../core/tx/machine'
 import type { TxEffect, TxPhase, TxState } from '../../core/tx/machine'
 
 /** The name of each phase, as shown on a button and in the Activity list. Same words as the ui kit's `TX_STATE_LABEL`. */
@@ -22,6 +23,15 @@ export const TX_EFFECT_TEXT: Record<TxEffect, string> = {
   'outcome-unknown': 'The transaction was sent and is not confirmed yet. It can still be included.',
   'fee-charged': 'A ledger included the transaction. The network fee was charged.',
 }
+
+/**
+ * A transaction that was signed and sent, then refused by the network before any ledger took it (a bad sequence
+ * number, a signature the network rejects). "Nothing was sent" would be untrue; "no fee" is true.
+ */
+export const TX_REFUSED_ON_SEND = 'The transaction was sent, but no ledger included it. No fee was charged.'
+
+/** What happened to the user's money for this state, as one sentence: `TX_EFFECT_TEXT`, except for a refusal on send. */
+export const txEffectText = (state: TxState): string => (refusedOnSend(state) ? TX_REFUSED_ON_SEND : TX_EFFECT_TEXT[state.effect])
 
 /** What each phase means and what to do, for the Sign step. */
 export const TX_PHASE_HELP: Record<Exclude<TxPhase, 'idle'>, string> = {
@@ -52,7 +62,7 @@ export interface TxSummary {
 export function describeTx(state: TxState): TxSummary | null {
   if (state.phase === 'idle') return null
   const title = TX_PHASE_LABEL[state.phase]
-  if (state.phase === 'failed') return { title, detail: `${state.error ?? TX_PHASE_HELP.failed} ${TX_EFFECT_TEXT[state.effect]}` }
+  if (state.phase === 'failed') return { title, detail: `${state.error ?? TX_PHASE_HELP.failed} ${txEffectText(state)}` }
   return { title, detail: TX_PHASE_HELP[state.phase] }
 }
 
@@ -74,7 +84,7 @@ export function announcementFor(label: string, state: TxState, done?: string | n
     case 'declined':
       return { message: `${label}: ${TX_PHASE_HELP.declined}`, politeness: 'polite' }
     case 'failed':
-      return { message: `${label}: ${TX_PHASE_LABEL.failed}. ${state.error ?? ''} ${TX_EFFECT_TEXT[state.effect]}`.replace(/\s+/g, ' ').trim(), politeness: 'assertive' }
+      return { message: `${label}: ${TX_PHASE_LABEL.failed}. ${state.error ?? ''} ${txEffectText(state)}`.replace(/\s+/g, ' ').trim(), politeness: 'assertive' }
     case 'unknown':
       return { message: `${label}: ${TX_PHASE_LABEL.unknown}. ${TX_PHASE_HELP.unknown}`, politeness: 'assertive' }
     case 'expired':

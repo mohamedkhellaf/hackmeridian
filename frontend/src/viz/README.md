@@ -1,7 +1,7 @@
 # `src/viz`: the StellSec chart kit
 
 Hand-written SVG, no chart library. Import from `src/viz` (the `index.ts` barrel). Every chart in one page:
-`/viz.html` in dev (`src/viz/Gallery.tsx`, default export, reusable in `/design`).
+the "Charts" chapter of `/design` (`src/viz/Gallery.tsx`, default export, mounted by `src/app/DesignPage.tsx`).
 
 ## Rules of the kit
 
@@ -61,7 +61,13 @@ Both payoff figures share one handle (`usePriceSlider`): an ink flag under the p
   description; a table of sampled points follows every chart (visually hidden unless `tableVisible`).
 - `HealthBar`, `Waterfall` and `Sparkline` are `role="img"` with a name built from the labels you pass.
 - `BulletRow decorative` hides the row when a table beside it carries the same figures.
-- axe reports no violation on `/viz.html` in both themes at 1440 and 390 px.
+- axe reports no violation on `/design` (which mounts every chart) in both themes at 1440 and 390 px.
+- `HealthBar` treats `0, 0, 0` as a known account ("Above opening margin"). Pass `NaN` for a requirement that
+  is not known yet: the bar then draws no state.
+- `Waterfall` names a zero deficit "Deficit 0.00, not paid" in its accessible name. Pass your own `label` when a
+  sentence reads better ("... no deficit.").
+- `WithWithoutChart` takes `readoutDifference` (replaces the "Difference" line of the default read-out) and
+  `readoutNote` (one sentence under it), so a caller adds its words without rebuilding the read-out with `readout`.
 
 ## Pure helpers (also exported)
 

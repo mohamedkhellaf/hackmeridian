@@ -117,5 +117,12 @@
       align-items: stretch;
       padding-inline: var(--s-16);
     }
+
+    /* A page's action bar: 64 px with the hairline (a 48 px action, 8 px above and below), plus the safe area. */
+    .footer[data-bar] {
+      min-height: calc(var(--actionbar-h) + env(safe-area-inset-bottom, 0px));
+      padding-block: calc(var(--s-8) - 1px) var(--s-8);
+      padding-bottom: max(var(--s-8), env(safe-area-inset-bottom, 0px));
+    }
   }
 }

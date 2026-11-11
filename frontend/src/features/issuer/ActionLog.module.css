@@ -1,0 +1,76 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  /* The sentence of the action wraps; the other columns keep to one line. */
+  .action {
+    min-width: 14rem;
+    white-space: normal;
+    font-weight: 500;
+  }
+
+  .none {
+    color: var(--muted);
+  }
+
+  /* Phones: one block per action, ruled like the table. */
+  .list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    padding-block: var(--s-12);
+
+    & + & {
+      border-top: 1px solid var(--hairline);
+    }
+  }
+
+  .label {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 550;
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .facts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    & > div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-16);
+    }
+
+    & dt {
+      flex: none;
+      color: var(--muted);
+    }
+
+    & dd {
+      margin: 0;
+      min-width: 0;
+      text-align: end;
+    }
+  }
+}

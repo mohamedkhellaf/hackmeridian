@@ -46,6 +46,28 @@ type Key = readonly unknown[]
 export const optionSubject = (id: bigint): string => `option:${id}`
 export const bidSubject = (id: bigint): string => `bid:${id}`
 
+// ---- Issuer actions ------------------------------------------------------------------------------------------
+// The issuer console sends raw transactions (trustline flags, clawback) through the same staged layer. They are
+// recorded as Covered entries under these action names. None is in the table below, so each one refreshes every
+// Covered read and the trustline reads: reserves and balances move after a freeze or a clawback.
+
+export type IssuerActionKind = 'authorize' | 'freeze' | 'clawback'
+const ISSUER_ACTION_PREFIX = 'issuer-'
+
+/** The machine name recorded with an issuer transaction: `issuer-freeze`. */
+export const issuerActionName = (kind: IssuerActionKind): string => `${ISSUER_ACTION_PREFIX}${kind}`
+
+/** True for an Activity entry made by the issuer console, so a list can name or link it apart from trades. */
+export const isIssuerAction = (action: string): boolean => action.startsWith(ISSUER_ACTION_PREFIX)
+
+/** What an issuer transaction acts on, as recorded with it: `issuer:<asset contract>:<target>`. */
+export const issuerSubject = (assetId: string, target: string): string => `issuer:${assetId}:${target}`
+
+export function parseIssuerSubject(subject: string | null | undefined): { assetId: string; target: string } | null {
+  const m = /^issuer:([^:]+):([^:]+)$/.exec(subject ?? '')
+  return m ? { assetId: m[1], target: m[2] } : null
+}
+
 /** The ids named by a subject string. Anything else (null, a Margin subject) names none. */
 export function subjectIds(subject: string | null | undefined): InvalidationSubject {
   const m = /^(option|bid):(\d+)$/.exec(subject ?? '')
@@ -54,8 +76,9 @@ export function subjectIds(subject: string | null | undefined): InvalidationSubj
 }
 
 /**
- * Key prefixes to invalidate after `action` settled on chain. An action this table does not know invalidates
- * every Covered read.
+ * Key prefixes to invalidate after `action` settled on chain. An action this table does not know (an issuer
+ * action sent through `useTx`, for instance) invalidates every Covered read and every trustline read, since it
+ * may have changed who is authorized.
  */
 export function keysToInvalidate(k: Keys, action: string, subject: InvalidationSubject = {}): Key[] {
   const option: Key[] = subject.optionId != null ? [k.option(subject.optionId)] : [k.optionAll()]
@@ -90,7 +113,7 @@ export function keysToInvalidate(k: Keys, action: string, subject: InvalidationS
       // Filling creates an option that is already active, with the buyer as holder.
       return [k.bids(), ...bid, k.options(), ...reserves, ...balances, k.buyerOpenCountAll()]
     default:
-      return [k.root()]
+      return [k.root(), k.holderStatusAll()]
   }
 }
 

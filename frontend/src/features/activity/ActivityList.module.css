@@ -1,0 +1,71 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    padding-block: var(--s-16);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .item:last-child {
+    border-bottom-color: var(--rule);
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-12);
+  }
+
+  .label {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .sub {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .note {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .facts {
+    margin-top: var(--s-4);
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12);
+  }
+
+  /* 44 px targets: the link and the button are padded out to the touch size. */
+  .target :where(a) {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+  }
+
+  .check {
+    min-height: var(--touch);
+  }
+}

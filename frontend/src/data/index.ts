@@ -4,7 +4,7 @@
 // Providers and the client
 export { DataProvider, OptionsClientProvider } from './providers'
 export type { DataProviderProps } from './providers'
-export { useOptionsClient, useMe } from './useOptionsClient'
+export { useOptionsClient, useMe, useIsMock } from './useOptionsClient'
 export type { OptionsClientHandle } from './useOptionsClient'
 export { queryClient, createQueryClient, POLL_MS, STALE_MS } from './queryClient'
 export type { Cadence } from './queryClient'
@@ -29,6 +29,7 @@ export {
   useBuyerOpenCount,
   useLedger,
   useAssetFacts,
+  useHolderStatus,
   useReference,
   referenceMode,
 } from './queries'
@@ -37,8 +38,9 @@ export { useNetworkStatus, NETWORK_STATE_LABEL } from './network'
 export type { NetworkState, NetworkStatus } from './network'
 
 // Derived views
-export { useMarket, useMarketsIndex, useBook, useGuidedMatch, usePositions, usePosition, useTodo, useActionsWaiting, usePortfolioKpis, optionReference } from './derived'
-export type { Derived, ViewOptions, PortfolioOptions, PositionDetail } from './derived'
+export { useAsset, useMarket, useMarketsIndex, useBook, useGuidedMatch, usePositions, usePosition, useTodo, useActionsWaiting, usePortfolioKpis, optionReference, isNotFoundMessage } from './derived'
+export type { Derived, ViewOptions, PortfolioOptions, PositionDetail, AssetRoute } from './derived'
+export { LADDER_ROWS } from './derived/market'
 export type { MarketView, ExpiryColumn, GridRow, GridCell, OtherOrder, MarketSummary, BookView, BookEntry, MarketIndexRow, MarketSource } from './derived/market'
 export type { PositionView, PositionsView, TodoView, TodoTone } from './derived/positions'
 export type { GuidedMatch, GuidedAlternative, GuidedTermsInput } from './derived/guided'
@@ -49,11 +51,12 @@ export type { TxController, TxDescription, UseTxOptions } from './tx/useTx'
 export type { TxRun, TxMeta } from './tx/runner'
 export { useActivity } from './tx/useActivity'
 export type { ActivityView } from './tx/useActivity'
-export { canCheckEntry, isOpenEntry, entryState } from './tx/activityStore'
+export { activityStore, canCheckEntry, isOpenEntry, entryState } from './tx/activityStore'
 export type { ActivityEntry, ActivityPhase, ActivityProduct } from './tx/activityStore'
-export { TX_PHASE_LABEL, TX_PHASE_HELP, TX_EFFECT_TEXT, describeTx } from './tx/copy'
+export { TX_PHASE_LABEL, TX_PHASE_HELP, TX_EFFECT_TEXT, TX_REFUSED_ON_SEND, describeTx, txEffectText } from './tx/copy'
 export type { TxSummary } from './tx/copy'
-export { optionSubject, bidSubject } from './tx/invalidation'
+export { optionSubject, bidSubject, isIssuerAction, issuerActionName, issuerSubject, parseIssuerSubject } from './tx/invalidation'
+export type { IssuerActionKind } from './tx/invalidation'
 export type { CoveredAction } from './tx/invalidation'
 export {
   useBuy,
@@ -74,13 +77,9 @@ export { usePreTrade } from './usePreTrade'
 export type { PreTradeOptions, PreTradeView } from './usePreTrade'
 
 // Settings
-export { useSettings, useDefaultMode, settingsStore, applySettings, DEFAULT_SETTINGS, MODE_CHOICES, SETTINGS_STORAGE_KEY } from './settings'
+export { initSettings, useSettings, useDefaultMode, settingsStore, applySettings, DEFAULT_SETTINGS, MODE_CHOICES, SETTINGS_STORAGE_KEY } from './settings'
 export type { Settings, SettingsHandle, DefaultMode, ThemeChoice, DensityChoice, PnlScheme } from './settings'
 
-// Margin
-export { ProProvider, ProLoader } from './pro/ProContext'
-export type { ProProviderProps, ProLoaderProps } from './pro/ProContext'
-export { usePro } from './pro/proCtx'
-export type { ProCtxValue, Outcome, ProCall } from './pro/proCtx'
-export { useProClient } from './pro/useProClient'
-export type { ProClientState } from './pro/useProClient'
+// Margin (also importable as a folder: `../data/pro`)
+export { ProProvider, MarginProvider, ProLoader, MarginLoader, usePro, useMargin, useProClient } from './pro'
+export type { ProProviderProps, ProLoaderProps, ProCtxValue, Outcome, ProCall, ProClientState } from './pro'

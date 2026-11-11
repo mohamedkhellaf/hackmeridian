@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { TxError } from './errors'
-import { TX_IDLE, canCheckAgain, canStart, hasHash, isSettled, isWorking, notFoundStatus, reduce, runMachine } from './machine'
+import { TX_IDLE, canCheckAgain, canStart, hasHash, isSettled, isWorking, notFoundStatus, reduce, refusedOnSend, runMachine, stoppedStage } from './machine'
 import type { TxEvent, TxState } from './machine'
+import type { TxStage } from './types'
 
 const HASH = 'ab'.repeat(32)
 const play = (events: TxEvent[], from: TxState = TX_IDLE) => events.reduce(reduce, from)
@@ -190,5 +191,46 @@ describe('runMachine', () => {
     )
     expect(called).toBe(false)
     expect(state).toBe(unknown)
+  })
+})
+
+describe('where a transaction stopped', () => {
+  const through = (...stages: TxStage[]): TxState => stages.reduce((s, stage) => reduce(s, { type: 'stage', stage }), reduce(TX_IDLE, { type: 'start' }))
+  const inLedgerQueue: TxStage = { stage: 'pending', hash: 'h1', maxTime: 100 }
+
+  it('tells a refusal before sending from a refusal by the network', () => {
+    const early = reduce(through({ stage: 'checking' }), { type: 'error', error: new TxError('refused', 'Not eligible.') })
+    expect(early).toMatchObject({ phase: 'failed', effect: 'nothing-sent', stoppedAt: 'checking' })
+    expect(stoppedStage(early)).toBe('check')
+    expect(refusedOnSend(early)).toBe(false)
+
+    const onSend = reduce(through({ stage: 'checking' }, { stage: 'signing' }, { stage: 'submitting' }), { type: 'error', error: new TxError('refused', 'Bad sequence.') })
+    expect(onSend).toMatchObject({ phase: 'failed', effect: 'nothing-sent', stoppedAt: 'submitting' })
+    expect(stoppedStage(onSend)).toBe('submit')
+    expect(refusedOnSend(onSend)).toBe(true)
+  })
+
+  it('puts a decline on the sign step and a ledger failure on the confirm step', () => {
+    const declined = reduce(through({ stage: 'checking' }, { stage: 'signing' }), { type: 'error', error: new TxError('declined', 'No.') })
+    expect(stoppedStage(declined)).toBe('sign')
+    const failed = reduce(through({ stage: 'checking' }, { stage: 'signing' }, { stage: 'submitting' }, inLedgerQueue), { type: 'error', error: new TxError('failed', 'Refused by the contract.') })
+    expect(failed.stoppedAt).toBe('pending')
+    expect(stoppedStage(failed)).toBe('confirm')
+    expect(refusedOnSend(failed)).toBe(false)
+  })
+
+  it('reads an older record without the field from what it has: a hash means it was sent', () => {
+    const base: TxState = { phase: 'failed', hash: null, maxTime: null, ledger: null, error: 'x', effect: 'nothing-sent' }
+    expect(stoppedStage(base)).toBe('check')
+    expect(stoppedStage({ ...base, hash: 'abc' })).toBe('submit')
+    expect(stoppedStage({ ...base, effect: 'fee-charged' })).toBe('confirm')
+    expect(stoppedStage({ ...base, phase: 'declined' })).toBe('sign')
+  })
+
+  it('keeps an unknown outcome on a stage that was sent', () => {
+    const unknown = reduce(through({ stage: 'checking' }, { stage: 'signing' }, { stage: 'submitting' }), { type: 'error', error: new Error('socket closed') })
+    expect(unknown).toMatchObject({ phase: 'unknown', stoppedAt: 'submitting' })
+    const settled = reduce(unknown, { type: 'resolve', check: { status: 'failed', message: 'Refused.' } })
+    expect(stoppedStage(settled)).toBe('confirm')
   })
 })

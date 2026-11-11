@@ -61,8 +61,10 @@ describe('keysToInvalidate', () => {
     expect(has(of('cancel-offer'), k.writerOpenCountAll())).toBe(true)
   })
 
-  it('invalidates every Covered read for an action it does not know', () => {
-    expect(keysToInvalidate(k, 'other')).toEqual([k.root()])
+  it('invalidates every Covered read and every trustline read for an action it does not know', () => {
+    expect(keysToInvalidate(k, 'other')).toEqual([k.root(), k.holderStatusAll()])
+    // The prefix covers the read of any account for any asset.
+    expect(k.holderStatus('BOND', 'GISSUER', 'GHOLDER').slice(0, 1)).toEqual([...k.holderStatusAll()])
   })
 
   it('only touches balances after a Margin call', () => {

@@ -31,12 +31,14 @@ export interface KeyValueItemProps {
   marked?: boolean
   /** A caption under the value: a required disclosure next to its figure, or the local time under a deadline. */
   hint?: ReactNode
+  /** `lg` is the closing figure of a term sheet ("You pay 1.80 USDx"): a heavier rule above it and a larger figure. */
+  size?: 'md' | 'lg'
   className?: string
 }
 
-export function KeyValueItem({ label, children, marked = false, hint, className }: KeyValueItemProps) {
+export function KeyValueItem({ label, children, marked = false, hint, size = 'md', className }: KeyValueItemProps) {
   return (
-    <div className={cx(styles.item, className)}>
+    <div className={cx(styles.item, className)} data-size={size === 'lg' ? 'lg' : undefined}>
       <dt className={styles.label}>{label}</dt>
       <dd className={styles.value}>
         <span className={styles.figure}>{marked ? <Marker>{children}</Marker> : children}</span>

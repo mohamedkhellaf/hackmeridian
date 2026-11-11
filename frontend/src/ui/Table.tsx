@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { HTMLAttributes, ReactNode, TdHTMLAttributes, ThHTMLAttributes } from 'react'
+import type { HTMLAttributes, ReactNode, Ref, TdHTMLAttributes, ThHTMLAttributes } from 'react'
 import { IconChevronDown, IconChevronUp, IconSelect } from './icons'
 import { cx } from './internal/cx'
 import styles from './Table.module.css'
@@ -55,18 +55,27 @@ export interface TableProps extends Omit<HTMLAttributes<HTMLTableElement>, 'clas
   caption?: string
   /** Fixed column widths: columns do not jump while figures change. */
   fixed?: boolean
+  /**
+   * Cells hold sentences, not figures: text wraps and sits on the first line of its row, in the body size, and
+   * the row header is set in the serif like a term on a term sheet (rules in brief, limits, issuer powers).
+   */
+  prose?: boolean
+  /** The table element, for a composite widget that manages focus inside it (the chain). */
+  ref?: Ref<HTMLTableElement>
   className?: string
 }
 
 /** A native, ruled table: header underline, row hairlines, no outer box, no zebra. */
-export function Table({ density, on = 'bg', caption, fixed = false, className, children, ...rest }: TableProps) {
+export function Table({ density, on = 'bg', caption, fixed = false, prose = false, ref, className, children, ...rest }: TableProps) {
   return (
     <table
       {...rest}
+      ref={ref}
       className={cx(styles.table, className)}
       data-density={density === 'compact' ? 'compact' : undefined}
       data-on={on}
       data-fixed={fixed || undefined}
+      data-prose={prose || undefined}
     >
       {caption ? <caption className="ui-vh">{caption}</caption> : null}
       {children}
@@ -87,12 +96,14 @@ export interface TrProps extends HTMLAttributes<HTMLTableRowElement> {
   selected?: boolean
   /** Hover tone for rows that can be opened. The row itself is not a control: put a link or button in a cell. */
   interactive?: boolean
+  ref?: Ref<HTMLTableRowElement>
 }
 
-export function Tr({ selected = false, interactive = false, className, ...rest }: TrProps) {
+export function Tr({ selected = false, interactive = false, ref, className, ...rest }: TrProps) {
   return (
     <tr
       {...rest}
+      ref={ref}
       className={cx(styles.tr, className)}
       data-selected={selected || undefined}
       data-interactive={interactive || undefined}

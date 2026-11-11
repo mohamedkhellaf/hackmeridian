@@ -1,0 +1,30 @@
+@layer features {
+  .details {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+
+    & > summary {
+      width: fit-content;
+      min-height: var(--control-h-sm);
+      padding-block: var(--s-4);
+      cursor: pointer;
+      border-radius: var(--r-control);
+    }
+  }
+
+  .message {
+    max-width: 100%;
+    margin-top: var(--s-8);
+    padding: var(--s-12);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    color: var(--text-2);
+    background: var(--sunken);
+    border-radius: var(--r-control);
+  }
+}

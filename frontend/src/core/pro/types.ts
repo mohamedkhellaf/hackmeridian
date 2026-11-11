@@ -8,6 +8,12 @@ import type { TxOptions } from '../tx/types'
 
 export const USDX_DECIMALS = 7
 
+/**
+ * The underlying of the Margin market. A deployment has exactly one; neither the contract views nor the fixture
+ * file name it, so it is a constant of the build (the Testnet deployment and the fixtures both use EQTY).
+ */
+export const PRO_UNDERLYING = 'EQTY'
+
 /** A party: a fixture name (MAKER_A, VAULT...) while simulated, a G... address on chain. */
 export type Party = string
 /** The vault is a pseudo-account inside the contract. */

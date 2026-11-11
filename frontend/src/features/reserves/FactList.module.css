@@ -1,0 +1,43 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: var(--s-12);
+    padding-block: var(--s-8);
+    border-top: 1px solid var(--hairline);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .fact dt {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .fact dd {
+    margin: 0;
+    max-width: 34rem;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .source {
+    display: block;
+    margin-top: var(--s-4);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .source code {
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+  }
+}

@@ -37,7 +37,34 @@ export interface TxState {
   /** Message for failed, unknown, expired and declined. */
   error: string | null
   effect: TxEffect
+  /**
+   * The stage the transaction had reached when it stopped short of confirmed (failed, declined, unknown,
+   * expired). It tells a refusal by a pre-check (nothing was sent) from a refusal by the network (sent, taken by
+   * no ledger): both are `failed` with `nothing-sent`. Absent on states recorded before the field existed; read
+   * it through `stoppedStage`.
+   */
+  stoppedAt?: TxStageName | null
 }
+
+/** The four steps of the progress list. */
+export type TxStep = 'check' | 'sign' | 'submit' | 'confirm'
+
+const STEP_OF: Record<TxStageName, TxStep> = { checking: 'check', signing: 'sign', submitting: 'submit', pending: 'confirm' }
+
+/**
+ * The step of the progress list on which a transaction stopped. A ledger that included it is always `confirm`;
+ * a decline is `sign`; otherwise the stage recorded when it stopped, or for an older record a guess from what
+ * is known (a hash means it was sent).
+ */
+export function stoppedStage(s: TxState): TxStep {
+  if (s.effect === 'fee-charged') return 'confirm'
+  if (s.phase === 'declined') return 'sign'
+  if (s.stoppedAt) return STEP_OF[s.stoppedAt]
+  return s.hash ? 'submit' : 'check'
+}
+
+/** True for a transaction that was signed and sent, then refused by the network before any ledger took it. */
+export const refusedOnSend = (s: TxState): boolean => s.phase === 'failed' && s.effect === 'nothing-sent' && (s.stoppedAt === 'submitting' || s.stoppedAt === 'pending')
 
 export type TxEvent =
   /** The user pressed the button. Ignored while a transaction is in flight or its outcome is unknown. */
@@ -104,26 +131,28 @@ function fromStage(s: TxState, stage: TxStage): TxState {
 function fromError(s: TxState, error: unknown): TxState {
   if (isSettled(s)) return s
   const message = errorMessage(error) || 'The transaction failed.'
+  // The stage it had reached: the phase it is in now, or the one already recorded (an `unknown` being settled).
+  const at: TxStageName = s.phase in RANK ? (s.phase as TxStageName) : (s.stoppedAt ?? 'checking')
   if (error instanceof TxError) {
     const hash = error.hash ?? s.hash
     const maxTime = error.maxTime ?? s.maxTime
     switch (error.kind) {
       case 'declined':
-        return { ...TX_IDLE, phase: 'declined', error: message }
+        return { ...TX_IDLE, phase: 'declined', error: message, stoppedAt: 'signing' }
       case 'refused':
-        return { ...TX_IDLE, phase: 'failed', error: message }
+        return { ...TX_IDLE, phase: 'failed', error: message, stoppedAt: at }
       case 'failed':
-        return { ...s, phase: 'failed', hash, maxTime, error: message, effect: 'fee-charged' }
+        return { ...s, phase: 'failed', hash, maxTime, error: message, effect: 'fee-charged', stoppedAt: 'pending' }
       case 'unknown':
-        return { ...s, phase: 'unknown', hash, maxTime, error: message, effect: 'outcome-unknown' }
+        return { ...s, phase: 'unknown', hash, maxTime, error: message, effect: 'outcome-unknown', stoppedAt: RANK[at] >= RANK.submitting ? at : 'submitting' }
       case 'expired':
-        return { ...s, phase: 'expired', hash, maxTime, error: message, effect: 'nothing-sent' }
+        return { ...s, phase: 'expired', hash, maxTime, error: message, effect: 'nothing-sent', stoppedAt: 'pending' }
     }
   }
   // An untyped failure. Before anything was signed, nothing can have been sent. From `submitting` on we cannot
   // know whether the network has it, so the honest state is unknown, never "failed, try again".
-  if (s.phase === 'submitting' || s.phase === 'pending' || s.phase === 'unknown') return { ...s, phase: 'unknown', error: message, effect: 'outcome-unknown' }
-  return { ...TX_IDLE, phase: 'failed', error: message }
+  if (s.phase === 'submitting' || s.phase === 'pending' || s.phase === 'unknown') return { ...s, phase: 'unknown', error: message, effect: 'outcome-unknown', stoppedAt: at }
+  return { ...TX_IDLE, phase: 'failed', error: message, stoppedAt: at }
 }
 
 function fromCheck(s: TxState, check: TxCheck): TxState {
@@ -132,9 +161,9 @@ function fromCheck(s: TxState, check: TxCheck): TxState {
     case 'confirmed':
       return { ...s, phase: 'confirmed', ledger: check.ledger, error: null, effect: 'fee-charged' }
     case 'failed':
-      return { ...s, phase: 'failed', error: check.message, effect: 'fee-charged' }
+      return { ...s, phase: 'failed', error: check.message, effect: 'fee-charged', stoppedAt: 'pending' }
     case 'expired':
-      return { ...s, phase: 'expired', error: null, effect: 'nothing-sent' }
+      return { ...s, phase: 'expired', error: null, effect: 'nothing-sent', stoppedAt: 'pending' }
     case 'unknown':
       return s
   }

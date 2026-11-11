@@ -63,6 +63,13 @@
       --button-bg-active: var(--danger-tint);
     }
 
+    /* A destructive action in a dense row: the danger ink, no border. */
+    &[data-variant='quiet'][data-tone='danger']:not([data-disabled]) {
+      --button-fg: var(--danger);
+      --button-bg-hover: var(--danger-tint);
+      --button-bg-active: var(--danger-tint);
+    }
+
     &[data-size='sm'] {
       --button-h: var(--control-h-sm);
       --button-px: var(--s-12);
@@ -111,7 +118,8 @@
       &[data-size='sm']::after {
         content: '';
         position: absolute;
-        inset: calc(var(--s-8) * -1) 0;
+        /* Measured from inside the 1 px border: 26 px of padding box plus 9 px above and below is 44. */
+        inset: calc(var(--s-8) * -1 - 1px) 0;
       }
     }
   }

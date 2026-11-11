@@ -307,3 +307,14 @@ describe('guidedTermsOf', () => {
     expect(o.maxLoss).toBeCloseTo(4.3, 9)
   })
 })
+
+describe('the value of the asset lot at a price', () => {
+  it('is quantity times price for every intent, also where "without" is cash', async () => {
+    const { guidedOutcome } = await import('./strategies')
+    const terms = { qty: 5, strike: 10, premiumTotal: 1.8, entryPrice: 10 }
+    for (const intent of ['floor', 'earn-hold', 'earn-buy', 'lock-buy'] as const) {
+      expect(guidedOutcome(intent, terms, 9.4, { steps: 1 }).assetValue).toBeCloseTo(47, 9)
+      expect(guidedOutcome(intent, terms, 0, { steps: 1 }).assetValue).toBe(0)
+    }
+  })
+})

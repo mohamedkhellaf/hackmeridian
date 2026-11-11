@@ -1,0 +1,210 @@
+@layer features {
+  .table {
+    min-width: 20rem;
+  }
+
+  /* The token column takes what the three figures leave, but never pushes them to the far edge. */
+  .tokenHead {
+    width: 46%;
+    padding-inline-start: var(--s-32);
+  }
+
+  /* The token cell is the row's one control: the button fills it so the whole cell opens the split. */
+  .tokenCell {
+    padding-block: 0;
+    padding-inline: 0;
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    width: 100%;
+    min-height: var(--row-h);
+    padding-inline: var(--s-8) var(--s-12);
+    border-radius: var(--r-control);
+    text-align: start;
+    color: var(--text);
+  }
+
+  .toggle:focus-visible {
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  .chevron {
+    display: inline-flex;
+    color: var(--muted);
+  }
+
+  @media (hover: hover) {
+    .toggle:hover .chevron {
+      color: var(--text);
+    }
+
+    .toggle:hover .code {
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
+    }
+  }
+
+  .code {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+  }
+
+  .role {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+    color: var(--muted);
+  }
+
+  .unavailable {
+    color: var(--muted);
+  }
+
+  .difference {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
+  }
+
+  .difference[data-state='short'] {
+    color: var(--loss);
+    font-weight: 600;
+  }
+
+  .word {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .difference[data-state='over'] .word {
+    color: var(--muted);
+  }
+
+  /* An open token and its lines read as one block of the statement, set on the sheet tone. */
+  .row[data-open] > :where(th, td),
+  .sub > :where(th, td) {
+    background: var(--surface);
+  }
+
+  .sub > :where(th, td) {
+    height: var(--row-h-compact);
+    padding-block: var(--s-6);
+    border-bottom-color: var(--hairline);
+    font-weight: 420;
+    color: var(--text-2);
+    vertical-align: top;
+  }
+
+  .itemHead {
+    padding-inline-start: var(--s-32);
+    white-space: normal;
+  }
+
+  /* Label and meaning in two columns, so a meaning that wraps stays under itself. */
+  .itemGrid {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    align-items: baseline;
+  }
+
+  .itemLabel {
+    font-weight: 550;
+    color: var(--text);
+  }
+
+  .itemMeaning {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 420;
+    color: var(--muted);
+  }
+
+  /* The total: a heavier rule above it, as on a statement. */
+  .sub[data-sum] > :where(th, td) {
+    border-top: 1px solid var(--rule);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .sub[data-last] > :where(th, td) {
+    border-bottom-color: var(--rule);
+  }
+
+  .wide {
+    padding-inline-start: var(--s-32);
+    white-space: normal;
+  }
+
+  .proof {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-32);
+  }
+
+  .proofItem {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .proofLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  @media (max-width: 767.98px) {
+    .tokenHead {
+      width: auto;
+      padding-inline-start: var(--s-12);
+    }
+
+    .toggle {
+      min-height: var(--touch);
+      flex-wrap: wrap;
+      gap: 0 var(--s-6);
+      padding: var(--s-4) var(--s-8) var(--s-4) var(--s-4);
+    }
+
+    /* Code over role, the chevron beside both. */
+    .role {
+      flex-basis: 100%;
+      padding-inline-start: calc(1rem + var(--s-6));
+    }
+
+    .wide {
+      padding: var(--s-4) var(--s-12) var(--s-12);
+    }
+
+    .itemLabel {
+      display: block;
+      min-width: 0;
+    }
+
+    .itemMeaning {
+      display: block;
+    }
+
+    .phoneItems {
+      margin-bottom: var(--s-8);
+    }
+
+    .phoneItems > .phoneSum {
+      border-top-color: var(--rule);
+    }
+
+    .phoneItems :where(dd) {
+      color: var(--text);
+    }
+  }
+}

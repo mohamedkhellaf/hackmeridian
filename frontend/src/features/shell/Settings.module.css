@@ -1,0 +1,7 @@
+@layer features {
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+}

@@ -1,0 +1,281 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    min-width: 0;
+    padding-top: var(--s-32);
+    border-top: 1px solid var(--rule);
+  }
+
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+  }
+
+  .lede {
+    max-width: 42rem;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  /* A fact about this build, set apart by a rule on its left rather than by a tinted panel. */
+  .note {
+    max-width: 42rem;
+    margin-top: var(--s-6);
+    padding-inline-start: var(--s-12);
+    border-inline-start: 2px solid var(--rule);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .blockHead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  .blockTitle {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+
+  /* The three facts of a contract, said once in the serif. */
+  .statement {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: 560;
+    color: var(--text);
+    text-wrap: balance;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: var(--s-24) var(--s-56);
+    align-items: start;
+  }
+
+  .columns[data-single] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .identity {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .idLine {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  .idLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .hash {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: var(--s-4);
+    min-width: 0;
+  }
+
+  .hashText {
+    padding-block: var(--s-6);
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+    font-weight: 400;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- tokens ---- */
+
+  .tokenCode {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .tokenRole {
+    margin-inline-start: var(--s-4);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+    color: var(--muted);
+  }
+
+  .tokenBlocks {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .tokenBlock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding-block: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .tokenHead {
+    margin: 0;
+  }
+
+  .tokenNotes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    max-width: 46rem;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .otherListed {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  /* ---- Margin: a fenced block, apart from the Covered contract ---- */
+
+  .margin {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+    padding: var(--s-24);
+    border-radius: var(--r-card);
+    background: var(--sunken);
+  }
+
+  .margin .lede {
+    margin-top: var(--s-6);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .margin .identity,
+  .margin :where(dl) > div,
+  .role {
+    border-color: var(--rule);
+  }
+
+  .roles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-24) var(--s-56);
+    align-items: start;
+  }
+
+  .role {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+  }
+
+  .roleHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-16);
+  }
+
+  .roleName {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .roleSummary {
+    max-width: 34rem;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .listLabel {
+    margin-top: var(--s-8);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    max-width: 34rem;
+    margin: 0;
+    padding-inline-start: var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .list li::marker {
+    color: var(--muted);
+  }
+
+  .separation {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  @media (max-width: 999.98px) {
+    .columns,
+    .roles {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .root {
+      gap: var(--s-32);
+    }
+
+    .margin {
+      padding: var(--s-16);
+    }
+  }
+}

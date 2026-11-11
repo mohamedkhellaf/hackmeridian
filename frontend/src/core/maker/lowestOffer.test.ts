@@ -51,3 +51,16 @@ describe('lowestOpenInSeries groups by the UTC expiry day', () => {
     expect(lowestOpenInSeries([a, b], { ...draft, expiry: T }, USDX)?.id).toBe(2n)
   })
 })
+
+describe('lowestOpenInSeriesOf', () => {
+  it('finds the cheapest offer of a series named by its terms, before any quantity', async () => {
+    const { lowestOpenInSeriesOf } = await import('./lowestOffer')
+    const a = offer({ id: 1n, totalPremium: 2n * U })
+    const b = offer({ id: 2n, totalPremium: (18n * U) / 10n })
+    const call = offer({ id: 3n, kind: 'call', totalPremium: U / 10n })
+    const series = { underlying: FUND, kind: 'put' as const, strikePerUnit: 10n * U, expiry: T + 3600 }
+    expect(lowestOpenInSeriesOf([a, b, call], series, USDX)?.id).toBe(2n)
+    expect(lowestOpenInSeriesOf([a, b, call], { ...series, strikePerUnit: 11n * U }, USDX)).toBeNull()
+    expect(lowestOpenInSeriesOf([a, b, call], { ...series, kind: 'call' }, USDX)?.id).toBe(3n)
+  })
+})

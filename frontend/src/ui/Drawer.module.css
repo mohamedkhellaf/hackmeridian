@@ -87,6 +87,14 @@
     }
   }
 
+  /* A page on phones: the whole viewport, flat. */
+  @media (max-width: 767.98px) {
+    .popup[data-placement='right'][data-page] {
+      width: 100vw;
+      box-shadow: none;
+    }
+  }
+
   .content {
     display: flex;
     flex-direction: column;

@@ -1,0 +1,140 @@
+@layer features {
+  .list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--raised);
+
+    & > li + li {
+      border-top: 1px solid var(--hairline);
+    }
+
+    & > li:first-child .row {
+      border-radius: var(--r-card) var(--r-card) 0 0;
+    }
+
+    & > li:last-child .row {
+      border-radius: 0 0 var(--r-card) var(--r-card);
+    }
+
+    & > li:only-child .row {
+      border-radius: var(--r-card);
+    }
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-12);
+    width: 100%;
+    min-height: var(--s-56);
+    padding: var(--s-8) var(--s-12);
+    color: var(--text);
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover:not([data-blocked]) {
+        background: var(--hover);
+      }
+    }
+
+    &:active:not([data-blocked]) {
+      background: var(--pressed);
+    }
+
+    /* The ring is drawn inside the row: the list clips nothing, but neighbours would cover an outer ring. */
+    &:focus-visible {
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    &[data-blocked] {
+      color: var(--disabled-fg);
+      cursor: not-allowed;
+
+      & .kind,
+      & .status,
+      & .monogram {
+        color: var(--disabled-fg);
+      }
+    }
+
+    &[data-busy] {
+      cursor: progress;
+    }
+  }
+
+  .monogram {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--s-32);
+    height: var(--s-32);
+    border-radius: var(--r-control);
+    background: var(--sunken);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+    font-family: var(--font-serif);
+    font-size: var(--ui-size);
+    line-height: 1;
+    font-weight: 600;
+    color: var(--text-2);
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .name {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 550;
+  }
+
+  /* Secondary ink, not the muted one: the caption must hold 4.5:1 on the row's hover tone too. */
+  .kind {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    flex: none;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--text-2);
+  }
+
+  a.row .status {
+    color: var(--accent);
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
+  .loadingText {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .disclosure {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+}

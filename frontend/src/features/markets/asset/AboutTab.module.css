@@ -1,0 +1,147 @@
+@layer features {
+  .root {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-32);
+    align-items: start;
+    min-width: 0;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    min-width: 0;
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  @media (min-width: 1024px) {
+    .root {
+      grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    }
+  }
+
+  /* In one column, "Your access" comes first: it decides whether the rest is actionable. */
+  @media (max-width: 1023.98px) {
+    .root {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .side {
+      display: contents;
+    }
+
+    .access {
+      order: -1;
+    }
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  .note {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  /* The powers table reads as sentences: cells wrap, and the first column names the power. */
+  .powers {
+    & td,
+    & th[scope='row'] {
+      height: auto;
+      padding-block: var(--s-12);
+      white-space: normal;
+      vertical-align: top;
+    }
+  }
+
+  .power {
+    width: 13rem;
+  }
+
+  .state {
+    width: 6rem;
+    color: var(--text-2);
+    font-weight: 500;
+
+    &[data-on] {
+      color: var(--text);
+      font-weight: 600;
+    }
+  }
+
+  .effect {
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .means {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: var(--measure);
+    margin: 0;
+    padding-inline-start: var(--s-20);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text-2);
+
+    & > li::marker {
+      color: var(--muted);
+    }
+  }
+
+  .accessLine {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .more {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  @media (max-width: 767.98px) {
+    .power {
+      width: 8.5rem;
+    }
+
+    .state {
+      width: 4rem;
+    }
+  }
+}

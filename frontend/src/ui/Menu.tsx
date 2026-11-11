@@ -12,15 +12,21 @@ export interface MenuProps {
   align?: 'start' | 'center' | 'end'
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** `tall` lets a menu with many 44 px rows (the wallet menu on phones) use most of the viewport before it scrolls. */
+  size?: 'default' | 'tall'
+  /** A class for the popup, for a width of its own. */
+  popupClassName?: string
 }
 
-export function Menu({ trigger, children, side = 'bottom', align = 'end', open, onOpenChange }: MenuProps) {
+export function Menu({ trigger, children, side = 'bottom', align = 'end', open, onOpenChange, size = 'default', popupClassName }: MenuProps) {
   return (
     <BaseMenu.Root modal={false} open={open} onOpenChange={onOpenChange ? (next) => onOpenChange(next) : undefined}>
       <BaseMenu.Trigger render={trigger} />
       <BaseMenu.Portal>
         <BaseMenu.Positioner className={popup.positioner} side={side} align={align} sideOffset={6} collisionPadding={8}>
-          <BaseMenu.Popup className={popup.popup}>{children}</BaseMenu.Popup>
+          <BaseMenu.Popup className={cx(popup.popup, popupClassName)} data-size={size === 'tall' ? 'tall' : undefined}>
+            {children}
+          </BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>
     </BaseMenu.Root>
@@ -86,6 +92,24 @@ export function MenuLinkItem({ href, render, external = false, children, icon }:
         </span>
       ) : null}
     </BaseMenu.LinkItem>
+  )
+}
+
+export interface MenuStaticProps {
+  children: ReactNode
+  className?: string
+}
+
+/**
+ * Plain content inside a menu group (balances, a fact), starting where the words of the items start. It is not
+ * an item: it takes no focus, the arrow keys skip it and assistive technology does not see it, so the group's
+ * label must say the same thing for screen readers.
+ */
+export function MenuStatic({ children, className }: MenuStaticProps) {
+  return (
+    <div className={cx(popup.static, className)} aria-hidden="true">
+      {children}
+    </div>
   )
 }
 

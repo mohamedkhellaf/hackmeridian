@@ -85,14 +85,16 @@ export function createSettingsStore(options: SettingsStoreOptions = {}): Setting
   const apply = options.apply ?? applySettings
   const listeners = new Set<() => void>()
 
-  const read = (): Settings => {
+  /** What storage holds, or null when there is no storage to ask (none, or it throws). */
+  const read = (): Settings | null => {
+    if (!storage) return null
     try {
-      return parseSettings(storage?.getItem(SETTINGS_STORAGE_KEY))
+      return parseSettings(storage.getItem(SETTINGS_STORAGE_KEY))
     } catch {
-      return DEFAULT_SETTINGS
+      return null
     }
   }
-  let current = read()
+  let current = read() ?? DEFAULT_SETTINGS
   apply(current)
 
   const commit = (next: Settings, persist: boolean) => {
@@ -119,7 +121,11 @@ export function createSettingsStore(options: SettingsStoreOptions = {}): Setting
     get: () => current,
     set: (patch) => commit(parseSettings(JSON.stringify({ ...current, ...patch })), true),
     reset: () => commit(DEFAULT_SETTINGS, true),
-    reload: () => commit(read(), false),
+    reload: () => {
+      // Without storage the choice lives on this page only: there is nothing to follow, so keep it.
+      const stored = read()
+      if (stored) commit(stored, false)
+    },
   }
 }
 
@@ -128,6 +134,19 @@ export function createSettingsStore(options: SettingsStoreOptions = {}): Setting
  * the entry file sets the theme before React renders.
  */
 export const settingsStore: SettingsStore = createSettingsStore()
+
+/**
+ * Reads the stored settings and writes `data-theme`, `data-density` and `data-pnl` on <html>. Call it from the
+ * entry file before React mounts so the first paint has the right theme. Safe anywhere: without a document or
+ * without storage it does nothing and returns the defaults. Calling it again re-reads storage.
+ */
+export function initSettings(): Settings {
+  settingsStore.reload()
+  const current = settingsStore.get()
+  // `reload` only applies a change; the entry file wants the attributes written even when nothing changed.
+  applySettings(current)
+  return current
+}
 
 export interface SettingsHandle extends Settings {
   set: (patch: Partial<Settings>) => void

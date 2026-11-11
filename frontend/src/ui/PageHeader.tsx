@@ -15,19 +15,22 @@ export interface PageHeaderProps {
   back?: ReactNode
   /** The shell moves focus here after a route change. The heading is focusable by script, not in the tab order. */
   headingRef?: Ref<HTMLHeadingElement>
+  /** 1 on a page. A specimen or an embedded header takes the level of its place, so the page keeps one `h1`. */
+  headingLevel?: 1 | 2 | 3 | 4
   className?: string
 }
 
 /** The head of a page: one `h1`, at most one line under it and one row of actions. No hero, no eyebrow. */
-export function PageHeader({ title, description, meta, actions, back, headingRef, className }: PageHeaderProps) {
+export function PageHeader({ title, description, meta, actions, back, headingRef, headingLevel = 1, className }: PageHeaderProps) {
+  const Heading = `h${headingLevel}` as 'h1' | 'h2' | 'h3' | 'h4'
   return (
     <header className={cx(styles.root, className)}>
       {back ? <div className={styles.back}>{back}</div> : null}
       <div className={styles.row}>
         <div className={styles.main}>
-          <h1 className={styles.title} ref={headingRef} tabIndex={-1}>
+          <Heading className={styles.title} ref={headingRef} tabIndex={-1}>
             {title}
-          </h1>
+          </Heading>
           {description ? <p className={styles.description}>{description}</p> : null}
         </div>
         {actions ? <div className={styles.actions}>{actions}</div> : null}

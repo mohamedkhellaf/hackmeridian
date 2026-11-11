@@ -1,0 +1,45 @@
+@layer features {
+  .money {
+    white-space: nowrap;
+  }
+
+  .deadline {
+    display: inline;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    text-align: end;
+
+    &[data-status='fail'] {
+      color: var(--danger);
+    }
+
+    &[data-status='unknown'] {
+      font-family: var(--font-sans);
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      font-weight: 450;
+      color: var(--text-2);
+    }
+  }
+
+  .statusIcon {
+    flex: none;
+    align-self: center;
+  }
+
+  .pending {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--figure-line);
+  }
+
+  .issues {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+}

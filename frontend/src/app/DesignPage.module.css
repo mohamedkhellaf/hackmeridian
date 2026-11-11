@@ -1,0 +1,24 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-56);
+    min-width: 0;
+  }
+
+  .charts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+    padding-top: var(--s-32);
+    border-top: 1px solid var(--rule);
+  }
+
+  .chapter {
+    font-size: var(--h1-size);
+    line-height: var(--h1-line);
+    font-weight: var(--h1-weight);
+    letter-spacing: var(--h1-track);
+  }
+}

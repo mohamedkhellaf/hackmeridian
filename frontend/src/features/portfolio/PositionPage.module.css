@@ -1,0 +1,49 @@
+@layer features {
+  .page {
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    min-height: var(--s-24);
+  }
+
+  .empty {
+    max-width: 34rem;
+  }
+
+  .note {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  /* The note on the left, what it means on the right; one column when the page is narrow. */
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--s-24);
+    min-width: 0;
+
+    @container (min-width: 60rem) {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: var(--s-32);
+    }
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+}

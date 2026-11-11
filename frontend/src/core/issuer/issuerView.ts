@@ -1,4 +1,4 @@
-import type { IssuerFlags, TrustStatus } from './issuerTx'
+import type { IssuerFlags, TrustStatus } from '../stellar/issuerTx'
 
 // Pure view helpers for the issuer console (no network, no React).
 

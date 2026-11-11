@@ -271,6 +271,8 @@ export function demoSeed(atSec: number = nowSec()): MockSeed {
   const balances: Record<string, Record<string, bigint>> = {
     [A]: { [q.contractId]: whole(2_500, q), [FUND.contractId]: whole(120, FUND), [BOND.contractId]: whole(12, BOND), [EQTY.contractId]: whole(40, EQTY) },
     [B]: { [q.contractId]: whole(1_200, q), [FUND.contractId]: whole(60, FUND), [BOND.contractId]: whole(6, BOND), [EQTY.contractId]: whole(25, EQTY) },
+    // An empty wallet, for the first-run states ("Get test funds"): every other account gets the default balances.
+    [DEMO_WALLETS.c]: { [q.contractId]: 0n, [FUND.contractId]: 0n, [BOND.contractId]: 0n, [EQTY.contractId]: 0n },
   }
 
   return { quote: q, underlyings: [...MOCK_UNDERLYINGS], options, asks, bids, balances, defaultBalances: defaultBalances() }

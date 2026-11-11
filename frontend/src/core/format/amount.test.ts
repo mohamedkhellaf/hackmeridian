@@ -150,3 +150,12 @@ describe('formatNumber (chart figures only)', () => {
     expect(formatNumber(NaN)).toBe('–')
   })
 })
+
+describe('noBreak', () => {
+  it('keeps a deadline or a figure with its unit on one line', async () => {
+    const { noBreak, NBSP } = await import('./amount')
+    expect(noBreak('20 Nov 2026, 08:00 UTC')).toBe(`20${NBSP}Nov${NBSP}2026,${NBSP}08:00${NBSP}UTC`)
+    expect(noBreak('1.80 USDx')).toBe(`1.80${NBSP}USDx`)
+    expect(noBreak('BOND')).toBe('BOND')
+  })
+})

@@ -1,0 +1,9 @@
+@layer features {
+  /* A sentence that ends in an address: the two stay on one line where there is room and wrap as units. */
+  .line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2) var(--s-8);
+  }
+}

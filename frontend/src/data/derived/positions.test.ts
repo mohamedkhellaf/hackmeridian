@@ -147,6 +147,35 @@ describe('buildTodo', () => {
     expect(first.urgency).toBe('far')
   })
 
+  it('asks both writers to claim: a put writer the underlying delivered, a call writer the strike paid', () => {
+    const options = w.source(A).options
+    // Option 8: a put on 5 FUND at 9.80 that the second wallet wrote. Its holder exercises it.
+    const put = options.find((o) => o.id === 8n)!
+    expect(put.kind).toBe('put')
+    const exercised = options.map((o) => (o.id === 8n ? { ...o, state: 'exercised' as const } : o))
+    const forB = buildTodo(exercised, B, FIXED_SEC, referenceOf)
+    const claim = forB.find((t) => t.kind === 'claim')!
+    expect(claim.option.id).toBe(8n)
+    expect(claim.tone).toBe('action')
+    expect(claim.amount).toEqual({ token: w.assets.FUND, amount: put.underlyingQty })
+    // Option 3 (the default wallet): a call writer claims the strike in the quote token.
+    const call = buildTodo(options, A, FIXED_SEC, referenceOf).find((t) => t.kind === 'claim')!
+    expect(call.option.kind).toBe('call')
+    expect(call.amount?.token).toEqual(w.quote)
+    expect(countActionsWaiting(exercised, B, FIXED_SEC, referenceOf)).toBe(2)
+  })
+
+  it('lists the reclaim of an offer that expired without a buyer, and forgets an old expired holding', () => {
+    const options = w.source(A).options
+    const passed = options.find((o) => o.id === 5n)!.expiry
+    // Option 6 is the wallet's open offer: once expired unsold, its collateral waits for a reclaim.
+    const unsold = options.map((o) => (o.id === 6n ? { ...o, state: 'expired' as const, expiry: passed } : o))
+    const todo = buildTodo(unsold, A, FIXED_SEC, referenceOf)
+    expect(todo.filter((t) => t.kind === 'reclaim').map((t) => t.option.id)).toEqual([4n, 6n])
+    // An option that expired unexercised is shown for a week, then it is only in "Show closed".
+    expect(buildTodo(options, A, passed + 8 * 86_400, referenceOf).some((t) => t.kind === 'expired-unexercised')).toBe(false)
+  })
+
   it('has nothing for a guest', () => {
     expect(buildTodo(w.source(null).options, null, FIXED_SEC, referenceOf)).toEqual([])
     expect(countActionsWaiting(w.source(null).options, null, FIXED_SEC, referenceOf)).toBe(0)

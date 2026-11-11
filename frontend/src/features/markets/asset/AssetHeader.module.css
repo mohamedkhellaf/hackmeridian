@@ -1,0 +1,153 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .back {
+    display: flex;
+  }
+
+  .identity {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-16);
+  }
+
+  .glyph {
+    flex: none;
+    color: var(--text);
+  }
+
+  .code {
+    font-family: var(--font-serif);
+    font-size: var(--h1-size);
+    line-height: var(--h1-line);
+    font-weight: var(--h1-weight);
+    letter-spacing: var(--h1-track);
+    /* Room for the focus ring when the shell moves focus here after a navigation. */
+    margin-inline: calc(var(--s-6) * -1);
+    padding-inline: var(--s-6);
+    border-radius: var(--r-control);
+
+    &:focus:not(:focus-visible) {
+      box-shadow: none;
+    }
+  }
+
+  .type {
+    align-self: flex-end;
+    padding-bottom: var(--s-6);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  /* A look-alike of a reference code: said in words, with the glyph, before any figure. */
+  .similar {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-8);
+    color: var(--warn);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+
+    & > svg {
+      flex: none;
+      margin-top: var(--s-2);
+    }
+  }
+
+  /* A ruled strip of facts: label over value, one column each. */
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) repeat(3, minmax(0, 1fr));
+    gap: var(--s-16) var(--s-32);
+    margin: 0;
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+  }
+
+  .fact {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+
+    & dt {
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      font-stretch: var(--label-stretch);
+      color: var(--muted);
+    }
+
+    & dd {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-2);
+      margin: 0;
+      min-width: 0;
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+    }
+  }
+
+  .price {
+    display: flex;
+    align-items: baseline;
+    min-height: var(--figure-lg-line);
+  }
+
+  .noPrice {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    color: var(--text-2);
+  }
+
+  .source {
+    max-width: 44ch;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .word {
+    font-size: var(--ui-size);
+    line-height: var(--figure-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .holdings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+  }
+
+  .guest {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    text-wrap: pretty;
+  }
+
+  @media (max-width: 899.98px) {
+    .facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s-16) var(--s-24);
+    }
+
+    .fact[data-wide] {
+      grid-column: 1 / -1;
+    }
+  }
+}

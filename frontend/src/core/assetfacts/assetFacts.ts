@@ -140,6 +140,24 @@ export interface AssetFacts {
   issuerInfo: IssuerFacts | null
   /** A read that failed: the panel says so instead of guessing. */
   partial: boolean
+  /** True for the fixture facts of a mock asset (`mockAssetFacts`): the flags are a demo setting, not read from a chain. */
+  mock?: boolean
+}
+
+/**
+ * Fixture flags for the three mock assets, so the demo can show an issuer power that is on and one that is off.
+ * Only the issuer's flags are given: no trustline count and no holder count is invented (`record` stays null).
+ */
+const MOCK_FLAGS: Readonly<Record<string, AssetFlags>> = {
+  FUND: { authRequired: false, authRevocable: true, clawback: true, authImmutable: false },
+  BOND: { authRequired: true, authRevocable: true, clawback: true, authImmutable: false },
+  EQTY: { authRequired: true, authRevocable: true, clawback: false, authImmutable: false },
+}
+
+/** The facts of a mock asset: flags from the fixture table (every power off for a code it does not know). */
+export function mockAssetFacts(code: string, issuer: string | null = null): AssetFacts {
+  const flags = MOCK_FLAGS[code] ?? { authRequired: false, authRevocable: false, clawback: false, authImmutable: false }
+  return { code, issuer, native: false, record: null, issuerInfo: { homeDomain: null, locked: false, flags }, partial: false, mock: true }
 }
 
 async function loadFacts(contractId: string, fallbackCode: string): Promise<AssetFacts> {

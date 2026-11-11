@@ -1,0 +1,43 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding-top: var(--s-20);
+    min-width: 0;
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
+  .summary,
+  .notice,
+  .stale {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .notice {
+    color: var(--text-2);
+  }
+
+  .stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+    color: var(--warn);
+  }
+}

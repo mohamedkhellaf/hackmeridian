@@ -11,7 +11,11 @@ export interface TimelineItem {
   actor?: ReactNode
   /** One or two sentences, or a transaction link. */
   description?: ReactNode
-  status: 'done' | 'current' | 'upcoming'
+  /**
+   * Where this step stands in a real history. Leave it out for a walk-through that is nobody's position (how an
+   * option lives, in general): the mark is then a plain ink point and no status word is read out.
+   */
+  status?: 'done' | 'current' | 'upcoming'
 }
 
 export interface TimelineProps {
@@ -28,7 +32,7 @@ export function Timeline({ label, items, className }: TimelineProps) {
   return (
     <ol className={cx(styles.root, className)} aria-label={label}>
       {items.map((item, i) => (
-        <li key={i} className={styles.item} data-status={item.status} aria-current={item.status === 'current' ? 'step' : undefined}>
+        <li key={i} className={styles.item} data-status={item.status ?? 'neutral'} aria-current={item.status === 'current' ? 'step' : undefined}>
           <span className={styles.mark} aria-hidden="true" />
           <div className={styles.body}>
             <div className={styles.head}>
@@ -37,7 +41,7 @@ export function Timeline({ label, items, className }: TimelineProps) {
             </div>
             <p className={styles.title}>
               {item.title}
-              <span className="ui-vh">, {STATUS_WORD[item.status]}</span>
+              {item.status ? <span className="ui-vh">, {STATUS_WORD[item.status]}</span> : null}
             </p>
             {item.description ? <div className={styles.description}>{item.description}</div> : null}
           </div>

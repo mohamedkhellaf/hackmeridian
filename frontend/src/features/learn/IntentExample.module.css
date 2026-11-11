@@ -1,0 +1,76 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    padding-top: var(--s-24);
+    border-top: 1px solid var(--rule);
+  }
+
+  .lead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: var(--measure);
+  }
+
+  .name {
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .statement {
+    color: var(--text-2);
+  }
+
+  /* The deal in exact figures, set as a figure: serif, tabular. */
+  .deal {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: 450;
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  /* The terms and the figure, side by side when there is room. */
+  .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-24);
+    align-items: start;
+  }
+
+  @container (min-width: 40rem) {
+    .pair {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @container (min-width: 52rem) {
+    .pair {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: var(--s-32);
+    }
+  }
+
+  .note,
+  .figure,
+  .sheet,
+  .outcomes {
+    min-width: 0;
+  }
+
+  .figure {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
+  /* What it costs, at the weight of what it gives: beside the figure, not under the fold. */
+  .trade {
+    max-width: var(--measure);
+    color: var(--text-2);
+  }
+}

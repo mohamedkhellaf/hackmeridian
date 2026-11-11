@@ -1,0 +1,203 @@
+@layer ui {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+
+    &[data-appearance='note'] {
+      gap: var(--s-8);
+    }
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-12);
+  }
+
+  .legend {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--text-2);
+  }
+
+  .root[data-appearance='note'] .legend {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    color: var(--text);
+  }
+
+  .aside {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-align: end;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(var(--chip-columns), minmax(0, 1fr));
+    gap: var(--s-6);
+  }
+
+  .root[data-appearance='note'] .grid[data-width='fixed'] {
+    grid-template-columns: repeat(var(--chip-columns), minmax(0, 8.5rem));
+  }
+
+  .chip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: var(--control-h);
+    padding: var(--s-4) var(--s-2);
+    border: 1px solid var(--control);
+    border-radius: var(--r-control);
+    background: var(--surface);
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums lining-nums;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-hover) var(--ease-enter),
+      border-color var(--dur-hover) var(--ease-enter),
+      color var(--dur-hover) var(--ease-enter);
+
+    &:has(.input:focus-visible) {
+      box-shadow: var(--focus-ring);
+    }
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+
+  /* Forms: the chosen chip is filled with ink, like the chosen segment of a strip. */
+  .root[data-appearance='control'] .chip {
+    @media (hover: hover) {
+      &:hover:not([data-checked]) {
+        background: var(--hover);
+        color: var(--text);
+      }
+    }
+
+    &[data-checked] {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--primary-fg);
+      font-weight: 600;
+    }
+  }
+
+  /* On a note: a blank to fill in. Dashed until something funded stands behind it; a double rule when chosen. */
+  .root[data-appearance='note'] .chip {
+    align-items: stretch;
+    gap: var(--s-2);
+    min-height: var(--touch);
+    padding: var(--s-6);
+    border-style: dashed;
+    background: transparent;
+    text-align: start;
+
+    &[data-marked] {
+      border-style: solid;
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    @media (hover: hover) {
+      &:hover {
+        border-color: var(--text);
+      }
+    }
+
+    &[data-checked] {
+      border: 1px solid var(--text);
+      outline: 1px solid var(--text);
+      background: var(--raised);
+      color: var(--text);
+    }
+  }
+
+  /* The native radio covers its chip: it takes the click and the keys, the label draws the look. */
+  .input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-4);
+    white-space: nowrap;
+  }
+
+  .root[data-appearance='note'] .label {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+  }
+
+  .tick {
+    flex: none;
+    color: var(--text-2);
+  }
+
+  .chip[data-checked] .tick {
+    color: inherit;
+  }
+
+  .detail {
+    font-size: var(--badge-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .root[data-appearance='control'] .chip[data-checked] .detail {
+    color: inherit;
+  }
+
+  .root[data-appearance='note'] .detail {
+    font-size: var(--caption-size);
+    font-weight: 400;
+    font-stretch: var(--label-stretch);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* On a narrow note the grid drops to rows of five, then three. */
+  @container (max-width: 43.99rem) {
+    .root[data-appearance='note'] .grid,
+    .root[data-appearance='note'] .grid[data-width='fixed'] {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+
+  @container (max-width: 31.99rem) {
+    .root[data-appearance='note'] .grid,
+    .root[data-appearance='note'] .grid[data-width='fixed'] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+}

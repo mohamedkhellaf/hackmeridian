@@ -1,0 +1,125 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+    min-width: 0;
+
+    @media (max-width: 767.98px) {
+      gap: var(--s-24);
+    }
+  }
+
+  /* The blank slip on the left, what the page will hold on the right. */
+  .guest {
+    display: grid;
+    grid-template-columns: minmax(0, 30rem) minmax(0, 26rem);
+    align-items: start;
+    gap: var(--s-32) var(--s-56);
+
+    @media (max-width: 1199.98px) {
+      grid-template-columns: minmax(0, 34rem);
+    }
+  }
+
+  .guestList {
+    padding-top: var(--s-8);
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+  }
+
+  .loadingCards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+    gap: var(--s-12);
+  }
+
+  .loadingStats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-16) var(--s-32);
+    padding-block: var(--s-16);
+    border-block: 1px solid var(--rule);
+
+    @media (max-width: 767.98px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* A blank slip keeps the width of a slip, however wide the page. */
+  .empty {
+    max-width: 34rem;
+  }
+
+  .lists {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  /* Tabs on the left, the one view setting on the right, on the same rule. */
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-24);
+    min-width: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+    padding-top: var(--s-16);
+    min-width: 0;
+  }
+
+  .orders {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .ordersHead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .ordersHeading {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .ordersLead {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .ordersEmpty {
+    padding-block: var(--s-12);
+    border-block: 1px solid var(--hairline);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .hidden {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+}

@@ -14,13 +14,16 @@ import { useOptionsClient } from './useOptionsClient'
  */
 export type NetworkState = 'mock' | 'connecting' | 'ok' | 'delayed' | 'down'
 
-/** The word shown beside the dot. Colour is never the only signal. */
+/**
+ * The word shown beside the dot. Colour is never the only signal. It names what is being judged, the RPC the
+ * reads come from, not the network itself (the design library's shell bars use the same three words).
+ */
 export const NETWORK_STATE_LABEL: Record<NetworkState, string> = {
   mock: 'Mock data',
   connecting: 'Connecting',
-  ok: 'Online',
-  delayed: 'Delayed',
-  down: 'Offline',
+  ok: 'RPC ok',
+  delayed: 'RPC slow',
+  down: 'RPC down',
 }
 
 export interface NetworkStatus {

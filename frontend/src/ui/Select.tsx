@@ -1,6 +1,6 @@
 import { Field as BaseField } from '@base-ui/react/field'
 import { Select as BaseSelect } from '@base-ui/react/select'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { FieldMessages } from './Field'
 import { IconCheck, IconSelect } from './icons'
 import { cx } from './internal/cx'
@@ -30,6 +30,12 @@ export interface SelectProps<V extends string = string> {
   error?: ReactNode
   disabled?: boolean
   name?: string
+  /** Called when the list starts to open or close. */
+  onOpenChange?: (open: boolean) => void
+  /** Called once the list has finished opening or closing (after its exit transition). */
+  onOpenChangeComplete?: (open: boolean) => void
+  /** Where focus goes when the list closes, instead of the trigger (a heading the choice scrolls to). */
+  finalFocus?: RefObject<HTMLElement | null>
   className?: string
 }
 
@@ -46,6 +52,9 @@ export function Select<V extends string = string>({
   error,
   disabled,
   name,
+  onOpenChange,
+  onOpenChangeComplete,
+  finalFocus,
   className,
 }: SelectProps<V>) {
   return (
@@ -57,6 +66,8 @@ export function Select<V extends string = string>({
           if (next !== null) onValueChange(next)
         }}
         disabled={disabled}
+        onOpenChange={onOpenChange ? (open) => onOpenChange(open) : undefined}
+        onOpenChangeComplete={onOpenChangeComplete}
       >
         <BaseSelect.Label className={cx(field.label, hideLabel && 'ui-vh')}>{label}</BaseSelect.Label>
         <BaseSelect.Trigger className={styles.trigger} data-size={size}>
@@ -67,7 +78,7 @@ export function Select<V extends string = string>({
         </BaseSelect.Trigger>
         <BaseSelect.Portal>
           <BaseSelect.Positioner className={popup.positioner} sideOffset={4} alignItemWithTrigger={false} align="start">
-            <BaseSelect.Popup className={popup.popup}>
+            <BaseSelect.Popup className={popup.popup} finalFocus={finalFocus}>
               <BaseSelect.List className={popup.list}>
                 {options.map((option) => (
                   <BaseSelect.Item key={option.value} value={option.value} disabled={option.disabled} className={popup.item}>

@@ -5,6 +5,7 @@ export {
   NBSP,
   THIN_NBSP,
   NO_VALUE,
+  noBreak,
   groupDigits,
   formatUnits,
   formatExact,

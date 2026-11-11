@@ -12,10 +12,47 @@
       {
         "allowConstantExport": true
       }
+    ],
+    "no-restricted-globals": [
+      "error",
+      { "name": "process", "message": "Browser code has no Node globals. Read build values from import.meta.env." },
+      { "name": "Buffer", "message": "Browser code has no Node globals. Use Uint8Array." },
+      { "name": "__dirname", "message": "Browser code has no Node globals." },
+      { "name": "__filename", "message": "Browser code has no Node globals." },
+      { "name": "require", "message": "Browser code is ES modules: use import." }
+    ],
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          { "group": ["node:*"], "message": "Browser code cannot import Node built-ins." },
+          { "group": ["@base-ui/**"], "message": "Base UI is imported only inside src/ui. Use the component of the kit." },
+          { "group": ["@phosphor-icons/**"], "message": "Icons are imported only through src/ui (icons.ts)." }
+        ]
+      }
     ]
   },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.testhelper.ts", "**/*.mjs", "e2e/**", "*.config.ts"],
+      "rules": {
+        "no-restricted-globals": "off",
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/ui/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          { "patterns": [{ "group": ["node:*"], "message": "Browser code cannot import Node built-ins." }] }
+        ]
+      }
+    }
+  ],
   "ignorePatterns": [
     "legacy-ui/**",
-    "dist/**"
+    "dist/**",
+    "test-results/**"
   ]
 }

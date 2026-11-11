@@ -1,0 +1,35 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-12) var(--s-20);
+  }
+
+  .asset {
+    flex: 0 1 12rem;
+  }
+
+  .kind {
+    flex: none;
+  }
+
+  .sort {
+    flex: 0 1 15rem;
+    margin-inline-start: auto;
+  }
+
+  /* Phones: asset and kind share a line, the order takes the next one. Nothing is cut short. */
+  @media (max-width: 767.98px) {
+    .root {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--s-12);
+    }
+
+    .sort {
+      grid-column: 1 / -1;
+      margin: 0;
+    }
+  }
+}

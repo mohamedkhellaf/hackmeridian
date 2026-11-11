@@ -264,9 +264,30 @@ describe('labels of the twelve writes', () => {
       'Fill request for put on 10.00 FUND',
     ])
     expect(labels.map((l) => l.done)).toEqual(['Bought', 'Exercised', 'Delivery claimed', 'Reclaimed', 'Offer cancelled', 'Offer written', 'Listed for sale', 'Listing cancelled', 'Bought from holder', 'Request posted', 'Request cancelled', 'Request filled'])
-    for (const l of labels) {
-      expect(findBannedWords(`${l.label} ${l.done}`)).toEqual([])
-      expect(`${l.label} ${l.done}`).not.toMatch(/[—–→!]/)
+    // The second line of the Activity entry: the series, exactly. New orders get theirs from the contract's quote token.
+    const quote = held.quote
+    const details = labels.map((l, i) => (i === 5 ? W.writeOffer.detail!(held, quote) : i === 9 ? W.createBid.detail!(bid, quote) : l.detail))
+    expect(details).toEqual([
+      'Strike 97.00 USDx per BOND, deadline 20 Nov 2026, 08:00 UTC',
+      'Strike 97.00 USDx per BOND, deadline 20 Nov 2026, 08:00 UTC',
+      'Call on 1.00 BOND, strike 98.00 USDx per BOND, deadline 13 Nov 2026, 08:00 UTC',
+      'Put on 2.00 EQTY, strike 24.00 USDx per EQTY, deadline 6 Nov 2026, 08:00 UTC',
+      'Strike 9.80 USDx per FUND, deadline 27 Nov 2026, 08:00 UTC',
+      'Strike 97.00 USDx per BOND, deadline 20 Nov 2026, 08:00 UTC',
+      'Strike 97.00 USDx per BOND, deadline 20 Nov 2026, 08:00 UTC',
+      'Strike 97.00 USDx per BOND, deadline 20 Nov 2026, 08:00 UTC',
+      'Strike 97.00 USDx per BOND, deadline 20 Nov 2026, 08:00 UTC',
+      'Strike 10.40 USDx per FUND, deadline 20 Nov 2026, 08:00 UTC',
+      'Strike 10.40 USDx per FUND, deadline 20 Nov 2026, 08:00 UTC',
+      'Strike 10.40 USDx per FUND, deadline 20 Nov 2026, 08:00 UTC',
+    ])
+    // Without the asset list a new order still says when it ends; an uneven strike is given as the total, never rounded.
+    expect(W.writeOffer.detail!(held, null)).toBe('Deadline 20 Nov 2026, 08:00 UTC')
+    expect(W.buy.describe({ ...held, underlyingQty: 3n * 10n ** 7n, totalStrike: 100n * 10n ** 7n }).detail).toBe('Total strike 100.00 USDx, deadline 20 Nov 2026, 08:00 UTC')
+    for (const [i, l] of labels.entries()) {
+      const text = `${l.label} ${l.done} ${details[i]}`
+      expect(findBannedWords(text)).toEqual([])
+      expect(text).not.toMatch(/[—–→!]/)
     }
     expect(Object.values(W).map((w) => w.action)).toEqual(['buy', 'exercise', 'claim-delivery', 'reclaim', 'cancel-offer', 'write-offer', 'list-for-sale', 'cancel-sale', 'buy-resale', 'create-bid', 'cancel-bid', 'fill-bid'])
   })

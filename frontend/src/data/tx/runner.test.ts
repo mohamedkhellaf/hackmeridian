@@ -270,3 +270,26 @@ describe('refusedState', () => {
     expect(mayHaveChanged(s)).toBe(false)
   })
 })
+
+describe('what a confirmed transaction created', () => {
+  it('is recorded on its Activity entry, and only when the write was confirmed', async () => {
+    const activity = createActivityStore({ storage: null })
+    const deps = { activity, flights: createFlights(), onSettled: () => {}, checkTx: async () => ({ status: 'unknown' as const }), autoCheck: false }
+    const meta = { product: 'covered' as const, action: 'write-offer', label: 'Write put on 5.00 BOND', address: 'GME', mock: true }
+
+    const ok = await runTransaction(deps, meta, async () => ({ hash: 'h1', ledger: null, id: 12n }), { created: (r) => `option:${r.id}` })
+    expect(ok.state.phase).toBe('confirmed')
+    expect(activity.get('GME', ok.entryId!)?.created).toBe('option:12')
+
+    const failed = await runTransaction(
+      deps,
+      meta,
+      async (): Promise<{ hash: string; ledger: null; id: bigint }> => {
+        throw new TxError('failed', 'Refused by the contract.', { hash: 'h2', maxTime: 10 })
+      },
+      { created: (r) => `option:${r.id}` },
+    )
+    expect(failed.state.phase).toBe('failed')
+    expect(activity.get('GME', failed.entryId!)?.created ?? null).toBeNull()
+  })
+})

@@ -1,0 +1,30 @@
+@layer features {
+  .root {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-24);
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .side {
+    display: flex;
+    min-width: 0;
+
+    & > * {
+      flex: 1;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .root {
+      grid-template-columns: minmax(0, 1fr) calc(var(--rail-w) - var(--s-40));
+      column-gap: var(--s-40);
+    }
+  }
+}

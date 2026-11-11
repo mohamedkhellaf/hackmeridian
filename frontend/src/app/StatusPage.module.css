@@ -1,0 +1,60 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-12) var(--s-20);
+    padding-top: var(--s-4);
+  }
+
+  /* Outside the shell, on the landing route. */
+  .bare {
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--s-56) var(--gutter);
+
+    @media (width < 768px) {
+      padding-block: var(--s-32);
+    }
+  }
+
+  /*
+   * Before the shell's code arrives: the measures of features/shell (bar height, hairline, page gutters, the
+   * reserved scrollbar gutter), so the skeleton stays where it is when the real chrome replaces this frame.
+   */
+  .shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
+  .bar {
+    height: calc(var(--s-56) + env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .page {
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--s-32) max(var(--gutter), env(safe-area-inset-right, 0px)) var(--s-56) max(var(--gutter), env(safe-area-inset-left, 0px));
+
+    @media (width < 768px) {
+      padding-block: var(--s-20) var(--s-40);
+    }
+  }
+
+  @media (width >= 768px) {
+    :root:has(.shell) {
+      scrollbar-gutter: stable;
+    }
+  }
+}

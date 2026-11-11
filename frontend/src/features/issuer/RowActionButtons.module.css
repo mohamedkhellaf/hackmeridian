@@ -1,0 +1,19 @@
+@layer features {
+  /* One line of buttons, sitting on the first text line of the row. */
+  .buttons {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: var(--s-8);
+    margin-block: calc(var(--s-4) * -1);
+  }
+
+  /* On a phone the row is a block: the buttons start at the left edge, under the facts. */
+  @media (max-width: 767.98px) {
+    .buttons {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      margin-block: 0;
+    }
+  }
+}

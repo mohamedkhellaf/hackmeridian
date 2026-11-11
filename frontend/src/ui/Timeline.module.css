@@ -44,7 +44,8 @@
     background: var(--bg);
   }
 
-  .item[data-status='done'] .mark {
+  .item[data-status='done'] .mark,
+  .item[data-status='neutral'] .mark {
     border-color: var(--text);
     background: var(--text);
   }
@@ -69,8 +70,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 0 var(--s-12);
+    gap: 0 var(--s-8);
     font-size: var(--label-size);
     line-height: var(--s-20);
     color: var(--muted);
@@ -85,8 +85,15 @@
     color: var(--text-2);
   }
 
+  /* The actor follows the time on the same line, next to the step it belongs to, behind a short rule. */
   .actor {
     font-weight: 500;
+
+    .time + & {
+      padding-inline-start: var(--s-8);
+      border-inline-start: 1px solid var(--rule);
+      line-height: var(--label-line);
+    }
   }
 
   .title {

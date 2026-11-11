@@ -36,6 +36,6 @@ export const REFERENCE_LABEL: Record<ReferenceKind, string> = {
 export const REFERENCE_NOTE: Record<ReferenceKind, string> = {
   demo: 'Chosen by the team for this demo. Not a market.',
   fixed: "Fixed by the team's faucet. Not a market.",
-  desk: "Set by the team's standing offers on the Stellar Testnet DEX. No real funds.",
+  desk: "Set by the team's standing offers on the Stellar test network exchange. Not a market.",
   none: 'Set an assumed price to see what an option would pay.',
 }

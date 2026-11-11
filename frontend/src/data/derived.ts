@@ -7,8 +7,10 @@
 // (a 10 or 30 second step) moves.
 import type { UseQueryResult } from '@tanstack/react-query'
 import { useMemo } from 'react'
+import { resolveAssetParam, tierOf } from '../core/assets'
+import type { AssetNetwork, AssetTier } from '../core/assets'
 import type { SeriesRef } from '../core/market/selection'
-import type { OptionOffer, TokenInfo } from '../core/options/types'
+import type { OptionOffer, SupportedAssets, TokenInfo } from '../core/options/types'
 import type { GuidedIntent } from '../core/payoff/strategies'
 import type { PortfolioSummary } from '../core/portfolio/positions'
 import { referenceFor } from '../core/reference'
@@ -82,17 +84,71 @@ const idOf = (asset: string | { contractId: string } | null | undefined): string
 export const optionReference = (o: OptionOffer): ReferencePrice => referenceFor(o.underlying, referenceMode(), o.quote.decimals)
 const assetReference = (quoteDecimals: number) => (asset: TokenInfo): ReferencePrice => referenceFor(asset, referenceMode(), quoteDecimals)
 
-/** The option, ask and bid lists as one source for the selectors, with their combined status. */
-function useSource(me: string | null, cadence: Cadence, stepSec: number) {
-  const options = useOptions({ cadence })
-  const asks = useAsks({ cadence })
-  const bids = useBids({ cadence })
+/**
+ * The option, ask and bid lists as one source for the selectors, with their combined status. With `enabled`
+ * false nothing is read (a portfolio view without a wallet): the queries stay idle and the view has no subject.
+ */
+function useSource(me: string | null, cadence: Cadence, stepSec: number, enabled: boolean = true) {
+  const options = useOptions({ cadence, enabled })
+  const asks = useAsks({ cadence, enabled })
+  const bids = useBids({ cadence, enabled })
   const nowSec = useNowSec(stepSec)
   const optionList = options.data
   const askList = asks.data ?? null
   const bidList = bids.data ?? null
-  const source = useMemo<MarketSource | null>(() => (optionList ? { options: optionList, asks: askList, bids: bidList, me, nowSec } : null), [optionList, askList, bidList, me, nowSec])
+  // `null` is the contract's answer "no such feature"; `undefined` is a read that has not landed yet.
+  const bidsOn = bids.data !== null
+  const resaleOn = asks.data !== null
+  const source = useMemo<MarketSource | null>(
+    () => (optionList ? { options: optionList, asks: askList, bids: bidList, me, nowSec, bidsOn, resaleOn } : null),
+    [optionList, askList, bidList, me, nowSec, bidsOn, resaleOn],
+  )
   return { source, options, asks, bids }
+}
+
+// ------------------------------------------------------------------------------------------- one asset
+
+export interface AssetRoute {
+  /**
+   *   found    the segment names an asset the contract lists: `token` is set
+   *   unknown  well formed, but the contract lists no such asset
+   *   invalid  not a slug, a CODE-ISSUER pair or a contract id: render a fixed "no such asset" view and never echo it
+   */
+  status: 'found' | 'unknown' | 'invalid'
+  token: TokenInfo | null
+  /** The contract's quote token. */
+  quote: TokenInfo
+  /** The canonical `$asset` segment of the asset; replace the URL with it when `isCanonical` is false. */
+  canonical: string | null
+  isCanonical: boolean
+  /** `Reference`, `Domain-linked` or `No domain link`; null when not found. */
+  tier: AssetTier | null
+  /** `Fund share`, `Bond`, `Equity` for a reference asset, else null. */
+  typeLabel: string | null
+}
+
+/** Resolves a `$asset` segment against the reference list and the listed tokens. Pure, for tests. */
+export function resolveAssetRoute(param: string, listed: SupportedAssets, network: AssetNetwork): AssetRoute {
+  const base = { quote: listed.quote, canonical: null, isCanonical: false, tier: null, typeLabel: null, token: null }
+  const r = resolveAssetParam(param, network, listed.underlyings)
+  if (r.status === 'invalid') return { ...base, status: 'invalid' }
+  // A reference asset the contract does not list (yet) has no market: it is unknown here.
+  const token = r.status === 'found' ? (listed.underlyings.find((t) => t.contractId === r.contractId) ?? null) : null
+  if (r.status !== 'found' || !token) return { ...base, status: 'unknown' }
+  return { status: 'found', token, quote: listed.quote, canonical: r.canonical, isCanonical: r.isCanonical, tier: tierOf(token), typeLabel: r.reference?.typeLabel ?? null }
+}
+
+/**
+ * The asset a `/markets/$asset` URL names: a slug (`bond`), `CODE-ISSUER` or a contract id, resolved with
+ * core/assets against the tokens the contract lists. `data.token.contractId` is the id every other hook takes.
+ * `data` is null while the asset list loads (or without a param); once loaded it always has a `status`.
+ */
+export function useAsset(param: string | null | undefined): Derived<AssetRoute> {
+  const assets = useAssets()
+  const listed = assets.data
+  const data = useMemo(() => (listed && param ? resolveAssetRoute(param, listed, referenceMode()) : null), [listed, param])
+  const status = combineStatus([assets])
+  return { ...status, data: status.ready ? data : null }
 }
 
 // ------------------------------------------------------------------------------------------- markets
@@ -205,7 +261,7 @@ export interface PortfolioOptions extends ViewOptions {
 export function usePositions(me?: string | null, opts: PortfolioOptions = {}): Derived<PositionsView> {
   const client = useOptionsClient()
   const who = me === undefined ? client.me : me
-  const { source, options, asks, bids } = useSource(who, opts.cadence ?? 'book', 10)
+  const { source, options, asks, bids } = useSource(who, opts.cadence ?? 'book', 10, !!who)
   const showClosed = opts.showClosed ?? false
   const data = useMemo(() => (source && who ? buildPositions({ ...source, referenceOf: optionReference }, showClosed) : null), [source, who, showClosed])
   const status = combineStatus([options], [asks, bids])
@@ -221,8 +277,15 @@ export interface PositionDetail {
   fresh: boolean
 }
 
-/** One option for the position page, re-read every 10 s while mounted. `data` is null for an id that does not exist. */
-export function usePosition(id: bigint | null | undefined, me?: string | null, opts: ViewOptions = {}): Derived<PositionDetail> {
+/** True for the message of a read that failed because the id does not exist (as against a network failure). */
+export const isNotFoundMessage = (message: string | null): boolean => !!message && /not found|no such|does not exist/i.test(message)
+
+/**
+ * One option for the position page, re-read every 10 s while mounted. A guest gets the option with
+ * `position: null`. For an id the contract does not have, `isError` and `notFound` are both true: show
+ * "No such position", not a retry.
+ */
+export function usePosition(id: bigint | null | undefined, me?: string | null, opts: ViewOptions = {}): Derived<PositionDetail> & { notFound: boolean } {
   const client = useOptionsClient()
   const who = me === undefined ? client.me : me
   const option = useOption(id, { cadence: opts.cadence ?? 'book' })
@@ -236,7 +299,7 @@ export function usePosition(id: bigint | null | undefined, me?: string | null, o
     [o, askList, who, nowSec, fresh],
   )
   const status = combineStatus([option], [asks])
-  return { ...status, data: status.ready ? data : null }
+  return { ...status, data: status.ready ? data : null, notFound: status.isError && isNotFoundMessage(status.error) }
 }
 
 /**
@@ -248,7 +311,7 @@ export function usePosition(id: bigint | null | undefined, me?: string | null, o
 export function useTodo(me?: string | null, opts: ViewOptions = {}): Derived<TodoView[]> {
   const client = useOptionsClient()
   const who = me === undefined ? client.me : me
-  const options = useOptions({ cadence: opts.cadence ?? 'book' })
+  const options = useOptions({ cadence: opts.cadence ?? 'book', enabled: !!who })
   const nowSec = useNowSec(10)
   const list = options.data
   const data = useMemo(() => (list && who ? buildTodo(list, who, nowSec, optionReference) : null), [list, who, nowSec])
@@ -273,7 +336,7 @@ export function useActionsWaiting(me?: string | null, opts: ViewOptions = {}): n
 export function usePortfolioKpis(me?: string | null, opts: ViewOptions = {}): Derived<PortfolioSummary> {
   const client = useOptionsClient()
   const who = me === undefined ? client.me : me
-  const options = useOptions({ cadence: opts.cadence ?? 'book' })
+  const options = useOptions({ cadence: opts.cadence ?? 'book', enabled: !!who })
   const list = options.data
   const data = useMemo(() => (list && who ? buildKpis(list, who) : null), [list, who])
   const status = combineStatus([options])

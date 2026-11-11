@@ -1,0 +1,447 @@
+/*
+ * Layout of the landing page: status rule, navigation, hero, closing band, footer.
+ *
+ * The landing has a type scale of its own, set here on the page root and read by every landing module
+ * (`--landing-*`). The app's tokens stop at a 44 px display size; a public first screen needs a larger headline,
+ * a lede and a reading size. Colours, spacing and families are the design system's tokens, unchanged.
+ */
+@layer features {
+  .page {
+    --landing-gutter: clamp(1rem, 4.4vw, 4rem);
+    --landing-max: 82rem;
+    --landing-section-gap: clamp(3.5rem, 2.2rem + 4.6vw, 6rem);
+
+    --landing-h1-size: clamp(2.625rem, 1.5rem + 4vw, 4rem);
+    --landing-h1-line: 1.1;
+    --landing-h2-size: clamp(1.75rem, 1.42rem + 1.2vw, 2.25rem);
+    --landing-h2-line: 1.14;
+    --landing-h3-size: 1.25rem;
+    --landing-h3-line: 1.625rem;
+    --landing-lede-size: clamp(1.0625rem, 0.99rem + 0.3vw, 1.1875rem);
+    --landing-lede-line: 1.58;
+    --landing-body-size: 1rem;
+    --landing-body-line: 1.625rem;
+    --landing-term-size: 1.625rem;
+    --landing-term-line: 1.875rem;
+    --landing-figure-size: 1.5rem;
+    --landing-figure-line: 1.875rem;
+    --landing-fact-size: 1.75rem;
+    --landing-fact-line: 2rem;
+
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ---- Status rule ------------------------------------------------------------------------------------- */
+
+  .status {
+    padding-inline: var(--landing-gutter);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--sunken);
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+    color: var(--muted);
+  }
+
+  .statusInner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-24);
+    max-width: var(--landing-max);
+    min-height: var(--s-32);
+    margin-inline: auto;
+    padding-block: var(--s-6);
+  }
+
+  .statusState {
+    font-weight: 500;
+    color: var(--text-2);
+  }
+
+  .statusRight {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-24);
+
+    & > * {
+      white-space: nowrap;
+    }
+  }
+
+  .statusLink {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 0.2em;
+    border-radius: var(--r-tag);
+
+    @media (hover: hover) {
+      &:hover {
+        color: var(--text);
+        text-decoration-color: currentColor;
+      }
+    }
+  }
+
+  /* ---- Navigation -------------------------------------------------------------------------------------- */
+
+  .top {
+    padding-inline: var(--landing-gutter);
+  }
+
+  .topInner {
+    display: flex;
+    align-items: center;
+    gap: var(--s-32);
+    max-width: var(--landing-max);
+    min-height: var(--s-72);
+    margin-inline: auto;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+    margin-inline-end: auto;
+    border-radius: var(--r-control);
+    text-decoration: none;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: var(--s-32);
+
+    @media (max-width: 767.98px) {
+      display: none;
+    }
+  }
+
+  .navLink {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 500;
+  }
+
+  /* ---- Hero -------------------------------------------------------------------------------------------- */
+
+  .hero {
+    padding-inline: var(--landing-gutter);
+  }
+
+  /* Phones read text, widget, facts. Wide screens put the facts on the foot of the text column, level with
+     the foot of the note beside it. */
+  .heroInner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-40);
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--s-32) var(--landing-section-gap);
+
+    @media (min-width: 1100px) {
+      grid-template-columns: minmax(0, 38rem) minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+      gap: var(--s-56);
+      padding-top: var(--s-40);
+    }
+  }
+
+  .heroText {
+    min-width: 0;
+  }
+
+  .heroLabel {
+    margin-bottom: var(--s-16);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* The headline is text and the largest thing painted on the first screen. */
+  .h1 {
+    font-family: var(--font-serif);
+    font-size: var(--landing-h1-size);
+    line-height: var(--landing-h1-line);
+    font-weight: 600;
+    letter-spacing: var(--display-track);
+    text-wrap: balance;
+  }
+
+  /* The marked words stay on one line: a highlighter stroke does not break in two. */
+  .marked {
+    white-space: nowrap;
+  }
+
+  .lede {
+    max-width: 33rem;
+    margin-top: var(--s-24);
+    font-size: var(--landing-lede-size);
+    line-height: var(--landing-lede-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-12) var(--s-24);
+    margin-top: var(--s-32);
+  }
+
+  .cta {
+    --button-h: var(--touch);
+    --button-px: var(--s-20);
+
+    font-size: var(--body-size);
+  }
+
+  .secondary {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 500;
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: var(--s-16) var(--s-24);
+    margin: 0;
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+
+    @media (min-width: 1100px) {
+      grid-column: 1;
+      grid-row: 2;
+      align-self: end;
+    }
+
+    @media (max-width: 519.98px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* The figure is read first and its label after, so the pair is reversed on screen only. */
+  .fact {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: var(--s-4);
+    min-width: 0;
+
+    & dd {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: var(--landing-fact-size);
+      line-height: var(--landing-fact-line);
+      font-weight: 560;
+      letter-spacing: var(--h1-track);
+      font-variant-numeric: tabular-nums lining-nums;
+      white-space: nowrap;
+    }
+
+    & dt {
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      color: var(--muted);
+      text-wrap: pretty;
+    }
+  }
+
+  .factUnit {
+    line-height: 1;
+    font-size: 0.6em;
+    font-weight: 560;
+    letter-spacing: normal;
+  }
+
+  .factLink {
+    white-space: nowrap;
+  }
+
+  .heroWidget {
+    min-width: 0;
+
+    @media (min-width: 1100px) {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+    }
+
+    @media (min-width: 768px) and (max-width: 1099.98px) {
+      max-width: 44rem;
+    }
+  }
+
+  /* ---- Closing band ------------------------------------------------------------------------------------ */
+
+  .closing {
+    padding-inline: var(--landing-gutter);
+  }
+
+  .closingInner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-40);
+    align-items: end;
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--landing-section-gap);
+    border-top: 1px solid var(--rule);
+
+    @media (min-width: 1000px) {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    }
+  }
+
+  .closingText {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .closingHeading {
+    font-family: var(--font-serif);
+    font-size: var(--landing-h2-size);
+    line-height: var(--landing-h2-line);
+    font-weight: 560;
+    letter-spacing: var(--h1-track);
+  }
+
+  .closingBody {
+    margin-bottom: var(--s-12);
+    font-size: var(--landing-lede-size);
+    line-height: var(--landing-lede-line);
+    color: var(--text-2);
+  }
+
+  .ornament {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .ornamentCaption {
+    margin-top: var(--s-8);
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    text-align: end;
+  }
+
+  /* ---- Footer ------------------------------------------------------------------------------------------ */
+
+  .footer {
+    padding-inline: var(--landing-gutter);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid var(--rule);
+    background: var(--sunken);
+  }
+
+  .footerInner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-40);
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--s-56) var(--s-40);
+
+    @media (min-width: 1000px) {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    }
+  }
+
+  .footerBrand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .footerContract {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    margin-top: var(--s-12);
+  }
+
+  .footerLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .footerNav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-32) var(--s-24);
+
+    @media (max-width: 519.98px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .footerGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+
+    & ul {
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+    }
+
+    /* Rows a finger can hit: the link fills a 44 px row on touch screens, a compact one elsewhere. */
+    & li a {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--s-32);
+
+      @media (pointer: coarse) {
+        min-height: var(--touch);
+      }
+    }
+  }
+
+  .legal {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding-top: var(--s-20);
+    border-top: 1px solid var(--hairline);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+
+    & p {
+      max-width: 96ch;
+      text-wrap: pretty;
+    }
+  }
+}

@@ -1,0 +1,35 @@
+@layer features {
+  .none {
+    color: var(--muted);
+  }
+
+  .amount {
+    display: inline-flex;
+    align-items: baseline;
+
+    /* A shortfall, debt or deficit: the column or label names it, the tone repeats it. */
+    &[data-tone='loss'] {
+      color: var(--loss);
+    }
+  }
+
+  .sub {
+    margin-inline-start: var(--s-6);
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-weight: 400;
+    font-feature-settings: 'zero';
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .party {
+    white-space: nowrap;
+  }
+
+  .you {
+    color: var(--muted);
+    font-weight: 450;
+  }
+}

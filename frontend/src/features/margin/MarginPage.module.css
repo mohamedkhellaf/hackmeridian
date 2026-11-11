@@ -1,0 +1,33 @@
+@layer features {
+  /* One column of blocks on the 8 px rhythm. The shell sets the width and the gutters. */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  .replayLine {
+    margin-top: calc(var(--s-12) * -1);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .strong {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+  }
+
+  @media (max-width: 767.98px) {
+    .page {
+      gap: var(--s-20);
+    }
+  }
+}

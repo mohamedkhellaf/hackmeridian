@@ -226,3 +226,18 @@ describe('bareSeed', () => {
     expect(s.underlyings).toHaveLength(3)
   })
 })
+
+describe('the empty test wallet', () => {
+  it('holds nothing, while any other unknown account gets the default balances', async () => {
+    const { MockOptionsClient } = await import('./mockClient')
+    const c = new MockOptionsClient(demoSeed())
+    const empty = await c.balances(DEMO_WALLETS.c)
+    expect(empty.length).toBeGreaterThan(1)
+    for (const b of empty) expect(b.balance).toBe(0n)
+    const stranger = await c.balances('GSOMEONEELSE')
+    expect(stranger.every((b) => (b.balance ?? 0n) > 0n)).toBe(true)
+    const seed = demoSeed()
+    expect(seed.options.some((o) => o.holder === DEMO_WALLETS.c || o.writer === DEMO_WALLETS.c)).toBe(false)
+    expect(seed.bids.some((b) => b.buyer === DEMO_WALLETS.c)).toBe(false)
+  })
+})

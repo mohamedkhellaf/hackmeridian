@@ -24,6 +24,8 @@ export interface OverlayFrameProps {
   bodyId: string
   /** A short rule above the header that reads as a grab handle on bottom sheets. */
   handle?: boolean
+  /** On phones the footer is the 64 px action bar of a full page, not a stack of full-width buttons. */
+  bar?: boolean
 }
 
 /** Header (title, close), scrolling body and a footer that stays in view. Shared by Dialog, Drawer and Sheet. */
@@ -37,6 +39,7 @@ export function OverlayFrame({
   titleId,
   bodyId,
   handle = false,
+  bar = false,
 }: OverlayFrameProps) {
   const { Title, Description, Close } = parts
   return (
@@ -54,7 +57,11 @@ export function OverlayFrame({
         {description ? <Description className={styles.description}>{description}</Description> : null}
         {children}
       </div>
-      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+      {footer ? (
+        <footer className={styles.footer} data-bar={bar || undefined}>
+          {footer}
+        </footer>
+      ) : null}
     </div>
   )
 }

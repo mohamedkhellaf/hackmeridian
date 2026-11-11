@@ -91,6 +91,11 @@ export interface GuidedOutcome extends GuidedPoint {
   difference: number
   /** True when the option is in the money at `s`, so its holder would exercise. */
   exercised: boolean
+  /**
+   * What the lot of the asset is worth at `s` (`qty x s`), whoever ends up holding it. For the two intents that
+   * start from cash `withoutValue` is the cash, not this, so a sentence that prices the asset reads it here.
+   */
+  assetValue: number
   /** Premium per unit. */
   premiumPerUnit: number
   /**
@@ -228,6 +233,7 @@ export function guidedOutcome(intent: GuidedIntent, terms: GuidedTerms, price: n
     withoutValue,
     difference: withValue - withoutValue,
     exercised: info.optionKind === 'put' ? price < terms.strike : price > terms.strike,
+    assetValue: terms.qty * price,
     premiumPerUnit: terms.premiumTotal / terms.qty,
     breakeven: m.breakeven,
     maxLoss: m.maxLoss,

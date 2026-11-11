@@ -3,7 +3,7 @@
 Import everything from `src/ui` (the `index.ts` barrel). It loads the fonts, tokens and base styles first, so the
 cascade layers (`tokens, base, ui, features`) are always declared before any component style. Never import
 `@base-ui/react` or `@phosphor-icons/react` outside this folder. `ui/` takes plain props: no `core/`, `data/` or
-feature imports. Rules and rationale: `frontend/DESIGN.md`. Live specimens: `/design` (or `/design.html` in dev).
+feature imports. Rules and rationale: `frontend/DESIGN.md`. Live specimens: `/design`.
 
 Feature CSS goes in `@layer features { … }` and uses the semantic variables of `tokens/tokens.css` only.
 
@@ -98,3 +98,30 @@ Decisions worth knowing:
   the scan (`new AxeBuilder({ page }).exclude('[data-base-ui-focus-guard]')`); everything else scans clean.
 - **Tree-shaking.** Each Phosphor icon module carries six weights and only two are used. Icons are marked pure so
   unused ones drop out; if the size budget still bites, replace `icons.ts` with a two-weight sprite.
+
+## Added during integration (11 Nov 2026)
+
+| Piece | What it is |
+|---|---|
+| `ChoiceChips` | A wrapping radio group of chips with an optional second line. `appearance="control"` (forms: ink when chosen) or `"note"` (serif figures on a contract note; dashed until `marked`, which adds a tick). `value: null` means none is chosen. Used by the ticket and by guided mode. |
+| `StepTrail` | The one-line trail of a short flow ("Terms, Review, Sign, Receipt"): `steps: { label, status: 'done' \| 'current' \| 'upcoming' }[]`. For steps with details use `Stepper`. |
+| `useMediaQuery(query)`, `useIsPhone()`, `useIsWide()`, `PHONE_QUERY`, `WIDE_QUERY` | The two breakpoints as hooks, for the few places where the markup itself differs by width (a table that becomes a list, the ticket's container). Layout alone stays in CSS. |
+| `Drawer presentation="page"` | On phones the drawer is a full page and its footer is the 64 px action bar, outside the scroller. |
+| `SwipeIgnore` | An area inside a `Drawer` or `Sheet` where a drag belongs to the content (a chart handle), not to the swipe that dismisses the panel. |
+| `Dialog` / `Drawer` / `Sheet` `finalFocus={false}` | Leaves focus alone on close: the caller moves it (to a result region that holds a button). |
+| `Select onOpenChange`, `onOpenChangeComplete`, `finalFocus` | For a select that sends focus elsewhere after a choice (a heading the choice scrolls to). Clear the target in `onOpenChange(true)`, so Escape still returns to the trigger. |
+| `Menu size="tall"`, `popupClassName`, `MenuStatic` | A menu with many 44 px rows may use more of the viewport; `MenuStatic` holds plain rows (balances) that are not items and are hidden from assistive technology: repeat them in the group label. |
+| `Segmented` | 44 px segments on touch screens at every size (the strip draws its line as an inset outline there). `SegmentedOption.count` / `countLabel` add a count after the label. |
+| `Table prose` | Cells that hold sentences: wrapping, top-aligned, body size, a serif row header. `Table` and `Tr` take a `ref`. |
+| `KeyValueItem size="lg"` | The closing figure of a term sheet ("You pay 1.80 USDx"). |
+| `EmptyNote children`, `size="sm"` | Blank form lines inside the slip; a compact form for a desk screen that stacks several empty tables. |
+| `Timeline` | `status` is optional (a walk-through that is nobody's history draws plain ink points); the actor sits beside the time, behind a short rule. |
+| `PageHeader headingLevel` | 1 on a page; a specimen or an embedded header takes the level of its place. |
+| `Button tone="danger"` on `variant="quiet"` | A destructive action in a dense row: danger ink, no border. |
+| `TxStepper failedAt` | Now `'check' \| 'sign' \| 'submit' \| 'confirm'`; pass `stoppedStage(state)` from `core/tx/machine`. |
+| `Countdown` | Reads the clock again when the page becomes visible or takes focus (a sleeping tab no longer shows a stale figure). |
+
+Known limits: the copy button and the explorer link inside `Address` are 28 px wide (44 px high on touch screens).
+A menu or a select list is portalled outside every landmark, so axe's best-practice rule `region` reports it while
+it is open: `e2e/helpers.ts` switches that rule off for such a scan.
+

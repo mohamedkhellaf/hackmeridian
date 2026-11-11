@@ -47,6 +47,10 @@ export interface ProCtxValue {
   tx: TxState
   /** A call is in flight. */
   busy: boolean
+  /** The last call was sent and its outcome is unknown: it can be looked up again, and must not be sent again. */
+  canCheckAgain: boolean
+  /** Looks an unknown outcome up again (the same lookup as in Activity). Resolves with the state after the look. */
+  checkAgain: () => Promise<TxState>
 }
 
 export const ProCtx = createContext<ProCtxValue | null>(null)

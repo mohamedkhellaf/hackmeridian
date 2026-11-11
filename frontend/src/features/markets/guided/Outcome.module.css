@@ -1,0 +1,107 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+    container-type: inline-size;
+  }
+
+  .chart {
+    min-width: 0;
+  }
+
+  /* The read-out itself (label, the two figures) is the chart kit's; these are the two lines guided adds to it. */
+  .difference {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .sentence {
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+    /* Two lines are reserved so the plot does not jump while the price is dragged. */
+    min-height: calc(var(--body-line) * 2);
+  }
+
+  .hint {
+    margin-top: var(--s-8);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-24);
+    margin: 0;
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+  }
+
+  .facts[data-count='1'] {
+    grid-template-columns: minmax(0, var(--measure));
+  }
+
+  .fact {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+
+    & dt {
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      font-stretch: var(--label-stretch);
+      color: var(--muted);
+    }
+
+    & dd {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-4);
+      margin: 0;
+    }
+  }
+
+  .factValue {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .factHint {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  @container (max-width: 35.99rem) {
+    .facts {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-16);
+    }
+
+    .fact {
+      padding-bottom: var(--s-16);
+      border-bottom: 1px solid var(--hairline);
+
+      &:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+    }
+  }
+}

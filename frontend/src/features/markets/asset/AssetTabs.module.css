@@ -1,0 +1,32 @@
+@layer features {
+  .root {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  /* From 768 px the switch sits at the right end of the tab rule. Below, it is a full-width row under the tabs. */
+  @media (min-width: 768px) {
+    .mode {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-end: 0;
+      display: flex;
+      align-items: center;
+      height: var(--control-h);
+      padding-bottom: var(--s-4);
+      padding-inline-start: var(--s-16);
+      background: var(--bg);
+    }
+  }
+
+  /* Touch: the kit's switch is 44 px tall there, so its slot is too. */
+  @media (pointer: coarse) {
+    .mode {
+      height: var(--touch);
+      padding-bottom: 0;
+    }
+  }
+}

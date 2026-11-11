@@ -1,0 +1,41 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 var(--s-40);
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .list li {
+    padding-block: var(--s-8);
+    border-top: 1px solid var(--hairline);
+    text-wrap: pretty;
+  }
+
+  @media (min-width: 1000px) {
+    .list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .list li {
+      padding-block: var(--s-12) 0;
+    }
+  }
+}

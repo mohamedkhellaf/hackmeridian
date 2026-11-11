@@ -1,0 +1,103 @@
+@layer features {
+  .root {
+    min-width: 0;
+  }
+
+  /* The action column takes what its button needs; the figures sit next to it. */
+  .actionCol {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .from {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .source {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .own {
+    color: var(--text-2);
+  }
+
+  .series {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+    font-weight: 500;
+  }
+
+  /* The second line of a cell: a deadline under its series, a total under its per-unit figure. */
+  .sub,
+  .totalInline {
+    display: block;
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .perUnit {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: var(--s-8);
+  }
+
+  .best {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .figure {
+    font-weight: 500;
+  }
+
+  .totalInline {
+    display: none;
+  }
+
+  .why {
+    min-width: calc(var(--s-72) + var(--s-40));
+    color: var(--text-2);
+    white-space: normal;
+  }
+
+  .noteCell {
+    white-space: normal;
+  }
+
+  .note {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: var(--s-6);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+
+    & > svg {
+      color: var(--warn);
+    }
+  }
+
+  /* "Other offers": two-line rows, so the total sits under the per-unit figure instead of in a column. */
+  .root[data-layout='series'] {
+    & .totalCol {
+      display: none;
+    }
+
+    & .totalInline {
+      display: block;
+    }
+
+    & .table td {
+      padding-block: var(--s-6);
+    }
+  }
+}

@@ -29,8 +29,9 @@ export function NavigationSection() {
       title="Navigation"
       lead="Three things look alike and are not: tabs swap panels inside a page, navigation tabs are links between pages, and a segmented control changes the mode of one view. Each has its own keyboard model."
     >
-      <Specimen title="Page header" note="One h1 in the serif, at most one line under it and one row of actions. No hero, no eyebrow. Focus lands on the heading after a route change." layout="stack" surface>
+      <Specimen title="Page header" note="One h1 in the serif, at most one line under it and one row of actions. No hero, no eyebrow. Focus lands on the heading after a route change. (This specimen is set a level down, so the page keeps its one h1.)" layout="stack" surface>
         <PageHeader
+          headingLevel={4}
           back={
             <Link href="#navigation" tone="quiet">
               <IconBack size={14} style={{ display: 'inline', verticalAlign: '-0.12em', marginInlineEnd: 4 }} />
@@ -38,7 +39,7 @@ export function NavigationSection() {
             </Link>
           }
           title="BOND"
-          description="Fictional tokenized bond on Stellar Testnet."
+          description="A tokenized bond, issued on Stellar."
           meta={
             <>
               <span className={styles.glyphItem}>

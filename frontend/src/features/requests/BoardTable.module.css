@@ -1,0 +1,81 @@
+@layer features {
+  /* Two lines per row: the figure, then what qualifies it. Rows grow from the kit's 40 px to fit. */
+  .table :is(td, th[scope='row']) {
+    padding-block: var(--s-8);
+  }
+
+  .asset {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+  }
+
+  .code {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .type {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .serial {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-weight: 400;
+    font-feature-settings: 'zero';
+    color: var(--muted);
+  }
+
+  .kind {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    font-weight: 500;
+  }
+
+  .stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+
+    &[data-align='end'] {
+      align-items: flex-end;
+    }
+  }
+
+  .sub {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    color: var(--muted);
+
+    &[data-wrap] {
+      max-width: 26ch;
+      white-space: normal;
+      text-wrap: pretty;
+    }
+  }
+
+  .short {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--warn);
+  }
+
+  .none {
+    color: var(--muted);
+  }
+}

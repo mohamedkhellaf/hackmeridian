@@ -33,8 +33,19 @@
       --segment-h: var(--control-h-sm);
     }
 
+    /*
+     * Touch: every segment is a 44 px target, whatever the size. The strip loses its border box (the segments
+     * would be 2 px short inside it) and draws the same line as an inset outline, above the segments.
+     */
     @media (pointer: coarse) {
-      --segment-h: var(--touch);
+      &,
+      &[data-size='sm'] {
+        --segment-h: var(--touch);
+      }
+
+      border-width: 0;
+      outline: 1px solid var(--control);
+      outline-offset: -1px;
     }
   }
 
@@ -49,6 +60,11 @@
     gap: var(--s-6);
     flex: 1 0 auto;
     min-height: calc(var(--segment-h) - 2px);
+
+    @media (pointer: coarse) {
+      min-height: var(--segment-h);
+    }
+
     padding: var(--s-2) var(--s-12);
     border-radius: 0;
     color: var(--text-2);
@@ -114,6 +130,20 @@
     display: inline-flex;
     flex-direction: column;
     align-items: center;
+  }
+
+  /* A count after the label ("13 Nov  4"): tabular, quieter than the label, never the only sign of emptiness. */
+  .count {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    opacity: 0.75;
+  }
+
+  .labelRow {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
   }
 
   .detail {

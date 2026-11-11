@@ -14,7 +14,7 @@ import type { Ask, OptionKind, OptionOffer, TokenInfo } from '../../core/options
 import { moneyness, priceOf } from '../../core/reference'
 import type { Moneyness, ReferencePrice } from '../../core/reference'
 import type { Bid } from '../../core/requests/types'
-import { NON_STANDARD_REASONS, classifyOffer, expiryCycle, expiryDayKey, standardExpiries, strikeLadder, strikesOf } from '../../core/series'
+import { LADDER_ROWS, NON_STANDARD_REASONS, classifyOffer, expiryCycle, expiryDayKey, standardExpiries, strikeLadder, strikesOf } from '../../core/series'
 import type { NonStandardReason } from '../../core/series'
 import { premiumUnits } from '../../core/units'
 
@@ -29,6 +29,13 @@ export interface MarketSource {
   /** Connected address, or null. */
   me: string | null
   nowSec: number
+  /**
+   * Whether the contract has requests and resale at all. Set by the hooks, which know a read that is still
+   * running (support not known yet, counted as supported) from one that answered "none" (`null`). Without them
+   * the answer is read from `bids` and `asks`.
+   */
+  bidsOn?: boolean
+  resaleOn?: boolean
 }
 
 export interface GridCell {
@@ -126,6 +133,13 @@ export interface MarketView {
   otherExpiries: number[]
   /** Every open, unexpired bid on the asset (standard or not), highest premium per unit first. */
   bids: BookRow[]
+  /**
+   * Whether the contract has requests (funded bids, from v1.5) and resale listings (from v1.4). `bids` is empty
+   * both for "no bids" and for "no bid support": these two flags tell them apart, so a view on an older contract
+   * can leave out the bid side, "Post a bid here" and the "Request" of an empty cell.
+   */
+  bidsOn: boolean
+  resaleOn: boolean
   summary: MarketSummary
 }
 
@@ -141,9 +155,12 @@ export function assetRows(input: MarketInputs, underlyingId: string): BookRow[] 
   return allRows(input).filter((r) => r.underlying.contractId === underlyingId)
 }
 
+/** Strike rows of the grid: the app-wide constant of core/series, re-exported for the callers of this layer. */
+export { LADDER_ROWS }
+
 /** The strike ladder of an asset: around the reference price, or from the strikes that exist when there is none. */
 export function ladderFor(reference: ReferencePrice, quoteDecimals: number, rows: readonly BookRow[]): bigint[] {
-  return strikeLadder(priceOf(reference), quoteDecimals, undefined, { existing: strikesOf(rows) })
+  return strikeLadder(priceOf(reference), quoteDecimals, LADDER_ROWS, { existing: strikesOf(rows) })
 }
 
 const emptyCounts = (): Record<NonStandardReason, number> => Object.fromEntries(NON_STANDARD_REASONS.map((r) => [r, 0])) as Record<NonStandardReason, number>
@@ -262,6 +279,8 @@ export function buildMarket(src: MarketSource, asset: TokenInfo, quote: TokenInf
     otherCounts,
     otherExpiries: [...new Set(other.map((o) => o.row.expiry).filter((e) => !expiries.includes(e)))].sort((a, b) => a - b),
     bids: sortBook(rows).bids,
+    bidsOn: src.bidsOn ?? src.bids !== null,
+    resaleOn: src.resaleOn ?? src.asks !== null,
     summary,
   }
 }

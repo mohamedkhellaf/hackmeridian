@@ -60,8 +60,8 @@ export function ProProvider({ client, sim, live = null, defaultMe, children }: P
 
   const clearOutcome = useCallback(() => setOutcome(null), [])
   const value = useMemo<ProCtxValue>(
-    () => ({ client, sim, live, simulated, model, me, setMe, outcome, clearOutcome, run, tx: tx.state, busy: isWorking(tx.state) }),
-    [client, sim, live, simulated, model, me, outcome, clearOutcome, run, tx.state],
+    () => ({ client, sim, live, simulated, model, me, setMe, outcome, clearOutcome, run, tx: tx.state, busy: isWorking(tx.state), canCheckAgain: tx.canCheckAgain, checkAgain: tx.checkAgain }),
+    [client, sim, live, simulated, model, me, outcome, clearOutcome, run, tx.state, tx.canCheckAgain, tx.checkAgain],
   )
   return <ProCtx.Provider value={value}>{children}</ProCtx.Provider>
 }

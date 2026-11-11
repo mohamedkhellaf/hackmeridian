@@ -89,6 +89,12 @@ export function formatExact(units: bigint, decimals: number, opts: FormatExactOp
   return `${signOf(negative, units === 0n, sign)}${group ? groupDigits(whole) : whole}${shown ? `.${shown}` : ''}`
 }
 
+/**
+ * The same text with every space made a no-break space, so it stays on one line inside a sentence: a deadline
+ * (`noBreak(formatUtc(ts))`), a figure with its unit.
+ */
+export const noBreak = (text: string): string => text.replaceAll(' ', NBSP)
+
 /** `withUnit('1,080.00', 'USDx')` is `1,080.00 USDx`. Pass `THIN_NBSP` or `NBSP` as the separator in dense cells. */
 export function withUnit(text: string, code: string, separator: string = ' '): string {
   return `${text}${separator}${code}`

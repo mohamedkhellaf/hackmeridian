@@ -230,3 +230,47 @@ describe('openCollateral accounting', () => {
     expect(delta(lines, base, q)).toEqual([25n * UNIT, 0n, 0n])
   })
 })
+
+describe('demo switches for reads and reserves', () => {
+  it('fails the next list read once, then answers again', async () => {
+    const { c } = await setup()
+    c.failNextRead('listOptions')
+    await expect(run(c.listOptions())).rejects.toThrow(/did not answer/)
+    await expect(run(c.listOptions())).resolves.toEqual([])
+    // The other reads were not staged.
+    await expect(run(c.listBids())).resolves.toEqual([])
+  })
+
+  it('fails every list read the given number of times when no read is named, and can be cleared', async () => {
+    const { c } = await setup()
+    c.failNextRead(undefined, 2)
+    await expect(run(c.listBids())).rejects.toThrow()
+    await expect(run(c.listBids())).rejects.toThrow()
+    await expect(run(c.listBids())).resolves.toEqual([])
+    await expect(run(c.listAsks())).rejects.toThrow()
+    c.failNextRead(undefined, 0)
+    await expect(run(c.listAsks())).resolves.toEqual([])
+    await expect(run(c.listOptions())).resolves.toEqual([])
+  })
+
+  it('claws tokens back from the contract: held falls under reserved, never below zero', async () => {
+    const { c, assets, offer } = await setup()
+    await run(c.createOffer(offer(), W))
+    const q = assets.quote.contractId
+    const before = (await c.collateralHealth()).find((h) => h.token.contractId === q)!
+    expect(before.held).toBe(before.reserved)
+    expect(before.reserved).toBe(20n * UNIT)
+
+    c.clawBack(q, 5n * UNIT)
+    const after = (await c.collateralHealth()).find((h) => h.token.contractId === q)!
+    expect(after.reserved).toBe(20n * UNIT)
+    expect(after.held).toBe(15n * UNIT)
+
+    c.clawBack(q, 1_000n * UNIT)
+    expect((await c.collateralHealth()).find((h) => h.token.contractId === q)!.held).toBe(0n)
+    // An unknown token and a zero amount change nothing.
+    c.clawBack('C_NOT_LISTED', UNIT)
+    c.clawBack(q, 0n)
+    expect((await c.collateralHealth()).find((h) => h.token.contractId === q)!.held).toBe(0n)
+  })
+})

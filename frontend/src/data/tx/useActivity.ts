@@ -34,7 +34,7 @@ export function useActivity(address?: string | null): ActivityView {
     async (id: string) => {
       const e = activity.get(who, id)
       if (!e || !canCheckEntry(e)) return null
-      return checkEntry(deps, { address: who, product: e.product, action: e.action, label: e.label, done: e.done, subject: e.subject, mock: e.mock }, id)
+      return checkEntry(deps, { address: who, product: e.product, action: e.action, label: e.label, detail: e.detail, done: e.done, subject: e.subject, mock: e.mock }, id)
     },
     [deps, activity, who],
   )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findBannedWords } from '../../core/disclosures'
+import { BANNED_TAGLINES, findBannedWords } from '../../core/disclosures'
 import { TX_IDLE } from '../../core/tx/machine'
 import type { TxEffect, TxState } from '../../core/tx/machine'
 import { TX_STATE_LABEL } from '../../ui/txStates'
@@ -16,6 +16,7 @@ describe('transaction copy', () => {
   it('follows the house style: no banned words, dashes, arrows or exclamation marks', () => {
     for (const text of ALL) {
       expect(findBannedWords(text)).toEqual([])
+      expect(findBannedWords(text, BANNED_TAGLINES)).toEqual([])
       expect(text).not.toMatch(/[—–→←!…]/)
       expect(text[0]).toBe(text[0].toUpperCase())
     }
@@ -49,5 +50,19 @@ describe('transaction copy', () => {
     for (const phase of ['failed', 'unknown', 'expired'] as const) expect(announcementFor('Exercise', state(phase, 'outcome-unknown', 'x'))!.politeness).toBe('assertive')
     // A failure without a message still reads as a sentence.
     expect(announcementFor('Exercise', state('failed'))!.message).toBe('Exercise: Failed. Nothing was sent. No fee was charged.')
+  })
+})
+
+describe('a refusal after sending', () => {
+  it('never says nothing was sent, and still says no fee was charged', async () => {
+    const { describeTx, txEffectText, TX_EFFECT_TEXT, TX_REFUSED_ON_SEND } = await import('./copy')
+    const refused = { phase: 'failed', hash: null, maxTime: null, ledger: null, error: 'The sequence number is out of date.', effect: 'nothing-sent', stoppedAt: 'submitting' } as const
+    expect(txEffectText(refused)).toBe(TX_REFUSED_ON_SEND)
+    expect(TX_REFUSED_ON_SEND).not.toMatch(/nothing was sent/i)
+    expect(TX_REFUSED_ON_SEND).toMatch(/no fee was charged/i)
+    expect(describeTx(refused)?.detail).toBe(`The sequence number is out of date. ${TX_REFUSED_ON_SEND}`)
+    // Before anything was sent the usual sentence stands.
+    expect(txEffectText({ ...refused, stoppedAt: 'checking' })).toBe(TX_EFFECT_TEXT['nothing-sent'])
+    expect(txEffectText({ ...refused, stoppedAt: undefined })).toBe(TX_EFFECT_TEXT['nothing-sent'])
   })
 })

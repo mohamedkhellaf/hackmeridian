@@ -2,12 +2,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cellKey, seriesRefOf } from '../../core/market/selection'
 import type { SeriesRef } from '../../core/market/selection'
 import { DEMO_HEDGERS, DEMO_MAKERS, DEMO_WALLETS } from '../../core/options/demoAccounts'
+import { demoStrikes } from '../../core/options/mockSeed'
 import type { OptionOffer } from '../../core/options/types'
 import { noReference } from '../../core/reference'
 import { isStandardExpiry, standardExpiries } from '../../core/series'
 import { FIXED_MS, FIXED_SEC, demoWorld } from './demoSource.testhelper'
 import type { DemoWorld } from './demoSource.testhelper'
-import { buildBook, buildMarket, buildMarketIndex, marketInputs } from './market'
+import { LADDER_ROWS, buildBook, buildMarket, buildMarketIndex, marketInputs } from './market'
 
 const A = DEMO_WALLETS.a
 const units = (n: number) => BigInt(Math.round(n * 100)) * 10n ** 5n // 7 decimals
@@ -31,11 +32,12 @@ describe('buildMarket: the standard grid over the demo market', () => {
     expect(m.columns.map((c) => c.day)).toEqual(['2026-11-13', '2026-11-20', '2026-11-27', '2026-12-25', '2027-01-29'])
     expect(m.columns.map((c) => c.cycle)).toEqual(['weekly', 'weekly', 'monthly', 'monthly', 'monthly'])
     expect(m.columns[0].secondsLeft).toBe(44 * 3600)
-    // FUND demo price 10.20: step 0.20, seven strikes centred on 10.20.
-    expect(m.ladder).toEqual([9.6, 9.8, 10.0, 10.2, 10.4, 10.6, 10.8].map(units))
+    // FUND demo price 10.20: step 0.20, nine strikes centred on 10.20.
+    expect(m.ladder).toHaveLength(LADDER_ROWS)
+    expect(m.ladder).toEqual([9.4, 9.6, 9.8, 10.0, 10.2, 10.4, 10.6, 10.8, 11.0].map(units))
     for (const c of m.columns) expect(c.rows.map((r) => r.strikePerUnit)).toEqual(m.ladder)
-    // The reference sits exactly on the 10.20 strike: three strikes are below it.
-    expect(m.referenceRule).toEqual({ below: 3, at: 3 })
+    // The reference sits exactly on the 10.20 strike: four strikes are below it.
+    expect(m.referenceRule).toEqual({ below: 4, at: 4 })
   })
 
   it('prices each cell from the cheapest standard offer of exactly that series and counts its makers', () => {
@@ -67,7 +69,25 @@ describe('buildMarket: the standard grid over the demo market', () => {
     // The demo quotes three expiries; the two far month-ends are empty columns.
     expect(priced).toBeGreaterThan(10)
     expect(m.columns[3].offers + m.columns[4].offers).toBe(0)
-    expect(m.cells.size).toBe(5 * 7 * 2)
+    expect(m.cells.size).toBe(5 * LADDER_ROWS * 2)
+  })
+
+  it('has every strike the demo makers quote on the ladder of each asset, and only the two seeded orders off it', () => {
+    const src = w.source(null)
+    const others: Record<string, number> = {}
+    for (const asset of [w.assets.FUND, w.assets.BOND, w.assets.EQTY]) {
+      const m = buildMarket(src, asset, w.quote, w.reference(asset))
+      expect(m.ladder).toHaveLength(LADDER_ROWS)
+      // The five strikes the demo quotes are the five central rows; two empty rows frame them on each side.
+      expect(demoStrikes(asset)).toEqual(m.ladder.slice(2, 7))
+      const onGrid = [...m.cells.values()].reduce((n, c) => n + c.offers, 0)
+      const open = openOffers(src, asset.contractId).length + (src.asks ?? []).filter((a) => src.options.find((o) => o.id === a.id)?.underlying.contractId === asset.contractId).length
+      expect(onGrid + m.other.filter((o) => o.row.source !== 'bid').length).toBe(open)
+      others[asset.code] = m.other.length
+      // The outer rows are empty in the demo: they offer "Request".
+      for (const c of m.columns) for (const r of [c.rows[0], c.rows[1], c.rows[7], c.rows[8]]) expect(r.call.empty && r.put.empty).toBe(true)
+    }
+    expect(others).toEqual({ FUND: 1, BOND: 0, EQTY: 1 })
   })
 
   it('keeps off-grid orders out of the grid and lists them with the reason', () => {
@@ -252,5 +272,23 @@ describe('buildMarketIndex', () => {
     expect(rows[1].similar?.level).toBe('same')
     expect(rows[1].summary.offers).toBe(0)
     expect(rows[1].summary.nearestExpiry).toBeNull()
+  })
+})
+
+describe('request and resale support', () => {
+  it('reads support from the source: null lists mean the contract has neither, the hook flags win when given', async () => {
+    const { buildMarket } = await import('./market')
+    const { MOCK_QUOTE, MOCK_UNDERLYINGS } = await import('../../core/options/mockSeed')
+    const { noReference } = await import('../../core/reference')
+    const NO_REFERENCE = noReference()
+    const asset = MOCK_UNDERLYINGS[0]
+    const base = { options: [], me: null, nowSec: 1_800_000_000 }
+    const old = buildMarket({ ...base, asks: null, bids: null }, asset, MOCK_QUOTE, NO_REFERENCE)
+    expect([old.bidsOn, old.resaleOn]).toEqual([false, false])
+    const current = buildMarket({ ...base, asks: [], bids: [] }, asset, MOCK_QUOTE, NO_REFERENCE)
+    expect([current.bidsOn, current.resaleOn]).toEqual([true, true])
+    // While the two reads are still running the lists are null, but support is not known to be missing.
+    const loading = buildMarket({ ...base, asks: null, bids: null, bidsOn: true, resaleOn: true }, asset, MOCK_QUOTE, NO_REFERENCE)
+    expect([loading.bidsOn, loading.resaleOn]).toEqual([true, true])
   })
 })

@@ -1,0 +1,54 @@
+@layer features {
+  /*
+   * Facts about the chrome that pages may need, published on the root while the shell is mounted:
+   *   --shell-tabbar-h   the height the phone tab bar takes at the bottom of the viewport (0 from 768 px up)
+   *   --toast-bottom     lifts the ui kit's toast region above the tab bar
+   * From 768 px the scrollbar gutter is reserved, so a short page and a long page have the same width and the
+   * centred text block does not move between routes. (Phones draw their scrollbar over the page.)
+   */
+  :root:has(.shell) {
+    --shell-tabbar-h: 0px;
+  }
+
+  @media (min-width: 768px) {
+    :root:has(.shell) {
+      scrollbar-gutter: stable;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    :root:has(.shell) {
+      --shell-tabbar-h: calc(var(--s-56) + 1px + env(safe-area-inset-bottom, 0px));
+      --toast-bottom: calc(var(--s-56) + var(--s-12));
+    }
+  }
+
+  .shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    padding-bottom: var(--shell-tabbar-h, 0px);
+  }
+
+  /* The page: at most --page-max wide, with the gutter. It grows so the footer rests at the bottom of a short page. */
+  .main {
+    flex: 1 0 auto;
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--s-32) max(var(--gutter), env(safe-area-inset-right, 0px)) var(--s-56) max(var(--gutter), env(safe-area-inset-left, 0px));
+
+    /* Focus arrives here from the skip link; the page itself is the landmark, so no ring is drawn around it. */
+    &:focus,
+    &:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .main {
+      padding-block: var(--s-20) var(--s-40);
+    }
+  }
+}

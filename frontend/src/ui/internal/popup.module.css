@@ -34,8 +34,18 @@
     }
   }
 
+  /* A menu with many 44 px rows (the wallet menu on phones) may use more of the viewport before it scrolls. */
+  .popup[data-size='tall'] {
+    max-height: min(var(--available-height, 100vh), 32rem);
+  }
+
   .list {
     outline: none;
+  }
+
+  /* Plain content in a menu group, starting where the words of the items start: past the edge, the icon slot and its gap. */
+  .static {
+    padding: 0 var(--s-12) var(--s-4) calc(var(--s-12) + var(--icon) + var(--s-8));
   }
 
   .item {

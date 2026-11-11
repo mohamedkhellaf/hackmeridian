@@ -1,16 +1,35 @@
 // Every required disclosure sentence, in one place (brief section 6.2, AGENTS.md honest-claims rules).
 //
 // The wording is fixed: each string below is copied from the UI it replaces (the snapshot under legacy-ui/, checked
-// by disclosures.test.ts while that snapshot exists). Components and tests import from here and never retype a
+// by disclosures.test.ts while that snapshot exists), except the footer notice and the Margin banners, which the
+// owner had rewritten on 11 Nov 2026 (see LEGAL_NOTICE). Components and tests import from here and never retype a
 // sentence. Each sentence has one home in the app; `DISCLOSURE_HOMES` is the register.
 
 // ---------------------------------------------------------------------------------------------- app-wide
 
-/** App footer, every app route. */
-export const TESTNET_DISCLOSURE = 'Stellar Testnet. Fictional assets and makers. No real funds.'
+/**
+ * App footer, every route: the legal notice.
+ *
+ * Owner's direction, 11 Nov 2026: no tagline-style disclaimers anywhere in the interface ("Testnet only",
+ * "Fictional assets", "No real funds", "Unaudited" as slogans, status rules, chips or banners). The footer carries a
+ * conventional legal notice instead, and the network name appears only as a state indicator in the top bar.
+ * Disclosures tied to a decision (issuer powers, premium, payoff caption, Margin payout risk) stay, as sentences,
+ * where the decision is made.
+ */
+export const LEGAL_NOTICE =
+  'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.'
 
-/** App footer, mock mode only (no options contract id in the build). */
-export const MOCK_DISCLOSURE = 'Mock data, not read from a chain.'
+/** App footer, before the legal notice. */
+export const COPYRIGHT_NOTICE = '\u00A9 2026 The StellSec authors.'
+
+/** @deprecated The footer shows `LEGAL_NOTICE`. Kept so imports written before the change still compile. */
+export const TESTNET_DISCLOSURE = LEGAL_NOTICE
+
+/**
+ * @deprecated Mock mode is shown by the network indicator in the top bar, not by a footer sentence.
+ * Empty on purpose: render nothing for it.
+ */
+export const MOCK_DISCLOSURE = ''
 
 /** Connect dialog. */
 export const WALLET_DISCLOSURE = 'Set the wallet to Testnet. StellSec never asks for your secret key or recovery phrase.'
@@ -64,13 +83,18 @@ export function clawbackShortfallParts(tokens: string | readonly string[]): { le
 // ---------------------------------------------------------------------------------------------- Margin
 
 /** Margin banner on every Margin screen while it replays fixtures (no Margin contract id in the build). */
-export const MARGIN_BANNER_SIMULATED = 'Margin (experimental). Simulated on fixtures. No contract is called.'
+export const MARGIN_BANNER_SIMULATED = 'Simulated: this section replays recorded scenarios, and no contract is called.'
 
-/** Margin banner on every Margin screen when it runs against the Testnet contract. */
-export const MARGIN_BANNER_ONCHAIN =
-  "Margin (experimental). Testnet contract. Partial margin: payouts can be reduced; any deficit is shown. Prices and the settlement price are set by the team's publisher."
+/** The payout-risk sentence of Margin (AGENTS.md, "StellSec Pro UI", Copy): on every Margin screen, whatever the build. */
+export const MARGIN_PAYOUT_RISK = 'Partial margin: payouts can be reduced; any deficit is shown.'
 
-/** The banner for the build: fixtures when `simulated`, the Testnet contract otherwise. */
+/** Who sets the prices of Margin: on every Margin screen, whatever the build. */
+export const MARGIN_PUBLISHER_LINE = "Prices and the settlement price are set by the team's publisher."
+
+/** Margin banner on every Margin screen when it runs against the deployed contract: the two sentences above. */
+export const MARGIN_BANNER_ONCHAIN = `${MARGIN_PAYOUT_RISK} ${MARGIN_PUBLISHER_LINE}`
+
+/** The banner for the build: fixtures when `simulated`, the deployed contract otherwise. */
 export const marginBanner = (simulated: boolean): string => (simulated ? MARGIN_BANNER_SIMULATED : MARGIN_BANNER_ONCHAIN)
 
 /** Title of the Margin entry warning dialog. */
@@ -120,8 +144,7 @@ export interface DisclosureHome {
 
 /** One entry per required sentence: what it says and where it lives. Tests walk this list. */
 export const DISCLOSURE_HOMES: readonly DisclosureHome[] = [
-  { id: 'testnet', text: TESTNET_DISCLOSURE, home: 'App footer on every app route' },
-  { id: 'mock', text: MOCK_DISCLOSURE, home: 'App footer, mock mode only' },
+  { id: 'legal', text: LEGAL_NOTICE, home: 'App footer on every route' },
   { id: 'issuer', text: ISSUER_DISCLOSURE, home: 'Ticket review step for buy, fill and resale buy; asset About tab' },
   { id: 'premium', text: PREMIUM_DISCLOSURE, home: 'Next to the premium in the buy review' },
   { id: 'resale-price', text: RESALE_PRICE_DISCLOSURE, home: 'Next to the price in the resale buy review' },
@@ -130,7 +153,7 @@ export const DISCLOSURE_HOMES: readonly DisclosureHome[] = [
   { id: 'bid-escrow', text: bidEscrowDisclosure('2.00 USDx'), home: 'Bid ticket' },
   { id: 'wallet', text: WALLET_DISCLOSURE, home: 'Connect dialog' },
   { id: 'margin-banner-simulated', text: MARGIN_BANNER_SIMULATED, home: 'Every Margin screen, fixture builds' },
-  { id: 'margin-banner-onchain', text: MARGIN_BANNER_ONCHAIN, home: 'Every Margin screen, Testnet contract builds' },
+  { id: 'margin-banner-onchain', text: MARGIN_BANNER_ONCHAIN, home: 'Every Margin screen, contract builds' },
   { id: 'margin-warning-1', text: MARGIN_WARNING_BULLETS[0], home: 'Margin entry warning dialog' },
   { id: 'margin-warning-2', text: MARGIN_WARNING_BULLETS[1], home: 'Margin entry warning dialog' },
   { id: 'margin-warning-3', text: MARGIN_WARNING_BULLETS[2], home: 'Margin entry warning dialog' },
@@ -170,6 +193,13 @@ export const BANNED_WORDS: readonly string[] = [
   'apy',
   'earn interest',
 ]
+
+/**
+ * Tagline-style disclaimers the interface does not use (owner's direction, 11 Nov 2026). The legal notice in the
+ * footer and the network indicator say what needs saying; these slogans are not repeated around the product.
+ * Match with `findBannedWords(text, BANNED_TAGLINES)`.
+ */
+export const BANNED_TAGLINES: readonly string[] = ['testnet only', 'fictional assets', 'no real funds', 'not real funds', 'unaudited', 'demo environment']
 
 /** Never said of a Margin position, on top of `BANNED_WORDS`. */
 export const MARGIN_BANNED_WORDS: readonly string[] = [...BANNED_WORDS, 'fully collateralized', 'fully collateralised']

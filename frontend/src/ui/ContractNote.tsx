@@ -119,23 +119,30 @@ export interface EmptyNoteProps {
   hint?: ReactNode
   /** At most one action. */
   action?: ReactNode
+  /** Inside the slip, under the sentence: the blank lines of the form that will be filled in (never more copy). */
+  children?: ReactNode
+  /** `sm` for a desk screen that stacks several empty tables: no serial line, less room, a smaller sentence. */
+  size?: 'md' | 'sm'
   headingLevel?: 2 | 3 | 4
   className?: string
 }
 
 /** The empty state: a blank, dashed slip with one sentence and at most one action. */
-export function EmptyNote({ title, hint, action, headingLevel = 3, className }: EmptyNoteProps) {
+export function EmptyNote({ title, hint, action, children, size = 'md', headingLevel = 3, className }: EmptyNoteProps) {
   const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4'
   return (
-    <div className={cx(styles.root, styles.empty, className)}>
-      <div className={styles.running}>
-        <p className={styles.serial} aria-hidden="true">
-          No. ------
-        </p>
-      </div>
+    <div className={cx(styles.root, styles.empty, className)} data-size={size === 'sm' ? 'sm' : undefined}>
+      {size === 'sm' ? null : (
+        <div className={styles.running}>
+          <p className={styles.serial} aria-hidden="true">
+            No. ------
+          </p>
+        </div>
+      )}
       <div className={styles.emptyBody}>
         <Heading className={styles.emptyTitle}>{title}</Heading>
         {hint ? <p className={styles.emptyHint}>{hint}</p> : null}
+        {children ? <div className={styles.emptyLines}>{children}</div> : null}
         {action ? <div className={styles.emptyAction}>{action}</div> : null}
       </div>
     </div>

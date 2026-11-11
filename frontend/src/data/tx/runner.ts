@@ -28,6 +28,8 @@ export interface TxMeta {
   action: string
   /** What it is, with figures: "Buy put on 5.00 BOND". Shown in Activity and announced. */
   label: string
+  /** The terms behind the label, as a second line in Activity. Not announced. */
+  detail?: string | null
   /** Past-tense word for a confirmed outcome: "Bought". */
   done?: string | null
   /** What it acts on: `option:12`, `bid:3`. Lets a row show its own progress. */
@@ -61,11 +63,16 @@ export interface RunnerDeps {
   autoCheck?: boolean
 }
 
-export interface RunOptions {
+export interface RunOptions<T = unknown> {
   /** Receives every state of the run, including a later resolution of an unknown outcome. */
   onState?: (state: TxState) => void
   /** Set false to skip the announcements of this run. */
   announce?: boolean
+  /**
+   * What the confirmed write created, from its result: `option:<id>` for a new offer, `bid:<id>` for a new
+   * request. Recorded on the Activity entry, so the thing created can link the transaction that made it.
+   */
+  created?: (result: T) => string | null
 }
 
 const defaultSchedule = (fn: () => void, ms: number): (() => void) => {
@@ -94,7 +101,7 @@ function speak(deps: RunnerDeps, meta: TxMeta, state: TxState, on: boolean): voi
  * Looks an unknown transaction up again and writes the answer to its Activity entry. Resolves with the new
  * state (still `unknown` when the network has no answer yet), or null when the entry cannot be checked.
  */
-export async function checkEntry(deps: RunnerDeps, meta: Pick<TxMeta, 'address' | 'product' | 'action' | 'label' | 'done' | 'subject' | 'mock'>, entryId: string, opts: RunOptions = {}): Promise<TxState | null> {
+export async function checkEntry(deps: RunnerDeps, meta: Pick<TxMeta, 'address' | 'product' | 'action' | 'label' | 'detail' | 'done' | 'subject' | 'mock'>, entryId: string, opts: RunOptions = {}): Promise<TxState | null> {
   const entry = deps.activity.get(meta.address, entryId)
   if (!entry || entry.phase !== 'unknown' || !entry.hash) return entry ? entryState(entry) : null
   let check: TxCheck
@@ -132,7 +139,7 @@ function watchUnknown(deps: RunnerDeps, meta: TxMeta, entryId: string, opts: Run
  * Runs `write` (a client call that takes `{ onStage }`) through the machine. Never rejects.
  * `meta.label` is announced with each phase unless `opts.announce` is false.
  */
-export async function runTransaction<T extends TxReceipt>(deps: RunnerDeps, meta: TxMeta, write: (opts: Required<TxOptions>) => Promise<T>, opts: RunOptions = {}): Promise<TxRun<T>> {
+export async function runTransaction<T extends TxReceipt>(deps: RunnerDeps, meta: TxMeta, write: (opts: Required<TxOptions>) => Promise<T>, opts: RunOptions<T> = {}): Promise<TxRun<T>> {
   const announce = opts.announce ?? true
   if (deps.flights.count() > 0) {
     const state = refusedState(TX_BUSY_MESSAGE)
@@ -157,7 +164,11 @@ export async function runTransaction<T extends TxReceipt>(deps: RunnerDeps, meta
     deps.activity.remove(meta.address, entry.id)
     return { state, result, entryId: null }
   }
+  if (state.phase === 'confirmed' && result !== null && opts.created) {
+    const created = opts.created(result)
+    if (created) deps.activity.setCreated(meta.address, entry.id, created)
+  }
   if (mayHaveChanged(state)) deps.onSettled(meta, state)
-  if (state.phase === 'unknown' && state.hash) watchUnknown(deps, meta, entry.id, opts)
+  if (state.phase === 'unknown' && state.hash) watchUnknown(deps, meta, entry.id, { onState: opts.onState, announce: opts.announce })
   return { state, result, entryId: entry.id }
 }

@@ -1,0 +1,117 @@
+@layer features {
+  .root {
+    min-width: 0;
+  }
+
+  .lead {
+    max-width: var(--measure);
+    margin-top: calc(var(--s-8) * -1);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  /* A real sequence, so the steps are numbered: the counter is set in the serif like a figure. */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-24);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--rule);
+    counter-increment: step;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+
+    &[data-state='next'] {
+      border-top-color: var(--text);
+      box-shadow: inset 0 1px 0 var(--text);
+    }
+  }
+
+  .stepHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-12);
+  }
+
+  .stepTitle {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+
+    &::before {
+      content: counter(step) '. ';
+      font-weight: var(--figure-weight);
+      color: var(--muted);
+    }
+  }
+
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    flex: none;
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--text);
+  }
+
+  .stepBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
+  .issuers {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    margin: 0;
+
+    & > div {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-2) var(--s-12);
+    }
+
+    & dt {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    & dd {
+      margin: 0;
+    }
+  }
+
+  .source {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  @media (max-width: 899.98px) {
+    .steps {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-16);
+    }
+  }
+}

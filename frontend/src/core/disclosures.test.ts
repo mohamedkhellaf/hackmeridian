@@ -8,7 +8,10 @@ import {
   clawbackShortfallDisclosure,
   clawbackShortfallParts,
   COLLATERAL_CARDS,
+  BANNED_TAGLINES,
+  COPYRIGHT_NOTICE,
   DISCLOSURE_HOMES,
+  LEGAL_NOTICE,
   findBannedWords,
   ISSUER_DISCLOSURE,
   MARGIN_BANNED_WORDS,
@@ -28,8 +31,13 @@ import {
 
 describe('required sentences, verbatim (brief section 6.2)', () => {
   it('keeps the exact wording of each fixed sentence', () => {
-    expect(TESTNET_DISCLOSURE).toBe('Stellar Testnet. Fictional assets and makers. No real funds.')
-    expect(MOCK_DISCLOSURE).toBe('Mock data, not read from a chain.')
+    expect(LEGAL_NOTICE).toBe(
+      'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.',
+    )
+    expect(COPYRIGHT_NOTICE).toBe('\u00A9 2026 The StellSec authors.')
+    expect(TESTNET_DISCLOSURE).toBe(LEGAL_NOTICE)
+    expect(MOCK_DISCLOSURE).toBe('')
+    expect(findBannedWords(LEGAL_NOTICE, BANNED_TAGLINES)).toEqual([])
     expect(ISSUER_DISCLOSURE).toBe(
       'The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.',
     )
@@ -63,9 +71,9 @@ describe('required sentences, verbatim (brief section 6.2)', () => {
   })
 
   it('keeps both Margin banner variants and picks by build', () => {
-    expect(MARGIN_BANNER_SIMULATED).toBe('Margin (experimental). Simulated on fixtures. No contract is called.')
+    expect(MARGIN_BANNER_SIMULATED).toBe('Simulated: this section replays recorded scenarios, and no contract is called.')
     expect(MARGIN_BANNER_ONCHAIN).toBe(
-      "Margin (experimental). Testnet contract. Partial margin: payouts can be reduced; any deficit is shown. Prices and the settlement price are set by the team's publisher.",
+      "Partial margin: payouts can be reduced; any deficit is shown. Prices and the settlement price are set by the team's publisher.",
     )
     expect(marginBanner(true)).toBe(MARGIN_BANNER_SIMULATED)
     expect(marginBanner(false)).toBe(MARGIN_BANNER_ONCHAIN)
@@ -104,14 +112,12 @@ const LEGACY = fileURLToPath(new URL('../../legacy-ui/', import.meta.url))
 describe.skipIf(!existsSync(LEGACY))('wording matches the legacy UI sources', () => {
   const read = (path: string) => readFileSync(`${LEGACY}${path}`, 'utf8')
   const sources: [string, string[]][] = [
-    ['src/layout/AppShell.tsx', [`'${TESTNET_DISCLOSURE}'`, `'${MOCK_DISCLOSURE}'`]],
     ['src/market/BuyTicket.tsx', [ISSUER_DISCLOSURE, `>${PREMIUM_DISCLOSURE}<`]],
     ['src/resale/ResaleMarket.tsx', [ISSUER_DISCLOSURE, `>${RESALE_PRICE_DISCLOSURE}<`]],
     ['src/payoff/PayoffChart.tsx', [`>${PAYOFF_CAPTION}<`]],
     ['src/wallet/ConnectWalletDialog.tsx', [`>${WALLET_DISCLOSURE}<`]],
     ['src/requests/RequestDialog.tsx', [bidEscrowDisclosure('{amt(bid.totalPremium, q)}')]],
     ['src/reserves/ShortfallWarning.tsx', [`'${clawbackShortfallParts('X').rest.replace(' on X', '')}'`, 'Clawback shortfall on {token.code}']],
-    ['src/pro/copy.ts', [`'${MARGIN_BANNER_SIMULATED}'`, `"${MARGIN_BANNER_ONCHAIN}"`]],
     [
       'src/market/MarginWarning.tsx',
       [
@@ -123,10 +129,10 @@ describe.skipIf(!existsSync(LEGACY))('wording matches the legacy UI sources', ()
     ],
     [
       'e2e/helpers.ts',
-      [`'${TESTNET_DISCLOSURE}'`, `'${MOCK_DISCLOSURE}'`, `'${ISSUER_DISCLOSURE}'`, `'${PREMIUM_DISCLOSURE}'`, `'${PAYOFF_CAPTION}'`],
+      [`'${ISSUER_DISCLOSURE}'`, `'${PREMIUM_DISCLOSURE}'`, `'${PAYOFF_CAPTION}'`],
     ],
     ['e2e/requests.spec.ts', [`'${bidEscrowDisclosure('2.00 USDx')}'`]],
-    ['e2e/pro.spec.ts', [`'${MARGIN_BANNER_SIMULATED}'`, `'${MARGIN_WARNING_BULLETS[0]}'`, `'${MARGIN_WARNING_BULLETS[1]}'`]],
+    ['e2e/pro.spec.ts', [`'${MARGIN_WARNING_BULLETS[0]}'`, `'${MARGIN_WARNING_BULLETS[1]}'`]],
   ]
 
   it.each(sources)('%s', (path, needles) => {
@@ -146,8 +152,7 @@ describe('register of homes', () => {
     }
     const texts = DISCLOSURE_HOMES.map((d) => d.text)
     for (const required of [
-      TESTNET_DISCLOSURE,
-      MOCK_DISCLOSURE,
+      LEGAL_NOTICE,
       ISSUER_DISCLOSURE,
       PREMIUM_DISCLOSURE,
       RESALE_PRICE_DISCLOSURE,

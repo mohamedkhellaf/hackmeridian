@@ -1,0 +1,181 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+    min-width: 0;
+  }
+
+  /* The slip keeps the width of a slip instead of stretching across the page. */
+  .note {
+    max-width: 44rem;
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
+  .lead {
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  /* The three actions as a ruled sheet: one row per action, the two answers side by side. */
+  .actions {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .action {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-12);
+    padding-block: var(--s-16);
+
+    & + & {
+      border-top: 1px solid var(--hairline);
+    }
+  }
+
+  .name {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+    color: var(--text);
+  }
+
+  .cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+  }
+
+  .cellLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .cellText {
+    max-width: 52ch;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-32);
+  }
+
+  .reads {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .read {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding-block: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .readName {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .readText {
+    margin: 0;
+    max-width: 60ch;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .links {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    @media (pointer: coarse) {
+      gap: var(--s-4);
+
+      & a {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--touch);
+      }
+    }
+  }
+
+  @media (min-width: 768px) {
+    .action {
+      grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: var(--s-32);
+      align-items: start;
+    }
+
+    /* The column labels are printed once, on the first row; the other rows keep theirs for screen readers. */
+    .action:not(:first-child) .cellLabel {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .action:not(:first-child) .name {
+      margin-top: 0;
+    }
+
+    .action:first-child .name {
+      margin-top: calc(var(--label-line) + var(--s-4));
+    }
+
+    .columns {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: var(--s-56);
+      align-items: start;
+    }
+  }
+}

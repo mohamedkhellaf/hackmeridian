@@ -61,6 +61,10 @@ export interface WithWithoutChartProps {
   caption: ReactNode
   /** Replaces the two figures above the plot. `false` removes them. */
   readout?: ReactNode | ((state: WithWithoutReadoutState) => ReactNode) | false
+  /** Replaces the "Difference +1.80 USDx" line of the default read-out with the caller's own (its words, an exact amount). */
+  readoutDifference?: (state: WithWithoutReadoutState) => ReactNode
+  /** Added under the default read-out: one sentence saying what the figures mean at this price. */
+  readoutNote?: (state: WithWithoutReadoutState) => ReactNode
   /** Replaces the sentence read on the handle. */
   valueText?: (state: WithWithoutReadoutState) => string
   xLabel?: string
@@ -169,12 +173,17 @@ export function WithWithoutChart(props: WithWithoutChartProps) {
             </dd>
           </div>
         </dl>
-        <p className={css.difference} data-direction={state.direction}>
-          {state.direction !== 'even' && <SignGlyph direction={state.direction} />}
-          <span>
-            Difference {state.differenceText} {unit}
-          </span>
-        </p>
+        {props.readoutDifference ? (
+          props.readoutDifference(state)
+        ) : (
+          <p className={css.difference} data-direction={state.direction}>
+            {state.direction !== 'even' && <SignGlyph direction={state.direction} />}
+            <span>
+              Difference {state.differenceText} {unit}
+            </span>
+          </p>
+        )}
+        {props.readoutNote ? props.readoutNote(state) : null}
       </div>
     ) : null
 

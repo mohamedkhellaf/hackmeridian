@@ -55,6 +55,8 @@ export function makeKeys(contractId: string | undefined | null) {
     ledger: () => ['ledger', config.rpcUrl] as const,
     /** Not a contract read: issuer account and asset record from Horizon. */
     assetFacts: (tokenContractId: string) => ['asset-facts', tokenContractId] as const,
+    /** Not a contract read: an account's trustline from Horizon. The first entry is the prefix of them all. */
+    holderStatusAll: () => ['holder-status'] as const,
     holderStatus: (code: string, issuer: string, address: string) => ['holder-status', code, issuer, address] as const,
   }
 }

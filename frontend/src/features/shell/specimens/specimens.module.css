@@ -1,0 +1,41 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--s-32) var(--gutter) var(--s-72);
+  }
+
+  .title {
+    font-size: var(--h1-size);
+    line-height: var(--h1-line);
+  }
+
+  .lead {
+    max-width: var(--measure);
+    color: var(--text-2);
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding-top: var(--s-24);
+    border-top: 1px solid var(--rule);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-12) var(--s-16);
+  }
+
+  /* The banners and the footer bring their own gutters: cancel the page's so they sit on the same edge. */
+  .banners,
+  .frame {
+    margin-inline: calc(var(--gutter) * -1);
+  }
+}

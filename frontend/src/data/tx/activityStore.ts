@@ -13,6 +13,7 @@
 //   - an entry found in storage still "submitting" or "pending" long after its last update was interrupted by a
 //     reload: it is shown as outcome unknown, which is the truth, and can be checked again when it has a hash.
 import type { TxEffect, TxPhase, TxState } from '../../core/tx/machine'
+import type { TxStageName } from '../../core/tx/types'
 
 export const ACTIVITY_CAP = 50
 export const ACTIVITY_KEY_PREFIX = 'stellsec.activity.v1.'
@@ -36,10 +37,17 @@ export interface ActivityEntry {
   action: string
   /** What it is, with figures: "Buy put on 5.00 BOND". */
   label: string
+  /** The terms behind the label, for a second line: "Strike 99.00 USDx per BOND, deadline 13 Nov 2026, 08:00 UTC". Null when the caller gave none. */
+  detail: string | null
   /** The past-tense word for a confirmed outcome: "Bought". Null when the caller gave none. */
   done: string | null
   /** What it acts on, for links: `option:12`, `bid:3`. Null when it creates something new. */
   subject: string | null
+  /**
+   * What a confirmed transaction created, once the contract has answered: `option:12` for a written offer or a
+   * filled request, `bid:3` for a posted request. Lets a position link the transaction that made it.
+   */
+  created?: string | null
   phase: ActivityPhase
   effect: TxEffect
   hash: string | null
@@ -47,6 +55,8 @@ export interface ActivityEntry {
   maxTime: number | null
   ledger: number | null
   error: string | null
+  /** The stage it had reached when it stopped short of confirmed (core/tx `TxState.stoppedAt`). Absent on older entries. */
+  stoppedAt?: TxStageName | null
   /** Made on the mock client or on Margin fixtures: the hash (if any) has no explorer page. */
   mock: boolean
   /** Milliseconds since the epoch. */
@@ -54,7 +64,7 @@ export interface ActivityEntry {
   updatedAt: number
 }
 
-export type NewActivity = Pick<ActivityEntry, 'product' | 'action' | 'label' | 'mock'> & { address: string | null; done?: string | null; subject?: string | null }
+export type NewActivity = Pick<ActivityEntry, 'product' | 'action' | 'label' | 'mock'> & { address: string | null; detail?: string | null; done?: string | null; subject?: string | null }
 
 export type ActivityStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
@@ -77,6 +87,8 @@ export interface ActivityStore {
   /** Writes a machine state onto an entry. An `idle` state is ignored. */
   apply(address: string | null, id: string, state: TxState): void
   remove(address: string | null, id: string): void
+  /** Records what a confirmed transaction created (`option:<id>`, `bid:<id>`). */
+  setCreated(address: string | null, id: string, created: string): void
   /** Removes the entries whose outcome is final. In-flight and unknown entries stay. */
   clearSettled(address: string | null): void
   /** Reads the list of an address from storage again (another tab wrote it). */
@@ -86,13 +98,14 @@ export interface ActivityStore {
 const WORKING: ReadonlySet<ActivityPhase> = new Set<ActivityPhase>(['checking', 'signing', 'submitting', 'pending'])
 const PHASES: ReadonlySet<string> = new Set(['checking', 'signing', 'submitting', 'pending', 'confirmed', 'failed', 'unknown', 'expired', 'declined'])
 const EFFECTS: ReadonlySet<string> = new Set(['nothing-sent', 'outcome-unknown', 'fee-charged'])
+const STAGES: ReadonlySet<string> = new Set(['checking', 'signing', 'submitting', 'pending'])
 
 /** The outcome is not final: the entry is in flight or unknown. */
 export const isOpenEntry = (e: Pick<ActivityEntry, 'phase'>): boolean => WORKING.has(e.phase) || e.phase === 'unknown'
 
 /** The entry as a machine state, to reduce a later check into it. */
 export function entryState(e: ActivityEntry): TxState {
-  return { phase: e.phase, hash: e.hash, maxTime: e.maxTime, ledger: e.ledger, error: e.error, effect: e.effect }
+  return { phase: e.phase, hash: e.hash, maxTime: e.maxTime, ledger: e.ledger, error: e.error, effect: e.effect, stoppedAt: e.stoppedAt ?? null }
 }
 
 /** Only what reached (or may have reached) the network is worth keeping across a reload. */
@@ -115,14 +128,17 @@ export function parseEntry(raw: unknown): ActivityEntry | null {
     product: r.product === 'margin' ? 'margin' : 'covered',
     action: r.action,
     label: r.label,
+    detail: strOrNull(r.detail),
     done: strOrNull(r.done),
     subject: strOrNull(r.subject),
+    created: strOrNull(r.created),
     phase: r.phase as ActivityPhase,
     effect: str(r.effect) && EFFECTS.has(r.effect) ? (r.effect as TxEffect) : 'outcome-unknown',
     hash: strOrNull(r.hash),
     maxTime: numOrNull(r.maxTime),
     ledger: numOrNull(r.ledger),
     error: strOrNull(r.error),
+    stoppedAt: str(r.stoppedAt) && STAGES.has(r.stoppedAt) ? (r.stoppedAt as TxStageName) : null,
     mock: r.mock === true,
     startedAt,
     updatedAt: numOrNull(r.updatedAt) ?? startedAt,
@@ -255,6 +271,7 @@ export function createActivityStore(options: ActivityStoreOptions = {}): Activit
         product: entry.product,
         action: entry.action,
         label: entry.label,
+        detail: entry.detail ?? null,
         done: entry.done ?? null,
         subject: entry.subject ?? null,
         phase: 'checking',
@@ -277,12 +294,22 @@ export function createActivityStore(options: ActivityStoreOptions = {}): Activit
       const list = load(key)
       const current = list.find((e) => e.id === id)
       if (!current) return
-      const next: ActivityEntry = { ...current, phase: state.phase, effect: state.effect, hash: state.hash, maxTime: state.maxTime, ledger: state.ledger, error: state.error, updatedAt: now() }
+      const next: ActivityEntry = { ...current, phase: state.phase, effect: state.effect, hash: state.hash, maxTime: state.maxTime, ledger: state.ledger, error: state.error, stoppedAt: state.stoppedAt ?? null, updatedAt: now() }
       if (!isOpenEntry(next) || next.phase === 'unknown') running.delete(id)
       if (sameEntry({ ...next, updatedAt: current.updatedAt }, current)) return
       commit(
         key,
         list.map((e) => (e.id === id ? next : e)),
+      )
+    },
+    setCreated(address, id, created) {
+      const key = keyOf(address)
+      const list = load(key)
+      const current = list.find((e) => e.id === id)
+      if (!current || current.created === created) return
+      commit(
+        key,
+        list.map((e) => (e.id === id ? { ...e, created } : e)),
       )
     },
     remove(address, id) {

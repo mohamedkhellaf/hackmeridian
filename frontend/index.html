@@ -6,12 +6,43 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f4f2ec" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#121210" media="(prefers-color-scheme: dark)" />
+    <title>StellSec: options on tokenized assets, on Stellar</title>
+    <meta
+      name="description"
+      content="Puts and calls on tokenized assets, on Stellar. The maker locks the full collateral in the contract before you pay, and exercise swaps the asset for payment in one transaction. Runs on the Stellar test network."
+    />
+    <!-- The stored display settings, applied before the first paint so a forced theme never flashes. The key and
+         the three attributes mirror src/data/settings.ts (src/app/indexHtml.test.ts holds them in step). -->
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('stellsec.settings.v1') || '{}')
+        var d = document.documentElement
+        if (s.theme === 'light' || s.theme === 'dark') d.setAttribute('data-theme', s.theme)
+        if (s.density === 'compact') d.setAttribute('data-density', 'compact')
+        if (s.pnl === 'classic' || s.pnl === 'mono') d.setAttribute('data-pnl', s.pnl)
+      } catch (e) {}
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/logo-128.png" />
-    <title>StellSec</title>
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- The two faces above the fold (titles and figures, interface text). The build rewrites these to the same
+         hashed files the stylesheet uses. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/node_modules/@fontsource-variable/source-serif-4/files/source-serif-4-latin-wght-normal.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/node_modules/@fontsource-variable/instrument-sans/files/instrument-sans-latin-wdth-normal.woff2" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="StellSec" />
+    <meta property="og:title" content="StellSec: options on tokenized assets, on Stellar" />
+    <meta
+      property="og:description"
+      content="Puts and calls on tokenized assets. The maker locks the full collateral in the contract before you pay, and exercise swaps the asset for payment in one transaction."
+    />
+    <meta property="og:image" content="%SITE_URL%/og-card.png" />
+    <meta property="og:image:alt" content="StellSec: options on tokenized assets, on Stellar" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>StellSec is an application and needs JavaScript. A plain-text description is at /llms.txt.</noscript>
     <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>

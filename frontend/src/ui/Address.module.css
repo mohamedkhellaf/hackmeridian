@@ -59,6 +59,17 @@
         color: var(--text);
       }
     }
+
+    /* Touch: the 28 px mark keeps its look; its hit area grows to 44 px high and takes the gap beside it. */
+    @media (pointer: coarse) {
+      position: relative;
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset: calc(var(--s-8) * -1) calc(var(--s-2) * -1);
+      }
+    }
   }
 
   .txLink {

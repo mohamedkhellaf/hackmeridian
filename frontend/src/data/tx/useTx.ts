@@ -65,6 +65,8 @@ export interface UseTxOptions {
 /** What a transaction is, for Activity, the announcements and the invalidation. A bare string is the label. */
 export interface TxDescription {
   label: string
+  /** The terms behind the label, for the second line of its Activity entry. */
+  detail?: string | null
   /** Machine name (`buy`, `exercise`, `deposit`...). Default `other`, which invalidates every Covered read. */
   action?: string
   /** Past-tense word for a confirmed outcome. */
@@ -78,10 +80,10 @@ export interface TxController {
   state: TxState
   /**
    * Runs a client write: `run('Buy put on 5.00 BOND', (opts) => client.buy(id, me, opts))`. Never rejects.
-   * Refused without sending when no wallet is connected, when another transaction is in flight, or while this
-   * controller's last transaction is still unknown.
+   * Refused without sending when no wallet is connected, when the wallet is on another network, when another
+   * transaction is in flight, or while this controller's last transaction is still unknown.
    */
-  run: <T extends TxReceipt>(what: string | TxDescription, write: (opts: Required<TxOptions>) => Promise<T>) => Promise<TxRun<T>>
+  run: <T extends TxReceipt>(what: string | TxDescription, write: (opts: Required<TxOptions>) => Promise<T>, created?: (result: T) => string | null) => Promise<TxRun<T>>
   /** Looks an unknown outcome up again. Resolves with the state after the look. */
   checkAgain: () => Promise<TxState>
   /** Back to idle. Ignored while in flight or unknown. */
@@ -109,12 +111,14 @@ const START: Local = { state: TX_IDLE, entryId: null, subject: null, address: nu
 
 export function useTx(options: UseTxOptions = {}): TxController {
   const deps = useRunnerDeps()
-  const { me, isMock } = useOptionsClient()
+  const { me, isMock, wrongNetwork } = useOptionsClient()
   const product = options.product ?? 'covered'
   const address = options.address === undefined ? me : options.address
   const mock = options.mock ?? isMock
   const speak = options.announce ?? true
   const needsWallet = options.needsWallet ?? true
+  // A wallet on another network would sign for that network: the transaction could only fail. Refuse it first.
+  const networkBlock = needsWallet && !mock ? wrongNetwork : null
 
   const [local, setLocal] = useState<Local>(START)
   // The latest values, for callbacks that outlive a render (a run in progress, a timer).
@@ -140,23 +144,24 @@ export function useTx(options: UseTxOptions = {}): TxController {
   }, [deps, update])
 
   const run = useCallback(
-    async <T extends TxReceipt>(what: string | TxDescription, write: (opts: Required<TxOptions>) => Promise<T>): Promise<TxRun<T>> => {
+    async <T extends TxReceipt>(what: string | TxDescription, write: (opts: Required<TxOptions>) => Promise<T>, created?: (result: T) => string | null): Promise<TxRun<T>> => {
       const d: TxDescription = typeof what === 'string' ? { label: what } : what
-      const meta: TxMeta = { product, action: d.action ?? 'other', label: d.label, done: d.done ?? null, subject: d.subject ?? null, address, mock }
+      const meta: TxMeta = { product, action: d.action ?? 'other', label: d.label, detail: d.detail ?? null, done: d.done ?? null, subject: d.subject ?? null, address, mock }
       const current = settle()
       if (!canStart(current.state)) return { state: current.state, result: null, entryId: current.entryId }
-      if (needsWallet && !address) {
-        const refused = refusedState(TX_NOT_CONNECTED)
+      const block = needsWallet && !address ? TX_NOT_CONNECTED : networkBlock
+      if (block) {
+        const refused = refusedState(block)
         update({ state: refused, entryId: null, subject: meta.subject ?? null, address })
         return { state: refused, result: null, entryId: null }
       }
       latest.current.meta = meta
       update({ state: TX_IDLE, entryId: null, subject: meta.subject ?? null, address })
-      const done = await runTransaction(deps, meta, write, { announce: speak, onState: (s) => update({ state: s }) })
+      const done = await runTransaction(deps, meta, write, { announce: speak, onState: (s) => update({ state: s }), created })
       update({ state: done.state, entryId: done.entryId })
       return done
     },
-    [deps, product, address, mock, speak, needsWallet, update, settle],
+    [deps, product, address, mock, speak, needsWallet, networkBlock, update, settle],
   )
 
   const checkAgain = useCallback(async (): Promise<TxState> => {

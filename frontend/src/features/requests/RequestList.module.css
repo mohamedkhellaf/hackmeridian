@@ -1,0 +1,147 @@
+@layer features {
+  .list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding-block: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+
+    /* The request the ticket is showing: the same tint as a selected table row. */
+    &[data-selected] {
+      margin-inline: calc(var(--s-8) * -1);
+      padding-inline: var(--s-8);
+      background: var(--accent-tint);
+    }
+  }
+
+  .line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 var(--s-12);
+    min-width: 0;
+  }
+
+  .title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    min-width: 0;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .glyph {
+    flex: none;
+    align-self: center;
+  }
+
+  .premium {
+    margin: 0;
+    margin-inline-start: auto;
+  }
+
+  .terms {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .aside {
+    margin: 0;
+    margin-inline-start: auto;
+    font-size: var(--caption-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .foot {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-12);
+    margin-top: var(--s-8);
+  }
+
+  .facts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .lock {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .yours {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .short {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    font-weight: 500;
+    color: var(--warn);
+  }
+
+  .ids {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--s-12);
+  }
+
+  .buyer {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+  }
+
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .serial {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+  }
+
+  .action {
+    flex: none;
+  }
+}

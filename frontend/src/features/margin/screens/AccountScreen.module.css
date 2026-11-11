@@ -1,0 +1,105 @@
+@layer features {
+  /* Wide: the requirement and the facts on the left, the form in a rail. Phones: requirement, form, facts. */
+  .root {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'requirement form'
+      'facts form';
+    gap: var(--s-32);
+    align-items: start;
+  }
+
+  .requirement {
+    grid-area: requirement;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    min-width: 0;
+  }
+
+  .facts {
+    grid-area: facts;
+  }
+
+  .form {
+    grid-area: form;
+    position: sticky;
+    top: var(--s-72);
+  }
+
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-16) var(--s-32);
+  }
+
+  .health {
+    max-width: 45rem;
+  }
+
+  .restore {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8) var(--s-12);
+  }
+
+  .restoreNote,
+  .replay {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .muted {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .replay {
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .shorts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-2);
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-8);
+  }
+
+  @media (max-width: 1199.98px) {
+    .root {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+      grid-template-areas:
+        'requirement'
+        'form'
+        'facts';
+    }
+
+    .form {
+      position: static;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .root {
+      gap: var(--s-24);
+    }
+
+    .figures {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-12);
+    }
+  }
+}

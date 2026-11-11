@@ -55,7 +55,7 @@ describe('activity store: recording', () => {
     expect(h.store.get(ME, e.id)).toMatchObject({ phase: 'pending', hash: 'abc123', maxTime: 2_000, effect: 'outcome-unknown', startedAt: 1_000_000, updatedAt: 1_000_500 })
     h.store.apply(ME, e.id, CONFIRMED)
     expect(h.store.get(ME, e.id)).toMatchObject({ phase: 'confirmed', ledger: 77, effect: 'fee-charged', error: null })
-    expect(entryState(h.store.get(ME, e.id)!)).toEqual(CONFIRMED)
+    expect(entryState(h.store.get(ME, e.id)!)).toEqual({ ...CONFIRMED, stoppedAt: null })
   })
 
   it('keeps one list per address, newest first', () => {
@@ -136,6 +136,23 @@ describe('activity store: persistence', () => {
     expect(again.list(ME)).toHaveLength(1)
     expect(again.list(ME)[0]).toMatchObject({ id: e.id, phase: 'confirmed', hash: 'abc123', ledger: 77, label: 'Buy put on 5.00 BOND' })
     expect(again.list(OTHER)).toHaveLength(0)
+  })
+
+  it('keeps the terms line of an entry, and reads an entry stored without one', () => {
+    const storage = memoryStorage()
+    const h = harness(storage)
+    const detail = 'Strike 99.00 USDx per BOND, deadline 13 Nov 2026, 08:00 UTC'
+    const e = h.store.begin(live({ detail }))
+    expect(e.detail).toBe(detail)
+    h.store.apply(ME, e.id, CONFIRMED)
+    expect(createActivityStore({ storage }).list(ME)[0].detail).toBe(detail)
+    // An entry written by a build that had no such field.
+    const key = ACTIVITY_KEY_PREFIX + ME
+    const stored = JSON.parse(storage.data.get(key)!) as Record<string, unknown>[]
+    delete stored[0].detail
+    storage.data.set(key, JSON.stringify(stored))
+    expect(createActivityStore({ storage }).list(ME)[0]).toMatchObject({ id: e.id, detail: null, phase: 'confirmed' })
+    expect(h.store.begin(live()).detail).toBeNull()
   })
 
   it('keeps mock and fixture transactions in memory only', () => {

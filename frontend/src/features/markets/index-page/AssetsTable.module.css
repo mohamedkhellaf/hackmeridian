@@ -1,0 +1,211 @@
+@layer features {
+  .table {
+    display: block;
+  }
+
+  .cards {
+    display: none;
+  }
+
+  .assetCell {
+    padding-block: var(--s-8);
+    font-weight: inherit;
+  }
+
+  .identity {
+    display: flex;
+    align-items: center;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .glyph {
+    flex: none;
+    color: var(--text-2);
+
+    &[data-empty] {
+      inline-size: var(--s-24);
+    }
+  }
+
+  .idText {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  .idLine {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+  }
+
+  /* The asset code is the link to its page: serif, ink, underlined on hover. */
+  .code {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: var(--r-tag);
+
+    @media (hover: hover) {
+      &:hover {
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 0.2em;
+      }
+    }
+  }
+
+  .type {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .issuer {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .similar {
+    color: var(--warn);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    white-space: normal;
+  }
+
+  .stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .sub {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .none {
+    color: var(--muted);
+  }
+
+  .thinCell {
+    white-space: normal;
+    color: var(--text-2);
+  }
+
+  .thin {
+    text-wrap: pretty;
+  }
+
+  @media (max-width: 767.98px) {
+    .table {
+      display: none;
+    }
+
+    .cards {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-12);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-12);
+      padding: var(--s-16);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-card);
+      background: var(--surface);
+    }
+
+    .cardHead {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--s-12);
+    }
+
+    .cardIdentity {
+      display: flex;
+      align-items: center;
+      gap: var(--s-12);
+      min-width: 0;
+    }
+
+    .cardPrice {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+    }
+
+    .cardFacts {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s-12) var(--s-16);
+      margin: 0;
+      padding-top: var(--s-12);
+      border-top: 1px solid var(--hairline);
+
+      & > div {
+        display: flex;
+        flex-direction: column;
+        gap: var(--s-2);
+        min-width: 0;
+      }
+
+      & dt {
+        color: var(--muted);
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+        font-weight: var(--label-weight);
+        font-stretch: var(--label-stretch);
+      }
+
+      & dd {
+        margin: 0;
+        font-size: var(--ui-size);
+        line-height: var(--ui-line);
+        font-weight: 500;
+      }
+    }
+
+    .cardThin {
+      padding-top: var(--s-12);
+      border-top: 1px solid var(--hairline);
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      color: var(--text-2);
+    }
+
+    .cardFoot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-12);
+    }
+
+    .cardExpiry {
+      color: var(--muted);
+      font-size: var(--caption-size);
+      line-height: var(--caption-line);
+    }
+  }
+}

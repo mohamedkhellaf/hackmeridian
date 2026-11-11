@@ -166,4 +166,28 @@
   .emptyAction {
     margin-top: var(--s-8);
   }
+
+  /* The blank lines of the form, inside the slip. */
+  .emptyLines {
+    align-self: stretch;
+    margin-top: var(--s-8);
+  }
+
+  /* Compact: one of several empty tables on a desk screen. */
+  .empty[data-size='sm'] {
+    & .emptyBody {
+      gap: var(--s-4);
+      padding-block: var(--s-12);
+    }
+
+    & .emptyTitle {
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+      letter-spacing: 0;
+    }
+
+    & .emptyAction {
+      margin-top: var(--s-4);
+    }
+  }
 }

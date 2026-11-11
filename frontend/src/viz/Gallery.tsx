@@ -178,7 +178,7 @@ function GuidedOutcome() {
 
 const WALK = [10, 10.02, 9.97, 9.91, 9.95, 10.06, 10.11, 10.04, 9.99, 10.08, 10.17, 10.21, 10.14, 10.19, 10.26, 10.22, 10.3]
 
-/** Every chart of the kit with realistic figures and the edge cases it must survive. Mounted at /viz.html and reusable in the design gallery. */
+/** Every chart of the kit with realistic figures and the edge cases it must survive. Mounted under "Charts" on the /design page. */
 export default function Gallery() {
   return (
     <div className={css.gallery}>

@@ -1,0 +1,18 @@
+@layer features {
+  /* The naming column: just wide enough for its longest name. */
+  .rowHeader {
+    width: min(13rem, 34%);
+  }
+
+  [data-first='wide'] .rowHeader {
+    width: min(21rem, 36%);
+  }
+
+  /* Phones: the naming column gives room to the sentences. */
+  @container (max-width: 30rem) {
+    .rowHeader {
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+    }
+  }
+}

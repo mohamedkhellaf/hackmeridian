@@ -1,0 +1,113 @@
+@layer features {
+  .root {
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+    list-style: none;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .item {
+    display: grid;
+    gap: var(--s-8);
+    padding: var(--s-12) 0;
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+
+    /* The order the open ticket is about. */
+    &[data-selected] {
+      margin-inline: calc(var(--s-8) * -1);
+      padding-inline: var(--s-8);
+      background: var(--accent-tint);
+    }
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .who {
+    display: grid;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  .series {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+    font-weight: 600;
+  }
+
+  .sub {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .from {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .source {
+    font-weight: 500;
+  }
+
+  .own {
+    color: var(--text-2);
+  }
+
+  /* Quantity, premium per unit and total: label over figure, three across. */
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-8);
+    margin: 0;
+
+    & dt {
+      color: var(--muted);
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      font-stretch: var(--label-stretch);
+    }
+
+    & dd {
+      margin: 0;
+      font-weight: 500;
+    }
+
+    & > div:last-child {
+      text-align: end;
+    }
+  }
+
+  .best {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    font-weight: 450;
+  }
+
+  .note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-6);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+
+    & > svg {
+      color: var(--warn);
+    }
+  }
+}

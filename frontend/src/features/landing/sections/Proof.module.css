@@ -1,0 +1,75 @@
+@layer features {
+  .table {
+    table-layout: fixed;
+  }
+
+  /* Prose cells: they wrap, and sit on their first line. */
+  .claim,
+  .evidence {
+    height: auto;
+    padding-block: var(--s-12);
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  .claim {
+    width: 62%;
+    padding-inline-start: 0;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .evidence {
+    padding-inline-end: 0;
+  }
+
+  .kind {
+    display: block;
+    margin-bottom: var(--s-2);
+    font-size: var(--label-size);
+    line-height: var(--body-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .links {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .hash {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--ui-line);
+    font-feature-settings: 'zero';
+    color: var(--muted);
+  }
+
+  .all {
+    margin-top: var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+  }
+
+  .table th:first-child {
+    padding-inline-start: 0;
+  }
+
+  .table th:last-child {
+    padding-inline-end: 0;
+  }
+
+  @media (max-width: 599.98px) {
+    .claim {
+      width: 56%;
+    }
+  }
+}

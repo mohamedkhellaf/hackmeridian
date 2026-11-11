@@ -187,3 +187,24 @@ Used when the build has no `VITE_OPTIONS_CONTRACT_ID`. All of it is computed fro
   submitting 100, pending 200).
 - **Staging an outcome:** `(client as MockOptionsClient).failNextWith('unknown')` makes the next write end unknown;
   `checkTx` then confirms it.
+
+## Added during integration (11 Nov 2026)
+
+| Module | What |
+|---|---|
+| `links.ts` | `REPOSITORY_URL` and `DOC_LINKS`: the public addresses the landing page, the footer and Learn cite. |
+| `deployments.ts` | The recorded Testnet deployments (contract ids, wasm hashes, deploy transactions, Margin admin and publisher), moved from the Reserves feature. |
+| `payoff/leg.ts` | One option from one side: exact strike, premium and breakeven per unit, the caps of each side, what exercise moves, and the leg's profit and loss (`legPnl`, `legPnlOf`, `legNumbers`) for both the holder and the writer. The ticket and the position page share it. |
+| `payoff/strategies.ts` | `GuidedOutcome.assetValue` (`qty x price`). |
+| `pro/coverage.ts` | The hypothetical payout split of the Margin buy dialog (adapter to `packages/payoff`), and `toChartNumber`. |
+| `pro/scenarios.ts` | English titles and summaries of the recorded Margin scenarios (`scenarioCopy`, `scenarioTitle`, `scenarioSummary`). |
+| `pro/types.ts` | `PRO_UNDERLYING`: the one underlying of the Margin market. |
+| `stellar/issuerTx.ts`, `stellar/issuerNet.ts`, `stellar/rawTx.ts` | The issuer transactions and reads (moved from `core/issuer`), and the SDK objects a hand-built transaction needs. Static SDK imports: reach them from a lazily loaded chunk only. |
+| `tx/machine.ts` | `TxState.stoppedAt`, `stoppedStage(state)`, `refusedOnSend(state)`: where a transaction stopped. |
+| `maker/lowestOffer.ts` | `lowestOpenInSeriesOf(offers, series, quote)`: the cheapest offer of a series named by its terms. |
+| `series` | `LADDER_ROWS`: the strike rows of the app's grid, one number for every view. |
+| `format` | `noBreak(text)`: keeps a deadline or a figure with its unit on one line. |
+| `assetfacts` | `mockAssetFacts(code)`: fixture flags for mock assets (`mock: true`, no counts). |
+| `options/mockClient.ts` | `failNextRead(method?, times)`, `clawBack(tokenId, units)`; `DEMO_WALLETS.c` is an empty wallet. `createOptionsClient` no longer keeps a failed load of the mock chunk. |
+| `disclosures.ts` | `MARGIN_PAYOUT_RISK`, `MARGIN_PUBLISHER_LINE` (the on-chain banner is the two together). |
+

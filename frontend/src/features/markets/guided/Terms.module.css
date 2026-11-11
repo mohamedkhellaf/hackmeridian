@@ -1,0 +1,94 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    min-width: 0;
+    padding-block: var(--s-8) var(--s-20);
+  }
+
+  .header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: var(--s-16) var(--s-32);
+    align-items: start;
+    padding-bottom: var(--s-20);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .qty {
+    min-width: 0;
+  }
+
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-16) var(--s-32);
+    margin: 0;
+    min-width: 0;
+  }
+
+  .figure {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+
+    & dt {
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      font-weight: var(--ui-weight);
+      color: var(--text);
+    }
+
+    & dd {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-6);
+      margin: 0;
+    }
+  }
+
+  /* The figure sits on the same line as the amount field beside it. */
+  .value {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    min-height: var(--control-h);
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--control-h);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .unit {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    font-weight: var(--ui-weight);
+    color: var(--muted);
+  }
+
+  .hint {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .legend {
+    max-width: var(--measure);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  @container (max-width: 43.99rem) {
+    .header {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

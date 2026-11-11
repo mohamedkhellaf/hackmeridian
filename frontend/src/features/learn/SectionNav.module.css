@@ -1,0 +1,107 @@
+@layer features {
+  /* Below 1200 px: a select that stays at the top of the viewport and names the section being read. */
+  .list {
+    display: none;
+  }
+
+  .select {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    /* Full bleed, so the text scrolling under it never shows beside it. */
+    margin-inline: calc(var(--gutter) * -1);
+    padding: var(--s-8) var(--gutter);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--bg);
+  }
+
+  .select > * {
+    max-width: var(--popup-max);
+  }
+
+  /* From 1200 px: a list that stays beside the text while it scrolls. */
+  @media (min-width: 1200px) {
+    .select {
+      display: none;
+    }
+
+    .list {
+      display: block;
+      position: sticky;
+      top: var(--s-24);
+      align-self: start;
+      max-height: calc(100dvh - var(--s-40));
+      overflow-y: auto;
+    }
+  }
+
+  .title {
+    padding-bottom: var(--s-8);
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .items {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .items > li {
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  /* The current section is said in ink and weight, and marked by a rule on the left: never by colour alone. */
+  .link {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    padding: var(--s-8) var(--s-4) var(--s-8) var(--s-12);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 450;
+    text-decoration: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset-block: var(--s-6);
+      inset-inline-start: 0;
+      width: 2px;
+      background: transparent;
+    }
+
+    &[aria-current] {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    &[aria-current]::before {
+      background: var(--text);
+    }
+
+    &:focus-visible {
+      outline-offset: -2px;
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+  }
+
+  .number {
+    flex: none;
+    min-width: var(--s-12);
+    font-family: var(--font-serif);
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .link[aria-current] .number {
+    color: var(--text);
+  }
+}
