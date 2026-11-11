@@ -8,8 +8,8 @@ import { AmountField, Button, Callout, Card, EmptyNote, KeyValue, KeyValueItem, 
 import type { TagAppearance } from '../../../ui'
 import { Waterfall } from '../../../viz'
 import { AMOUNT_ERROR, LP_LOCK_NOTE } from '../copy'
-import { QUOTE, bpsPercent, lots, toChartNumber, usdx } from '../model/money'
-import { contractTitle, partyName } from '../model/names'
+import { QUOTE, bpsPercent, lots, toChartNumber, usdx, usdxInput, withUnit } from '../model/money'
+import { contractTitle, partyName, runsFirstText } from '../model/names'
 import { splitSentence } from '../../../core/pro/coverage'
 import { oracleView } from '../model/oracle'
 import { seriesSettlements } from '../model/settlement'
@@ -19,6 +19,8 @@ import { DeskTable } from '../parts/DeskTable'
 import type { DeskColumn } from '../parts/DeskTable'
 import { Sub, Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
+import { RecordedField } from '../parts/RecordedField'
+import { RunsFirst } from '../parts/RunsFirst'
 import { Footnote, Section } from '../parts/Section'
 import { useReplayable } from '../parts/useReplayable'
 import css from './VaultScreen.module.css'
@@ -45,10 +47,15 @@ export function VaultScreen() {
   const [amount, setAmount] = useState('')
   const [confirming, setConfirming] = useState(false)
   const v = model.vault
-  const units = parseUsdx(amount) ?? 0n
+  // Fixtures: the amount of the recorded vault deposit a press replays, locked (ruling F11).
+  const recorded = simulated ? replay.next('lp_deposit', (args) => args[0] === me) : null
+  const units = simulated ? (recorded ? BigInt(recorded.args[1] as number) : 0n) : (parseUsdx(amount) ?? 0n)
   const valid = units > 0n
   const pending = oracleView(model).pending.length > 0
-  const scripted = replay.can('lp_deposit', (args) => args[0] === me)
+  const scripted = !simulated || recorded !== null
+  const wallet = model.wallets[me]
+  const recordedAt = replay.requirementAt(VAULT)
+  const noValue = recordedAt !== null ? `The scenario records the vault value at step ${recordedAt}.` : `The scenario records no vault value after step ${replay.position}.`
 
   const shareRows: ShareRow[] = v.lpShares.map((l) => ({ lp: l.lp, shares: l.shares, bps: v.totalShares > 0n ? (l.shares * 10_000n) / v.totalShares : null }))
   const mine = me !== '' ? v.lpShares.find((l) => l.lp === me)?.shares : undefined
@@ -119,7 +126,15 @@ export function VaultScreen() {
   return (
     <div className={css.root}>
       <div className={css.figures}>
-        <Stat size="lg" label="Vault value" value={<Usdx v={v.value} none="No value at this moment" />} unit={v.value !== null ? QUOTE : undefined} />
+        {v.value !== null || !simulated ? (
+          <Stat size="lg" label="Vault value" value={<Usdx v={v.value} none="No value at this moment" />} unit={v.value !== null ? QUOTE : undefined} />
+        ) : (
+          // A replay step that records no vault value: where the scenario records it, in place of a bare dash.
+          <div className={css.noValue}>
+            <span className={css.noValueLabel}>Vault value</span>
+            <p>{noValue}</p>
+          </div>
+        )}
         <Stat label="Cash" value={<Usdx v={v.cash} />} unit={QUOTE} hint={`Includes the ${bpsPercent(model.config.reserveFeeBps)} reserve fee taken from every premium.`} />
         <Stat label="Reserved for takeovers" value={<Usdx v={v.reserved} />} unit={QUOTE} hint="Takeover payments kept for the books it took over." />
         <Stat label="Owed by writers" value={<Usdx v={v.debtsOwed} tone="loss" />} unit={QUOTE} hint="Takeover shortfalls not collected yet." />
@@ -151,7 +166,7 @@ export function VaultScreen() {
           </Section>
 
           {vaultBooks.length > 0 ? (
-            <Section title="Books taken over" note="Short calls the vault now carries. They settle at expiry and cannot be exercised early.">
+            <Section title="Books taken over" note="Short calls the vault now carries. They settle at the deadline and cannot be exercised early.">
               <DeskTable caption="Books owned by the vault" columns={bookColumns} rows={vaultBooks} rowKey={(b) => b.id} empty={null} />
             </Section>
           ) : null}
@@ -162,23 +177,33 @@ export function VaultScreen() {
         </div>
 
         <Card title="Deposit to the vault" headingLevel={2} className={css.form}>
-          <AmountField
-            label="Amount"
-            unit={QUOTE}
-            decimals={7}
-            value={amount}
-            onValueChange={setAmount}
-            aside={model.wallets[me] !== undefined ? `Wallet ${usdx(model.wallets[me])} ${QUOTE}` : undefined}
-            validate={(value) => (value.trim() === '' || (parseUsdx(value) ?? 0n) > 0n ? undefined : AMOUNT_ERROR)}
-          />
+          {simulated ? (
+            <RecordedField
+              label="Amount"
+              unit={QUOTE}
+              value={recorded ? usdxInput(units) : ''}
+              aside={wallet !== undefined ? `Wallet ${withUnit(usdx(wallet))}` : undefined}
+              hint={recorded ? `Recorded amount for step ${recorded.number}. ${runsFirstText(recorded.before)}`.trim() : replay.reason(`vault deposit by ${partyName(me)}`)}
+            />
+          ) : (
+            <AmountField
+              label="Amount"
+              unit={QUOTE}
+              decimals={7}
+              value={amount}
+              onValueChange={setAmount}
+              aside={wallet !== undefined ? `Wallet ${withUnit(usdx(wallet))}` : undefined}
+              validate={(value) => (value.trim() === '' || (parseUsdx(value) ?? 0n) > 0n ? undefined : AMOUNT_ERROR)}
+            />
+          )}
           {canAct ? (
             <Button
               variant="primary"
               disabled={!valid || !scripted || busy}
-              disabledReason={!valid ? 'Enter an amount first.' : !scripted ? replay.reason(`vault deposit by ${partyName(me)}`) : undefined}
+              disabledReason={!scripted ? replay.reason(`vault deposit by ${partyName(me)}`) : !valid ? 'Enter an amount first.' : undefined}
               onClick={() => setConfirming(true)}
             >
-              Deposit to the vault
+              {recorded ? `Deposit ${withUnit(usdx(units))} to the vault` : 'Deposit to the vault'}
             </Button>
           ) : (
             <Button variant="primary" onClick={connect}>
@@ -203,7 +228,7 @@ export function VaultScreen() {
               <figure key={s.series.id} className={css.settlement}>
                 <Waterfall
                   max={scale}
-                  heading={`${contractTitle(s.series)}: owed ${usdx(s.due)} ${QUOTE} at settlement`}
+                  heading={`${contractTitle(s.series)}: owed ${withUnit(usdx(s.due))} at settlement`}
                   paidLabel={`Paid ${usdx(s.due - (s.deficit ?? 0n))} of ${usdx(s.due)}`}
                   label={`${contractTitle(s.series)}. ${splitSentence(usdx(s.due), usdx(s.fromOwners), usdx(s.vaultPaid), (s.deficit ?? 0n) > 0n ? usdx(s.deficit) : null, QUOTE)}`}
                   segments={[
@@ -227,9 +252,9 @@ export function VaultScreen() {
         confirmLabel="Deposit to the vault"
         expectRefusal={pending}
         onConfirm={() =>
-          void act({ label: 'LP deposit', done: 'Deposited to the vault' }, (opts) => client.lpDeposit(me, units, opts), (shares) => ({
+          void act({ label: 'LP deposit', done: 'Deposited to the vault' }, (opts) => client.lpDeposit(me, units, opts), (shares, step) => ({
             facts: [
-              { label: 'Deposited', value: units },
+              { label: 'Deposited', value: step ? BigInt(step.args[1] as number) : units },
               { label: 'Shares received', value: usdx(shares) },
             ],
           }))
@@ -244,6 +269,7 @@ export function VaultScreen() {
           </KeyValueItem>
         </KeyValue>
         <p>{LP_LOCK_NOTE} The capital pays holders when a writer margin falls short, so it can be lost.</p>
+        <RunsFirst step={recorded} />
         {pending ? (
           <Callout variant="warning" title="A settlement price is pending.">
             <p>

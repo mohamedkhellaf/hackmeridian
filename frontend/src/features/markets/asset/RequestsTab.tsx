@@ -1,42 +1,60 @@
-// The Requests tab of an asset: buyers' funded bids waiting for a maker. A maker fills one from the ticket ("Fill
-// request"); a buyer posts one ("Post a request"); the wallet's own requests are marked and can be cancelled in
-// the same dialog as in the chain, which says what comes back and shows the transaction's stages.
+// The Requests tab of an asset: buyers' funded requests waiting for a maker. A request is drawn here as /requests
+// draws it (ruling F15): Kind, Strike, Quantity, Deadline, Premium per unit with the total beneath, Buyer and the
+// action, the deadline as `13 Nov 2026, 08:00 UTC` with the time left beneath, and on phones the same card. Both
+// pages read the row model and its words from core/requests/rows. A maker fills a request from the ticket; a buyer
+// posts one; the wallet's own requests are marked and can be cancelled (also after their deadline: the premium
+// comes back either way) in the same dialog as in the chain.
 import { Link as RouterLink } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
+import type { ReactElement } from 'react'
 import type { AssetSearch } from '../../../app/search'
-import { formatCountdown, formatUnits } from '../../../core/format'
 import type { BookRow } from '../../../core/market/book'
 import type { TokenInfo } from '../../../core/options/types'
-import type { Bid } from '../../../core/requests/types'
-import { premiumUnits, strikeUnits } from '../../../core/units'
+import {
+  CANCEL_REQUEST,
+  FILL_REQUEST,
+  IN_TOTAL,
+  LAPSE_LINE,
+  REQUEST_COLUMNS as COL,
+  YOURS,
+  cancelRequestLabel,
+  fillRequestLabel,
+  lapsing,
+  perAsset,
+  requestRow as toRow,
+  requestTitle,
+  serialText,
+  warnBelowOf,
+} from '../../../core/requests/rows'
+import type { RequestRow } from '../../../core/requests/rows'
 import { bidSubject, useBids, useMe, useNowSec, useSubjectBusy } from '../../../data'
-import { Button, ButtonLink, Callout, DateTime, EmptyNote, Glyph, Marker, Skeleton, Table, TableWrap, TBody, Td, Th, THead, Tr } from '../../../ui'
+import {
+  Amount,
+  Button,
+  ButtonLink,
+  Callout,
+  Countdown,
+  DateTime,
+  EmptyNote,
+  Glyph,
+  IconWarning,
+  Marker,
+  Skeleton,
+  Table,
+  TableWrap,
+  TBody,
+  Td,
+  Th,
+  THead,
+  Tr,
+  VisuallyHidden,
+} from '../../../ui'
 import { searchFromTicketIntent } from '../../ticket'
 import type { TicketIntent } from '../../ticket'
 import { CancelDialog } from '../chain/CancelDialog'
-import {
-  CANCEL_REFUND,
-  CANCEL_REQUEST,
-  KIND_WORD,
-  LAPSED,
-  NONE,
-  POST_REQUEST,
-  REQUESTS_ERROR,
-  REQUESTS_HEADING,
-  REQUESTS_UNSUPPORTED,
-  REQ_COL,
-  RETRY,
-  SELL_TO_BID,
-  YOURS,
-  perUnitLine,
-  requestsCaption,
-  requestsEmpty,
-  requestsLead,
-} from '../copy'
-import { assetRequests, requestRow } from '../model'
-import type { AssetRequest } from '../model'
-import { ChainId, Money } from '../parts'
-import { moneyText } from '../values'
+import { POST_REQUEST, REQUESTS_ERROR, REQUESTS_HEADING, REQUESTS_UNSUPPORTED, RETRY, requestsCaption, requestsEmpty, requestsLead } from '../copy'
+import { assetRequests, requestRow as bookRowOf } from '../model'
+import { ChainId } from '../parts'
 import { ASSET_ROUTE, CLEAR_TICKET, EXACT, compactSearch, useAssetParam, useAssetSearch } from '../routing'
 import styles from './RequestsTab.module.css'
 
@@ -50,31 +68,32 @@ function useTicketSearch(): (intent: TicketIntent) => AssetSearch {
   return (intent) => compactSearch({ ...search, ...CLEAR_TICKET, ...searchFromTicketIntent(intent) })
 }
 
-function CancelButton({ bid, onCancel, fullWidth = false }: { bid: Bid; onCancel: (bid: Bid) => void; fullWidth?: boolean }) {
-  const busy = useSubjectBusy(bidSubject(bid.id))
+/** The premium per unit, the figure a request is priced by, under the highlighter on the wallet's own request. */
+function PerUnit({ row, figure }: { row: RequestRow; figure?: 'serif' }) {
+  const amount = <Amount value={row.premiumPerUnit.text} exact={row.premiumPerUnit.exact} unit={row.premiumPerUnit.code} figure={figure} />
+  return row.mine ? <Marker>{amount}</Marker> : amount
+}
+
+/** The total the buyer escrowed, under the premium per unit. */
+function Total({ row }: { row: RequestRow }) {
   return (
-    <Button size={fullWidth ? 'md' : 'sm'} fullWidth={fullWidth} loading={busy} aria-label={`${CANCEL_REQUEST} your request for ${KIND_WORD[bid.kind].toLowerCase()} on ${moneyText(bid.underlyingQty, bid.underlying)}. ${CANCEL_REFUND}`} onClick={() => onCancel(bid)}>
+    <>
+      <Amount value={row.premium.text} exact={row.premium.exact} unit={row.premium.code} /> {IN_TOTAL}
+    </>
+  )
+}
+
+/** The one action of a row: fill another wallet's request, or cancel the wallet's own. One look per layout (F14). */
+function RowAction({ row, size, fill, onCancel }: { row: RequestRow; size: 'sm' | 'md'; fill: (row: RequestRow) => ReactElement<Record<string, unknown>>; onCancel: (row: RequestRow) => void }) {
+  const busy = useSubjectBusy(bidSubject(row.bid.id))
+  return row.mine ? (
+    <Button size={size} loading={busy} aria-label={cancelRequestLabel(row)} onClick={() => onCancel(row)}>
       {CANCEL_REQUEST}
     </Button>
-  )
-}
-
-function Kind({ bid }: { bid: Bid }) {
-  return (
-    <span className={styles.kind}>
-      <Glyph name={bid.kind === 'put' ? 'long-put' : 'long-call'} />
-      {KIND_WORD[bid.kind]}
-    </span>
-  )
-}
-
-/** The deadline, and under it the time left; the wallet's own lapsed request says it expired instead. */
-function Deadline({ r, nowSec }: { r: AssetRequest; nowSec: number }) {
-  return (
-    <span className={styles.stack}>
-      <DateTime value={r.bid.expiry * 1000} format="date" />
-      <span className={styles.sub}>{r.open ? formatCountdown(r.bid.expiry - nowSec) : LAPSED}</span>
-    </span>
+  ) : (
+    <ButtonLink size={size} aria-label={fillRequestLabel(row)} render={fill(row)}>
+      {FILL_REQUEST}
+    </ButtonLink>
   )
 }
 
@@ -85,18 +104,23 @@ export function RequestsTab({ token }: RequestsTabProps) {
   const param = useAssetParam()
   const search = useAssetSearch()
   const ticketSearch = useTicketSearch()
-  const rows = useMemo(() => (bids.data ? assetRequests(bids.data, token.contractId, me, nowSec) : null), [bids.data, token.contractId, me, nowSec])
+  // Every open request on the asset, then the wallet's own whose deadline passed with the premium still escrowed:
+  // those read as expired, as on /requests.
+  const rows = useMemo(
+    () => (bids.data ? assetRequests(bids.data, token.contractId, me, nowSec).map((r) => toRow(r.open ? r.bid : { ...r.bid, state: 'expired' }, me)) : null),
+    [bids.data, token.contractId, me, nowSec],
+  )
   const [cancelling, setCancelling] = useState<BookRow | null>(null)
-  const cancel = (bid: Bid) => setCancelling(requestRow(bid))
+  const cancel = (row: RequestRow) => setCancelling(bookRowOf(row.bid))
+  const caption = requestsCaption(token.code)
 
   const postRequest = (
     <ButtonLink render={<RouterLink to={ASSET_ROUTE} params={{ asset: param }} search={ticketSearch({ mode: 'bid', assetId: token.contractId, kind: 'put' })} activeOptions={EXACT} resetScroll={false} />}>
       {POST_REQUEST}
     </ButtonLink>
   )
-  const sellLink = (bid: Bid) => <RouterLink to={ASSET_ROUTE} params={{ asset: param }} search={ticketSearch({ mode: 'fill', bidId: bid.id })} activeOptions={EXACT} resetScroll={false} />
-  const sellName = (bid: Bid) =>
-    `${SELL_TO_BID}: ${KIND_WORD[bid.kind].toLowerCase()} on ${moneyText(bid.underlyingQty, bid.underlying)}, premium ${moneyText(bid.totalPremium, bid.quote)}`
+  const fill = (row: RequestRow) => <RouterLink to={ASSET_ROUTE} params={{ asset: param }} search={ticketSearch({ mode: 'fill', bidId: row.bid.id })} activeOptions={EXACT} resetScroll={false} />
+  const selected = (row: RequestRow) => search.bid === row.key
 
   return (
     <section className={styles.root} aria-labelledby="asset-requests" aria-busy={bids.isPending || undefined}>
@@ -121,128 +145,133 @@ export function RequestsTab({ token }: RequestsTabProps) {
         <EmptyNote title={requestsEmpty(token.code)} action={postRequest} />
       ) : (
         <div className={styles.list}>
-          <TableWrap label={requestsCaption(token.code)} className={styles.table}>
-            <Table caption={requestsCaption(token.code)}>
+          <TableWrap label={caption} className={styles.tableWrap}>
+            <Table caption={caption} fixed className={styles.table}>
+              <colgroup>
+                <col className={styles.colKind} />
+                <col className={styles.colStrike} />
+                <col className={styles.colQty} />
+                <col className={styles.colDeadline} />
+                <col className={styles.colPremium} />
+                <col className={styles.colBuyer} />
+                <col className={styles.colAction} />
+              </colgroup>
               <THead>
                 <Tr>
-                  <Th>{REQ_COL.kind}</Th>
-                  <Th numeric>{REQ_COL.strike}</Th>
-                  <Th numeric>{REQ_COL.qty}</Th>
-                  <Th numeric>{REQ_COL.expiry}</Th>
-                  <Th numeric>{REQ_COL.premium}</Th>
-                  <Th>{REQ_COL.buyer}</Th>
-                  <Th>
-                    <span className="ui-vh">{REQ_COL.action}</span>
-                  </Th>
+                  <Th>{COL.kind}</Th>
+                  <Th strike>{COL.strike}</Th>
+                  <Th numeric>{COL.quantity}</Th>
+                  <Th>{COL.deadline}</Th>
+                  <Th numeric>{COL.premium}</Th>
+                  <Th>{COL.buyer}</Th>
+                  <Th pinned>{COL.action}</Th>
                 </Tr>
               </THead>
               <TBody>
-                {rows.map((r) => {
-                  const { bid } = r
-                  const strike = strikeUnits(bid)
-                  const per = premiumUnits(bid)
-                  const premium = <Money units={bid.totalPremium} token={bid.quote} />
-                  return (
-                    <Tr key={String(bid.id)} selected={search.bid === String(bid.id)}>
-                      <Td>
-                        <Kind bid={bid} />
-                      </Td>
-                      <Td numeric className={styles.strike}>
-                        {strike !== null ? <Money units={strike} token={bid.quote} /> : NONE}
-                      </Td>
-                      <Td numeric>
-                        <Money units={bid.underlyingQty} token={bid.underlying} />
-                      </Td>
-                      <Td numeric>
-                        <Deadline r={r} nowSec={nowSec} />
-                      </Td>
-                      <Td numeric>
-                        <span className={styles.stack}>
-                          <span>{r.mine ? <Marker>{premium}</Marker> : premium}</span>
-                          {per !== null ? <span className={styles.sub}>{perUnitLine(formatUnits(per, bid.quote.decimals))}</span> : null}
+                {rows.map((row) => (
+                  <Tr key={row.key} selected={selected(row)} interactive data-mine={row.mine || undefined}>
+                    {/* The request's number sits under the first cell of the row, as on /requests. */}
+                    <Td>
+                      <span className={styles.stack}>
+                        <span className={styles.kind}>
+                          <Glyph name={row.glyph} size={12} />
+                          <span>{row.kindWord}</span>
                         </span>
-                      </Td>
-                      <Td>{r.mine ? <span className={styles.yours}>{YOURS}</span> : <ChainId value={bid.buyer} copyLabel={null} explorerLabel="View the buyer on the explorer" />}</Td>
-                      <Td align="end" className={styles.actionCell}>
-                        {r.mine ? (
-                          <CancelButton bid={bid} onCancel={cancel} />
-                        ) : (
-                          <ButtonLink size="sm" aria-label={sellName(bid)} render={sellLink(bid)}>
-                            {SELL_TO_BID}
-                          </ButtonLink>
-                        )}
-                      </Td>
-                    </Tr>
-                  )
-                })}
+                        <span className={styles.sub}>{serialText(row.serial)}</span>
+                      </span>
+                    </Td>
+                    <Td strike>
+                      <Amount value={row.strike.text} exact={row.strike.exact} unit={row.strike.code} />
+                    </Td>
+                    <Td numeric>
+                      <Amount value={row.quantity.text} exact={row.quantity.exact} unit={row.quantity.code} />
+                    </Td>
+                    <Td>
+                      <span className={styles.stack}>
+                        <DateTime value={row.deadlineSec * 1000} />
+                        <span className={styles.sub}>
+                          <Countdown to={row.deadlineSec * 1000} warnBelowMs={warnBelowOf(row)} />
+                        </span>
+                        {lapsing(row, nowSec) ? (
+                          <span className={styles.warn}>
+                            <IconWarning size={12} />
+                            <span>{LAPSE_LINE}</span>
+                          </span>
+                        ) : null}
+                      </span>
+                    </Td>
+                    <Td numeric>
+                      <span className={styles.stack} data-align="end">
+                        <PerUnit row={row} />
+                        <span className={styles.sub}>
+                          <Total row={row} />
+                        </span>
+                      </span>
+                    </Td>
+                    <Td>
+                      <ChainId value={row.bid.buyer} name={row.mine ? YOURS : undefined} copyLabel={null} explorerLabel="View the buyer on the explorer" />
+                    </Td>
+                    <Td pinned>
+                      <RowAction row={row} size="sm" fill={fill} onCancel={cancel} />
+                    </Td>
+                  </Tr>
+                ))}
               </TBody>
             </Table>
           </TableWrap>
 
-          <ul className={styles.cards} role="list" aria-label={requestsCaption(token.code)}>
-            {rows.map((r) => {
-              const { bid } = r
-              const strike = strikeUnits(bid)
-              const per = premiumUnits(bid)
-              return (
-                <li key={String(bid.id)} className={styles.card} data-selected={search.bid === String(bid.id) || undefined}>
-                  <div className={styles.cardHead}>
-                    <span className={styles.cardKind}>
-                      <Kind bid={bid} />
-                      {strike !== null ? (
-                        <span className={styles.cardStrike}>
-                          at <Money units={strike} token={bid.quote} figure="serif" />
-                        </span>
-                      ) : null}
+          <ul className={styles.cards} aria-label={caption}>
+            {rows.map((row) => (
+              <li key={row.key} className={styles.card} data-selected={selected(row) || undefined} data-mine={row.mine || undefined}>
+                <div className={styles.line}>
+                  <p className={styles.title}>
+                    <Glyph name={row.glyph} size={12} className={styles.glyph} />
+                    <span>{requestTitle(row)}</span>
+                  </p>
+                  <p className={styles.premium}>
+                    <VisuallyHidden>{COL.premium}: </VisuallyHidden>
+                    <PerUnit row={row} figure="serif" />
+                    <span className={styles.per}>{perAsset(row)}</span>
+                  </p>
+                </div>
+                <div className={styles.line}>
+                  <p className={styles.terms}>
+                    <span className={styles.label}>{COL.strike}</span>
+                    <Amount value={row.strike.text} exact={row.strike.exact} unit={row.strike.code} />
+                  </p>
+                  <p className={styles.aside}>
+                    <Total row={row} />
+                  </p>
+                </div>
+                <div className={styles.line}>
+                  <p className={styles.terms}>
+                    <VisuallyHidden>{COL.deadline}: </VisuallyHidden>
+                    <DateTime value={row.deadlineSec * 1000} />
+                  </p>
+                  <p className={styles.aside}>
+                    <Countdown to={row.deadlineSec * 1000} warnBelowMs={warnBelowOf(row)} />
+                  </p>
+                </div>
+                {lapsing(row, nowSec) ? (
+                  <p className={styles.warnLine}>
+                    <IconWarning size={14} />
+                    <span>{LAPSE_LINE}</span>
+                  </p>
+                ) : null}
+                <div className={styles.foot}>
+                  <p className={styles.facts}>
+                    <span className={styles.buyer}>
+                      <span>{COL.buyer}</span>
+                      <ChainId value={row.bid.buyer} name={row.mine ? YOURS : undefined} copyLabel={null} explorerLabel="View the buyer on the explorer" />
                     </span>
-                    {r.open ? null : <span className={styles.lapsed}>{LAPSED}</span>}
+                    <span>{serialText(row.serial)}</span>
+                  </p>
+                  <div className={styles.action}>
+                    <RowAction row={row} size="md" fill={fill} onCancel={cancel} />
                   </div>
-                  <dl className={styles.cardFacts}>
-                    <div>
-                      <dt>{REQ_COL.qty}</dt>
-                      <dd>
-                        <Money units={bid.underlyingQty} token={bid.underlying} />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>{REQ_COL.expiry}</dt>
-                      <dd>
-                        <DateTime value={bid.expiry * 1000} format="date" />
-                        {r.open ? <span className={styles.sub}>{formatCountdown(bid.expiry - nowSec)}</span> : null}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>{REQ_COL.premium}</dt>
-                      <dd>
-                        <span>
-                          {r.mine ? (
-                            <Marker>
-                              <Money units={bid.totalPremium} token={bid.quote} />
-                            </Marker>
-                          ) : (
-                            <Money units={bid.totalPremium} token={bid.quote} />
-                          )}
-                        </span>
-                        {per !== null ? <span className={styles.sub}>{perUnitLine(formatUnits(per, bid.quote.decimals))}</span> : null}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>{REQ_COL.buyer}</dt>
-                      <dd>{r.mine ? <span className={styles.yours}>{YOURS}</span> : <ChainId value={bid.buyer} copyLabel={null} />}</dd>
-                    </div>
-                  </dl>
-                  <div className={styles.cardFoot}>
-                    {r.mine ? (
-                      <CancelButton bid={bid} onCancel={cancel} fullWidth />
-                    ) : (
-                      <ButtonLink fullWidth aria-label={sellName(bid)} render={sellLink(bid)}>
-                        {SELL_TO_BID}
-                      </ButtonLink>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
+                </div>
+              </li>
+            ))}
           </ul>
         </div>
       )}

@@ -19,7 +19,6 @@
     display: inline-flex;
     align-items: baseline;
     align-self: flex-start;
-    gap: var(--s-6);
     min-width: 0;
     max-width: 100%;
     margin: 0;
@@ -39,17 +38,22 @@
     color: var(--text);
   }
 
-  /* The highlighter bleeds past a marked figure: keep the unit's air after it. */
-  .figure:has(> mark) {
-    margin-inline-end: var(--s-4);
+  /* An amount takes the size of the terms; its unit is drawn by Amount, as everywhere else. */
+  .amount {
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
   }
 
-  .unit {
+  /* The time after a date ("08:00 UTC"), set as Amount sets a unit beside a serif figure, so the three terms read
+     alike. */
+  .rest {
+    margin-inline-start: 0.3em;
     font-family: var(--font-sans);
     font-size: var(--ui-size);
-    line-height: var(--ui-line);
     font-weight: 500;
-    color: var(--text-2);
+    color: var(--muted);
   }
 
   /* A term that can be changed carries a caret; the rule of a blank on a form appears under it on hover. One cue
@@ -72,6 +76,7 @@
 
   .caret {
     align-self: center;
+    margin-inline-start: var(--s-6);
     color: var(--muted);
   }
 

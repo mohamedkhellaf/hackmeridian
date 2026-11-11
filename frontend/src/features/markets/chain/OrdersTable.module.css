@@ -4,13 +4,13 @@
   }
 
   /* Fixed widths: the figures of the offers and the requests share their columns, and a busy button does not
-     push them aside. "From" takes what is left. */
+     push them aside. In the book and "Other offers", "From" (a role and an address) takes what is left. */
   .noCol {
-    width: calc(var(--s-72) + var(--s-8));
+    width: 3.5rem;
   }
 
   .seriesCol {
-    width: calc(var(--s-72) * 2 - var(--s-8));
+    width: 11rem;
   }
 
   .qtyCol {
@@ -26,7 +26,7 @@
   }
 
   .whyCol {
-    width: calc(var(--s-72) * 2);
+    width: 8rem;
   }
 
   .noteCol {
@@ -41,16 +41,25 @@
     }
   }
 
+  /* "Your orders": the role alone in "From", and the spare width to the two figures. */
+  .root[data-mine] {
+    & .fromCol {
+      width: 6rem;
+    }
+
+    & .qtyCol,
+    & .perUnitCol {
+      width: auto;
+    }
+  }
+
   .actionCol {
     white-space: nowrap;
   }
 
+  /* The contract's own number, unpadded and right-aligned (ruling F1). */
   .no {
     color: var(--text-2);
-    font-family: var(--font-mono);
-    font-size: var(--mono-size);
-    line-height: var(--mono-line);
-    font-feature-settings: 'zero';
   }
 
   /* The column that gives way: never drawn over its neighbours. */

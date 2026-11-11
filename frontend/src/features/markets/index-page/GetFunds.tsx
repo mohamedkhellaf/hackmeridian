@@ -1,12 +1,13 @@
 // The first-run strip for a connected wallet that holds none of the tokens traded here. It explains the three
 // real steps (README "Try it"): they happen in the wallet, so the strip reads how far the wallet is from its
 // balances and never claims a step it did not see. The one-click version is later work.
+import { Link as RouterLink } from '@tanstack/react-router'
 import { QUOTE_ASSETS, referenceAssets } from '../../../core/assets'
 import { formatList } from '../../../core/format'
 import { FAUCET_SOURCE } from '../../../core/reference'
 import type { TokenBalance } from '../../../core/stellar/tokens'
 import { Address, Button, Card, IconCheck, Link } from '../../../ui'
-import { FUNDS_CHECK, FUNDS_LEAD, FUNDS_MOCK_NOTE, FUNDS_STEPS, FUNDS_TITLE, STEP_DONE } from '../copy'
+import { FUNDS_BACK, FUNDS_CHECK, FUNDS_LEAD, FUNDS_MOCK_NOTE, FUNDS_STEPS, FUNDS_TITLE, STEP_DONE, shownAs } from '../copy'
 import { fundingProgress, fundsLead } from '../model'
 import type { FundingStep, StepState } from '../model'
 import type { ReactNode } from 'react'
@@ -23,6 +24,8 @@ export interface GetFundsProps {
   /** Reads the balances again (a wallet popup does not refocus the page, so nothing else would). */
   onCheck: () => void
   checking: boolean
+  /** The order that sent the visitor here (an internal path with its search, already checked by the route). */
+  from?: string
 }
 
 const friendbotUrl = (address: string): string => `https://friendbot.stellar.org/?addr=${encodeURIComponent(address)}`
@@ -45,13 +48,18 @@ function Step({ state, title, children }: { state: StepState; title: string; chi
   )
 }
 
-export function GetFunds({ address, balances, quoteId, mock, onCheck, checking }: GetFundsProps) {
+export function GetFunds({ address, balances, quoteId, mock, onCheck, checking, from }: GetFundsProps) {
   const quote = QUOTE_ASSETS.testnet
   const assets = referenceAssets('testnet')
   // Mock balances cannot move with these steps, so no step is marked done or next there.
   const progress: Record<FundingStep, StepState> = mock ? { fund: 'later', trust: 'later', swap: 'later' } : fundingProgress(balances, quoteId)
+  // On mock data the page shows its own codes: a Testnet code that differs is named with it, "FUND (RWA on Testnet)".
+  const shown = mock ? referenceAssets('mock') : []
   const codes = formatList(
-    assets.map((a) => a.code),
+    assets.map((a) => {
+      const here = shown.find((m) => m.type === a.type)
+      return here && here.code !== a.code ? shownAs(here.code, a.code) : a.code
+    }),
     'disjunction',
   )
   const lead = fundsLead(balances, quoteId)
@@ -92,11 +100,19 @@ export function GetFunds({ address, balances, quoteId, mock, onCheck, checking }
           <p className={styles.source}>{FAUCET_SOURCE}</p>
         </Step>
       </ol>
-      {mock ? null : (
+      {mock && !from ? null : (
         <p className={styles.check}>
-          <Button variant="secondary" size="sm" loading={checking} onClick={onCheck}>
-            {FUNDS_CHECK}
-          </Button>
+          {mock ? null : (
+            <Button variant="secondary" size="sm" loading={checking} onClick={onCheck}>
+              {FUNDS_CHECK}
+            </Button>
+          )}
+          {from ? (
+            // The router reads a full `href` (path and search) in place of `to`; `to` only satisfies the types.
+            <Link standalone render={<RouterLink to="/" href={from} />}>
+              {FUNDS_BACK}
+            </Link>
+          ) : null}
         </p>
       )}
     </Card>

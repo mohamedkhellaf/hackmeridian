@@ -39,14 +39,15 @@
     text-align: end;
   }
 
+  /*
+   * Equal columns that fill the row. The component sets the count: no more than fit at the widest chip's figure
+   * and tick, balanced across rows when they wrap. Two stacked groups given their own chip counts end on the same
+   * edge.
+   */
   .grid {
     display: grid;
     grid-template-columns: repeat(var(--chip-columns), minmax(0, 1fr));
     gap: var(--s-6);
-  }
-
-  .root[data-appearance='note'] .grid[data-width='fixed'] {
-    grid-template-columns: repeat(var(--chip-columns), minmax(0, 8.5rem));
   }
 
   .chip {
@@ -84,7 +85,6 @@
     }
   }
 
-  /* Forms: the chosen chip is filled with ink, like the chosen segment of a strip. */
   .root[data-appearance='control'] .chip {
     @media (hover: hover) {
       &:hover:not([data-checked]) {
@@ -92,36 +92,39 @@
         color: var(--text);
       }
     }
-
-    &[data-checked] {
-      border-color: var(--primary);
-      background: var(--primary);
-      color: var(--primary-fg);
-      font-weight: 600;
-    }
   }
 
-  /* On a note: figures set on the card. The tick alone marks a funded choice; a double rule marks the chosen one. */
+  /* On a note: figures set on the card. The tick alone marks a funded choice. */
   .root[data-appearance='note'] .chip {
     align-items: stretch;
     gap: var(--s-2);
     min-height: var(--touch);
-    padding: var(--s-6);
+    padding: var(--s-6) var(--s-4);
     background: transparent;
     color: var(--text);
     text-align: start;
 
     @media (hover: hover) {
-      &:hover {
+      &:hover:not([data-checked]) {
         border-color: var(--text);
       }
     }
+  }
 
-    &[data-checked] {
-      border: 1px solid var(--text);
-      outline: 1px solid var(--text);
-      background: var(--raised);
-      color: var(--text);
+  /*
+   * The chosen chip, in both appearances: the selection tint and an accent edge, never the primary button's ink.
+   * One weight in both states.
+   */
+  .root .chip[data-checked] {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+    color: var(--text);
+
+    @media (forced-colors: active) {
+      border-color: Highlight;
+      background: Highlight;
+      color: HighlightText;
+      forced-color-adjust: none;
     }
   }
 
@@ -182,8 +185,12 @@
     white-space: nowrap;
   }
 
-  .root[data-appearance='control'] .chip[data-checked] .detail {
-    color: inherit;
+  .chip[data-checked] .detail {
+    color: var(--text-2);
+
+    @media (forced-colors: active) {
+      color: inherit;
+    }
   }
 
   .root[data-appearance='note'] .detail {
@@ -192,20 +199,5 @@
     font-stretch: var(--label-stretch);
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  /* On a narrow note the grid drops to rows of five, then three. */
-  @container (max-width: 43.99rem) {
-    .root[data-appearance='note'] .grid,
-    .root[data-appearance='note'] .grid[data-width='fixed'] {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-  }
-
-  @container (max-width: 31.99rem) {
-    .root[data-appearance='note'] .grid,
-    .root[data-appearance='note'] .grid[data-width='fixed'] {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
   }
 }

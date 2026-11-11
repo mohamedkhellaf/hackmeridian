@@ -12,7 +12,7 @@ describe('exerciseFeasibility', () => {
     expect(exerciseFeasibility(put, { status: 'ok', balance: 5n * U }, undefined).level).toBe('ok')
     const w = exerciseFeasibility(put, { status: 'ok', balance: U }, undefined)
     expect(w.level).toBe('warn')
-    expect('message' in w && w.message).toMatch(/deliver 5(\.00)? RWA.*hold 1(\.00)? RWA/)
+    expect('message' in w && w.message).toMatch(/deliver 5(\.00)?\u00A0RWA.*hold 1(\.00)?\u00A0RWA/)
   })
   it('call: needs the quote strike', () => {
     expect(exerciseFeasibility(call, undefined, { status: 'ok', balance: 49n * U }).level).toBe('warn')

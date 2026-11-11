@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { formatUnits } from '../../../core/format'
+import { formatUnits, formatUtcDay } from '../../../core/format'
 import { cellKey } from '../../../core/market/selection'
 import { DEMO_WALLETS } from '../../../core/options/demoAccounts'
 import { noReference } from '../../../core/reference'
@@ -8,9 +8,12 @@ import type { DemoWorld } from '../../../data/derived/demoSource.testhelper'
 import { buildMarket } from '../../../data/derived/market'
 import type { GridCell, MarketView } from '../../../data'
 import {
+  chainColumns,
   defaultColumn,
   describeCell,
   gapLine,
+  halfAction,
+  halfRow,
   homePosition,
   leftLabel,
   missingDeadlineLine,
@@ -23,10 +26,12 @@ import {
   seriesTitle,
   strikeParam,
   strikeText,
-  takeableOf,
 } from './model'
+import type { HalfContext } from './model'
 
 const units = (n: number) => BigInt(Math.round(n * 100)) * 10n ** 5n // 7 decimals
+/** Core keeps a short date or time on one line with no-break spaces (ruling F7); the pins below read them as spaces. */
+const sp = (text: string | null | undefined): string | null | undefined => text?.replace(/\u00a0/g, ' ')
 
 let w: DemoWorld
 let fund: MarketView
@@ -65,17 +70,17 @@ describe('figures', () => {
   })
 
   it('keeps the largest unit of the time left', () => {
-    expect(leftLabel(44 * 3600)).toBe('1 d')
-    expect(leftLabel(15 * 86_400 + 3600)).toBe('15 d')
-    expect(leftLabel(5 * 3600 + 120)).toBe('5 h')
-    expect(leftLabel(12 * 60 + 5)).toBe('12 min')
-    expect(leftLabel(30)).toBe('<1 min')
+    expect(sp(leftLabel(44 * 3600))).toBe('1 d')
+    expect(sp(leftLabel(15 * 86_400 + 3600))).toBe('15 d')
+    expect(sp(leftLabel(5 * 3600 + 120))).toBe('5 h')
+    expect(sp(leftLabel(12 * 60 + 5))).toBe('12 min')
+    expect(sp(leftLabel(30))).toBe('<1 min')
     expect(leftLabel(-1)).toBe('expired')
   })
 
   it('names a series with the strike as the chain prints it', () => {
-    expect(seriesTitle('BOND', { kind: 'put', strikePerUnit: units(100), expiry: bond.expiries[0] }, 7)).toBe('BOND 100.00 put, 13 Nov')
-    expect(seriesTitle('FUND', { kind: 'call', strikePerUnit: units(9.8), expiry: fund.expiries[2] }, 7)).toBe('FUND 9.80 call, 27 Nov')
+    expect(sp(seriesTitle('BOND', { kind: 'put', strikePerUnit: units(100), expiry: bond.expiries[0] }, 7))).toBe('BOND 100.00 put, 13 Nov')
+    expect(sp(seriesTitle('FUND', { kind: 'call', strikePerUnit: units(9.8), expiry: fund.expiries[2] }, 7))).toBe('FUND 9.80 call, 27 Nov')
   })
 
   it('reads the reference with its label, and has none without a price', () => {
@@ -135,8 +140,8 @@ describe('selection from the URL', () => {
     expect(s.missing).toBe('2026-11-14')
     expect(resolveSelection(fund, { expiry: '2026-11-20' }).missing).toBeNull()
     const now = Math.floor(FIXED_MS / 1000)
-    expect(missingDeadlineLine('2026-11-14', s.column!, now)).toBe('14 Nov is not a listed deadline. Showing 13 Nov.')
-    expect(missingDeadlineLine('2020-01-03', s.column!, now)).toBe('The 3 Jan 2020 deadline has passed. Showing 13 Nov.')
+    expect(sp(missingDeadlineLine('2026-11-14', s.column!, now))).toBe('14 Nov is not a listed deadline. Showing 13 Nov.')
+    expect(sp(missingDeadlineLine('2020-01-03', s.column!, now))).toBe('The 3 Jan 2020 deadline has passed. Showing 13 Nov.')
     expect(missingDeadlineLine('not a day', s.column!, now)).toBeNull()
   })
 
@@ -160,103 +165,148 @@ describe('selection from the URL', () => {
 })
 
 describe('cells', () => {
-  it('shows the best offer per unit with its size; the maker count is in the name only', () => {
+  /** A guest on a narrow page, nothing open: a price selects its series. */
+  const ctx = (over: Partial<HalfContext> = {}): HalfContext => ({ phrase: 'the demo price', bidsOn: true, me: null, wide: false, form: null, ...over })
+  const word = (kind: string) => (kind === 'put' ? 'put' : 'call')
+
+  it('shows the best offer per unit with its size on the offer half; the maker count is in the name only', () => {
     const priced = cells(bond).filter((c) => !c.empty)
     expect(priced.length).toBeGreaterThan(20)
     for (const cell of priced) {
-      const text = describeCell(cell, 7, 'the demo price')
-      const kind = cell.ref.kind === 'put' ? 'Put' : 'Call'
-      expect(text.variant).toBe('priced')
-      expect(text.offer).toBe(premiumText(cell.bestPerUnit!, 7))
-      expect(text.size).toBe(formatUnits(cell.best!.underlyingQty, 7))
-      expect(text.name.startsWith(`${kind} at ${strikeText(cell.ref.strikePerUnit, 7)}, best offer ${text.offer} for ${text.size} BOND`)).toBe(true)
-      expect(text.name).toMatch(/, \d+ offers?(, \d+ makers?)?(,|$)/)
-      expect(text.name.includes('in the money at the demo price')).toBe(cell.moneyness === 'in')
-      expect(text.inTheMoney).toBe(cell.moneyness === 'in')
-      expect(text.ask).toBe(false)
+      const { offer, inTheMoney } = describeCell(cell, 7, ctx())
+      expect(offer.figure).toBe(premiumText(cell.bestPerUnit!, 7))
+      expect(offer.size).toBe(formatUnits(cell.best!.underlyingQty, 7))
+      expect(offer.hint).toBeNull()
+      expect(offer.name.startsWith(`Offer ${offer.figure} at ${strikeText(cell.ref.strikePerUnit, 7)}, ${word(cell.ref.kind)}, ${formatUtcDay(cell.ref.expiry)}, for ${offer.size} BOND`)).toBe(true)
+      expect(offer.name).toMatch(/, \d+ offers?(, \d+ makers?)?(,|\.$)/)
+      expect(offer.name.includes('in the money at the demo price')).toBe(cell.moneyness === 'in')
+      expect(inTheMoney).toBe(cell.moneyness === 'in')
     }
     const one = priced.find((c) => c.makers === 1 && c.offers === 1)!
-    expect(describeCell(one, 7, null).name).toMatch(/, 1 offer, 1 maker$/)
+    expect(describeCell(one, 7, ctx({ phrase: null })).offer.name).toMatch(/, 1 offer, 1 maker\.$/)
     const two = priced.find((c) => c.makers === 2)!
-    expect(describeCell(two, 7, null).name).toMatch(/, 2 offers, 2 makers$/)
+    expect(describeCell(two, 7, ctx({ phrase: null })).offer.name).toMatch(/, 2 offers, 2 makers\.$/)
   })
 
   it('says nothing about moneyness without a reference', () => {
-    for (const cell of cells(bond)) expect(describeCell(cell, 7, null).name).not.toMatch(/the money/)
+    for (const cell of cells(bond)) {
+      const text = describeCell(cell, 7, ctx({ phrase: null }))
+      expect(text.offer.name).not.toMatch(/the money/)
+      expect(text.request?.name).not.toMatch(/the money/)
+    }
   })
 
-  it('asks for a price on an empty cell and shows the best request on a cell with only a request', () => {
+  it('shows nothing on an empty half at rest; its hint and name say a press posts a request (ruling F2)', () => {
     const empty = cells(fund).find((c) => c.empty && c.bids === 0)!
-    const e = describeCell(empty, 7, null)
-    expect(e.variant).toBe('empty')
-    expect([e.offer, e.size, e.request]).toEqual([null, null, null])
-    expect(e.ask).toBe(true)
-    expect(e.name).toBe(`${empty.ref.kind === 'put' ? 'Put' : 'Call'} at ${strikeText(empty.ref.strikePerUnit, 7)}, no offer or request, ask for a price`)
-    // A contract without requests offers nothing on an empty cell.
-    expect(describeCell(empty, 7, null, false).ask).toBe(false)
-    expect(describeCell(empty, 7, null, false).name).toMatch(/, no offer$/)
+    const { offer, request } = describeCell(empty, 7, ctx({ phrase: null }))
+    const at = `at ${strikeText(empty.ref.strikePerUnit, 7)}, ${word(empty.ref.kind)}, ${formatUtcDay(empty.ref.expiry)}`
+    expect([offer.figure, offer.size, request!.figure, request!.size]).toEqual([null, null, null, null])
+    expect(offer.hint).toBe('Post a request')
+    expect(offer.name).toBe(`No offer ${at}. Post a request.`)
+    expect(request!.name).toBe(`No request ${at}. Post a request.`)
+    expect(offer.action).toEqual({ kind: 'post' })
+    // The director's specimen, word for word, with the no-break space core puts inside a short date.
+    const call102 = bond.columns[0].rows.find((r) => r.strikePerUnit === units(102))!.call
+    expect(describeCell(call102, 7, ctx({ phrase: null })).offer.name.replace(/\u00a0/g, ' ')).toBe('No offer at 102.00, call, 13 Nov. Post a request.')
+    // A contract without requests: no request half, and an empty offer half opens the write form.
+    const noBids = describeCell(empty, 7, ctx({ phrase: null, bidsOn: false }))
+    expect(noBids.request).toBeNull()
+    expect(noBids.offer.hint).toBe('Write an offer')
+    expect(noBids.offer.name).toBe(`No offer ${at}. Write an offer.`)
+    // With the write form open, a press retargets it: the hint says so.
+    expect(describeCell(empty, 7, ctx({ form: 'write' })).request!.hint).toBe('Write an offer')
+  })
 
+  it('gives a request its size like an offer, on its own half', () => {
     // Seeded: a request on a series nobody quotes (FUND put, second date).
     const requestOnly = cells(fund).find((c) => c.empty && c.bids > 0)!
-    const r = describeCell(requestOnly, 7, null)
-    expect(r.variant).toBe('request-only')
-    expect(r.offer).toBeNull()
-    expect(r.request).toBe(premiumText(requestOnly.bestBidPerUnit!, 7))
-    expect(r.ask).toBe(false)
-    expect(r.name).toBe(`Put at ${strikeText(requestOnly.ref.strikePerUnit, 7)}, no offer, best request ${r.request}, 1 request`)
-    expect(describeCell(requestOnly, 7, 'the demo price').name).toBe(`${r.name}, in the money at the demo price`)
+    const { offer, request } = describeCell(requestOnly, 7, ctx({ phrase: null }))
+    expect(offer.figure).toBeNull()
+    expect(offer.hint).toBe('Post a request')
+    expect(request!.figure).toBe(premiumText(requestOnly.bestBidPerUnit!, 7))
+    expect(request!.size).toBe(formatUnits(requestOnly.bestBid!.underlyingQty, 7))
+    expect(request!.hint).toBeNull()
+    expect(request!.name).toBe(
+      `Request ${request!.figure} at ${strikeText(requestOnly.ref.strikePerUnit, 7)}, put, ${formatUtcDay(requestOnly.ref.expiry)}, for ${request!.size} FUND, 1 request.`,
+    )
+    expect(describeCell(requestOnly, 7, ctx()).request!.name).toBe(`${request!.name.slice(0, -1)}, in the money at the demo price.`)
   })
 
   it('names a resale listing when it is the best offer', () => {
     const resale = cells(fund).find((c) => !c.empty && c.best?.source === 'resale')!
     expect(resale).toBeDefined()
-    expect(describeCell(resale, 7, null).name).toMatch(/, best offer \d+\.\d\d for [\d.,]+ FUND, a resale listing, \d+ offers?/)
+    expect(describeCell(resale, 7, ctx({ phrase: null })).offer.name).toMatch(/, for [\d.,]+ FUND, a resale listing, \d+ offers?/)
   })
 
   it("marks only a figure that is the wallet's own order; a holding is said in words", () => {
     const me = DEMO_WALLETS.a
-    expect(cells(fund).filter((c) => describeCell(c, 7, null, true, null).yours)).toHaveLength(0)
+    expect(cells(fund).filter((c) => describeCell(c, 7, ctx()).yours)).toHaveLength(0)
     let ownSeen = 0
     for (const cell of [...cells(fundA), ...cells(bondA)]) {
-      const text = describeCell(cell, 7, null, true, me)
+      const text = describeCell(cell, 7, ctx({ phrase: null, me }))
       const ownOffer = !cell.empty && cell.best !== null && cell.best.counterparty === me
       const ownRequest = cell.bids > 0 && cell.bestBid !== null && cell.bestBid.counterparty === me
-      expect(text.ownOffer).toBe(ownOffer)
-      expect(text.ownRequest).toBe(ownRequest)
+      expect(text.offer.own).toBe(ownOffer)
+      expect(text.request!.own).toBe(ownRequest)
       expect(text.yours).toBe(ownOffer || ownRequest)
-      if (text.yours) {
+      if (ownOffer) expect(text.offer.name).toMatch(/^Your offer /)
+      if (ownRequest) {
         ownSeen++
-        expect(text.name).toMatch(/, yours: the best (offer|request|offer and the best request)(,|$)/)
+        expect(text.request!.name).toMatch(/^Your request \d+\.\d\d at /)
       }
-      if (cell.holding) expect(text.name).toMatch(/you hold an option.* in this series$/)
-      if (cell.wrote) expect(text.name).toMatch(/you wrote an option.* in this series$/)
-      if (cell.mine && !text.yours) expect(text.name).toMatch(/you have an order in this series$/)
+      for (const half of [text.offer, text.request!]) {
+        if (cell.holding) expect(half.name).toMatch(/you hold an option.* in this series(\.|$)/)
+        if (cell.wrote) expect(half.name).toMatch(/you wrote an option.* in this series(\.|$)/)
+        if (cell.mine && !text.yours) expect(half.name).toMatch(/you have an order in this series(\.|$)/)
+      }
     }
-    // Seeded: the default wallet's request on BOND put 98, fourth date, under a maker's dearer offer.
+    // Seeded: the default wallet's request on BOND put 98, third date, under a maker's dearer offer.
     expect(ownSeen).toBeGreaterThan(0)
     // An option the wallet holds never puts the highlighter on another maker's price.
     const held = [...cells(fundA), ...cells(bondA)].filter((c) => c.holding && !c.mine && !c.empty)
     expect(held.length).toBeGreaterThan(0)
-    for (const cell of held) expect(describeCell(cell, 7, null, true, me).yours).toBe(false)
+    for (const cell of held) expect(describeCell(cell, 7, ctx({ me })).yours).toBe(false)
   })
 
-  it('takes the best order the wallet can take, never its own', () => {
+  it('opens Buy on the offer half and Fill on the request half from 1200 px, never on its own order (ruling F3)', () => {
     const me = DEMO_WALLETS.a
-    for (const cell of cells(fundA)) {
-      const row = takeableOf(cell, me)
-      if (row === null) continue
-      expect(row.counterparty).not.toBe(me)
-      if (!cell.empty && cell.best && cell.best.counterparty !== me && cell.best.offer?.writer !== me) expect(row).toBe(cell.best)
+    const wide = { bidsOn: true, me, wide: true, form: null } as const
+    let buys = 0
+    let fills = 0
+    for (const cell of [...cells(fundA), ...cells(bondA)]) {
+      const offer = halfAction(halfRow(cell, 'offer'), wide)
+      const request = halfAction(halfRow(cell, 'request'), wide)
+      if (offer.kind === 'take') {
+        buys++
+        expect(offer.row).toBe(cell.best)
+        expect(offer.row.source).not.toBe('bid')
+        expect(offer.row.counterparty).not.toBe(me)
+      }
+      if (request.kind === 'take') {
+        fills++
+        expect(request.row).toBe(cell.bestBid)
+        expect(request.row.source).toBe('bid')
+        expect(request.row.counterparty).not.toBe(me)
+      }
+      // The wallet's own order selects its series: its book has the Cancel.
+      if (halfRow(cell, 'request')?.counterparty === me) expect(request.kind).toBe('select')
+      const text = describeCell(cell, 7, { ...wide, phrase: null })
+      if (offer.kind === 'take') expect(text.offer.name).toMatch(/\. Buy\.$/)
+      if (request.kind === 'take') expect(text.request!.name).toMatch(/\. Fill request\.$/)
     }
-    const empty = cells(fund).find((c) => c.empty && c.bids === 0)!
-    expect(takeableOf(empty, null)).toBeNull()
-    const requestOnly = cells(fund).find((c) => c.empty && c.bids > 0)!
-    expect(takeableOf(requestOnly, null)?.source).toBe('bid')
+    expect(buys).toBeGreaterThan(10)
+    expect(fills).toBeGreaterThan(0)
+    // Below 1200 px a price selects its series; an empty half still posts a request; an open form follows the selection.
+    const priced = cells(bond).find((c) => !c.empty)!
+    expect(halfAction(halfRow(priced, 'offer'), { ...wide, wide: false })).toEqual({ kind: 'select' })
+    expect(halfAction(null, { ...wide, wide: false })).toEqual({ kind: 'post' })
+    expect(halfAction(halfRow(priced, 'offer'), { ...wide, form: 'bid' })).toEqual({ kind: 'post' })
+    expect(halfAction(halfRow(priced, 'offer'), { ...wide, form: 'write' })).toEqual({ kind: 'write' })
   })
 })
 
 describe('keyboard', () => {
-  const both = ['call', 'put'] as const
+  const four = chainColumns(true)
 
   it('maps keys to moves', () => {
     expect(moveForKey('ArrowUp', false)).toBe('up')
@@ -273,38 +323,43 @@ describe('keyboard', () => {
     expect(moveForKey('a', false)).toBeNull()
   })
 
-  it('moves between cells and stops at the edges', () => {
-    expect(nextPosition({ row: 3, side: 'call' }, 'down', 9, both)).toEqual({ row: 4, side: 'call' })
-    expect(nextPosition({ row: 3, side: 'call' }, 'up', 9, both)).toEqual({ row: 2, side: 'call' })
-    expect(nextPosition({ row: 0, side: 'call' }, 'up', 9, both)).toEqual({ row: 0, side: 'call' })
-    expect(nextPosition({ row: 8, side: 'put' }, 'down', 9, both)).toEqual({ row: 8, side: 'put' })
-    expect(nextPosition({ row: 3, side: 'call' }, 'right', 9, both)).toEqual({ row: 3, side: 'put' })
-    expect(nextPosition({ row: 3, side: 'put' }, 'right', 9, both)).toEqual({ row: 3, side: 'put' })
-    expect(nextPosition({ row: 3, side: 'put' }, 'left', 9, both)).toEqual({ row: 3, side: 'call' })
-    expect(nextPosition({ row: 3, side: 'call' }, 'left', 9, both)).toEqual({ row: 3, side: 'call' })
-    expect(nextPosition({ row: 3, side: 'put' }, 'row-start', 9, both)).toEqual({ row: 3, side: 'call' })
-    expect(nextPosition({ row: 3, side: 'call' }, 'row-end', 9, both)).toEqual({ row: 3, side: 'put' })
-    expect(nextPosition({ row: 3, side: 'put' }, 'top', 9, both)).toEqual({ row: 0, side: 'put' })
-    expect(nextPosition({ row: 3, side: 'call' }, 'bottom', 9, both)).toEqual({ row: 8, side: 'call' })
-    expect(nextPosition({ row: 3, side: 'put' }, 'first', 9, both)).toEqual({ row: 0, side: 'call' })
-    expect(nextPosition({ row: 3, side: 'call' }, 'last', 9, both)).toEqual({ row: 8, side: 'put' })
+  it('lists the halves left to right: the call side mirrored, the offers next to the strike', () => {
+    expect(four).toEqual(['call-request', 'call-offer', 'put-offer', 'put-request'])
+    expect(chainColumns(false)).toEqual(['call-offer', 'put-offer'])
   })
 
-  it('stays in the half shown on a phone', () => {
-    const puts = ['put'] as const
-    expect(nextPosition({ row: 3, side: 'put' }, 'left', 9, puts)).toEqual({ row: 3, side: 'put' })
-    expect(nextPosition({ row: 3, side: 'put' }, 'right', 9, puts)).toEqual({ row: 3, side: 'put' })
-    expect(nextPosition({ row: 3, side: 'put' }, 'down', 9, puts)).toEqual({ row: 4, side: 'put' })
-    // A remembered position from the other half lands in the half shown.
-    expect(nextPosition({ row: 3, side: 'call' }, 'down', 9, puts)).toEqual({ row: 4, side: 'put' })
-    expect(nextPosition({ row: 0, side: 'call' }, 'down', 0, puts)).toEqual({ row: 0, side: 'call' })
+  it('moves between halves and stops at the edges', () => {
+    expect(nextPosition({ row: 3, col: 'call-offer' }, 'down', 9, four)).toEqual({ row: 4, col: 'call-offer' })
+    expect(nextPosition({ row: 3, col: 'call-offer' }, 'up', 9, four)).toEqual({ row: 2, col: 'call-offer' })
+    expect(nextPosition({ row: 0, col: 'call-offer' }, 'up', 9, four)).toEqual({ row: 0, col: 'call-offer' })
+    expect(nextPosition({ row: 8, col: 'put-request' }, 'down', 9, four)).toEqual({ row: 8, col: 'put-request' })
+    expect(nextPosition({ row: 3, col: 'call-offer' }, 'right', 9, four)).toEqual({ row: 3, col: 'put-offer' })
+    expect(nextPosition({ row: 3, col: 'put-offer' }, 'right', 9, four)).toEqual({ row: 3, col: 'put-request' })
+    expect(nextPosition({ row: 3, col: 'put-request' }, 'right', 9, four)).toEqual({ row: 3, col: 'put-request' })
+    expect(nextPosition({ row: 3, col: 'put-offer' }, 'left', 9, four)).toEqual({ row: 3, col: 'call-offer' })
+    expect(nextPosition({ row: 3, col: 'call-request' }, 'left', 9, four)).toEqual({ row: 3, col: 'call-request' })
+    expect(nextPosition({ row: 3, col: 'put-offer' }, 'row-start', 9, four)).toEqual({ row: 3, col: 'call-request' })
+    expect(nextPosition({ row: 3, col: 'call-offer' }, 'row-end', 9, four)).toEqual({ row: 3, col: 'put-request' })
+    expect(nextPosition({ row: 3, col: 'put-offer' }, 'top', 9, four)).toEqual({ row: 0, col: 'put-offer' })
+    expect(nextPosition({ row: 3, col: 'call-offer' }, 'bottom', 9, four)).toEqual({ row: 8, col: 'call-offer' })
+    expect(nextPosition({ row: 3, col: 'put-offer' }, 'first', 9, four)).toEqual({ row: 0, col: 'call-request' })
+    expect(nextPosition({ row: 3, col: 'call-offer' }, 'last', 9, four)).toEqual({ row: 8, col: 'put-request' })
   })
 
-  it('gives the tab stop to the selected cell, else to the row at the reference price', () => {
-    expect(homePosition(fund, 9, both, { row: 6, side: 'put' })).toEqual({ row: 6, side: 'put' })
-    expect(homePosition(fund, 9, both, null)).toEqual({ row: 4, side: 'call' })
-    expect(homePosition(fund, 9, ['put'], { row: 6, side: 'call' })).toEqual({ row: 4, side: 'put' })
-    expect(homePosition({ referenceRule: null }, 9, both, null)).toEqual({ row: 0, side: 'call' })
-    expect(homePosition({ referenceRule: { below: 9, at: null } }, 9, both, null)).toEqual({ row: 8, side: 'call' })
+  it('stays on the halves shown on a contract without requests', () => {
+    const two = chainColumns(false)
+    expect(nextPosition({ row: 3, col: 'put-offer' }, 'right', 9, two)).toEqual({ row: 3, col: 'put-offer' })
+    expect(nextPosition({ row: 3, col: 'put-offer' }, 'left', 9, two)).toEqual({ row: 3, col: 'call-offer' })
+    // A remembered request half lands on the first half shown.
+    expect(nextPosition({ row: 3, col: 'put-request' }, 'down', 9, two)).toEqual({ row: 4, col: 'call-offer' })
+    expect(nextPosition({ row: 0, col: 'call-offer' }, 'down', 0, two)).toEqual({ row: 0, col: 'call-offer' })
+  })
+
+  it('gives the tab stop to the selected half, else to the call offer on the row at the reference price', () => {
+    expect(homePosition(fund, 9, four, { row: 6, col: 'put-offer' })).toEqual({ row: 6, col: 'put-offer' })
+    expect(homePosition(fund, 9, four, null)).toEqual({ row: 4, col: 'call-offer' })
+    expect(homePosition(fund, 9, chainColumns(false), { row: 6, col: 'put-request' })).toEqual({ row: 4, col: 'call-offer' })
+    expect(homePosition({ referenceRule: null }, 9, four, null)).toEqual({ row: 0, col: 'call-offer' })
+    expect(homePosition({ referenceRule: { below: 9, at: null } }, 9, four, null)).toEqual({ row: 8, col: 'call-offer' })
   })
 })

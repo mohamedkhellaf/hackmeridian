@@ -1,9 +1,15 @@
 @layer features {
+  /*
+   * Two measures on the page: prose at --measure, and every table and list (the statement, the notes, the
+   * contracts, the tokens, the Margin block) at one width, so all of them end on the same edge. A four-row
+   * statement at the width of a statement keeps its figures near the token they belong to.
+   */
   .page {
     display: flex;
     flex-direction: column;
     gap: var(--s-32);
     min-width: 0;
+    max-width: 60rem;
   }
 
   .reserves {
@@ -35,15 +41,16 @@
 
   /* The answer in one sentence, before the figures. */
   .summary {
+    max-width: var(--measure);
     font-size: var(--body-size);
     line-height: var(--body-line);
     color: var(--text-2);
   }
 
-  /* A four-row statement at the width of a statement: the figures stay near the token they belong to. */
+  /* The statement's container: under 400 px the table shares its width by what the columns hold. */
   .statement {
+    container-type: inline-size;
     min-width: 0;
-    max-width: 60rem;
   }
 
   .notes {
@@ -51,7 +58,6 @@
     flex-direction: column;
     gap: var(--s-8);
     min-width: 0;
-    max-width: 46rem;
   }
 
   /* While loading: the height of the table's header row above the skeleton rows. */

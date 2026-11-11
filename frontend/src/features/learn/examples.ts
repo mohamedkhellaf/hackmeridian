@@ -97,6 +97,12 @@ export interface ChartPoint {
   payoff: number
 }
 
+/** A figure and its unit, kept apart so the page renders them through `Amount`: `{ value: '5.00', unit: 'BOND' }`. */
+export interface Figure {
+  value: string
+  unit: string
+}
+
 export interface WorkedExample {
   terms: ExampleTerms
   intent: GuidedIntent
@@ -114,6 +120,10 @@ export interface WorkedExample {
   premiumPerUnitText: string
   /** What the maker locks: the whole strike for a put, the whole quantity for a call. */
   collateralText: string
+  /** The same three terms as figures, for the note: quantity, premium and collateral. */
+  qtyFigure: Figure
+  premiumFigure: Figure
+  collateralFigure: Figure
   startText: string
   /** Display numbers for the charts. */
   numbers: GuidedTerms
@@ -136,6 +146,7 @@ export interface WorkedExample {
 // In a sentence a figure never parts from its unit: `1.80 USDx` with a no-break space.
 const money = (units: bigint, token: UnitToken) => formatMoney(units, token, { separator: NBSP })
 const perUnitText = (units: bigint | null, decimals: number) => (units === null ? '' : formatUnits(units, decimals))
+const figure = (units: bigint, token: UnitToken): Figure => ({ value: formatUnits(units, token.decimals), unit: token.code })
 
 /** Builds the view of one example. Pure: the same terms always give the same text. */
 export function workedExample(t: ExampleTerms): WorkedExample {
@@ -159,6 +170,9 @@ export function workedExample(t: ExampleTerms): WorkedExample {
     premiumText: money(t.totalPremium, t.quote),
     premiumPerUnitText: perUnitText(premiumUnits(t), t.quote.decimals),
     collateralText: money(collateral.amount, collateral.token),
+    qtyFigure: figure(t.underlyingQty, t.underlying),
+    premiumFigure: figure(t.totalPremium, t.quote),
+    collateralFigure: figure(collateral.amount, collateral.token),
     startText: formatUnits(EXAMPLE_START_PER_UNIT, t.quote.decimals),
     numbers,
     strike: numbers.strike,

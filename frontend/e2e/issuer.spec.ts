@@ -48,9 +48,12 @@ test.describe('Issuer on mock data', () => {
     await expect(fact(statement(page), 'Open options')).toContainText(/\d/)
     await expect(statement(page).getByText('Authorization', { exact: true })).toHaveCount(0)
 
-    // What the issuer can do: the demo flags as the same table as the asset's About tab.
+    // What the issuer can do: the demo flags as the same table as the asset's About tab, in the one vocabulary of
+    // the About tab and Reserves (ruling F16).
     await expect(main(page).getByRole('heading', { level: 2, name: 'What the issuer can do' })).toBeVisible()
-    await expect(powers(page).getByRole('rowheader')).toHaveText(['Authorization required', 'Authorization revocable', 'Clawback enabled', 'Change these settings'])
+    await expect(powers(page).getByRole('rowheader')).toHaveText(['Approval required', 'Can freeze', 'Can claw back', 'Can change these'])
+    // The same plain table as the About tab: the power names in the table's sans face, not in serif.
+    expect(await powers(page).getByRole('rowheader').first().evaluate((el) => getComputedStyle(el).fontFamily)).not.toMatch(/serif 4/i)
 
     // The asset's identity, with no explorer link: mock ids never reach the network.
     const card = main(page).getByRole('complementary', { name: 'Asset' })
@@ -75,14 +78,18 @@ test.describe('Issuer on mock data', () => {
     await openApp(page, '/issuer')
     const state = (power: string) => powers(page).getByRole('row').filter({ has: page.getByRole('rowheader', { name: power }) }).getByRole('cell').first()
 
+    // The three mock assets share one issuer account, and the flags belong to the account: the same answers for
+    // each, those of the recorded Testnet issuer.
     await pickAsset(page, 'BOND')
     await expect(fact(statement(page), 'Held')).toContainText('BOND')
-    await expect(state('Authorization required')).toHaveText('On')
-    await expect(state('Clawback enabled')).toHaveText('On')
+    await expect(state('Approval required')).toHaveText('No')
+    await expect(state('Can freeze')).toHaveText('Yes')
+    await expect(state('Can claw back')).toHaveText('Yes')
 
     await pickAsset(page, 'EQTY')
     await expect(fact(statement(page), 'Reserved for open options')).toContainText('EQTY')
-    await expect(state('Clawback enabled')).toHaveText('Off')
+    await expect(state('Approval required')).toHaveText('No')
+    await expect(state('Can claw back')).toHaveText('Yes')
   })
 
   test('the reserves follow the mock chain: a clawback leaves the contract short, and the page says by how much', async ({ page }) => {
@@ -121,7 +128,7 @@ test.describe('Issuer on mock data', () => {
 
   test('the two links lead on, with the keyboard too', async ({ page }) => {
     await openApp(page, '/issuer')
-    const reserves = main(page).getByRole('link', { name: 'See what the contract holds' })
+    const reserves = main(page).getByRole('link', { name: 'Open Reserves' })
     const learn = main(page).getByRole('link', { name: 'How an issuer action affects an option' })
     await expect(reserves).toBeVisible()
     await expect(learn).toBeVisible()
@@ -171,6 +178,12 @@ test.describe('Issuer on mock data', () => {
         [statement(page), main(page).getByRole('heading', { name: 'What the issuer can do' }), main(page).getByRole('complementary', { name: 'Asset' })].map(async (l) => (await l.boundingBox())?.y ?? 0),
       )
       expect([...tops].sort((a, b) => a - b)).toEqual(tops)
+
+      // The powers are a ruled list on a phone: the name and its state on one line, the effect under them.
+      const list = main(page).getByRole('list', { name: 'Issuer powers' })
+      await expect(list.getByRole('listitem')).toHaveCount(4)
+      await expect(list.getByRole('listitem').first()).toContainText('Approval required')
+      await expect(main(page).getByRole('table', { name: 'Issuer powers' })).toHaveCount(0)
 
       for (const link of await main(page).getByRole('link').all()) {
         const box = await link.boundingBox()

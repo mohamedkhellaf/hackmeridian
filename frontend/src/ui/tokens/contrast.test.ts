@@ -4,7 +4,8 @@
  * the change in frontend/DESIGN.md.
  */
 import { describe, expect, it } from 'vitest'
-import { contrastRatio, formatRatio, parseColor } from './contrast'
+import { composite, contrastRatio, formatRatio, parseColor } from './contrast'
+import type { Rgb } from './contrast'
 
 /*
  * The stylesheets are read from disk: Vitest replaces every CSS import, `?raw` included, with an empty string.
@@ -122,6 +123,24 @@ describe('tokens.css', () => {
   })
 })
 
+/** A wash token, `color-mix(in srgb, var(--x) N%, transparent)`, painted over a ground token. */
+function washOver(tokens: Tokens, wash: string, ground: string): Rgb {
+  const mix = /^color-mix\(in srgb, var\((--[a-z0-9-]+)\) ([\d.]+)%, transparent\)$/.exec(tokens[wash] ?? '')
+  if (!mix) throw new Error(`tokens.css: ${wash} is not a wash of one token over transparent`)
+  const ink = parseColor(resolve(tokens, mix[1]))
+  const base = parseColor(resolve(tokens, ground))
+  if (!ink || !base) throw new Error(`tokens.css: cannot read ${mix[1]} or ${ground}`)
+  return composite({ ...ink, a: Number(mix[2]) / 100 }, base)
+}
+
+/** The table grounds the cell tone is painted over (`--table-bg`: the page, or a sheet). */
+const TABLE_GROUNDS = ['--bg', '--surface'] as const
+/**
+ * What sits in a toned cell: strikes and prices in ink, quiet text, the empty half's action in accent. Gain and
+ * loss do not hold on the tone over the Paper page (4.26:1), so no signed figure is set in a toned cell.
+ */
+const ON_CELL_TONE = ['--text', '--text-2', '--muted', '--accent'] as const
+
 describe.each(Object.entries(THEMES))('contrast: %s', (_name, tokens) => {
   it.each(TEXT_TOKENS.flatMap((fg) => GROUNDS.map((bg) => [fg, bg] as const)))('%s on %s holds 4.5:1', (fg, bg) => {
     const ratio = contrastRatio(resolve(tokens, fg), resolve(tokens, bg))
@@ -136,6 +155,12 @@ describe.each(Object.entries(THEMES))('contrast: %s', (_name, tokens) => {
   it.each(EXTRA_PAIRS)('%s on %s holds %d:1', (fg, bg, min) => {
     const ratio = contrastRatio(resolve(tokens, fg), resolve(tokens, bg))
     expect(ratio, `${fg} on ${bg} is ${formatRatio(ratio)}`).toBeGreaterThanOrEqual(min)
+  })
+
+  // The strike column and in-the-money cells of a table: the cell tone over the table's ground.
+  it.each(ON_CELL_TONE.flatMap((fg) => TABLE_GROUNDS.map((bg) => [fg, bg] as const)))('%s on --cell-tone over %s holds 4.5:1', (fg, bg) => {
+    const ratio = contrastRatio(resolve(tokens, fg), washOver(tokens, '--cell-tone', bg))
+    expect(ratio, `${fg} on --cell-tone over ${bg} is ${formatRatio(ratio)}`).toBeGreaterThanOrEqual(4.5)
   })
 })
 

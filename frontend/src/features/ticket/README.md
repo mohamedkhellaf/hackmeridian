@@ -1,7 +1,7 @@
 # `src/features/ticket`: the one order ticket
 
 Six modes (buy an offer, write an offer, post a request, fill a request, buy a resale listing, list a position
-for sale or re-price it), up to four steps (Terms for the forms, Review, Sign, Receipt), three containers. Other features import
+for sale or re-price it, and from the re-price ticket cancel the listing), up to four steps (Terms for the forms, Review, Sign, Receipt), three containers. Other features import
 `index.tsx` and nothing else from this folder.
 
 ## Public API (`index.tsx`)
@@ -40,6 +40,11 @@ export function searchFromTicketIntent(intent: TicketIntent | null): Partial<Ass
   of a form (kind, strike, expiry; quantity and premium on blur) so the series stays linkable. Navigate with
   `replace: true`. The form is the source of truth while it is open; it takes over terms that change under it.
 - **`startAt="review"`** opens on the review step when the terms are complete (the guided flow's primary action).
+- **`sides`** (default `true`) shows the Buy, Write and Request tabs when `onIntentChange` is given. The asset page
+  sets it to `false` in guided mode, where the intent picker is the page's one side switch (ruling F4);
+  `onIntentChange` still carries the in-ticket fallbacks there ("Fill request", the cheaper offer). Off, the write
+  and request forms also drop "Custom terms": the guided card shows listed series only, so the ticket never
+  describes a series the card cannot.
 - The host needs the app providers (wallet, data, tooltips, live regions) and a router: the receipt links to
   `/portfolio/$id`, `/portfolio`, `/requests` and, for the Margin card, `/margin/trade`.
 
@@ -63,19 +68,26 @@ The heading names the step; there is no step trail. Buy, fill and resale buy hav
 their review; write, request and list have a Terms step first (`startAt="review"` skips it when the terms are
 complete). The wallet signature is the consent: there is no tick box.
 
-- **Terms (the forms).** A ticket opened on a series shows it as three rows (kind, strike, deadline) with the pickers
-  behind "Change terms": the standard grid (deadline chips from `core/series`, nine strikes around the reference
+- **Terms (the forms).** Whenever a strike and a deadline are set (a series from the page, or the defaults: the first
+  listed deadline and the strike nearest the reference price) the form shows them as three rows (kind, strike,
+  deadline) with the pickers closed behind "Change terms", so the quantity and the premium sit on the first screen of
+  the rail. The pickers are the standard grid (deadline chips from `core/series`, nine strikes around the reference
   price) and "Custom terms" for anything else. The premium is typed per unit; the total is computed exactly and
-  shown, and the URL keeps the total. One validator (`core/maker/buildOffer`) plus the exactness of the total.
+  shown, and the URL keeps the total. A listing's price is typed per unit too, with the exact total as a row; the
+  contract gets the total. One validator (`core/maker/buildOffer`) plus the exactness of the total.
   Blocking findings of the pre-trade check are shown here already; the reason a button is disabled is printed above
   it. Enter in a field goes to the review. A guest sees everything and a Connect wallet action.
 - **Review.** Ordered by what informs the decision: what moves (the first figure large, the premium sentence beside
-  it), the issuer sentence (every mode but a listing), the checks that passed as one sentence with the read time
-  ("Read from the contract at 13:45:12 UTC: the offer is open, ..."; a line that did not pass stays a row with its
-  mark), the terms (strike, quantity, deadline, breakeven, most you can lose or, for a written call, what it gives
-  up, the other party by role), the outcome on either side of the strike with the commitment sentence, and the
-  payoff figure last, closed. A listing draws no figure. A transaction of this wallet whose outcome is unknown
-  blocks every review until it is checked.
+  it) and right under it the figures decided on (the breakeven, and for a write or a fill the most you can lose or,
+  for a written call, what it gives up), the issuer sentence (every mode but a listing), the checks that passed as
+  one sentence with the read time ("Read from the contract at 13:45:12 UTC: the offer is open, ..."; "Mock data,
+  13:45:12 UTC: ..." on mock data; a line that did not pass stays a row with its mark), the outcome on either side of
+  the strike with the commitment sentence, the terms (strike, quantity, deadline, a buyer's most you can lose, the
+  other party by role), and the payoff figure last, closed. A listing draws no figure. A transaction of this wallet
+  whose outcome is unknown blocks every review until it is checked.
+- **Notices.** A callout carries no category word: a heading only where it names the event ("Price changed"). A
+  wallet that cannot pay reads the shortfall at its balance row and in the reason under the action, with "How to
+  get test funds" beside it (the link carries the page it came from as `from`); no notice repeats it.
 - **Sign.** `recheck()` reads everything again, fresh; a blocking change returns to the review and says so. Closing
   the ticket before the wallet is asked cancels the attempt. Then the mutation runs and `TxStepper` shows the state
   machine; the heading follows the state. What is printed is a snapshot of what was sent.
@@ -86,7 +98,7 @@ complete). The wallet signature is the consent: there is no tick box.
 
 ## Checks ported from the old UI
 
-Re-read of the offer, ask or bid on open and before signing; the price-moved guard on resale (the ask the buyer
+Re-read of the offer, ask or bid on open and before signing (a cancelled listing re-reads the option and its ask); the price-moved guard on resale (the ask the buyer
 reviewed is the `max_total`; a new price blocks until the buyer looks at it); issuer eligibility; premium, price,
 escrow and collateral affordability with exact figures; exercise feasibility (warning); clawback shortfall
 (the required sentence, blocking); self-trade (own offer, own request, own listing, own written option); the caps

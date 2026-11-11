@@ -12,6 +12,12 @@
     color: var(--text);
   }
 
+  /* What the rail shows with no ticket open (the guided closing block): the box only listens for the press that
+     opens a ticket, it takes no room of its own. */
+  .idle {
+    display: contents;
+  }
+
   .railHead {
     display: flex;
     align-items: flex-start;

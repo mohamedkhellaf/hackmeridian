@@ -135,8 +135,8 @@ export function FeedbackSection() {
         <Timeline
           label="Life of this option"
           items={[
-            { time: 'Now', title: 'You pay the premium', description: 'The maker locked 50.00 USDx in the contract before you pay.', status: 'done' },
-            { time: 'Until the deadline', title: 'You exercise if it is worth it', description: 'You deliver 5 BOND and receive 50.00 USDx in the same transaction.', status: 'current' },
+            { time: 'Now', title: 'You pay the premium', description: 'The maker locked 50.00 USDx in the contract before you paid.', status: 'done' },
+            { time: 'Until the deadline', title: 'You exercise if it is worth it', description: 'You deliver 5.00 BOND and receive 50.00 USDx in the same transaction.', status: 'current' },
             { time: <DateTime value={SAMPLE_DEADLINE} />, title: 'The deadline passes', description: 'If you have not exercised by then, the right expires and the premium stays with the maker.', status: 'upcoming' },
             { time: 'After', title: 'The maker reclaims the collateral', status: 'upcoming' },
           ]}

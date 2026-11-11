@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { CallResult } from '../../../core/pro/types'
+import type { CallResult, ReplayedStep } from '../../../core/pro/types'
 import { usePro } from '../../../data'
 import type { ProCall } from '../../../data'
 import { useWallet } from '../../../wallet'
@@ -42,11 +42,11 @@ export function MarginUiProvider({ children }: { children: ReactNode }) {
   )
 
   const act = useCallback(
-    async <T,>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T) => ResultView): Promise<CallResult<T>> => {
+    async <T,>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T, step: ReplayedStep | null) => ResultView): Promise<CallResult<T>> => {
       setResult(null)
       sendFocus(true)
       const out = await run(what.label, call, what.done)
-      setResult(out.ok && describe ? describe(out.value) : null)
+      setResult(out.ok && describe ? describe(out.value, out.step ?? null) : null)
       sendFocus(false)
       return out
     },

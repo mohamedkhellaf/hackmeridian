@@ -119,7 +119,15 @@ test.describe('Learn', () => {
     await expect(floor).toContainText(/Pay 1\.80\sUSDx\. Until \d{1,2}\s\w{3}\s\d{4},\s08:00\sUTC you can sell 5\.00\sBOND for 50\.00\sUSDx\./)
     const note = floor.getByRole('article')
     await expect(note.getByRole('heading', { level: 4 })).toHaveText('Long put, BOND')
-    const terms = await note.locator('dl > div').evaluateAll((rows) => rows.map((row) => [row.querySelector('dt')?.textContent, row.querySelector('dd > span')?.textContent?.replace(/ /g, ' ')]))
+    // A figure with a unit is an Amount: read it as it is spoken (its visually hidden text), the rest as printed.
+    const terms = await note.locator('dl > div').evaluateAll((rows) =>
+      rows.map((row) => {
+        const value = row.querySelector('dd > span')
+        return [row.querySelector('dt')?.textContent, (value?.querySelector('.ui-vh') ?? value)?.textContent?.replace(/\u00a0/g, ' ')]
+      }),
+    )
+    // Each figure of the note and its unit are drawn by Amount, which keeps them on one line: none is a typed string.
+    await expect(note.locator('dd [data-figure="serif"]')).toHaveCount(6)
     expect(terms.filter(([label]) => label !== 'Deadline')).toEqual([
       ['Quantity', '5.00 BOND'],
       ['Floor, per BOND', '10.00 USDx'],
@@ -150,11 +158,11 @@ test.describe('Learn', () => {
     // The assumed price is a slider: arrow keys move it and the read-out follows.
     const handle = floor.getByRole('slider')
     await expect(handle).toHaveAttribute('aria-valuenow', '8')
-    await expect(handle).toHaveAttribute('aria-valuetext', /At 8\.00\. With the floor: 48\.20 USDx\. Without: 40\.00 USDx\./)
+    await expect(handle).toHaveAttribute('aria-valuetext', /At 8\.00\. With the floor: 48\.20\sUSDx\. Without: 40\.00\sUSDx\./)
     await handle.focus()
     await page.keyboard.press('End')
     await expect(handle).toHaveAttribute('aria-valuenow', '14')
-    await expect(handle).toHaveAttribute('aria-valuetext', /At 14\.00\. With the floor: 68\.20 USDx\. Without: 70\.00 USDx\./)
+    await expect(handle).toHaveAttribute('aria-valuetext', /At 14\.00\. With the floor: 68\.20\sUSDx\. Without: 70\.00\sUSDx\./)
 
     // A written put: what the user locks, and the loss said as plainly as the gain. Its example opens on a click.
     const earnBuy = page.locator('[data-intent="earn-buy"]')

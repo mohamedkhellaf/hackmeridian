@@ -21,63 +21,105 @@
     color: var(--text-2);
   }
 
-  /* Table while it fits its column, the list below that: measured on the column, not the window. */
+  /* Table while it fits its column, the cards below that: measured on the column, not the window. */
   .list {
     container-type: inline-size;
     min-width: 0;
   }
 
-  .table {
+  .tableWrap {
     display: block;
   }
 
-  .actionCell {
-    width: 1%;
-    white-space: nowrap;
+  /*
+   * The table of /requests without its asset column (ruling F15): two lines per row, the figure and what qualifies
+   * it, every cell on its first line and the action centred. Fixed columns in the same proportions; with a ticket
+   * open beside it the table keeps the width its figures need and scrolls inside its frame, the action pinned.
+   */
+  .table {
+    min-width: 58rem;
   }
 
-  .lapsed {
+  .table :is(td, th[scope='row']) {
+    padding-block: var(--s-8);
+    vertical-align: baseline;
+  }
+
+  .table td[data-pinned] {
+    vertical-align: middle;
+  }
+
+  .colKind {
+    width: 9.5%;
+  }
+
+  .colStrike {
+    width: 13%;
+  }
+
+  .colQty {
+    width: 12.5%;
+  }
+
+  .colDeadline {
+    width: 19%;
+  }
+
+  .colPremium {
+    width: 15%;
+  }
+
+  .colBuyer {
+    width: 16%;
+  }
+
+  .colAction {
+    width: 15%;
+  }
+
+  .kind {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    font-weight: 500;
+  }
+
+  .stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 100%;
+
+    &[data-align='end'] {
+      align-items: flex-end;
+    }
+  }
+
+  /* A caption line keeps one height, also when it carries the clock of a countdown, so rows stay even. */
+  .sub,
+  .warn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    height: var(--caption-line);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
     color: var(--muted);
-    font-size: var(--label-size);
-    line-height: var(--label-line);
-    font-weight: var(--label-weight);
+  }
+
+  .warn {
+    font-weight: 500;
+    color: var(--warn);
   }
 
   .cards {
     display: none;
   }
 
-  .kind {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s-8);
-    font-weight: 500;
-  }
-
-  .strike {
-    font-family: var(--font-serif);
-    font-size: var(--figure-size);
-    font-weight: 600;
-  }
-
-  .stack {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-end;
-  }
-
-  .sub {
-    color: var(--muted);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-  }
-
-  .yours {
-    font-weight: 600;
-  }
-
+  /* Below 44rem of column: one card per request, the card of /requests on a phone. */
   @container (max-width: 43.99rem) {
-    .table {
+    .tableWrap {
       display: none;
     }
 
@@ -89,84 +131,145 @@
       list-style: none;
       border-top: 1px solid var(--rule);
     }
+  }
 
-    .card {
-      display: flex;
-      flex-direction: column;
-      gap: var(--s-12);
-      padding-block: var(--s-16);
-      border-bottom: 1px solid var(--hairline);
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding-block: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
 
-      &[data-selected] {
-        margin-inline: calc(var(--s-8) * -1);
-        padding-inline: var(--s-8);
-        background: var(--accent-tint);
-      }
+    &:last-child {
+      border-bottom-color: var(--rule);
     }
 
-    .cardHead {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--s-12);
+    /* The request the ticket is showing: the same tint as a selected table row. */
+    &[data-selected] {
+      margin-inline: calc(var(--s-8) * -1);
+      padding-inline: var(--s-8);
+      background: var(--accent-tint);
+    }
+  }
+
+  /*
+   * A line of the card: a term on the left, its figure on the right. The right-hand figure keeps its line; the left
+   * side wraps inside (the demo price drops under the strike on a narrow phone). Only the title line lets the
+   * premium drop beneath it.
+   */
+  .line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 var(--s-12);
+    min-width: 0;
+
+    &:first-child {
+      flex-wrap: wrap;
     }
 
-    .cardKind {
-      display: inline-flex;
-      align-items: baseline;
-      gap: var(--s-8);
-      font-size: var(--figure-size);
-      line-height: var(--figure-line);
+    & > .terms {
+      flex: 0 1 auto;
+      min-width: 0;
     }
+  }
 
-    .cardStrike {
-      color: var(--text-2);
-    }
+  .title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    min-width: 0;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+  }
 
-    .cardFacts {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: var(--s-12) var(--s-16);
-      margin: 0;
+  .glyph {
+    flex: none;
+    align-self: center;
+  }
 
-      & > div {
-        display: flex;
-        flex-direction: column;
-        gap: var(--s-2);
-        min-width: 0;
-      }
+  .premium {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-4);
+    margin: 0;
+    margin-inline-start: auto;
+    white-space: nowrap;
+  }
 
-      & dt {
-        color: var(--muted);
-        font-size: var(--label-size);
-        line-height: var(--label-line);
-        font-weight: var(--label-weight);
-        font-stretch: var(--label-stretch);
-      }
+  .per {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
 
-      & dd {
-        display: flex;
-        flex-direction: column;
-        margin: 0;
-        font-size: var(--ui-size);
-        line-height: var(--ui-line);
-        font-weight: 500;
-      }
-    }
+  .terms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-6);
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
 
-    .cardFoot {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-    }
+  .label {
+    color: var(--muted);
+  }
 
-    .cancel {
-      align-items: stretch;
-    }
+  .aside {
+    flex: none;
+    margin: 0;
+    margin-inline-start: auto;
+    font-size: var(--caption-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    white-space: nowrap;
+  }
 
-    .cancelError {
-      max-width: none;
-      text-align: start;
-    }
+  .warnLine {
+    display: flex;
+    align-items: center;
+    gap: var(--s-4);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--warn);
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12);
+    margin-top: var(--s-8);
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--s-12);
+    min-width: 0;
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .buyer {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+  }
+
+  .action {
+    flex: none;
   }
 }

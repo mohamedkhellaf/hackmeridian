@@ -1,0 +1,10 @@
+@layer features {
+  .root {
+    display: block;
+    max-width: 22rem;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    white-space: normal;
+  }
+}

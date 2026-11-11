@@ -31,8 +31,10 @@ export interface NoteDef {
 }
 
 export const NOTES: readonly NoteDef[] = [
-  // On a phone the cards and the asset list are taller than the screen: no note fits beside them.
-  { id: 'intents', ...INTENTS_NOTE, side: 'bottom', align: 'start', phone: { dock: true } },
+  // On a phone the cards and the asset list are taller than the screen: no note fits beside them. From 768 px the
+  // first note sits under the end of the list, so the Assets heading below it stays in sight (there is no room
+  // above the list at the top of the page).
+  { id: 'intents', ...INTENTS_NOTE, side: 'bottom', align: 'end', phone: { dock: true } },
   { id: 'assets', ...ASSETS_NOTE, side: 'top', align: 'start', phone: { dock: true } },
   // Above the switch, not under it: from 1200 px the order panel is the column under the switch, and a note never
   // sits on an order. On a phone the switch is a full-width row under the tabs and the note goes under it.

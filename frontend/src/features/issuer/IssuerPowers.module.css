@@ -13,25 +13,6 @@
     color: var(--text-2);
   }
 
-  .power {
-    width: 13rem;
-  }
-
-  .state {
-    width: 6rem;
-    color: var(--text-2);
-    font-weight: 500;
-
-    &[data-on] {
-      color: var(--text);
-      font-weight: 600;
-    }
-  }
-
-  .effect {
-    color: var(--text-2);
-  }
-
   .more {
     font-size: var(--ui-size);
     line-height: var(--ui-line);
@@ -42,16 +23,6 @@
         align-items: center;
         min-height: var(--touch);
       }
-    }
-  }
-
-  @media (max-width: 767.98px) {
-    .power {
-      width: 8.5rem;
-    }
-
-    .state {
-      width: 4rem;
     }
   }
 }

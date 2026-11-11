@@ -7,6 +7,11 @@ import { usdx } from './money'
 /** The underlying of the Margin market (one per deployment): see `PRO_UNDERLYING` in core/pro/types. */
 export const UNDERLYING = PRO_UNDERLYING
 
+/** A number in the contract, unpadded and held to its sign: `No. 4` (ruling F1). */
+export function numbered(id: number | string): string {
+  return `No.\u00a0${id}`
+}
+
 /** `EQTY 110.00 call`. */
 export function contractName(s: SeriesView | undefined): string {
   return s ? `${UNDERLYING} ${usdx(s.strike)} call` : `${UNDERLYING} call`
@@ -73,4 +78,26 @@ const CALLS: Record<string, string> = {
 
 export function callName(op: string): string {
   return CALLS[op] ?? sentenceCase(op)
+}
+
+/** A step as a short phrase: "write a call (Maker A)", "move the clock forward". */
+export function stepPhrase(op: string, actor: string | null): string {
+  return `${callName(op).toLowerCase()}${actor ? ` (${partyName(actor)})` : ''}`
+}
+
+/** At most this many steps are named in a "run first" sentence; the rest are counted. */
+const NAMED_STEPS = 3
+
+/**
+ * Said before a press whose recorded step is not the next one: which steps the press runs first. Empty when
+ * it runs the next step. "Step 4 runs first: deposit margin (Maker A)."
+ */
+export function runsFirstText(before: readonly { number: number; op: string; actor: string | null }[]): string {
+  if (before.length === 0) return ''
+  const named = before.slice(0, NAMED_STEPS).map((b) => stepPhrase(b.op, b.actor))
+  const more = before.length - named.length
+  const list = more > 0 ? `${named.join(', ')} and ${more} more` : named.join(', ')
+  const first = before[0].number
+  const last = before[before.length - 1].number
+  return before.length === 1 ? `Step ${first} runs first: ${list}.` : `Steps ${first} to ${last} run first: ${list}.`
 }

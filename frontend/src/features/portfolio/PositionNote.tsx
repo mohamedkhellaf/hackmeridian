@@ -1,16 +1,16 @@
 // One option as a contract note: serial and the ledger it was read at, the kind with its payoff glyph, every
-// term, the other side, where the collateral is, the state tag and the deadline in UTC and local time with a
-// countdown. One figure sits under the highlighter: the one at stake now.
+// term, the other side, where the collateral is, the state tag and the deadline in UTC and local time (the page
+// header carries the countdown). One figure sits under the highlighter: the one at stake now.
 import type { ReactNode } from 'react'
 import { config, IS_MOCK } from '../../core/config'
 import { explorerAddress, explorerContract, isMockId } from '../../core/explorer'
-import { formatExact, formatUnits, groupDigits } from '../../core/format'
+import { MINUS, formatExact, formatUnits, groupDigits } from '../../core/format'
 import type { Money, OptionOffer, TokenInfo } from '../../core/options/types'
 import { claimAmount } from '../../core/portfolio/positions'
 import type { Role } from '../../core/portfolio/positions'
 import { priceOf } from '../../core/reference'
 import type { PositionView } from '../../data'
-import { Address, Amount, ContractNote, Countdown, DateTime } from '../../ui'
+import { Address, Amount, ContractNote, DateTime } from '../../ui'
 import type { NoteTerm } from '../../ui'
 import { CalendarMenu } from './CalendarMenu'
 import { NOTE_TERMS, strikeAgainst } from './copy'
@@ -29,6 +29,8 @@ export interface PositionNoteProps {
   nowSec: number
   /** This browser bought the option from its previous holder: the original premium is not the holder's cost. */
   resold?: boolean
+  /** It is proven that this wallet paid the original premium: the holder's breakeven is its own. */
+  paid?: boolean
   /** The live resale price of the option, for a viewer who is not its holder. */
   listedAt?: bigint | null
   /** Tokens the contract holds less of than it owes. */
@@ -67,12 +69,14 @@ const party = (address: string, me: string | null, label: string): ReactNode => 
 /** The figure at stake now: what waits to be claimed, else the listing price, else the holder's breakeven or the maker's premium. */
 type Mark = 'claim' | 'listing' | 'breakeven' | 'premium' | null
 
-export function PositionNote({ option: o, position, me, ledger, nowSec, resold = false, listedAt = null, short = [] }: PositionNoteProps) {
+export function PositionNote({ option: o, position, me, ledger, nowSec, resold = false, paid = false, listedAt = null, short = [] }: PositionNoteProps) {
   const role = position?.role ?? null
   const live = (o.state === 'active' || o.state === 'offered') && o.expiry > nowSec
   const perUnit = `${o.quote.code} per ${o.underlying.code}`
-  // A breakeven from the original premium is not the holder's own when it bought the option from a holder.
+  // A breakeven from the original premium is not the holder's own when it bought the option from a holder; when
+  // its own price is not proven either way, the row says what the breakeven comes from.
   const breakeven = role === 'holder' && resold ? null : breakevenText(o)
+  const breakevenLabel = role === 'holder' && !paid ? NOTE_TERMS.breakevenOriginal : NOTE_TERMS.breakeven
   const collateral = position?.collateral ?? (o.kind === 'put' ? strikeOf(o) : { token: o.underlying, amount: o.underlyingQty })
   const reference = position?.reference ?? null
   const figure = referenceFigure(reference, o.quote)
@@ -109,27 +113,25 @@ export function PositionNote({ option: o, position, me, ledger, nowSec, resold =
     },
   ]
   if (breakeven !== null) {
-    terms.push({ label: NOTE_TERMS.breakeven, value: <Amount value={breakeven} unit={perUnit} figure="serif" />, marked: mark === 'breakeven' })
+    terms.push({ label: breakevenLabel, value: <Amount value={breakeven} unit={perUnit} figure="serif" />, marked: mark === 'breakeven' })
   }
   terms.push({ label: NOTE_TERMS.deadline, value: <DateTime value={o.expiry * 1000} local="below" /> })
   if (o.state === 'active' && position?.moneyness && reference && priceOf(reference) !== null && figure !== null) {
     terms.push({ label: NOTE_TERMS.moneyness, value: MONEYNESS_WORD[position.moneyness], hint: strikeAgainst(position) ?? undefined })
     if (role === 'holder' && value !== null) {
+      // A value, not a gain: no gain colour and no plus sign (the premium is not counted). Below zero it keeps its minus.
+      const sign = value < 0n ? MINUS : ''
       const magnitude = value < 0n ? -value : value
       terms.push({
         label: NOTE_TERMS.exerciseValue,
-        value:
-          value === 0n ? (
-            amount({ token: o.quote, amount: 0n })
-          ) : (
-            <Amount
-              value={formatUnits(magnitude, o.quote.decimals)}
-              exact={formatExact(magnitude, o.quote.decimals)}
-              unit={o.quote.code}
-              direction={value > 0n ? 'gain' : 'loss'}
-              figure="serif"
-            />
-          ),
+        value: (
+          <Amount
+            value={`${sign}${formatUnits(magnitude, o.quote.decimals)}`}
+            exact={`${sign}${formatExact(magnitude, o.quote.decimals)}`}
+            unit={o.quote.code}
+            figure="serif"
+          />
+        ),
         hint: NOTE_TERMS.exerciseValueHint,
       })
     }
@@ -163,7 +165,6 @@ export function PositionNote({ option: o, position, me, ledger, nowSec, resold =
       kind={noteKind(o, role)}
       headingLevel={2}
       state={stateName(o)}
-      aside={live ? <Countdown to={o.expiry * 1000} warnBelowMs={(position?.role === 'holder' && position.moneyness === 'in' ? 48 : 2) * 3_600_000} label="Time left" /> : undefined}
       terms={terms}
       footer={
         calendar || contract ? (

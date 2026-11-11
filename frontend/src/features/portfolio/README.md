@@ -37,7 +37,8 @@ The router (`src/app/router.tsx`) lazy-loads two named exports of `index.tsx`:
 | `actions/ActionFlow.tsx`, `actions/useActionFlow.ts` | Which action is open on which option, and where focus returns. |
 | `model.ts`, `copy.ts`, `lifecycleSteps.ts`, `payoff.ts`, `calendar.ts`, `actions/checks.ts` | Pure modules, unit-tested: names and figures, every sentence, the lifecycle steps, the payoff figure, the calendar file, the re-checks before signing. |
 | `links.tsx`, `listReturn.ts`, `route.ts` | Router links (the back link returns to the list in history), and the two route handles. |
-| `hooks.ts` | Resale bought in this browser, an option made by filling a request, the clawback shortfall, offers sold since the last visit. |
+| `hooks.ts` | Resale bought in this browser, proof that this wallet paid the original premium, the request a maker filled into an option, the clawback shortfall, offers sold since the last visit. |
+| `Unsettled.tsx`, `waiting.ts` | "Outcome unknown" with "Check again" in place of an action, and why the other actions wait. |
 
 ## Decisions
 
@@ -47,9 +48,20 @@ The router (`src/app/router.tsx`) lazy-loads two named exports of `index.tsx`:
 - **A to-do card is something the wallet can do now.** An exercise asks for action only when the reference says it
   is in the money; the urgent one (48 hours or less) carries the ink rule. A held option that is not in the money
   gets a quiet card with a link (no button) only in its last 48 hours or when there is no reference price. An
-  option that lapsed in the last week is one plain line above the tabs. An expired request is a card: its premium
-  stays in the contract until it is cancelled. Cards carry no eyebrow labels and no icons.
-- **The State column is gone.** "Where it stands" says it, with the demo price and the strike in one line.
+  option that lapsed in the last week is one plain line above the tabs. An expired request is a card: a cancel takes
+  its premium back (anyone may also prune it, which refunds it too), and its row under Orders keeps "Cancel request".
+  Cards carry no eyebrow labels and no icons, hug their content, and a claim or a reclaim card has no sentence under
+  its title.
+- **A row gives its value.** The second line of "Where it stands" is the exercise value of a holding in the money
+  ("Exercise value 4.00 at the demo price 10.20"), where the strike stands for any other holding, and what a
+  written option or an open offer locks ("Locks 106.00 USDx"). An exercise value is drawn as a value, never as a
+  gain. The strike column is serif (`Td strike`), as on every table.
+- **Row actions look the same everywhere:** `Button` secondary, size `sm`, right-aligned in the pinned column;
+  priority shows by order. A listed holding offers "Change price" and "Cancel listing", as its page does.
+- **An unknown outcome stays visible.** While a transaction of the wallet has an unknown outcome and can still
+  land (`useUnsettledTx`), the card, the row and the page header of what it acts on show "Outcome unknown" and
+  "Check again" in place of the action, and every other action waits with the hook's sentence as its reason.
+- **The State column is gone.** "Where it stands" says it.
 - **Every action is a dialog with the same three stages.** The review states what moves in a serif sentence and
   lists what was re-read from the chain; signing shows the transaction stepper with what each state means; the
   receipt is a contract note that prints, and focus moves to it. An unknown outcome offers "Check again", never
@@ -60,9 +72,14 @@ The router (`src/app/router.tsx`) lazy-loads two named exports of `index.tsx`:
   gone (a confirmed action often removes its own card).
 - **Listing goes through the order ticket** (`TicketHost`, mode `list`, placement `overlay`), loaded only when
   "List for sale" is opened, from a Holding row or the position page. Re-pricing is the same ticket; withdrawing a
-  listing is a dialog here. A row whose exercise is out of the money leads with "List for sale".
+  listing is a dialog here, from the row, Orders or the position page. A row whose exercise is out of the money
+  leads with "List for sale".
 - **A premium the wallet did not pay is never called paid.** The total is "Original premiums"; for an option this
-  browser bought from a holder the position shows no breakeven and draws the leg without the premium.
+  browser bought from a holder the position shows no breakeven and draws the leg without the premium. Holding an
+  option proves nothing about its price (a resale elsewhere or a transfer also makes a holder): the lifecycle says
+  "You paid" only when this wallet's buy is confirmed in this browser or its own request was filled into the option,
+  and otherwise "A buyer paid". Without that proof the breakeven is "Breakeven at the original premium", the
+  figure's caption says "Original premium included." and its extremes are "at the original premium".
 - **A clawback shortfall is said where money waits:** the sentence once on the page, a line on affected rows and
   cards, and a failing (not blocking) "Contract balance" line plus the sentence in the claim, reclaim and cancel
   reviews.

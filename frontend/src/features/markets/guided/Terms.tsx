@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AmountField, ChoiceChips, IconCheck, Marker } from '../../../ui'
+import { Amount, AmountField, ChoiceChips, IconCheck, Marker } from '../../../ui'
 
 import styles from './Terms.module.css'
 import type { ChoiceChip } from '../../../ui'
@@ -24,11 +24,9 @@ export interface TermsProps {
     /** The chosen strike as a figure and its unit. */
     figure: string
     unit: string
-    /** Where it stands against the reference, in words. */
+    /** Where it stands against the reference, in words, with the price's two-word label. */
     hint?: string
     chipsLabel: string
-    /** The reference price with its label and note. */
-    reference: ReactNode
     chips: readonly ChoiceChip[]
     value: string | null
     onChange: (value: string) => void
@@ -78,7 +76,9 @@ export function Terms({ qty, strike, expiry, fundedKey, notice }: TermsProps) {
             <dt>{strike.label}</dt>
             <dd>
               <span className={styles.value} data-testid="guided-strike">
-                <Marker>{strike.figure}</Marker> <span className={styles.unit}>{strike.unit}</span>
+                <Marker>
+                  <Amount value={strike.figure} unit={strike.unit} figure="serif" size="lg" />
+                </Marker>
               </span>
               {strike.hint ? <span className={styles.hint}>{strike.hint}</span> : null}
             </dd>
@@ -87,7 +87,7 @@ export function Terms({ qty, strike, expiry, fundedKey, notice }: TermsProps) {
             <dt>{expiry.label}</dt>
             <dd>
               <time className={styles.value} dateTime={expiry.iso} data-testid="guided-expiry">
-                <span className={styles.day}>{expiry.day}</span> <span className={styles.unit}>{expiry.time}</span>
+                <span className={styles.day}>{expiry.day}</span> <span className={styles.time}>{expiry.time}</span>
               </time>
               {expiry.hint ? <span className={styles.hint}>{expiry.hint}</span> : null}
             </dd>
@@ -99,8 +99,9 @@ export function Terms({ qty, strike, expiry, fundedKey, notice }: TermsProps) {
           {notice}
         </p>
       ) : null}
-      <ChoiceChips appearance="note" label={strike.chipsLabel} aside={strike.reference} chips={strike.chips} value={strike.value} onValueChange={strike.onChange} columns={Math.max(strike.chips.length, 1)} />
-      <ChoiceChips appearance="note" width="fixed" label={expiry.chipsLabel} chips={expiry.chips} value={expiry.value} onValueChange={expiry.onChange} columns={Math.max(expiry.chips.length, 1)} />
+      {/* Both rows span the note, each chip a column of it, so the two end on the same edge. */}
+      <ChoiceChips appearance="note" label={strike.chipsLabel} chips={strike.chips} value={strike.value} onValueChange={strike.onChange} columns={Math.max(strike.chips.length, 1)} />
+      <ChoiceChips appearance="note" label={expiry.chipsLabel} chips={expiry.chips} value={expiry.value} onValueChange={expiry.onChange} columns={Math.max(expiry.chips.length, 1)} />
       {fundedKey ? (
         <p className={styles.legend} aria-hidden="true">
           <IconCheck size={12} className={styles.tick} /> {fundedKey}

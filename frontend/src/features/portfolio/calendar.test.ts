@@ -38,11 +38,11 @@ describe('deadline calendar entry', () => {
 
   it('gives the maker its own entry: what to claim or reclaim after the deadline, linked to the position', () => {
     const event = deadlineEvent(opt({ expiry: EXPIRY }), ORIGIN, 'writer')
-    expect(event.title).toBe('Reclaim 50.00 USDx, or claim the FUND delivered')
-    expect(event.description).toContain('claim the 5.00 FUND it left in the contract; if not, reclaim your 50.00 USDx.')
+    expect(event.title).toBe('Reclaim 50.00\u00A0USDx, or claim the FUND delivered')
+    expect(event.description).toContain('claim the 5.00\u00A0FUND it left in the contract; if not, reclaim your 50.00\u00A0USDx.')
     expect(event.url).toBe('https://stellsec.example/portfolio/184')
     expect(event.uid).toBe('option-184-1794556800-maker')
-    expect(deadlineEvent(opt({ kind: 'call', expiry: EXPIRY }), ORIGIN, 'writer').title).toBe('Reclaim 5.00 FUND, or claim the USDx paid')
+    expect(deadlineEvent(opt({ kind: 'call', expiry: EXPIRY }), ORIGIN, 'writer').title).toBe('Reclaim 5.00\u00A0FUND, or claim the USDx paid')
   })
 
   it('gives nothing for a deadline that is not a usable timestamp', () => {

@@ -2,9 +2,10 @@
 //
 // The wording is fixed: each string below was copied from the UI it replaced and is pinned word for word by
 // disclosures.test.ts, except the footer notices and the Margin banners, which the owner had rewritten on 11 Nov
-// 2026 (see LEGAL_NOTICE), and the payoff caption, which says "deadline" since the director's ruling R7 of the same
-// day. The two collateral cards of the old write ticket are gone (ruling E1). Components and tests import from here
-// and never retype a sentence. Each sentence has one home in the app; `DISCLOSURE_HOMES` is the register.
+// 2026 (see LEGAL_NOTICE; last sentence per ruling F8), the payoff caption, which says "deadline" since the director's
+// ruling R7 of the same day, and the bid escrow sentence (ruling F9). The two collateral cards of the old write
+// ticket are gone (ruling E1). Components and tests import from here and never retype a sentence. Each sentence has
+// one home in the app; `DISCLOSURE_HOMES` is the register.
 
 // ---------------------------------------------------------------------------------------------- app-wide
 
@@ -18,11 +19,11 @@
  * where the decision is made. The footer picks its notice with `legalNotice(isMock)`.
  */
 export const LEGAL_NOTICE =
-  'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.'
+  'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is investment advice or a solicitation to buy or sell any security.'
 
 /** App footer of a build without a contract (mock data): the same notice, true of what that build does. */
 export const LEGAL_NOTICE_MOCK =
-  'This software is provided as is, without warranty of any kind. This build runs on an in-memory demo market: nothing is read from Stellar or sent to it, and the tokens shown have no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.'
+  'This software is provided as is, without warranty of any kind. This build runs on an in-memory demo market: nothing is read from Stellar or sent to it, and the tokens shown have no monetary value. Nothing here is investment advice or a solicitation to buy or sell any security.'
 
 /** The footer's legal notice for the build (ruling E23): one paragraph, never both. */
 export const legalNotice = (isMock: boolean): string => (isMock ? LEGAL_NOTICE_MOCK : LEGAL_NOTICE)
@@ -54,10 +55,12 @@ export const PAYOFF_CAPTION = 'Hypothetical payoff at the deadline. Not a quote.
 
 /**
  * Request ticket. `amount` is the premium with its unit, already formatted: `bidEscrowDisclosure('2.00 USDx')` is
- * `You escrow 2.00 USDx now; refunded if you cancel or it expires.`
+ * `You escrow 2.00 USDx now. Until a maker fills the request you can cancel it and take the premium back, also after
+ * the deadline.` (ruling F9). The contract never refunds by itself: `cancel_bid` works while the request is open,
+ * before or after its deadline, and after the deadline anyone may prune it, which also refunds the buyer.
  */
 export function bidEscrowDisclosure(amount: string): string {
-  return `You escrow ${amount} now; refunded if you cancel or it expires.`
+  return `You escrow ${amount} now. Until a maker fills the request you can cancel it and take the premium back, also after the deadline.`
 }
 
 const SHORTFALL_LEAD = 'Clawback shortfall'

@@ -27,18 +27,24 @@ async function openedDialog(page: Page, name: string | RegExp): Promise<Locator>
 }
 
 /**
- * Lists the open position for `price` through the order ticket. The ticket's own words belong to the ticket, so
- * only its shape is relied on: a price field, Review, the button that names the price (the wallet signature is the consent).
+ * Lists the open position through the order ticket, typing `price` in its price field. The ticket's own words belong
+ * to the ticket, so only its shape is relied on: a price field, Review, the button that names the price (the wallet
+ * signature is the consent). Returns the price the button names (`2.50` for 2.00 BOND at 1.25 per unit), which is
+ * what the position then carries.
  */
-async function listThroughTicket(page: Page, price: string): Promise<void> {
+async function listThroughTicket(page: Page, price: string): Promise<string> {
   const ticket = page.getByRole('dialog')
   await expect(ticket).toContainText(/your put on BOND/i)
   await ticket.getByRole('textbox').first().fill(price)
   await ticket.getByRole('button', { name: 'Review', exact: true }).click()
-  await ticket.getByRole('button', { name: new RegExp(`^List for ${price.replace('.', '\\.')} USDx`) }).click()
+  const list = ticket.getByRole('button', { name: /^List for [\d.,]+\sUSDx/ })
+  const total = /^List for ([\d.,]+)/.exec((await list.textContent()) ?? '')?.[1] ?? ''
+  expect(total).not.toBe('')
+  await list.click()
   await expect(ticket).toContainText(/Listed/)
   await ticket.getByRole('button', { name: 'Done' }).click()
   await expect(ticket).toBeHidden()
+  return total
 }
 
 /** Signs the action of an open dialog and waits for its receipt, which takes focus. */
@@ -66,8 +72,11 @@ test.describe('Portfolio', () => {
     const urgent = page.getByTestId('todo-exercise-0')
     await expect(urgent.getByRole('heading', { name: 'Exercise your put on 10.00 FUND' })).toBeVisible()
     await expect(urgent).toContainText('In the money at the demo price 10.20. You deliver 10.00 FUND and receive 106.00 USDx.')
+    // The exercise value is a value, not a gain: no plus sign, and the premium is said to be left out.
     await expect(urgent).toContainText('Exercise value')
-    await expect(urgent).toContainText('+4.00')
+    await expect(urgent).toContainText('4.00 USDx')
+    await expect(urgent).not.toContainText('+4.00')
+    await expect(urgent).toContainText('At the reference price. The premium is not counted.')
     await expect(urgent.getByRole('timer')).toHaveAccessibleName(/^Time left to exercise:/)
     await expect(urgent.locator('time')).toContainText('UTC')
     await expect(urgent.getByRole('button', { name: 'Exercise' })).toBeVisible()
@@ -78,13 +87,18 @@ test.describe('Portfolio', () => {
     // An option that is out of the money and more than 48 hours from its deadline is not a to-do.
     await expect(page.getByTestId('todo-exercise-1')).toHaveCount(0)
 
-    // Both kinds of maker are told what waits in the contract, once.
+    // Both kinds of maker are told what waits in the contract, once: the title and the button, no sentence.
     await expect(page.getByTestId('todo-claim-3')).toContainText('Claim 98.00 USDx from your exercised call')
-    await expect(page.getByTestId('todo-claim-3')).toContainText('It waits in the contract until you claim it.')
+    await expect(page.getByTestId('todo-claim-3')).not.toContainText('It waits in the contract')
     await expect(page.getByTestId('todo-reclaim-4')).toContainText('Reclaim 48.00 USDx from your expired put')
+    await expect(page.getByTestId('todo-reclaim-4')).not.toContainText('It stays in the contract')
+    // Each card hugs its content: a claim is not stretched to the height of the exercise beside it.
+    const exerciseHeight = (await urgent.boundingBox())?.height ?? 0
+    const claimHeight = (await page.getByTestId('todo-claim-3').boundingBox())?.height ?? 0
+    expect(claimHeight).toBeLessThan(exerciseHeight - 40)
     // An option that lapsed this week is one plain line, not a card.
     await expect(page.getByTestId('todo-expired-unexercised-5')).toHaveCount(0)
-    await expect(page.getByTestId('lapsed-5')).toContainText(/^Your call on 5\.00 FUND expired on .+ without being exercised\./)
+    await expect(page.getByTestId('lapsed-5')).toContainText(/^Your call on 5\.00\sFUND expired on .+ without being exercised\./)
 
     // One ink button on the page: the most pressing action.
     await expect(page.locator('main button[data-variant="primary"]')).toHaveCount(1)
@@ -101,26 +115,39 @@ test.describe('Portfolio', () => {
     await expect(page.getByRole('tab', { name: /^Orders/ })).toContainText('2')
     await expect(page.getByText(/closed position or order is hidden/)).toHaveCount(0)
 
-    // The holding table says where each option stands, in words, against the labelled demo price; no state column.
+    // The holding table says where each option stands, in words, and what it is worth against the labelled demo
+    // price; no state column. The strike column is serif, as on every table.
     const table = page.getByRole('table', { name: /^Options you hold/ })
     await expect(table.getByRole('columnheader', { name: 'State' })).toHaveCount(0)
     await expect(table.getByTestId('row-0')).toContainText('In the money')
-    await expect(table.getByTestId('row-0')).toContainText('Demo price 10.20, below the strike 10.60')
+    await expect(table.getByTestId('row-0')).toContainText('Exercise value 4.00 at the demo price 10.20')
     await expect(table.getByTestId('row-0')).toContainText('0.43 per FUND')
     await expect(table.getByTestId('row-1')).toContainText('Out of the money')
+    await expect(table.getByTestId('row-1')).toContainText('Demo price 99.40, above the strike 97.00')
     await expect(table.getByTestId('row-0').getByText('Active', { exact: true })).toHaveCount(0)
-    // In the money: exercise, and list for sale beside it. Out of the money: the row leads with the listing.
+    await expect(table.getByTestId('row-0').locator('td[data-strike]')).toHaveCSS('font-family', /Serif/)
+    // In the money: exercise, and list for sale beside it. Out of the money: the row leads with the listing. Every
+    // row action has the same look.
     await expect(table.getByTestId('row-0').getByRole('button', { name: /^Exercise/ })).toBeVisible()
     await expect(table.getByTestId('row-0').getByRole('button', { name: /^List for sale/ })).toBeVisible()
     await expect(table.getByTestId('row-1').getByRole('button', { name: /^Exercise/ })).toHaveCount(0)
     await expect(table.getByTestId('row-1').getByRole('button', { name: /^List for sale/ })).toBeVisible()
+    for (const button of await table.getByRole('button').all()) {
+      await expect(button).toHaveAttribute('data-variant', 'secondary')
+      await expect(button).toHaveAttribute('data-size', 'sm')
+    }
+
+    // A written option that is live says what it locks.
+    await page.getByRole('tab', { name: /^Written/ }).click()
+    await expect(page.getByRole('table', { name: /^Options you wrote/ }).getByTestId('row-2')).toContainText('Locks 4.00 EQTY')
+    await page.getByRole('tab', { name: /^Holding/ }).click()
 
     // A click anywhere on a row opens the position.
     await table.getByTestId('row-1').getByRole('cell', { name: 'BOND', exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Put on 2.00 BOND at 97.00' })).toBeVisible()
   })
 
-  test('a request past its deadline is a to-do: its premium waits in the contract until it is cancelled', async ({ page }) => {
+  test('a request past its deadline is a to-do, and Orders still offers to cancel it', async ({ page }) => {
     await openApp(page, '/portfolio?tab=orders', { connect: true })
     const request = page.getByRole('table', { name: /^Your requests/ }).getByTestId('request-0')
     const deadline = Date.parse((await request.locator('time').first().getAttribute('datetime')) ?? '')
@@ -128,8 +155,16 @@ test.describe('Portfolio', () => {
     await page.clock.setFixedTime(deadline + 60_000)
 
     const card = page.getByTestId('todo-request-0')
-    await expect(card).toContainText(/^Take back 0\.92 USDx from your expired request/, { timeout: 20_000 })
-    await expect(card).toContainText('No maker filled your request for a put on 2.00 BOND. The premium stays in the contract until you cancel it.')
+    // The mock prices its requests from the time left, so the figure is read from the row, not pinned.
+    await expect(card).toContainText(/^Take back \d+\.\d{2}\sUSDx from your expired request/, { timeout: 20_000 })
+    const taken = /^Take back (\d+\.\d{2})/.exec((await card.textContent()) ?? '')?.[1]
+    expect(taken, 'the amount on the card').toBeTruthy()
+    await expect(request).toContainText(taken!)
+    await expect(card).toContainText('No maker filled your request for a put on 2.00 BOND.')
+    await expect(card).not.toContainText('stays in the contract')
+    // The open request past its deadline can be cancelled from its row too.
+    await expect(request).toContainText('Expired. Cancel it to get the premium back')
+    await expect(request.getByRole('button', { name: /^Cancel request/ })).toBeEnabled()
     await card.getByRole('button', { name: 'Cancel request' }).click()
     const dialog = await openedDialog(page, 'Cancel request')
     await expect(dialog).toContainText('This request expired without a maker.')
@@ -168,7 +203,7 @@ test.describe('Portfolio', () => {
     await goTo(page, 'Portfolio')
     await expect(page.getByTestId('todo-exercise-0')).toContainText('You hold 1.00 of the 10.00 FUND this exercise delivers.')
 
-    await page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-0').getByRole('link', { name: /^Put on 10\.00 FUND/ }).click()
+    await page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-0').getByRole('link', { name: /^Put on 10\.00\sFUND/ }).click()
     const main = page.locator('main')
     await expect(main).toContainText('You hold 1.00 of the 10.00 FUND this exercise delivers.')
     await main.getByRole('button', { name: 'Exercise', exact: true }).click()
@@ -186,7 +221,8 @@ test.describe('Portfolio', () => {
     await expect(dialog).toContainText('Demo price 10.20 USDx')
     // Feasibility with exact figures: the option is still active and the wallet holds what it must deliver.
     const checks = dialog.getByRole('region', { name: 'Checked before you sign' })
-    await expect(checks).toContainText(/^Read from the contract: the option is active/)
+    // Mock data is not read from a contract, and the line says so.
+    await expect(checks).toContainText(/^Mock data: the option is active/)
     await expect(checks).toContainText('you hold 120.00 FUND')
 
     const receipt = await confirmAndReadReceipt(dialog, 'Exercise')
@@ -265,7 +301,7 @@ test.describe('Portfolio', () => {
     await page.clock.setFixedTime(deadline + 30_000)
     await expect(page.getByTestId('todo-exercise-0')).toHaveCount(0, { timeout: 20_000 })
     const expired = page.getByTestId('lapsed-0')
-    await expect(expired).toContainText(/Your put on 10\.00 FUND expired on .+ without being exercised\./, { timeout: 20_000 })
+    await expect(expired).toContainText(/Your put on 10\.00\sFUND expired on .+ without being exercised\./, { timeout: 20_000 })
     await expect(expired.getByRole('button')).toHaveCount(0)
     await expect(page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-0')).toHaveCount(0)
   })
@@ -276,7 +312,7 @@ test.describe('Portfolio', () => {
 
     const dialog = await openedDialog(page, 'Claim delivery')
     await expect(dialog).toContainText('The holder exercised this call and paid 98.00 USDx. Claiming moves it from the contract to your wallet.')
-    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText(/^Read from the contract at \d\d:\d\d:\d\d UTC: the option is exercised and 98\.00 USDx waits in the contract\.$/)
+    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText(/^Mock data, \d\d:\d\d:\d\d\sUTC: the option is exercised and 98\.00\sUSDx waits in the contract\.$/)
 
     const receipt = await confirmAndReadReceipt(dialog, 'Claim delivery')
     await expect(page.getByRole('dialog', { name: 'Delivery claimed: call on 1.00 BOND' })).toBeVisible()
@@ -340,24 +376,24 @@ test.describe('Portfolio', () => {
   test('list a position for sale through the ticket, then cancel the listing', async ({ page }) => {
     await openApp(page, '/portfolio', { connect: true })
     // The row's word is the link to the position page.
-    await page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-1').getByRole('link', { name: /^Put on 2\.00 BOND/ }).click()
+    await page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-1').getByRole('link', { name: /^Put on 2\.00\sBOND/ }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Put on 2.00 BOND at 97.00' })).toBeVisible()
     // The header says what exercising does; listing has its own name.
     await expect(page.locator('main')).toContainText('Exercise to sell 2.00 BOND for 194.00 USDx, at any time before the deadline.')
 
     await page.locator('main').getByRole('button', { name: 'List for sale', exact: true }).click()
     await expect(page).toHaveURL(/do=sell/)
-    await listThroughTicket(page, '1.25')
+    const ask = await listThroughTicket(page, '1.25')
     expect(await currentPath(page)).toBe('/portfolio/1')
 
     // The position now carries its listing: the price on the note, re-pricing and withdrawing as actions.
-    await expect(page.locator('main')).toContainText('It is listed for resale at 1.25 USDx.')
+    await expect(page.locator('main')).toContainText(`It is listed for resale at ${ask} USDx.`)
     await expect(page.locator('main').getByRole('button', { name: 'Change price' })).toBeVisible()
     await page.locator('main').getByRole('button', { name: 'Cancel listing' }).click()
 
     const dialog = await openedDialog(page, 'Cancel listing')
-    await expect(dialog).toContainText('Your put on 2.00 BOND is no longer for sale at 1.25 USDx. You keep the option and can still exercise it before the deadline.')
-    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('it is for sale at 1.25 USDx')
+    await expect(dialog).toContainText(`Your put on 2.00 BOND is no longer for sale at ${ask} USDx. You keep the option and can still exercise it before the deadline.`)
+    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText(`it is for sale at ${ask} USDx`)
     await confirmAndReadReceipt(dialog, 'Cancel listing')
     await expect(page.getByRole('dialog', { name: 'Listing cancelled: put on 2.00 BOND' })).toBeVisible()
     await done(dialog)
@@ -370,24 +406,60 @@ test.describe('Portfolio', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Portfolio' })).toBeVisible()
   })
 
-  test('a holding row lists the option for sale in place, without leaving the list', async ({ page }) => {
+  test('a holding row lists the option for sale in place, and its listing can be changed or withdrawn there', async ({ page }) => {
     await openApp(page, '/portfolio', { connect: true })
     await page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-1').getByRole('button', { name: /^List for sale/ }).click()
-    await listThroughTicket(page, '1.10')
+    const ask = await listThroughTicket(page, '1.10')
     expect(await currentPath(page)).toBe('/portfolio')
     const row = page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-1')
-    await expect(row).toContainText('Listed for resale at 1.10 USDx')
+    await expect(row).toContainText(`Listed for resale at ${ask} USDx`)
+    // The row offers every action of the position page: change the price, or cancel the listing beside it.
     await expect(row.getByRole('button', { name: /^Change price/ })).toBeVisible()
+    await row.getByRole('button', { name: /^Cancel listing/ }).click()
+    const dialog = await openedDialog(page, 'Cancel listing')
+    await confirmAndReadReceipt(dialog, 'Cancel listing')
+    await done(dialog)
+    await expect(row.getByRole('button', { name: /^List for sale/ })).toBeVisible()
+    await expect(row.getByRole('button', { name: /^Cancel listing/ })).toHaveCount(0)
+  })
+
+  test('after an outcome-unknown transaction the position says so in place of its action, and the rest wait', async ({ page }) => {
+    await openApp(page, '/portfolio', { connect: true })
+    await page.getByTestId('todo-reclaim-4').getByRole('button', { name: 'Reclaim' }).click()
+    const dialog = await openedDialog(page, 'Reclaim collateral')
+    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('48.00 USDx waits in the contract')
+    await failNext(page, 'unknown')
+    await dialog.getByRole('button', { name: 'Reclaim', exact: true }).click()
+    await expect(dialog.getByRole('group', { name: 'Transaction progress' })).toContainText('Outcome unknown')
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+
+    // The card of that option: the state and "Check again" in place of Reclaim.
+    const card = page.getByTestId('todo-reclaim-4')
+    await expect(card.getByTestId('tx-state')).toHaveText('Outcome unknown')
+    await expect(card.getByRole('button', { name: 'Reclaim', exact: true })).toHaveCount(0)
+    // Every other action waits for it, and says why.
+    const exercise = page.getByTestId('todo-exercise-0').getByRole('button', { name: 'Exercise' })
+    await expect(exercise).toHaveAttribute('aria-disabled', 'true')
+    await expect(exercise).toHaveAccessibleDescription(/Check it in Activity/)
+    // The row of that option says the same.
+    await page.getByRole('tab', { name: /^Written/ }).click()
+    await expect(page.getByRole('table', { name: /^Options you wrote/ }).getByTestId('row-4').getByTestId('tx-state')).toHaveText('Outcome unknown')
+
+    // Checking again finds the reclaim confirmed: the card goes and the other actions are back.
+    await card.getByRole('button', { name: /^Check again/ }).click()
+    await expect(card).toHaveCount(0)
+    await expect(exercise).not.toHaveAttribute('aria-disabled', 'true')
   })
 
   test('a listing shows under Orders with its price and can be withdrawn there', async ({ page }) => {
     await openApp(page, '/portfolio/1?do=sell', { connect: true })
-    await listThroughTicket(page, '1.25')
+    const ask = await listThroughTicket(page, '1.25')
 
     await page.locator('main').getByRole('link', { name: 'Portfolio' }).click()
     await page.getByRole('tab', { name: /^Orders/ }).click()
     const listing = page.getByRole('table', { name: /^Your resale listings/ }).getByTestId('listing-1')
-    await expect(listing).toContainText('1.25')
+    await expect(listing).toContainText(ask)
     await expect(listing.getByRole('button', { name: /^Change price/ })).toBeVisible()
 
     // Withdrawn from the list itself: the receipt links to the position, and the row is gone afterwards.
@@ -485,7 +557,8 @@ test.describe('Portfolio', () => {
     await expect(main).not.toContainText('FUND-2026')
 
     const note = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Long put, FUND' }) })
-    await expect(note).toContainText('No. 000000')
+    // The serial line prints the option number as the contract does, unpadded.
+    await expect(note).toContainText(/No\.\s0(?!\d)/)
     await expect(note.getByText('Active', { exact: true })).toBeVisible()
     for (const term of ['Quantity', 'Strike', 'Original premium', 'Breakeven', 'Deadline', 'At the reference', 'Exercise value', 'Collateral in the contract', 'Maker']) {
       await expect(note.locator('dt', { hasText: term }).first()).toBeVisible()
@@ -493,16 +566,24 @@ test.describe('Portfolio', () => {
     await expect(note.locator('dt', { hasText: 'Writer' })).toHaveCount(0)
     await expect(note).toContainText('Demo price 10.20, below the strike 10.60')
     await expect(note.locator('time')).toContainText('UTC')
-    await expect(note.getByRole('timer')).toBeVisible()
+    // The countdown is in the header, once: the note does not repeat it.
+    await expect(note.getByRole('timer')).toHaveCount(0)
+    await expect(main.locator('header').getByRole('timer')).toBeVisible()
+    // This browser did not buy the option: its breakeven comes from the original premium and says so.
+    await expect(note.locator('dt', { hasText: 'Breakeven at the original premium' })).toBeVisible()
+    // The exercise value is a value, not a gain.
+    await expect(note).not.toContainText('+4.00')
     // One figure under the highlighter: the holder's breakeven.
     await expect(note.locator('mark')).toHaveCount(1)
 
     // The payoff figure: required caption, a readout that leads with what exercising pays, an assumed price that
-    // the keyboard moves.
+    // the keyboard moves. The figures drawn from the original premium say so.
     const figure = page.locator('figure').filter({ has: page.getByTestId('payoff-chart') })
     await expect(figure.locator('figcaption')).toContainText(PAYOFF_CAPTION)
-    await expect(figure.locator('figcaption')).toContainText('Premium included.')
+    await expect(figure.locator('figcaption')).toContainText('Original premium included.')
+    await expect(figure).toContainText('Most you can lose at the original premium')
     await expect(page.getByTestId('payoff-readout')).toContainText('If FUND is at 10.20 at the deadline, exercising pays')
+    await expect(page.getByTestId('payoff-readout')).not.toContainText('+4.00')
     await expect(page.getByTestId('payoff-readout')).toContainText('After the 4.30 USDx original premium:')
     const slider = figure.getByRole('slider')
     const before = await slider.getAttribute('aria-valuetext')
@@ -517,6 +598,9 @@ test.describe('Portfolio', () => {
     await expect(lifecycle.locator('[aria-current="step"]')).toContainText('Until the deadline')
     await expect(lifecycle).toContainText('You can exercise at any time')
     await expect(lifecycle).toContainText('The deadline passes')
+    // Holding the option does not prove this wallet paid the premium: the first sale is told in the third person.
+    await expect(lifecycle).toContainText('A buyer paid the premium of 4.30 USDx to the maker and became the holder.')
+    await expect(lifecycle).not.toContainText('You paid')
     await expect(lifecycle).not.toContainText('Nothing settles by itself')
     await expect(lifecycle).not.toContainText('acts')
 
@@ -657,13 +741,17 @@ test.describe('Portfolio', () => {
     const list = page.getByRole('list', { name: 'Options you hold' })
     await expect(list).toBeVisible()
     await expect(page.getByRole('table', { name: /^Options you hold/ })).toBeHidden()
-    const row = list.getByRole('link', { name: /Put on 10\.00 FUND at 10\.60/ })
+    const row = list.getByRole('link', { name: /Put on 10\.00\sFUND at\s10\.60/ })
     await expect(row).toContainText('In the money')
-    await expect(row).toContainText('Demo price 10.20, below the strike 10.60')
+    await expect(row).toContainText('Exercise value 4.00 at the demo price 10.20')
     await expect(row).toContainText('left')
     // The premium and the date are on the row too: no column of the table is left out.
     await expect(row).toContainText('Original premium 4.30 USDx')
     await expect(row).toContainText('UTC')
+    // The line under the totals keeps its line box on a touch screen: its link does not double the line height.
+    const lapsed = page.getByTestId('lapsed-5')
+    const lines = await lapsed.evaluate((el) => el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight))
+    expect(lines).toBeLessThanOrEqual(3.1)
     await expect(row).not.toContainText('Active')
     expect((await row.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
     const exercise = page.getByTestId('todo-exercise-0').getByRole('button', { name: 'Exercise' })
@@ -671,14 +759,21 @@ test.describe('Portfolio', () => {
 
     // A maker's row puts what waits for it in the emphasised corner.
     await page.getByRole('tab', { name: /^Written/ }).click()
-    await expect(page.getByRole('list', { name: 'Options you wrote' }).getByRole('link', { name: /Call on 1\.00 BOND/ })).toContainText('Claim 98.00 USDx')
+    await expect(page.getByRole('list', { name: 'Options you wrote' }).getByRole('link', { name: /Call on 1\.00\sBOND/ })).toContainText('Claim 98.00 USDx')
 
     // Orders keep their one action on the phone: a request has no page of its own.
     await page.getByRole('tab', { name: /^Orders/ }).click()
     await expect(page.getByRole('list', { name: 'Your requests' }).getByRole('button', { name: /^Cancel request/ })).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
+    // Below about 360 px the premium and the date each take a line, so neither breaks inside.
     await page.getByRole('tab', { name: /^Holding/ }).click()
+    await page.setViewportSize({ width: 320, height: 740 })
+    const premiumBox = await row.getByText(/^Original premium/).boundingBox()
+    const dateBox = await row.getByText(/UTC$/).boundingBox()
+    expect((dateBox?.y ?? 0) - (premiumBox?.y ?? 0)).toBeGreaterThan(8)
+    await expectNoHorizontalOverflow(page)
+    await page.setViewportSize({ width: 390, height: 844 })
     await row.click()
     await expect(page.getByRole('heading', { level: 1, name: 'Put on 10.00 FUND at 10.60' })).toBeVisible()
     await expect(page.getByTestId('payoff-chart')).toBeVisible()

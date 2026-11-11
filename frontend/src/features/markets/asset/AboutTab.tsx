@@ -2,7 +2,7 @@
 // what its issuer can do and what that means for an option on it. Facts come from the chain (core/assetfacts);
 // a read that failed says so instead of guessing. The contract's own facts live on Reserves, linked from here.
 import { Link as RouterLink } from '@tanstack/react-router'
-import { TIER_MEANING, findReferenceAsset, tierOf } from '../../../core/assets'
+import { findReferenceAsset } from '../../../core/assets'
 import type { AssetFlags } from '../../../core/assetfacts/assetFacts'
 import { ISSUER_POWERS_TITLE, POWERS_COLUMNS, POWER_STATE, describeFlagChange, describeFlags } from '../../../core/assetfacts/assetFacts'
 import { config } from '../../../core/config'
@@ -10,7 +10,8 @@ import { ISSUER_DISCLOSURE } from '../../../core/disclosures'
 import { isMockId } from '../../../core/explorer'
 import type { TokenInfo } from '../../../core/options/types'
 import { useAssetFacts, useBalancesById, useEligibility, useHolderStatus, useMe, useOptionsClient } from '../../../data'
-import { Button, Callout, KeyValue, KeyValueItem, Link, RowHeader, Skeleton, Table, TableWrap, TBody, Td, Th, THead, Tr } from '../../../ui'
+import { Button, Callout, FactTable, KeyValue, KeyValueItem, Link, Skeleton } from '../../../ui'
+import type { FactRow } from '../../../ui'
 import {
   ABOUT,
   ACCESS,
@@ -45,17 +46,10 @@ export interface AboutTabProps {
 /** Every flag on: the effects a flag has when it is on, for the case where the flags themselves are not known. */
 const ALL_ON: AssetFlags = { authRequired: true, authRevocable: true, clawback: true, authImmutable: false }
 
-interface PowerRow {
-  key: string
-  label: string
-  state: string
-  on: boolean
-  effect: string
-}
-
-function powerRows(flags: AssetFlags | null): PowerRow[] {
+/** The three flags and, once the flags are known, whether they can still change, in core/assetfacts's words. */
+function powerRows(flags: AssetFlags | null): FactRow[] {
   const known = flags !== null
-  const rows: PowerRow[] = describeFlags(flags ?? ALL_ON).map((f) => ({ key: f.key, label: f.label, state: known ? (f.on ? POWER_STATE.on : POWER_STATE.off) : NOT_READ, on: known && f.on, effect: f.consequence }))
+  const rows: FactRow[] = describeFlags(flags ?? ALL_ON).map((f) => ({ key: f.key, label: f.label, state: known ? (f.on ? POWER_STATE.on : POWER_STATE.off) : NOT_READ, on: known && f.on, effect: f.consequence }))
   if (flags !== null) {
     const change = describeFlagChange(flags)
     rows.push({ key: change.key, label: change.label, state: change.state, on: change.on, effect: change.consequence })
@@ -63,49 +57,8 @@ function powerRows(flags: AssetFlags | null): PowerRow[] {
   return rows
 }
 
-/** A table where it fits; under about 40rem each power is a stacked row: name and state, the effect under it. */
-function Powers({ flags }: { flags: AssetFlags | null }) {
-  const rows = powerRows(flags)
-  return (
-    <div className={styles.powersWrap}>
-      <TableWrap label={POWERS_CAPTION} className={styles.powersTable}>
-        <Table caption={POWERS_CAPTION} className={styles.powers}>
-          <THead>
-            <Tr>
-              <Th>{POWERS_COLUMNS.power}</Th>
-              <Th>{POWERS_COLUMNS.state}</Th>
-              <Th>{POWERS_COLUMNS.effect}</Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {rows.map((r) => (
-              <Tr key={r.key}>
-                <RowHeader className={styles.power}>{r.label}</RowHeader>
-                <Td className={styles.state} data-on={r.on || undefined}>
-                  {r.state}
-                </Td>
-                <Td className={styles.effect}>{r.effect}</Td>
-              </Tr>
-            ))}
-          </TBody>
-        </Table>
-      </TableWrap>
-      <ul className={styles.powersList} role="list" aria-label={POWERS_CAPTION}>
-        {rows.map((r) => (
-          <li key={r.key}>
-            <p className={styles.powerHead}>
-              <span className={styles.power}>{r.label}</span>
-              <span className={styles.state} data-on={r.on || undefined}>
-                {r.state}
-              </span>
-            </p>
-            <p className={styles.effect}>{r.effect}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+/** The column heads of the powers table, as the Issuer page has them. */
+const COLUMNS = { label: POWERS_COLUMNS.power, state: POWERS_COLUMNS.state, effect: POWERS_COLUMNS.effect } as const
 
 /** "Your access": decided from what the wallet itself lacks first, then from the issuer's authorization. */
 function Access({ token, me }: { token: TokenInfo; me: string }) {
@@ -137,7 +90,6 @@ export function AboutTab({ token }: AboutTabProps) {
   const mockAsset = isMockId(token.contractId)
   const facts = useAssetFacts(token)
   const listed = findReferenceAsset(token.contractId)
-  const tier = tierOf(token)
 
   const d = facts.data
   // A mock asset answers at once with the flags of the regulated asset the mock plays; only a real one has reads
@@ -164,15 +116,12 @@ export function AboutTab({ token }: AboutTabProps) {
         ) : null}
         {d?.partial ? <Callout variant="warning" title={FACTS_PARTIAL} /> : null}
         {d?.native ? <p className={styles.note}>{NATIVE_FACTS}</p> : null}
-        <KeyValue figures="sans" className={styles.facts}>
+        <KeyValue figures="sans">
           <KeyValueItem label={FACT_ROW.issuer}>
             {issuer ? <ChainId value={issuer} length="medium" copyLabel="Copy the issuer address" explorerLabel="View the issuer on the explorer" /> : loading ? <Skeleton width="8rem" /> : UNKNOWN}
           </KeyValueItem>
           <KeyValueItem label={FACT_ROW.contract}>
             <ChainId value={token.contractId} length="medium" copyLabel="Copy the asset contract id" explorerLabel="View the asset contract on the explorer" />
-          </KeyValueItem>
-          <KeyValueItem label={FACT_ROW.tier} hint={TIER_MEANING[tier]}>
-            {tier}
           </KeyValueItem>
           {mockAsset ? null : (
             <>
@@ -209,7 +158,7 @@ export function AboutTab({ token }: AboutTabProps) {
         ) : (
           <>
             {flags === null ? <p className={styles.note}>{UNKNOWN_POWERS_NOTE}</p> : null}
-            <Powers flags={flags} />
+            <FactTable caption={POWERS_CAPTION} columns={COLUMNS} rows={powerRows(flags)} />
           </>
         )}
         <p className={styles.issuer}>{ISSUER_DISCLOSURE}</p>

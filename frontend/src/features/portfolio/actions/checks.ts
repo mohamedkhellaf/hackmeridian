@@ -2,7 +2,7 @@
 // means. Pure. Same rules as core/options/preTrade: a read that is still running says "Checking", a read that
 // failed is "unknown" and never blocks, because the contract is the final check.
 import { clawbackShortfallDisclosure } from '../../../core/disclosures'
-import { formatMoney } from '../../../core/format'
+import { formatMoney, formatUtcClock } from '../../../core/format'
 import type { Fact, PreTradeLine } from '../../../core/options/preTrade'
 import { requiredCollateral } from '../../../core/options/types'
 import type { OptionOffer, TokenInfo } from '../../../core/options/types'
@@ -215,13 +215,17 @@ export function passedPhrase(l: CheckLine): string {
   return `${l.label.toLowerCase()}: ${l.text}`
 }
 
-/** The passed lines as one sentence with the time of the read: "Read from the contract at 14:32:16 UTC: ...". */
-export function checksSentence(at: string | null, lines: readonly CheckLine[]): string | null {
+/**
+ * The passed lines as one sentence with the time of the read: "Read from the contract at 14:32:16 UTC: ...". On mock
+ * data nothing is read from a contract, and the line says so as Reserves does: "Mock data, 14:32:16 UTC: ...".
+ */
+export function checksSentence(at: string | null, lines: readonly CheckLine[], mock = false): string | null {
   const parts = lines.filter((l) => l.status === 'ok').map(passedPhrase)
   if (parts.length === 0) return null
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  if (mock) return at ? `Mock data, ${at}: ${list}.` : `Mock data: ${list}.`
   return at ? `Read from the contract at ${at}: ${list}.` : `Read from the contract: ${list}.`
 }
 
 /** `14:32:16 UTC`, the time of a read, for the checks sentence. Null before the first read. */
-export const readTime = (ms: number | null | undefined): string | null => (ms && ms > 0 ? `${new Date(ms).toISOString().slice(11, 19)} UTC` : null)
+export const readTime = (ms: number | null | undefined): string | null => (ms && ms > 0 ? formatUtcClock(Math.floor(ms / 1000)) : null)

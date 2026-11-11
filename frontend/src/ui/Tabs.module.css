@@ -20,7 +20,10 @@
     list-style: none;
   }
 
-  /* Links between sub-pages never hide one off the edge: in a narrow column they wrap onto a second line. */
+  /*
+   * Links between sub-pages never hide one off the edge: in a narrow column they wrap onto a second line. The two
+   * lines touch (no row gap), so they read as one block above the rule.
+   */
   .navRoot {
     container-type: inline-size;
   }
@@ -28,7 +31,7 @@
   @container (max-width: 24rem) {
     .navList {
       flex-wrap: wrap;
-      column-gap: var(--s-16);
+      gap: 0 var(--s-16);
       overflow-x: visible;
     }
   }

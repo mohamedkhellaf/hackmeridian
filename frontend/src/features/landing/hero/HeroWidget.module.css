@@ -143,13 +143,12 @@
     }
   }
 
-  .outcomeUnit {
-    line-height: 1;
-    font-family: var(--font-sans);
-    font-size: var(--ui-size);
-    font-weight: 500;
-    letter-spacing: normal;
-    color: var(--text-2);
+  /* The figure keeps the size of the outcome row; Amount draws the unit. */
+  .outcomeAmount {
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
   }
 
   /* Two lines are kept, so the note does not change height while the price is dragged. */

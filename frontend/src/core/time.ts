@@ -1,6 +1,7 @@
 // Clock and calendar helpers shared by every core module: one copy of nowSec, MONTHS, the expiry day key and the
 // compact countdown. The display formats of the new UI (`13 Nov 2026, 08:00 UTC`, `2 d 4 h`, deadline urgency)
 // live in core/format; the functions here keep the compact forms the Margin tables and the ported logic use.
+// As in core/format (ruling F7), a duration or a date never breaks inside: its spaces are no-break spaces.
 
 export const SECONDS_PER_DAY = 86_400
 
@@ -14,6 +15,9 @@ export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', '
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
+/** U+00A0: the space inside a date, a time or a duration, so it never breaks across lines (ruling F7). */
+const NBSP = '\u00A0'
+
 /**
  * UTC calendar day of an expiry, `2026-10-29`. This is the one grouping key for expiries: the chain columns,
  * the "lowest offer in this series" lookup and the `expiry=YYYY-MM-DD` search param all use it, so two users in
@@ -26,7 +30,7 @@ export function expiryDay(expiryUnix: number): string {
 /** `29 Oct` for a day key (`2026-10-29`). */
 export function dayLabel(day: string): string {
   const [, m, d] = day.split('-').map(Number)
-  return `${d} ${MONTHS[m - 1]}`
+  return `${d}${NBSP}${MONTHS[m - 1]}`
 }
 
 /**
@@ -40,8 +44,8 @@ export function compactCountdown(expiryUnix: number, atMs: number = Date.now()):
   const d = Math.floor(secs / SECONDS_PER_DAY)
   const h = Math.floor((secs % SECONDS_PER_DAY) / 3600)
   const m = Math.floor((secs % 3600) / 60)
-  if (d > 0) return `${d}d ${h}h`
-  if (h > 0) return `${h}h ${m}m`
+  if (d > 0) return `${d}d${NBSP}${h}h`
+  if (h > 0) return `${h}h${NBSP}${m}m`
   return `${Math.max(m, 1)}m`
 }
 
@@ -49,22 +53,22 @@ export function compactCountdown(expiryUnix: number, atMs: number = Date.now()):
 export function formatDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
   if (s < 60) return `${s}s`
-  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`
-  if (s < SECONDS_PER_DAY) return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
-  return `${Math.floor(s / SECONDS_PER_DAY)}d ${Math.floor((s % SECONDS_PER_DAY) / 3600)}h`
+  if (s < 3600) return `${Math.floor(s / 60)}m${NBSP}${s % 60}s`
+  if (s < SECONDS_PER_DAY) return `${Math.floor(s / 3600)}h${NBSP}${Math.floor((s % 3600) / 60)}m`
+  return `${Math.floor(s / SECONDS_PER_DAY)}d${NBSP}${Math.floor((s % SECONDS_PER_DAY) / 3600)}h`
 }
 
 /** Compact local expiry for tables, `29 Oct 06:04`; the year is added when it is not the current one. */
 export function formatExpiryShort(expiryUnix: number, atMs: number = Date.now()): string {
   const d = new Date(expiryUnix * 1000)
-  const year = d.getFullYear() !== new Date(atMs).getFullYear() ? ` ${d.getFullYear()}` : ''
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}${year} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  const year = d.getFullYear() !== new Date(atMs).getFullYear() ? `${NBSP}${d.getFullYear()}` : ''
+  return `${d.getDate()}${NBSP}${MONTHS[d.getMonth()]}${year} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
 /** UTC time without the zone, `29 Oct 2026 06:04`, for a column whose header says UTC. */
 export function formatUtcShort(unix: number): string {
   const d = new Date(unix * 1000)
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
+  return `${d.getUTCDate()}${NBSP}${MONTHS[d.getUTCMonth()]}${NBSP}${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
 }
 
 /** Value for `<input type="datetime-local">`: local time without a zone, `YYYY-MM-DDTHH:mm`. */

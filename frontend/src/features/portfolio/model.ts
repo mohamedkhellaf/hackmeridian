@@ -1,7 +1,7 @@
 // Pure view helpers of the portfolio feature: names, glyphs, formatted figures and which actions a position
 // allows. No React and no maths on money: every amount is formatted from exact integer units, and anything
 // that compares a strike with a price comes from core/reference through the data layer's `PositionView`.
-import { formatExact, formatMoney, formatUnits, NO_VALUE } from '../../core/format'
+import { formatExact, formatMoney, formatUnits, noBreak, NO_VALUE, withUnit } from '../../core/format'
 import type { Ask, Money, OptionKind, OptionOffer, TokenInfo } from '../../core/options/types'
 import type { ActionKind, Role } from '../../core/portfolio/positions'
 import { priceOf } from '../../core/reference'
@@ -27,8 +27,8 @@ export function glyphOf(kind: OptionKind, role: Role | null): PayoffGlyph {
 /** `5.00 USDx`: two decimals, truncated, grouped. For tables and summaries. */
 export const money = (m: Money): string => formatMoney(m.amount, m.token)
 
-/** `5.00 USDx` with every digit of the amount. For sentences that state what a transaction moves. */
-export const exactMoney = (m: Money): string => `${formatExact(m.amount, m.token.decimals)} ${m.token.code}`
+/** `5.00 USDx` with every digit of the amount, never broken from its unit. For sentences that state what a transaction moves. */
+export const exactMoney = (m: Money): string => withUnit(formatExact(m.amount, m.token.decimals), m.token.code)
 
 export const qtyOf = (o: Pick<OptionOffer, 'underlying' | 'underlyingQty'>): Money => ({ token: o.underlying, amount: o.underlyingQty })
 export const strikeOf = (o: Pick<OptionOffer, 'quote' | 'totalStrike'>): Money => ({ token: o.quote, amount: o.totalStrike })
@@ -61,7 +61,7 @@ export function noteKind(o: Pick<OptionOffer, 'kind' | 'underlying'>, role: Role
   return `${KIND_WORD[o.kind]}, ${o.underlying.code}`
 }
 
-/** The option id as the contract note prints it: `000184`. */
+/** The option id as the contract note prints it, unpadded: `184`. */
 export { serialOf } from '../../core/format/option'
 
 /**
@@ -162,10 +162,10 @@ export function showsCard(t: TodoView): boolean {
   return t.kind === 'exercise' && ((t.urgency !== null && t.urgency !== 'far') || t.moneyness === 'unknown')
 }
 
-/** The premium per whole unit of underlying as text (`0.43 per FUND`), or null when the quantity is zero. */
+/** The premium per whole unit of underlying as text (`0.43 per FUND`, on one line), or null when the quantity is zero. */
 export function premiumPerUnitLine(o: Pick<OptionOffer, 'underlying' | 'quote' | 'underlyingQty' | 'totalPremium'>): string | null {
   const unit = premiumUnits(o)
-  return unit === null ? null : `${formatUnits(unit, o.quote.decimals)} per ${o.underlying.code}`
+  return unit === null ? null : noBreak(`${formatUnits(unit, o.quote.decimals)} per ${o.underlying.code}`)
 }
 
 /**

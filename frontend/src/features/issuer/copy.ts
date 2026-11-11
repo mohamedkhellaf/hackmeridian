@@ -67,7 +67,8 @@ export const COPY = {
     openSplit: (active: number, offered: number, awaiting: number) => `${active} active, ${offered} offered, ${awaiting} waiting for a claim or a reclaim`,
     notRead: 'Not read',
     notAuthorized: (code: string) => `No ${code} option can be exercised, claimed or reclaimed until the issuer authorizes the Covered contract.`,
-    reservesLink: 'See what the contract holds',
+    /** One label per destination (ruling F19): the same words as the landing and the asset About tab. */
+    reservesLink: 'Open Reserves',
   },
 
   powers: {
@@ -151,10 +152,13 @@ export const COPY = {
     duplicate: 'This address is already in the list.',
   },
 
-  /** What the issuer's flags rule out for every account of the asset, said once above the accounts. */
+  /**
+   * What the issuer's flags rule out for every account of the asset, said once above the accounts, in the words
+   * of the powers table (core/assetfacts).
+   */
   limits: {
-    freeze: 'Freeze is not available: Authorization revocable is off.',
-    clawback: 'Claw back is not available: Clawback enabled is off.',
+    freeze: 'Freeze is not available: this issuer cannot freeze.',
+    clawback: 'Claw back is not available: this issuer cannot claw back.',
   },
 
   reasons: {
@@ -196,8 +200,8 @@ export const COPY = {
   authorizeFinal: {
     title: (who: string, code: string) => `Authorize ${who} for ${code}`,
     escrowTitle: (code: string) => `Authorize the Covered contract for ${code}`,
-    description: (code: string) => `Authorization revocable is off for ${code}, so once this account is authorized it can never be frozen.`,
-    escrowDescription: (code: string) => `Authorization revocable is off for ${code}, so once the Covered contract is authorized it can never be frozen.`,
+    description: (code: string) => `The ${code} issuer cannot freeze, so once this account is authorized it can never be frozen.`,
+    escrowDescription: (code: string) => `The ${code} issuer cannot freeze, so once the Covered contract is authorized it can never be frozen.`,
     confirm: 'Authorize',
   },
 
@@ -215,9 +219,10 @@ export const COPY = {
     balance: 'Balance',
     balanceUnknown: 'Not read',
     amount: 'Amount',
-    max: (amount: string, code: string) => `use the full balance, ${amount} ${code}`,
+    // A figure and its code never part at a line end: a no-break space joins them in these sentences.
+    max: (amount: string, code: string) => `use the full balance, ${amount}\u00a0${code}`,
     invalidAmount: (decimals: number) => `Enter an amount above zero with at most ${decimals} decimals.`,
-    overBalance: (balance: string, code: string) => `This balance is ${balance} ${code}. Enter ${balance} or less.`,
+    overBalance: (balance: string, code: string) => `This balance is ${balance}\u00a0${code}. Enter ${balance} or less.`,
     impactTitle: 'What it does to the reserves',
     reserved: 'Reserved for open options',
     heldNow: 'Held now',
@@ -225,10 +230,10 @@ export const COPY = {
     shortAfter: 'Short after this',
     notShort: 'None',
     impactUnknown: 'The reserves of the Covered contract could not be read, so the effect on open options is not shown.',
-    free: (amount: string, code: string) => `Up to ${amount} ${code} is not reserved.`,
+    free: (amount: string, code: string) => `Up to ${amount}\u00a0${code} is not reserved.`,
     freeNone: 'All of it is reserved: any amount leaves the contract short.',
     covered: (held: string, reserved: string) => `The contract still holds what it owes: ${held} held, ${reserved} reserved.`,
-    shortTitle: (amount: string, code: string) => `This leaves the Covered contract ${amount} ${code} short`,
+    shortTitle: (amount: string, code: string) => `This leaves the Covered contract ${amount}\u00a0${code} short`,
     unknownTitle: 'This can create a shortfall for option holders',
     /** Exact wording kept from the previous console. */
     accountWarning: "This takes the tokens without the holder's consent and cannot be undone.",
@@ -244,14 +249,14 @@ export const COPY = {
   labels: {
     authorize: (who: string, code: string) => `Authorize ${who} for ${code}`,
     freeze: (who: string, code: string) => `Freeze ${who} for ${code}`,
-    clawback: (amount: string, code: string, who: string) => `Claw back ${amount} ${code} from ${who}`,
+    clawback: (amount: string, code: string, who: string) => `Claw back ${amount}\u00a0${code} from ${who}`,
   },
 
   /** A confirmed action, in one line. */
   done: {
     authorize: (who: string, code: string) => `Authorized ${who} for ${code}.`,
     freeze: (who: string, code: string) => `Frozen ${who} for ${code}.`,
-    clawback: (amount: string, code: string, who: string) => `Clawed back ${amount} ${code} from ${who}.`,
+    clawback: (amount: string, code: string, who: string) => `Clawed back ${amount}\u00a0${code} from ${who}.`,
   },
 
   tx: {
@@ -290,7 +295,7 @@ export const COPY = {
  */
 export const RESULT_CODE_TEXT: Record<string, string | undefined> = {
   op_no_trust: 'The account has no trustline for this asset.',
-  op_cant_revoke: 'The issuer account does not have the Authorization revocable flag, so it cannot freeze.',
+  op_cant_revoke: 'This issuer cannot freeze: its account does not allow it.',
   op_not_clawback_enabled: 'Clawback is not enabled for this trustline.',
   op_underfunded: 'The account holds less than the amount.',
   op_no_issuer: 'The asset issuer account does not exist.',

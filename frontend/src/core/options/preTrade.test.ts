@@ -36,7 +36,7 @@ describe('preTrade: buy an offer', () => {
     expect(r.issues).toEqual([])
     expect(r.state).toEqual({ label: 'Offer', status: 'ok', text: 'Open' })
     expect(r.account).toEqual({ label: 'Your account', status: 'ok', text: 'Authorized by the FUND issuer' })
-    expect(r.funds).toEqual({ label: 'USDx balance', status: 'ok', text: '1,000.00 USDx' })
+    expect(r.funds).toEqual({ label: 'USDx balance', status: 'ok', text: '1,000.00\u00A0USDx' })
     expect(r.pays).toEqual({ token: USDX, amount: (18n * U) / 10n })
     expect(r.locks).toBeNull()
   })
@@ -73,8 +73,8 @@ describe('preTrade: buy an offer', () => {
     const r = preTrade(action, facts({ option: offer(), balances: bals((12n * U) / 10n, 100n * U) }))
     const issue = r.issues.find((i) => i.code === 'insufficient-funds')
     expect(issue).toMatchObject({ level: 'block', purpose: 'premium', need: { token: USDX, amount: (18n * U) / 10n }, have: { token: USDX, amount: (12n * U) / 10n }, short: { token: USDX, amount: (6n * U) / 10n } })
-    expect(issue?.message).toBe('You have 1.20 USDx; this needs 1.80 USDx. Get test funds or pick a smaller offer.')
-    expect(r.funds).toMatchObject({ status: 'fail', text: '0.60 USDx short' })
+    expect(issue?.message).toBe('You have 1.20\u00A0USDx; this needs 1.80\u00A0USDx. Get test funds or pick a smaller offer.')
+    expect(r.funds).toMatchObject({ status: 'fail', text: '0.60\u00A0USDx short' })
     expect(r.blocked).toBe(true)
   })
 
@@ -112,7 +112,7 @@ describe('preTrade: buy an offer', () => {
     const r = preTrade(action, facts({ option: offer(), balances: bals(1000n * U, 2n * U) }))
     expect(r.blocked).toBe(false)
     expect(codes(r.issues)).toEqual(['warn:exercise-unfunded'])
-    expect(r.issues[0].message).toMatch(/deliver 5\.00 FUND, but you hold 2\.00 FUND/)
+    expect(r.issues[0].message).toMatch(/deliver 5\.00\u00A0FUND, but you hold 2\.00\u00A0FUND/)
   })
 
   it('warns on a premium at or above the total strike', () => {
@@ -158,8 +158,8 @@ describe('preTrade: buy from a holder (resale)', () => {
   it('reports a re-priced listing with both prices', () => {
     const r = preTrade(action, facts({ option, liveAsk: (21n * U) / 10n }))
     expect(r.issues[0]).toMatchObject({ level: 'block', code: 'price-changed', was: { amount: (18n * U) / 10n }, now: { amount: (21n * U) / 10n } })
-    expect(r.issues[0].message).toBe('The seller changed the price to 2.10 USDx (it was 1.80 USDx). Review the new price before buying.')
-    expect(r.state).toMatchObject({ status: 'fail', text: 'Price changed to 2.10 USDx' })
+    expect(r.issues[0].message).toBe('The seller changed the price to 2.10\u00A0USDx (it was 1.80\u00A0USDx). Review the new price before buying.')
+    expect(r.state).toMatchObject({ status: 'fail', text: 'Price changed to 2.10\u00A0USDx' })
   })
 
   it('blocks when the listing is gone (withdrawn, sold, exercised, transferred or expired)', () => {
@@ -176,7 +176,7 @@ describe('preTrade: buy from a holder (resale)', () => {
 
   it('blocks when the price is not affordable, naming what the seller asks', () => {
     const r = preTrade(action, facts({ option, liveAsk: ask.askTotal, balances: bals(U, 100n * U) }))
-    expect(r.issues[0].message).toBe('You have 1.00 USDx; the seller asks 1.80 USDx. Get test funds first.')
+    expect(r.issues[0].message).toBe('You have 1.00\u00A0USDx; the seller asks 1.80\u00A0USDx. Get test funds first.')
   })
 
   it('is pending until both the option and its ask were read', () => {
@@ -201,7 +201,7 @@ describe('preTrade: fill a request', () => {
     const call = { ...bid, kind: 'call' as const }
     const r = preTrade({ type: 'fill-bid', bid: call }, facts({ bid: call, balances: bals(0n, 3n * U) }))
     expect(r.locks).toEqual({ token: FUND, amount: 5n * U })
-    expect(r.issues[0].message).toBe('You have 3.00 FUND; this locks 5.00 FUND. Get test funds or lower the quantity.')
+    expect(r.issues[0].message).toBe('You have 3.00\u00A0FUND; this locks 5.00\u00A0FUND. Get test funds or lower the quantity.')
     expect(tokensFor({ type: 'fill-bid', bid: call })).toEqual([FUND])
   })
 
@@ -236,7 +236,7 @@ describe('preTrade: write an offer', () => {
   it('blocks when the collateral is not there (the old form only coloured the line)', () => {
     const r = preTrade(action, facts({ writerOpenCount: 0, balances: bals(20n * U, 0n) }))
     expect(r.blocked).toBe(true)
-    expect(r.issues[0].message).toBe('You have 20.00 USDx; this locks 50.00 USDx. Get test funds or lower the quantity.')
+    expect(r.issues[0].message).toBe('You have 20.00\u00A0USDx; this locks 50.00\u00A0USDx. Get test funds or lower the quantity.')
   })
 
   it('blocks an unauthorized writer and a token in shortfall', () => {
@@ -257,7 +257,7 @@ describe('preTrade: post a request', () => {
 
   it('blocks at 50 open requests (the old form only warned) and on a short balance', () => {
     expect(preTrade(action, facts({ buyerOpenCount: 50 })).issues[0]).toMatchObject({ level: 'block', code: 'open-cap', who: 'buyer', open: 50 })
-    expect(preTrade(action, facts({ buyerOpenCount: 0, balances: bals(U, 0n) })).issues[0].message).toBe('You have 1.00 USDx; this request escrows 2.00 USDx. Get test funds or lower the premium.')
+    expect(preTrade(action, facts({ buyerOpenCount: 0, balances: bals(U, 0n) })).issues[0].message).toBe('You have 1.00\u00A0USDx; this request escrows 2.00\u00A0USDx. Get test funds or lower the premium.')
   })
 
   it('only warns when the buyer is not authorized: the request can be posted, the option could not be exercised', () => {
@@ -285,7 +285,7 @@ describe('preTrade: exercise', () => {
   it('blocks with the exact gap when the holder cannot deliver', () => {
     const r = preTrade(action, facts({ option: held, balances: bals(0n, 2n * U) }))
     expect(r.issues[0]).toMatchObject({ level: 'block', code: 'insufficient-funds', purpose: 'exercise', short: { amount: 3n * U } })
-    expect(r.issues[0].message).toBe('You have 2.00 FUND; exercising takes 5.00 FUND. Acquire 3.00 FUND before the deadline.')
+    expect(r.issues[0].message).toBe('You have 2.00\u00A0FUND; exercising takes 5.00\u00A0FUND. Acquire 3.00\u00A0FUND before the deadline.')
   })
 
   it('blocks after the deadline, when it is no longer active, and for anyone but the holder', () => {
@@ -306,12 +306,12 @@ describe('preTrade: exercise', () => {
     const r = preTrade(action, facts({ option: held, reference: demoReference('FUND') }))
     const issue = r.issues.find((i) => i.code === 'out-of-the-money')
     expect(issue?.level).toBe('warn')
-    expect(issue?.message).toBe('At the demo price of 10.20 USDx per FUND, this put is out of the money: you would deliver 5.00 FUND, worth about 51.00 USDx, for 50.00 USDx.')
+    expect(issue?.message).toBe('At the demo price of 10.20\u00A0USDx per FUND, this put is out of the money: you would deliver 5.00\u00A0FUND, worth about 51.00\u00A0USDx, for 50.00\u00A0USDx.')
     expect(r.blocked).toBe(false)
     // In the money: no such warning. A bare number is the user's own assumed price.
     expect(codes(preTrade(action, facts({ option: held, reference: 9n * U })).issues)).toEqual([])
     const assumed = preTrade(action, facts({ option: held, reference: 11n * U })).issues[0]
-    expect(assumed.message).toMatch(/^At the assumed price of 11\.00 USDx per FUND/)
+    expect(assumed.message).toMatch(/^At the assumed price of 11\.00\u00A0USDx per FUND/)
     // No price: nothing is guessed.
     expect(preTrade(action, facts({ option: held, reference: null })).issues).toEqual([])
   })
@@ -337,18 +337,18 @@ describe('preTrade: giving away exercise value (review finding 16)', () => {
     const w = preTrade({ type: 'write-offer', offer: draft, quote: USDX }, at('9.20'))
     const issue = w.issues.find((i) => i.code === 'below-exercise-value')
     expect(issue).toMatchObject({ level: 'warn', value: { token: USDX, amount: 4n * U }, paid: { token: USDX, amount: (21n * U) / 100n } })
-    expect(issue?.message).toBe('At the demo price of 9.20 USDx per FUND, the holder could exercise at once for 4.00 USDx. You are paid 0.21 USDx.')
+    expect(issue?.message).toBe('At the demo price of 9.20\u00A0USDx per FUND, the holder could exercise at once for 4.00\u00A0USDx. You are paid 0.21\u00A0USDx.')
     expect(w.blocked).toBe(false)
 
     const bid: Bid = { id: 2n, buyer: 'GBUYER', kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: U, expiry: NOW + 86400, state: 'open', optionId: null }
     const f = preTrade({ type: 'fill-bid', bid }, { ...at('9.20'), bid })
-    expect(f.issues.find((i) => i.code === 'below-exercise-value')?.message).toBe('At the demo price of 9.20 USDx per FUND, the holder could exercise at once for 4.00 USDx. You are paid 1.00 USDx.')
+    expect(f.issues.find((i) => i.code === 'below-exercise-value')?.message).toBe('At the demo price of 9.20\u00A0USDx per FUND, the holder could exercise at once for 4.00\u00A0USDx. You are paid 1.00\u00A0USDx.')
   })
 
   it('warns a holder listing below what exercising now is worth', () => {
     const held = offer({ id: 3n, state: 'active', holder: ME })
     const r = preTrade({ type: 'list-for-sale', option: held, askTotal: U / 2n }, { ...at('9.20'), option: held })
-    expect(r.issues.find((i) => i.code === 'below-exercise-value')?.message).toBe('At the demo price of 9.20 USDx per FUND, exercising now is worth 4.00 USDx. You list for 0.50 USDx.')
+    expect(r.issues.find((i) => i.code === 'below-exercise-value')?.message).toBe('At the demo price of 9.20\u00A0USDx per FUND, exercising now is worth 4.00\u00A0USDx. You list for 0.50\u00A0USDx.')
   })
 
   it('says nothing out of the money, at a fair price, or without a price', () => {

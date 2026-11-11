@@ -5,7 +5,7 @@
 // no tick box.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
-import { usePreTrade, useTxBusy, useUnsettledTx } from '../../data'
+import { useIsMock, usePreTrade, useTxBusy, useUnsettledTx } from '../../data'
 import type { PreTradeView, TxRun, UnsettledTx } from '../../data'
 import { ISSUER_DISCLOSURE } from '../../core/disclosures'
 import type { PreTradeAction, PreTradeLine } from '../../core/options/preTrade'
@@ -22,7 +22,7 @@ import { firstBlocker, readAtText } from './fmt'
 import { useFrame } from './frame'
 import type { SeriesRef } from './frame'
 import type { TicketMode } from './intent'
-import { Issues, StatusValue } from './parts'
+import { FundsLink, Issues, StatusValue } from './parts'
 import { PayoffFigure } from './PayoffFigure'
 import { ReceiptStep } from './ReceiptStep'
 import type { ReceiptView } from './ReceiptStep'
@@ -51,19 +51,31 @@ export interface Deal {
   /** The terms, or null while a form does not describe a valid option yet. */
   leg: Leg | null
   side: Side
-  /** What the pre-trade re-check evaluates. Null while there are no valid terms. */
+  /** What the pre-trade re-check evaluates. Null while there are no valid terms, or when `check` stands in for it. */
   action: PreTradeAction | null
+  /**
+   * The check of an action the pre-trade check does not cover (cancelling a listing): why it cannot go ahead (null:
+   * it can), whether its facts are still being read, and a fresh re-read before the wallet is asked.
+   */
+  check?: { blocked: string | null; pending: boolean; recheck: () => Promise<string | null> }
+  /** A way back to the step this review was opened from (the price form of a listing). */
+  back?: () => void
   /** The body of the Terms step (the forms). Null: the ticket opens on its review (buy, fill, resale buy). */
   terms: ReactNode | null
   /** Why the terms cannot be reviewed yet (a form that does not validate). */
   termsError: string | null
   /** Shows the re-check's warnings on the Terms step too (the forms, where the user can still change the terms). */
   warnOnTerms?: boolean
-  /** The serial line above the review of an existing order: "Offer No. 000047". */
+  /** The serial line above the review of an existing order: "Offer No. 47". */
   serial?: string
   /** What moves: you pay, receive, lock or escrow, with the required sentence beside the premium. */
   money: NoteTerm[]
-  /** The terms and what they mean for this side: strike, quantity, deadline, breakeven, most you can lose, the other party. */
+  /**
+   * The figures a trader decides on, right under the money rows: the breakeven and, for a write or a fill, the most
+   * you can lose or what a written call gives up. (A bought option's worst case is what it pays: it stays in `details`.)
+   */
+  figures?: NoteTerm[]
+  /** The terms, after the outcome sentences: strike, quantity, deadline, a buyer's most you can lose, the other party. */
   details: NoteTerm[]
   /** A way out of a blocking issue that the ticket can offer itself (show the seller's new price, take the next offer). */
   fix?: { label: string; onClick: () => void }
@@ -208,14 +220,15 @@ export function Flow<R>({ deal, tx, start, receipt, startAt }: FlowProps<R>) {
   }, [])
 
   const recheck = pre?.recheck
+  const ownRecheck = deal.check?.recheck
   const confirm = useCallback(async () => {
-    if (!recheck) return
+    if (!recheck && !ownRecheck) return
     setChanged(false)
     setSent({ summary: deal.summary, receipt })
     setStep('sign')
     setRechecking(true)
     // Everything the trade depends on is read again, fresh, before the wallet is asked.
-    const fresh = await recheck().catch(() => null)
+    const fresh = recheck ? await recheck().catch(() => null) : ownRecheck ? { blocked: (await ownRecheck().catch(() => null)) !== null } : null
     if (!alive.current || !isOpen()) return
     setRechecking(false)
     if (fresh?.blocked) {
@@ -225,7 +238,7 @@ export function Flow<R>({ deal, tx, start, receipt, startAt }: FlowProps<R>) {
     }
     const run = await start()
     if (run.result !== null && alive.current) setResult(run.result)
-  }, [recheck, start, deal.summary, receipt, isOpen])
+  }, [recheck, ownRecheck, start, deal.summary, receipt, isOpen])
 
   const backToReview = () => {
     tx.reset()
@@ -233,6 +246,8 @@ export function Flow<R>({ deal, tx, start, receipt, startAt }: FlowProps<R>) {
   }
 
   const blocker = firstBlocker(pre?.issues)
+  // A wallet that cannot pay gets the way to test funds beside the reason, the one place the shortfall is repeated.
+  const fundsBlocker = blocker !== null && (blocker.code === 'insufficient-funds' || blocker.code === 'unfunded-account') ? blocker.message : null
   const connect = (
     <Button variant="primary" fullWidth className={styles.primary} onClick={() => void wallet.connect()}>
       Connect wallet
@@ -240,8 +255,14 @@ export function Flow<R>({ deal, tx, start, receipt, startAt }: FlowProps<R>) {
   )
   const reasonLine = (reason: string | null) =>
     reason ? (
-      <p className={styles.reason} data-testid="action-reason">
-        {reason}
+      <p className={styles.reason}>
+        <span data-testid="action-reason">{reason}</span>
+        {reason === fundsBlocker ? (
+          <>
+            {' '}
+            <FundsLink />
+          </>
+        ) : null}
       </p>
     ) : null
 
@@ -278,13 +299,18 @@ export function Flow<R>({ deal, tx, start, receipt, startAt }: FlowProps<R>) {
       </>
     )
   } else if (shown === 'review' && deal.leg) {
-    const reason = deal.gone ?? blocker?.message ?? (unsettled ? pendingTxNotice(unsettled.sentAt, unsettled.until) : busyElsewhere ? TX_BUSY : !pre ? CHECKS_PENDING : null)
+    const own = deal.check
+    const reason =
+      deal.gone ??
+      blocker?.message ??
+      own?.blocked ??
+      (unsettled ? pendingTxNotice(unsettled.sentAt, unsettled.until) : busyElsewhere ? TX_BUSY : (own ? own.pending : !pre) ? CHECKS_PENDING : null)
     body = (
       <ReviewStep deal={deal} leg={deal.leg} pre={pre} changed={changed} unsettled={unsettled}>
         <Actions>
           {guest ? null : reasonLine(reason)}
-          {hasTerms ? (
-            <Button variant="quiet" onClick={() => setStep('terms')}>
+          {hasTerms || deal.back ? (
+            <Button variant="quiet" onClick={hasTerms ? () => setStep('terms') : deal.back}>
               Back
             </Button>
           ) : null}
@@ -345,29 +371,29 @@ function Rows({ rows, className }: { rows: NoteTerm[]; className?: string }) {
 }
 
 /**
- * The review, ordered by what informs the decision: what moves (with the premium sentence), the issuer sentence,
- * the checks read from the contract, the terms, the outcome on either side of the strike with the commitment, and
- * the payoff figure last, closed.
+ * The review, ordered by what informs the decision: what moves (with the premium sentence) and the figures decided
+ * on (breakeven, and for a maker the most it can lose), the issuer sentence, the checks read from the contract (a
+ * check that did not pass stays a row with its mark), the outcome on either side of the strike with the commitment,
+ * the terms, and the payoff figure last, closed.
  */
 function ReviewStep(props: { deal: Deal; leg: Leg; pre: PreTradeView | null; changed: boolean; unsettled: UnsettledTx | null; children: ReactNode }) {
   const { deal, leg, pre, changed, unsettled } = props
+  const mock = useIsMock()
   const checks = checksOf(pre)
   const at = readAtText(deal.readAt ?? 0) ?? null
   const [first, ...rest] = deal.money
   const blocker = firstBlocker(pre?.issues)
   // One notice, not two: after a re-check that stopped, the Changed notice carries the reason itself.
-  const changedReason = changed ? (deal.gone ?? blocker?.message ?? null) : null
+  const changedReason = changed ? (deal.gone ?? blocker?.message ?? deal.check?.blocked ?? null) : null
   const blocks = (pre?.issues ?? []).filter((i) => !(changed && i === blocker) && !(deal.gone && i.code === 'gone'))
   return (
     <>
       {changed ? (
-        <Callout variant="danger" label="Changed" alert>
+        <Callout variant="danger" alert>
           {changedReason ? `${RECHECK_BLOCKED} ${changedReason}` : RECHECK_BLOCKED}
         </Callout>
       ) : deal.gone ? (
-        <Callout variant="danger" label="Gone">
-          {deal.gone}
-        </Callout>
+        <Callout variant="danger">{deal.gone}</Callout>
       ) : null}
       {unsettled ? (
         <UnsettledNotice onCheck={unsettled.check} checkLabel={CHECK_AGAIN}>
@@ -383,7 +409,7 @@ function ReviewStep(props: { deal: Deal; leg: Leg; pre: PreTradeView | null; cha
             {first.value}
           </KeyValueItem>
         ) : null}
-        {rest.map((row, i) => (
+        {[...rest, ...(deal.figures ?? [])].map((row, i) => (
           <KeyValueItem key={i} label={row.label} marked={row.marked} hint={row.hint}>
             {row.value}
           </KeyValueItem>
@@ -392,15 +418,16 @@ function ReviewStep(props: { deal: Deal; leg: Leg; pre: PreTradeView | null; cha
       {deal.issuerDisclosure ? <p className={styles.issuer}>{ISSUER_DISCLOSURE}</p> : null}
       {checks.passed.length > 0 ? (
         <p className={styles.checks} data-testid="checks">
-          {checksSentence(at, checks.passed)}
+          {checksSentence(at, checks.passed, mock)}
         </p>
       ) : null}
-      <Rows rows={[...checks.rows, ...deal.details]} className={styles.summary} />
+      <Rows rows={checks.rows} className={styles.summary} />
       {deal.notices}
       {pre ? <Issues issues={pre.issues} only="warn" /> : null}
       <p className={styles.outcome} data-testid="outcome">
         {[...(deal.outcome ?? []), deal.commitment].join(' ')}
       </p>
+      <Rows rows={deal.details} className={styles.summary} />
       {deal.chartTitle && !deal.gone ? <PayoffFigure leg={leg} side={deal.side} reference={deal.reference} title={deal.chartTitle} /> : null}
       {props.children}
     </>

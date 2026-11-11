@@ -36,6 +36,20 @@ describe('the worked examples of the Learn page', () => {
     expect(plain(byIntent('lock-buy').collateralText)).toBe('5.00 BOND')
   })
 
+  it('keeps each figure of the note apart from its unit, for Amount: the same figures as the sentences', () => {
+    for (const x of workedExamples()) {
+      for (const [f, text] of [
+        [x.qtyFigure, x.qtyText],
+        [x.premiumFigure, x.premiumText],
+        [x.collateralFigure, x.collateralText],
+      ] as const) {
+        expect(`${f.value}${NBSP}${f.unit}`).toBe(text)
+      }
+    }
+    expect(byIntent('earn-hold').collateralFigure).toEqual({ value: '5.00', unit: 'BOND' })
+    expect(byIntent('earn-buy').collateralFigure).toEqual({ value: '47.50', unit: 'USDx' })
+  })
+
   it('takes breakeven and the extremes from the payoff module', () => {
     const rows = workedExamples().map((x) => [x.intent, x.breakevenText, x.maxLossText, x.maxGainText])
     expect(rows).toEqual([

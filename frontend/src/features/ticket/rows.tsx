@@ -4,7 +4,7 @@
 // quantity (the total beside a per-unit price, the local time and the time left beside a deadline), or where the
 // money sits. A caption never defines its own label.
 import { formatUtc } from '../../core/format'
-import type { Money, OptionKind, TokenInfo } from '../../core/options/types'
+import type { Money, OptionKind } from '../../core/options/types'
 import type { NoteTerm } from '../../ui'
 import { giveUpHint, giveUpValue } from './copy'
 import { moneyText, priceText } from './fmt'
@@ -20,8 +20,8 @@ export const kindRow = (kind: OptionKind): NoteTerm => ({ label: 'Kind', value: 
 export function strikeRow(leg: Leg): NoteTerm {
   return {
     label: 'Strike',
-    value: <PriceText units={strikePerUnit(leg)} quote={leg.quote} />,
-    hint: `Per ${leg.underlying.code}. ${moneyText({ token: leg.quote, amount: leg.totalStrike })} in total.`,
+    value: <PriceText units={strikePerUnit(leg)} quote={leg.quote} per={leg.underlying.code} />,
+    hint: `${moneyText({ token: leg.quote, amount: leg.totalStrike })} in total.`,
   }
 }
 
@@ -65,22 +65,21 @@ export const partyRow = (role: 'Maker' | 'Buyer' | 'Seller', address: string, me
 /** The terms a receipt prints, the same for every mode. `premiumLabel` names the premium for this side. */
 export function receiptTerms(leg: Leg, premiumLabel: string, collateral: Money | null): NoteTerm[] {
   const terms: NoteTerm[] = [
-    {
-      label: 'Strike',
-      value: (
-        <>
-          <PriceText units={strikePerUnit(leg)} quote={leg.quote} /> per {leg.underlying.code}
-        </>
-      ),
-    },
+    { label: 'Strike', value: <PriceText units={strikePerUnit(leg)} quote={leg.quote} per={leg.underlying.code} /> },
     { label: 'Quantity', value: <MoneyText money={{ token: leg.underlying, amount: leg.underlyingQty }} /> },
     { label: premiumLabel, value: <MoneyText money={{ token: leg.quote, amount: leg.totalPremium }} /> },
     { label: 'Breakeven', value: <PriceText units={breakevenPerUnit(leg)} quote={leg.quote} />, marked: true },
     { label: 'Deadline', value: formatUtc(leg.expiry) },
   ]
-  if (collateral) terms.push({ label: 'Collateral', value: `${moneyText(collateral)} in the contract` })
+  if (collateral) {
+    terms.push({
+      label: 'Collateral',
+      value: (
+        <>
+          <MoneyText money={collateral} /> in the contract
+        </>
+      ),
+    })
+  }
   return terms
 }
-
-/** `0.36 USDx per BOND`. */
-export const perUnitPhrase = (units: bigint | null, quote: TokenInfo, underlying: TokenInfo): string => `${priceText(units, quote)} per ${underlying.code}`

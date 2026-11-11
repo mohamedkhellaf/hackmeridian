@@ -1,4 +1,8 @@
 @layer features {
+  /*
+   * One card per request, the same card as on the asset page's Requests tab (ruling F15): what is wanted and the
+   * premium per unit, the strike and the total, the deadline and the time left, then the buyer and the action.
+   */
   .list {
     display: flex;
     flex-direction: column;
@@ -47,13 +51,26 @@
     }
   }
 
+  /*
+   * A line of the card: a term on the left, its figure on the right. The right-hand figure keeps its line; the left
+   * side wraps inside (the demo price drops under the strike on a narrow phone). Only the title line lets the
+   * premium drop beneath it.
+   */
   .line {
     display: flex;
-    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
     gap: 0 var(--s-12);
     min-width: 0;
+
+    &:first-child {
+      flex-wrap: wrap;
+    }
+
+    & > .terms {
+      flex: 0 1 auto;
+      min-width: 0;
+    }
   }
 
   .title {
@@ -75,19 +92,33 @@
   }
 
   .premium {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-4);
     margin: 0;
     margin-inline-start: auto;
+    white-space: nowrap;
+  }
+
+  .per {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
   }
 
   .terms {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0 var(--s-8);
+    gap: 0 var(--s-6);
     margin: 0;
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
+  }
+
+  .label {
+    color: var(--muted);
   }
 
   .reference {
@@ -107,6 +138,7 @@
   }
 
   .aside {
+    flex: none;
     margin: 0;
     margin-inline-start: auto;
     font-size: var(--caption-size);
@@ -117,7 +149,7 @@
 
   .foot {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: var(--s-12);
     margin-top: var(--s-8);
@@ -131,28 +163,6 @@
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     color: var(--muted);
-  }
-
-  .lock {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: 500;
-    color: var(--text);
-  }
-
-  .yours {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .short {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s-4);
-    font-weight: 500;
-    color: var(--warn);
   }
 
   /* The one state of "My requests" that asks for an action: in ink, with the warning glyph. */
@@ -185,13 +195,6 @@
     display: inline-flex;
     align-items: center;
     gap: var(--s-8);
-  }
-
-  .serial {
-    font-family: var(--font-mono);
-    font-size: var(--mono-size);
-    line-height: var(--mono-line);
-    font-feature-settings: 'zero';
   }
 
   .action {

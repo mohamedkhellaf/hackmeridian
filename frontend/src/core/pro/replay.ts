@@ -305,6 +305,20 @@ export function deriveModel(sc: RawScenario, cursor: number): ProModel {
 /** Matches the next scripted step of `op` that an action refers to. */
 export type StepMatcher = (s: RawStep) => boolean
 
+/** The party a step acts as (its first argument when that is a party name), or null (set_time, settle...). */
+export function stepActor(s: RawStep): string | null {
+  const a = s.args[0]
+  return typeof a === 'string' && /^[A-Z][A-Z0-9_]*$/.test(a) ? a : null
+}
+
+/**
+ * The next get_requirement step for `who` at or after `cursor`: the step where the scenario records that account's
+ * requirement (or the vault's, with VAULT). -1 when it records none later.
+ */
+export function nextRequirementStep(sc: RawScenario, cursor: number, who: string): number {
+  return findScripted(sc, cursor, 'get_requirement', (s) => isOk(s) && s.args[0] === who)
+}
+
 /** First step at or after `cursor` with the op and arguments of the action; -1 when the script has none. */
 export function findScripted(sc: RawScenario, cursor: number, op: string, match: StepMatcher): number {
   for (let i = cursor; i < sc.steps.length; i++) {

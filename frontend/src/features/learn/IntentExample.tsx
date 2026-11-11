@@ -1,12 +1,12 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import { PAYOFF_CAPTION } from '../../core/disclosures'
 import type { GuidedIntent } from '../../core/payoff/strategies'
-import { ButtonLink, Card, ContractNote, DateTime } from '../../ui'
+import { Amount, ButtonLink, Card, ContractNote, DateTime } from '../../ui'
 import type { NoteTerm, PayoffGlyph } from '../../ui'
 import { OutcomeCards, WithWithoutChart } from '../../viz'
 import { INTENT_COPY, OUTCOMES_LABEL, OUTCOMES_TITLE, TERM_LABELS, breakevenLabel, premiumPerUnit, scenarioDelta, scenarioLabel } from './content'
 import { Disclosure } from './Disclosure'
-import type { WorkedExample } from './examples'
+import type { Figure, WorkedExample } from './examples'
 import css from './IntentExample.module.css'
 
 const GLYPH: Record<GuidedIntent, PayoffGlyph> = {
@@ -37,19 +37,23 @@ export function IntentExample({ example: x, deadline, deadlineText, defaultOpen 
   const copy = INTENT_COPY[x.intent]
   const unit = x.quoteCode
 
+  // Every figure with a unit goes through Amount, which sets the unit beside the serif figure and keeps the two on one line.
+  const amount = (value: string, figureUnit: string = unit) => <Amount value={value} unit={figureUnit} figure="serif" />
+  const fig = (f: Figure) => amount(f.value, f.unit)
+
   const terms: NoteTerm[] = [
-    { label: TERM_LABELS.quantity, value: x.qtyText },
-    { label: copy.strikeLabel(x), value: `${x.strikePerUnitText} ${unit}` },
-    { label: copy.premiumLabel, value: x.premiumText, hint: premiumPerUnit(x) },
-    { label: copy.collateralLabel, value: x.collateralText },
+    { label: TERM_LABELS.quantity, value: fig(x.qtyFigure) },
+    { label: copy.strikeLabel(x), value: amount(x.strikePerUnitText) },
+    { label: copy.premiumLabel, value: fig(x.premiumFigure), hint: premiumPerUnit(x) },
+    { label: copy.collateralLabel, value: fig(x.collateralFigure) },
     { label: TERM_LABELS.deadline, value: <DateTime value={deadline * 1000} local="below" /> },
-    { label: breakevenLabel(x), value: `${x.breakevenText} ${unit}` },
+    { label: breakevenLabel(x), value: amount(x.breakevenText) },
     copy.givesUp
       ? { label: TERM_LABELS.givesUp, value: copy.givesUp.value(x), hint: copy.givesUp.hint(x) }
-      : { label: TERM_LABELS.maxLoss, value: `${x.maxLossText} ${unit}`, hint: copy.maxLossHint?.(x) },
+      : { label: TERM_LABELS.maxLoss, value: amount(x.maxLossText), hint: copy.maxLossHint?.(x) },
     {
       label: TERM_LABELS.maxGain,
-      value: x.maxGainText === null ? TERM_LABELS.noCap : `${x.maxGainText} ${unit}`,
+      value: x.maxGainText === null ? TERM_LABELS.noCap : amount(x.maxGainText),
       hint: copy.maxGainHint?.(x),
     },
   ]

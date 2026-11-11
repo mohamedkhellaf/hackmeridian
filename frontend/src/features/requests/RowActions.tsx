@@ -1,10 +1,10 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import { NO_VALUE } from '../../core/format'
 import { bidSubject, useSubjectBusy, useTxBusy } from '../../data'
-import { Button, ButtonLink, Link, VisuallyHidden } from '../../ui'
+import { Button, ButtonLink, VisuallyHidden } from '../../ui'
 import { holdsEscrow } from './board'
 import type { RequestRow } from './board'
-import { CANCELLING, CANCEL_REQUEST, FILL_REQUEST, NO_ACTION, TAKING_BACK, TX_BUSY_REASON, VIEW_POSITION, cancelLabel, fillLabel, positionLabel, takeBack, takeBackLabel } from './copy'
+import { CANCELLING, CANCEL_REQUEST, FILL_REQUEST, NO_ACTION, TX_BUSY_REASON, VIEW_POSITION, cancelLabel, fillLabel, positionLabel } from './copy'
 import { PORTFOLIO_POSITION_ROUTE } from './routing'
 import styles from './RowActions.module.css'
 
@@ -12,15 +12,16 @@ export interface RowActionsProps {
   row: RequestRow
   /** `board`: a maker's view. `mine`: every row is the wallet's own, in any state. */
   variant: 'board' | 'mine'
-  /** `table`: 28 px buttons in the pinned column. `list`: full-size buttons at the foot of a row. */
+  /** `table`: small buttons in the pinned column. `list`: touch-sized buttons at the foot of a card. */
   layout: 'table' | 'list'
   onSell: (row: RequestRow) => void
   onCancel: (row: RequestRow) => void
 }
 
 /**
- * The one thing the wallet can do with a request: fill it, cancel its own, take back the premium of its own expired
- * one, or open the position it became.
+ * The one thing the wallet can do with a request: fill it, cancel its own (before or after the deadline: either way
+ * the premium comes back), or open the position it became. Every action is a secondary button of one size per
+ * layout, so the same action looks the same on every row (ruling F14).
  */
 export function RowActions({ row, variant, layout, onSell, onCancel }: RowActionsProps) {
   const busy = useTxBusy()
@@ -28,18 +29,16 @@ export function RowActions({ row, variant, layout, onSell, onCancel }: RowAction
   const size = layout === 'list' ? 'md' : 'sm'
 
   if (row.mine && holdsEscrow(row.bid)) {
-    // The column is fixed in width, so the shorter in-flight word moves nothing around it.
-    const expired = row.state === 'expired'
     return (
-      <Button size={size} loading={rowBusy} disabled={busy && !rowBusy} disabledReason={TX_BUSY_REASON} aria-label={expired ? takeBackLabel(row) : cancelLabel(row)} onClick={() => onCancel(row)}>
-        {rowBusy ? (expired ? TAKING_BACK : CANCELLING) : expired ? takeBack(row.premium) : CANCEL_REQUEST}
+      <Button size={size} loading={rowBusy} disabled={busy && !rowBusy} disabledReason={TX_BUSY_REASON} aria-label={cancelLabel(row)} onClick={() => onCancel(row)}>
+        {rowBusy ? CANCELLING : CANCEL_REQUEST}
       </Button>
     )
   }
 
   if (variant === 'mine') {
     if (row.optionId === null) {
-      // A closed request has nothing left to do. A table cell says so; a list row simply has no button.
+      // A closed request has nothing left to do. A table cell says so; a card simply has no button.
       return layout === 'list' ? null : (
         <>
           <span aria-hidden="true" className={styles.none}>
@@ -49,15 +48,10 @@ export function RowActions({ row, variant, layout, onSell, onCancel }: RowAction
         </>
       )
     }
-    const to = <RouterLink to={PORTFOLIO_POSITION_ROUTE} params={{ id: row.optionId.toString() }} />
-    return layout === 'list' ? (
-      <ButtonLink aria-label={positionLabel(row)} render={to}>
+    return (
+      <ButtonLink size={size} aria-label={positionLabel(row)} render={<RouterLink to={PORTFOLIO_POSITION_ROUTE} params={{ id: row.optionId.toString() }} />}>
         {VIEW_POSITION}
       </ButtonLink>
-    ) : (
-      <Link className={styles.link} aria-label={positionLabel(row)} render={to}>
-        {VIEW_POSITION}
-      </Link>
     )
   }
 

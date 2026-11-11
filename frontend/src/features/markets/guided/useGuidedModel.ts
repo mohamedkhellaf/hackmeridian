@@ -19,7 +19,7 @@ import { useBalances, useGuidedMatch, useMarket, useMe, useNowSec, usePositions 
 import type { GuidedMatch, MarketView } from '../../../data'
 import { searchFromTicketIntent } from '../../ticket'
 import type { TicketIntent } from '../../ticket'
-import { ACTION, INTENT_COPY, OWN_SUMMARY } from './copy'
+import { ACTION, ANOTHER, INTENT_COPY, LOCK_SUMMARY, OWN_SUMMARY, another } from './copy'
 import type { IntentCopy, Words } from './copy'
 import {
   coverWith,
@@ -284,8 +284,21 @@ export function useGuidedModel(assetId: string): GuidedState {
         ? ACTION.ownOffer
         : ACTION.postOffer
   const ownTerms = exact ? own(false) : null
-  const collateral = kind === 'put' ? `${words.strikeTotal} ${words.q}` : `${words.qty} ${words.a}`
-  const summary = qty === null ? null : exact ? copy.summary({ ...words, deadline }) : ownPremium !== null ? OWN_SUMMARY[side]({ ...words, collateral, deadline }) : null
+  const collateral = kind === 'put' ? `${words.strikeTotal}\u00a0${words.q}` : `${words.qty}\u00a0${words.a}`
+  // A seller's deal is said before a premium is typed too: what is locked, and that the price is theirs to ask.
+  const deal =
+    qty === null
+      ? null
+      : exact
+        ? copy.summary({ ...words, deadline })
+        : ownPremium !== null
+          ? OWN_SUMMARY[side]({ ...words, collateral, deadline })
+          : side === 'write'
+            ? LOCK_SUMMARY({ ...words, collateral, deadline })
+            : null
+  // With the wallet's own order or position at these terms, the sentence says it is about another one.
+  const anotherLead = exact ? (exact.source === 'bid' ? ANOTHER.bid : exact.source === 'resale' ? ANOTHER.resale : ANOTHER.offer) : side === 'buy' ? ANOTHER.ownRequest : ANOTHER.ownOffer
+  const summary = deal !== null && mine !== null ? another(anotherLead, deal) : deal
 
   // What the action takes from the quote balance now, for a buyer: the premium. (A seller's shortfall is said
   // under the quantity field, with its figures.)

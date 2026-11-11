@@ -6,9 +6,8 @@ import { hasMarginAck, setMarginAck } from '../../core/market/marginAck'
 import { isProSimulated } from '../../core/pro/createClient'
 import type { SorobanProClient } from '../../core/pro/SorobanProClient'
 import { ProLoader, usePro } from '../../data'
-import { Button, Callout, EmptyNote, Link, NavTab, NavTabs, PageHeader, Skeleton } from '../../ui'
+import { Button, Callout, EmptyNote, NavTab, NavTabs, PageHeader, Skeleton } from '../../ui'
 import { SCREENS, SCREEN_ORDER, SCREEN_PATH } from './copy'
-import { partyName, scenarioCopy } from './model/names'
 import { EntryWarning } from './parts/EntryWarning'
 import { MarginUiProvider } from './parts/MarginUiProvider'
 import { OracleStrip } from './parts/OracleStrip'
@@ -56,21 +55,6 @@ function SubNav({ screen }: { screen: MarginScreen }) {
         </NavTab>
       ))}
     </NavTabs>
-  )
-}
-
-/** Fixture builds: which scenario, which step, as whom and at what time on the scenario's clock, in one line. */
-function ReplayLine() {
-  const { sim, me, model } = usePro()
-  if (!sim) return null
-  return (
-    <p className={css.replayLine}>
-      <span className={css.strong}>{scenarioCopy(sim.scenarioName).title}</span>, step {sim.position} of {sim.stepCount}, as <span className={css.strong}>{partyName(me)}</span>. The
-      scenario stands at {formatUtc(model.now)}.{' '}
-      <Link href="#replay" aria-label="Change scenario, step or account">
-        Change
-      </Link>
-    </p>
   )
 }
 
@@ -124,8 +108,7 @@ function Body({ screen }: { screen: MarginScreen }) {
           </p>
         </Callout>
       ) : null}
-      <ReplayLine />
-      <OracleStrip />
+      <OracleStrip exercise={screen === 'positions'} />
       <OutcomeRegion />
       <Screen screen={screen} />
       <ReplayCard />
@@ -148,7 +131,7 @@ export function MarginPage({ screen }: { screen: MarginScreen }) {
 
   return (
     <div className={css.page}>
-      <PageHeader title={copy.title} description={copy.description} meta={<Sentences />} headingRef={headingRef} />
+      <PageHeader title={copy.title} meta={<Sentences />} headingRef={headingRef} />
       <SubNav screen={screen} />
       <ProLoader
         loading={<Loading screen={screen} />}

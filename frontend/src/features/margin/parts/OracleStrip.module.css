@@ -1,14 +1,42 @@
 @layer features {
-  /* A ruled strip, like the reference line of a statement: labels above, figures under. */
+  /*
+   * One ruled row, like the reference line of a statement: the scenario on the left (fixtures), the publisher's
+   * figures on the right, labels above them. It wraps to two lines where the two do not fit side by side.
+   */
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-12) var(--s-40);
+    /* The sub-navigation's rule is directly above: the row closes with its own rule only. */
+    padding-block-end: var(--s-12);
+    border-block-end: 1px solid var(--hairline);
+  }
+
+  .scenario {
+    flex: 1 1 18rem;
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .strong {
+    font-weight: 600;
+    color: var(--text);
+  }
+
   .root {
-    padding-block: var(--s-12);
-    border-block: 1px solid var(--hairline);
+    flex: 0 1 auto;
+    min-width: 0;
   }
 
   .facts {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--s-12) var(--s-40);
+    gap: var(--s-12) var(--s-32);
     margin: 0;
   }
 
@@ -36,6 +64,7 @@
       font-weight: 500;
       font-variant-numeric: tabular-nums lining-nums;
       color: var(--text);
+      white-space: nowrap;
     }
 
     & dd[data-warn] {
@@ -45,16 +74,6 @@
 
   .fact dd.figure {
     align-items: baseline;
-    font-family: var(--font-serif);
-    font-size: var(--figure-size);
-    font-weight: var(--figure-weight);
-  }
-
-  .unit {
-    font-family: var(--font-sans);
-    font-size: var(--label-size);
-    font-weight: 500;
-    color: var(--muted);
   }
 
   .icon {
@@ -63,11 +82,42 @@
     height: var(--icon);
   }
 
+  /* Under 768 px: the figures are one line of text under the scenario sentence. */
+  .line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-6);
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+
+    &[data-warn] .icon {
+      margin-top: var(--s-2);
+      color: var(--warn);
+    }
+  }
+
+  .part {
+    display: inline-block;
+  }
+
+  .price {
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
   @media (max-width: 767.98px) {
-    .facts {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: var(--s-12) var(--s-16);
+    .row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--s-6);
+      padding-block-end: var(--s-8);
+    }
+
+    .scenario {
+      flex: none;
     }
   }
 }

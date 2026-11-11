@@ -16,7 +16,8 @@ import { CancelDialog } from './CancelDialog'
 import { ChainTable } from './ChainTable'
 import { COPY } from './copy'
 import { ExpiryBar } from './ExpiryBar'
-import { missingDeadlineLine, referenceLine, resolveSelection, selectionSearch, seriesTitle, strikeParam, takeableOf } from './model'
+import { halfAction, halfRow, missingDeadlineLine, referenceLine, resolveSelection, selectionSearch, seriesTitle, strikeParam } from './model'
+import type { Half } from './model'
 import { OtherOffers } from './OtherOffers'
 import { SeriesPanel } from './SeriesPanel'
 import type { Reveal } from './SeriesPanel'
@@ -162,38 +163,38 @@ function Chain({ view, narrow, listBook, listSeries, bidsOn, refreshFailed, onRe
     [openTicket, assetId, decimals],
   )
 
-  const pick = useCallback(
-    (picked: GridCell) => {
+  // A press on one half of a cell (ruling F3): the offer opens Buy on it and the request opens Fill on it (from 1200
+  // px, where the ticket is a column); an empty half opens the request form on the series (ruling F2); a write or
+  // request form that is open follows the selection instead; below 1200 px a price selects its series and brings
+  // the book into view. Pressing the selected series again closes it, unless that press opens another order.
+  const press = useCallback(
+    (picked: GridCell, half: Half) => {
       const title = seriesTitle(code, picked.ref, decimals)
+      const again = picked.key === selectedKey
       setMoved(null)
-      if (picked.empty && picked.bids === 0 && bidsOn && keptSide !== 'write') {
-        // An empty cell asks for a price: the series is selected and the request form opens on it. A maker with
-        // the write form open is not asking: the form follows the selection instead.
-        openOnSeries('bid', picked.ref)
-        announce(`${title}. No offer or request. Ask for a price.`)
+      const action = halfAction(halfRow(picked, half), { bidsOn, me, wide, form: keptSide ?? null })
+      if (again && keptSide) return
+      if (action.kind === 'post' || action.kind === 'write') {
+        // The form that opens announces itself; the chain does not talk over it.
+        openOnSeries(action.kind === 'post' ? 'bid' : 'write', picked.ref)
         return
       }
-      if (picked.key === selectedKey) {
-        // Pressing the selected cell again closes its panel, unless a write or request form is following it.
-        if (keptSide) return
+      const intent = action.kind === 'take' && !(again && ticketKey === action.row.key) ? ticketFor(action.row) : null
+      if (intent) {
+        openTicket(intent, picked.ref)
+        return
+      }
+      if (again) {
         patch({ ...CLEAR_TICKET, kind: undefined, strike: undefined })
         announce(`${title} closed.`)
         return
       }
-      // From 1200 px the ticket opens beside the chain on the best order the wallet can take there.
-      const best = wide && !keptSide ? takeableOf(picked, me) : null
-      const intent = best ? ticketFor(best) : null
-      if (intent) {
-        // The ticket that opens announces itself; the chain does not talk over it.
-        openTicket(intent, picked.ref)
-        return
-      }
-      patch({ ...CLEAR_TICKET, side: keptSide, ...selectionSearch(picked.ref, decimals) })
+      patch({ ...CLEAR_TICKET, ...selectionSearch(picked.ref, decimals) })
       // Below 1200 px the book under the chain is the result of the press: bring its heading into view.
       if (!wide) setReveal((prev) => ({ key: picked.key, n: (prev?.n ?? 0) + 1 }))
       announce(`${title} selected. Its offers and requests are listed under the chain.`)
     },
-    [code, decimals, bidsOn, selectedKey, keptSide, patch, openOnSeries, openTicket, wide, me],
+    [code, decimals, bidsOn, me, wide, selectedKey, keptSide, ticketKey, patch, openOnSeries, openTicket],
   )
 
   const take = useCallback(
@@ -233,7 +234,12 @@ function Chain({ view, narrow, listBook, listSeries, bidsOn, refreshFailed, onRe
     )
   }
 
+  const orders = column.offers + column.bids
   const units = COPY.units(view.quote.code, code, formatUtc(column.expiry))
+  // On a phone the number of orders leaves the deadline tab (after a time left it read as hours) for this line.
+  const caption = narrow ? COPY.units(view.quote.code, code, formatUtc(column.expiry), orders) : units
+  // The one line under the chain while nothing is selected: what a press does, or that nothing is posted yet.
+  const hint = orders === 0 ? (bidsOn ? COPY.noOrders : COPY.noOrdersNoBids) : bidsOn ? COPY.selectHint : COPY.selectHintNoBids
 
   return (
     <>
@@ -252,7 +258,7 @@ function Chain({ view, narrow, listBook, listSeries, bidsOn, refreshFailed, onRe
           compact={narrow}
         />
         {moved ? <p className={styles.moved}>{moved.line}</p> : null}
-        <p className={styles.caption}>{units}</p>
+        <p className={styles.caption}>{caption}</p>
         {refreshFailed ? (
           <p className={styles.stale}>
             <IconWarning size={16} />
@@ -267,14 +273,13 @@ function Chain({ view, narrow, listBook, listSeries, bidsOn, refreshFailed, onRe
           view={view}
           column={column}
           selectedKey={selectedKey}
-          bidsOn={bidsOn}
-          me={me}
+          context={{ bidsOn, me, wide, form: keptSide ?? null }}
           compact={narrow}
           caption={`${COPY.chainHeading(code)}. ${units}`}
-          onPick={pick}
+          onPress={press}
         />
         <p className={styles.legend}>{reference ? COPY.shaded(reference.phrase) : COPY.noReference}</p>
-        {ref ? null : <p className={styles.hint}>{bidsOn ? COPY.selectHint : COPY.selectHintNoBids}</p>}
+        {ref ? null : <p className={styles.hint}>{hint}</p>}
       </section>
 
       {ref ? (
@@ -293,7 +298,7 @@ function Chain({ view, narrow, listBook, listSeries, bidsOn, refreshFailed, onRe
         />
       ) : null}
 
-      <YourOrders view={view} narrow={listSeries} positions={positions} ticketKey={ticketKey} onSelect={show} onCancel={setCancelling} />
+      <YourOrders view={view} narrow={listSeries} positions={positions} selected={ref} ticketKey={ticketKey} onSelect={show} onCancel={setCancelling} />
       <OtherOffers view={view} narrow={listSeries} ticketKey={ticketKey} onTake={take} onCancel={setCancelling} />
       <CancelDialog row={cancelling} onClose={() => setCancelling(null)} />
     </>

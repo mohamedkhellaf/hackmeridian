@@ -3,17 +3,17 @@
 // gap line between them.
 import { Fragment } from 'react'
 import { explorerAccount } from '../../../core/explorer'
-import { formatUnits } from '../../../core/format'
+import { formatUnits, serialOf } from '../../../core/format'
 import { seriesRefOf } from '../../../core/market/selection'
 import { Address, DateTime, Glyph, IconWarning, Marker, shortenAddress } from '../../../ui'
 import { COPY, KIND_WORD, REASON_LABEL, SOURCE_LABEL } from './copy'
 import { premiumText, strikeText } from './model'
 import { OrderAction } from './OrderAction'
-import { isMine, notesOf, orderNumber } from './orders'
+import { idOf, isMine, notesOf } from './orders'
 import type { OrderSection, OrdersProps } from './orders'
 import styles from './OrdersList.module.css'
 
-export function OrdersList({ label, sections, gap = null, showSeries = false, showReason = true, onSelect, sharedReason = null, ticketKey = null, health, explorer, busy, onTake, onCancel }: OrdersProps) {
+export function OrdersList({ label, sections, gap = null, showSeries = false, showReason = true, onSelect, allMine = false, sharedReason = null, ticketKey = null, health, explorer, busy, onTake, onCancel }: OrdersProps) {
   const list = (section: OrderSection) => (
     <ul role="list" className={styles.root} aria-label={section.label ?? label}>
       {section.lines.map((line) => {
@@ -24,6 +24,7 @@ export function OrdersList({ label, sections, gap = null, showSeries = false, sh
         const notes = notesOf(line, health, !showSeries, sharedReason)
         const reason = showSeries ? (showReason && line.reason ? REASON_LABEL[line.reason] : null) : notes.reason
         const best = section.best?.has(row.key) ?? false
+        const id = idOf(row)
         return (
           <li key={row.key} className={styles.item} data-selected={row.key === ticketKey || undefined} data-order={row.key} data-source={row.source}>
             <div className={styles.head}>
@@ -50,17 +51,19 @@ export function OrdersList({ label, sections, gap = null, showSeries = false, sh
                 ) : null}
                 <span className={styles.from}>
                   <span className={styles.source}>{SOURCE_LABEL[row.source]}</span>
-                  {mine ? (
+                  {allMine ? null : mine ? (
                     <span className={styles.own}>{COPY.yoursRow}</span>
                   ) : (
                     <Address value={row.counterparty} copyLabel={null} explorerUrl={explorer ? explorerAccount(row.counterparty) : undefined} explorerLabel={`View ${shortenAddress(row.counterparty)} on the explorer`} />
                   )}
-                  <span className={styles.no}>
-                    {COPY.colNo} {orderNumber(row)}
-                  </span>
+                  {id === null ? null : (
+                    <span className={styles.no}>
+                      {COPY.colNo}&nbsp;{serialOf(id)}
+                    </span>
+                  )}
                 </span>
               </div>
-              <OrderAction line={line} busy={busy} size="md" onTake={onTake} onCancel={onCancel} />
+              <OrderAction line={line} busy={busy} onTake={onTake} onCancel={onCancel} />
             </div>
             <dl className={styles.figures}>
               <div>

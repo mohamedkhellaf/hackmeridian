@@ -7,11 +7,14 @@
 // say falls back to a default computed from what is funded. Every figure comes from core/ and data/ hooks,
 // through the model of useGuidedModel, which the closing block in the rail reads as well.
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { deadlineUrgency, formatCountdown, formatLocal, formatUnits, formatUtcDay, formatUtcTime, isoUtc } from '../../../core/format'
+import { expiryDayKey, plainDecimal } from '../../../core/series'
+import { definitionOf } from '../../../core/glossary'
 import { cellKey } from '../../../core/market/selection'
 import { distancePct } from '../../../core/reference'
 import { shortBy } from '../../../core/units'
-import { Button, Callout, ContractNote, EmptyNote, Skeleton, Timeline, announce, useIsWide } from '../../../ui'
+import { Button, Callout, ContractNote, EmptyNote, Skeleton, Term, Timeline, announce, useIsWide } from '../../../ui'
 import type { ChoiceChip } from '../../../ui'
 import { Available } from './Available'
 import { ActionBar, ClosingBlock } from './Closing'
@@ -65,7 +68,9 @@ import { IntentPicker } from './IntentPicker'
 import { OutcomeCardsBlock, OutcomeDetail } from './Outcome'
 import { useOutcome } from './useOutcome'
 import { Terms } from './Terms'
+import { publishShownSeries } from './shownSeries'
 import { distanceWords, inputAmount, normalizeDecimal } from './terms'
+import { ticketOpen, useGuidedSearch } from './useGuidedSearch'
 import { useGuidedIntent, useGuidedModel } from './useGuidedModel'
 import type { GuidedModel } from './useGuidedModel'
 import styles from './GuidedMode.module.css'
@@ -73,6 +78,15 @@ import styles from './GuidedMode.module.css'
 export function GuidedMode({ assetId }: { assetId: string }) {
   const { intent, setIntent } = useGuidedIntent()
   const state = useGuidedModel(assetId)
+
+  // An open ticket's side and kind decide the intent (terms.ts intentOf): the URL is made to say so, so the
+  // intent stays when the ticket closes. A replace, as the ticket's own changes are.
+  const { search, patch } = useGuidedSearch()
+  const urlIntent = search.intent
+  const open = ticketOpen(search)
+  useEffect(() => {
+    if (open && urlIntent !== intent) patch({ intent }, { replace: true })
+  }, [open, urlIntent, intent, patch])
 
   let body
   if (state.status === 'error') {
@@ -127,6 +141,30 @@ function Flow({ model }: { model: GuidedModel }) {
   const wide = useIsWide()
   const inRail = useClosingInRail()
 
+  // ---- the series on screen, for the switch to the chain
+  const strikeParam = plainDecimal(strike, quote.decimals)
+  const expiryParam = expiryDayKey(expiry)
+  useEffect(() => publishShownSeries(asset.contractId, { kind, strike: strikeParam, expiry: expiryParam }), [asset.contractId, kind, strikeParam, expiryParam])
+
+  // ---- one order on the page (F4): a write or request ticket that a link opened without terms takes the terms
+  // this page shows, never the ticket's own defaults. Once per opening, so a field the user empties in the ticket
+  // is not filled again.
+  const { search, patch } = useGuidedSearch()
+  const formSide = search.side === 'write' || search.side === 'bid' ? search.side : null
+  const seeded = useRef<string | null>(null)
+  const qtyText = qty !== null ? normalizeDecimal(model.qtyDraft.text) : undefined
+  useEffect(() => {
+    if (formSide === null) {
+      seeded.current = null
+      return
+    }
+    if (seeded.current === formSide) return
+    seeded.current = formSide
+    const next = { kind, strike: search.strike ?? strikeParam, expiry: search.expiry ?? expiryParam, qty: search.qty ?? qtyText }
+    if (next.strike === search.strike && next.expiry === search.expiry && next.qty === search.qty && search.kind === kind) return
+    patch(next, { replace: true })
+  }, [formSide, search.strike, search.expiry, search.qty, search.kind, kind, strikeParam, expiryParam, qtyText, patch])
+
   const money = (units: bigint) => formatUnits(units, quote.decimals)
   const units = (amount: bigint) => formatUnits(amount, asset.decimals)
   const referenceLabel = reference.label.toLowerCase()
@@ -135,17 +173,19 @@ function Flow({ model }: { model: GuidedModel }) {
   // ---- a price or a date the link named that is not on the list: the URL is set to what is shown, and that is
   // said once above the chips
   const [notice, setNotice] = useState<string | null>(null)
-  const { dropped, pin } = model
+  const { dropped, pin, ticketIsOpen } = model
   useEffect(() => {
     if (dropped.strike === null && dropped.expiry === null) return
     const parts: string[] = []
     if (dropped.strike !== null) parts.push(OFF_GRID.strike(money(dropped.strike), money(strike), quote.code))
     if (dropped.expiry !== null) parts.push(OFF_GRID.expiry(formatUtcDay(dropped.expiry), formatUtcDay(expiry)))
     setNotice(parts.join(' '))
-    // The URL then names the terms shown, so the dropped ones are reported once per link.
+    // Terms of the user's own typed in an open ticket ("Custom terms") stay with the ticket: closing it under the
+    // user would lose them. Once it is closed, the URL names the terms shown, so the dropped ones are said once.
+    if (ticketIsOpen) return
     pin({ premium: normalizeDecimal(model.premiumDraft.text) }, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dropped.strike, dropped.expiry])
+  }, [dropped.strike, dropped.expiry, ticketIsOpen])
 
   // ---- the quantity field: balances, lots, and what the quantity means
   const { held, cash, max, lots } = model
@@ -285,7 +325,6 @@ function Flow({ model }: { model: GuidedModel }) {
             unit: quote.code,
             hint: strikeHint,
             chipsLabel: STRIKE_CHIPS_LABEL[intent],
-            reference: referenceText ? `${reference.label} ${referenceText} ${quote.code}` : reference.label,
             chips: strikeChips,
             value: strike.toString(),
             onChange: (value) => {
@@ -358,7 +397,7 @@ function Flow({ model }: { model: GuidedModel }) {
             label={WHEN_HEADING}
             items={[
               { time: WHEN.now, title: steps.now.title, description: steps.now.body },
-              { time: WHEN.until, title: steps.until.title, description: steps.until.body },
+              { time: WHEN.until, title: steps.until.title, description: withExercise(steps.until.body) },
               { time: WHEN.at(formatUtcDay(expiry), formatUtcTime(expiry)), title: steps.at.title, description: steps.at.body },
               { time: WHEN.after, title: steps.after.title, description: steps.after.body },
             ]}
@@ -367,6 +406,19 @@ function Flow({ model }: { model: GuidedModel }) {
       </section>
 
       {showBar ? <ActionBar model={model} hidden={closingInPage && closingVisible} /> : null}
+    </>
+  )
+}
+
+/** The step's first "exercise" as the glossary term: one press for its sentence, where the word is met. */
+function withExercise(text: string): ReactNode {
+  const found = /\bexercise\b/.exec(text)
+  if (!found) return text
+  return (
+    <>
+      {text.slice(0, found.index)}
+      <Term definition={definitionOf('exercise')}>{found[0]}</Term>
+      {text.slice(found.index + found[0].length)}
     </>
   )
 }

@@ -10,17 +10,10 @@
     color: var(--muted);
   }
 
+  /* Its link sits in the sentence and keeps the sentence's line box. */
   .note {
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     color: var(--muted);
-  }
-
-  .link {
-    @media (pointer: coarse) {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--touch);
-    }
   }
 }

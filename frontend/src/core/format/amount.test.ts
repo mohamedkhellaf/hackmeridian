@@ -113,15 +113,16 @@ describe('formatExact', () => {
 })
 
 describe('withUnit and formatMoney', () => {
-  it('appends the code after a plain space by default', () => {
-    expect(withUnit('1,080.00', 'USDx')).toBe('1,080.00 USDx')
-    expect(formatMoney(2n * UNIT, USDX)).toBe('2.00 USDx')
-    expect(formatMoney(-18_000_000n, USDX, { sign: true })).toBe(`${MINUS}1.80 USDx`)
+  it('appends the code after a no-break space by default, so the figure never breaks from its unit (ruling F7)', () => {
+    expect(withUnit('1,080.00', 'USDx')).toBe('1,080.00\u00A0USDx')
+    expect(formatMoney(2n * UNIT, USDX)).toBe('2.00\u00A0USDx')
+    expect(formatMoney(-18_000_000n, USDX, { sign: true })).toBe(`${MINUS}1.80${NBSP}USDx`)
+    expect(formatMoney(2n * UNIT, USDX)).not.toContain(' ')
   })
 
-  it('takes a no-break separator for dense cells', () => {
+  it('takes a narrow no-break separator for dense cells', () => {
     expect(withUnit('2.00', 'USDx', THIN_NBSP)).toBe('2.00\u202FUSDx')
-    expect(formatMoney(2n * UNIT, USDX, { separator: NBSP })).toBe('2.00\u00A0USDx')
+    expect(formatMoney(2n * UNIT, USDX, { separator: THIN_NBSP })).toBe('2.00\u202FUSDx')
   })
 })
 

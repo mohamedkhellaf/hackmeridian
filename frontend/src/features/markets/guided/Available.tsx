@@ -1,7 +1,7 @@
 import type { Ref } from 'react'
 import type { GuidedAlternative } from '../../../data'
 import { explorerAccount, isMockId } from '../../../core/explorer'
-import { formatExact, formatUnits, formatUtc, formatUtcDay } from '../../../core/format'
+import { formatExact, formatUnits, formatUtc, formatUtcDay, serialOf } from '../../../core/format'
 import type { BookRow } from '../../../core/market/book'
 import { perUnit, premiumUnits } from '../../../core/units'
 import { Address, Amount, AmountField, Button, KeyValue, KeyValueItem, Skeleton } from '../../../ui'
@@ -24,7 +24,6 @@ import {
   NOT_FOUND_NO_QTY,
   OWN,
   PAID_AT_SIGN,
-  PAID_ONCE,
   PER_UNIT,
   READ_AT,
   RETRY,
@@ -48,7 +47,6 @@ export interface AvailableProps {
   onUse: (terms: { qty: bigint; strike: bigint; expiry: number }) => void
 }
 
-const serial = (id: bigint) => id.toString().padStart(6, '0')
 const clock = (ms: number) => `${new Date(ms).toISOString().slice(11, 19)} UTC`
 
 function Party({ value }: { value: string }) {
@@ -73,7 +71,7 @@ export function Available({ model, headingRef, onUse }: AvailableProps) {
         : model.lots.length > 0
           ? NO_SINGLE_OFFER(words.qty, words.a)
           : NO_OFFER_HEADING
-  const number = exact ? `${SERIAL_LABEL[exact.source]} ${serial(exact.bid?.id ?? exact.offer?.id ?? 0n)}` : null
+  const number = exact ? `${SERIAL_LABEL[exact.source]} ${serialOf(exact.bid?.id ?? exact.offer?.id ?? 0n)}` : null
 
   return (
     <section className={styles.root} aria-labelledby="guided-available">
@@ -90,7 +88,7 @@ export function Available({ model, headingRef, onUse }: AvailableProps) {
             </Button>
           </p>
         ) : number ? (
-          <p className={`${styles.aside} ui-mono`} data-testid="guided-number">
+          <p className={styles.aside} data-testid="guided-number">
             {number}
           </p>
         ) : null}
@@ -108,11 +106,11 @@ function OwnLine({ model }: { model: GuidedModel }) {
   let text: string
   if (mine.kind === 'holding') text = OWN.holding({ ...words, qty: units(mine.qty), deadline })
   else if (mine.kind === 'written') text = OWN.written({ ...words, qty: units(mine.qty), deadline })
-  else if (mine.kind === 'offer') text = OWN.offer(serial(mine.id), units(mine.qty), asset.code, money(mine.premium), quote.code)
-  else text = OWN.request(serial(mine.id), units(mine.qty), asset.code, money(mine.premium), quote.code)
+  else if (mine.kind === 'offer') text = OWN.offer(serialOf(mine.id), units(mine.qty), asset.code, money(mine.premium), quote.code)
+  else text = OWN.request(serialOf(mine.id), units(mine.qty), asset.code, money(mine.premium), quote.code)
   return (
     <p className={styles.mine} data-testid="guided-own">
-      {text} <OwnLink item={mine} quiet />
+      {text} <OwnLink item={mine} />
     </p>
   )
 }
@@ -150,7 +148,7 @@ function Found({ model, row }: { model: GuidedModel; row: BookRow }) {
         <KeyValueItem label={row.source === 'bid' ? FIELD.buyer : row.source === 'resale' ? FIELD.seller : FIELD.maker}>
           <Party value={row.counterparty} />
         </KeyValueItem>
-        <KeyValueItem label={buying ? FIELD.pay : FIELD.paid} size="lg" hint={buying ? PAID_ONCE : PAID_AT_SIGN}>
+        <KeyValueItem label={buying ? FIELD.pay : FIELD.paid} size="lg" hint={buying ? undefined : PAID_AT_SIGN}>
           <span data-testid="guided-total">
             <Amount value={formatUnits(row.totalPremium, quote.decimals)} exact={formatExact(row.totalPremium, quote.decimals)} unit={quote.code} figure="serif" size="lg" />
           </span>
@@ -253,12 +251,12 @@ function Suggestion({ alt, model, onUse }: { alt: GuidedAlternative; model: Guid
   const theirQty = formatUnits(alt.row.underlyingQty, asset.decimals)
   const theirStrike = formatUnits(alt.ref.strikePerUnit, quote.decimals)
   const parts: string[] = []
-  if (qty === null) parts.push(`${theirQty} ${asset.code}`)
+  if (qty === null) parts.push(`${theirQty}\u00a0${asset.code}`)
   else if (alt.differs.qty) parts.push(DIFFERS.qty(theirQty, words.qty, asset.code))
   if (alt.differs.strike) parts.push(DIFFERS.strike(copy.level(theirStrike), words.strike))
   if (alt.differs.expiry) parts.push(DIFFERS.expiry(formatUtcDay(alt.ref.expiry), formatUtcDay(model.expiry)))
   const lead = parts.map((p, i) => (i === 0 ? p : p.charAt(0).toLowerCase() + p.slice(1))).join(', ')
-  const full = `${theirQty} ${asset.code} at ${theirStrike} ${quote.code}, until ${formatUtc(alt.ref.expiry)}`
+  const full = `${theirQty}\u00a0${asset.code} at ${theirStrike}\u00a0${quote.code}, until ${formatUtc(alt.ref.expiry)}`
   return (
     <li className={styles.suggestion}>
       <p className={styles.suggestionTerms}>{lead || full}</p>
@@ -283,7 +281,7 @@ function Suggestion({ alt, model, onUse }: { alt: GuidedAlternative; model: Guid
 function Fallback({ model }: { model: GuidedModel }) {
   const { side, qty, words, asset, quote, lowestOffer, ownPremium, kind } = { ...model, kind: model.info.optionKind }
   const fallback = FALLBACK[side]
-  const collateral = qty === null ? '' : kind === 'put' ? `${words.strikeTotal} ${words.q}` : `${words.qty} ${words.a}`
+  const collateral = qty === null ? '' : kind === 'put' ? `${words.strikeTotal}\u00a0${words.q}` : `${words.qty}\u00a0${words.a}`
   const lowestPerUnit = lowestOffer ? premiumUnits(lowestOffer) : null
   const ownPerUnit = ownPremium !== null && qty !== null ? perUnit(ownPremium, { underlyingQty: qty, underlying: asset }) : null
   const suggested = lowestPerUnit !== null && qty !== null ? premiumAt(lowestPerUnit, qty, asset.decimals, quote.decimals) : null

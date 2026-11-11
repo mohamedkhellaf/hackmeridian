@@ -7,15 +7,18 @@
 //
 // The row and the card are one target: the action link is stretched over them. With an intent chosen above, the
 // action names the intent and opens the asset in guided mode with it.
+//
+// The two premium columns describe the market where it is traded: the best put and call offer at the strike
+// nearest the reference price, on the nearest deadline that has offers (`nearReference`). Its terms are under it.
 import { Link as RouterLink } from '@tanstack/react-router'
 import type { Intent } from '../../../app/search'
 import { assetParam } from '../../../core/assets'
 import { formatCountdown, formatUnits, formatUtcDate, formatUtcDay } from '../../../core/format'
-import type { BookRow } from '../../../core/market/book'
-import type { TokenInfo } from '../../../core/options/types'
+import type { OptionKind, TokenInfo } from '../../../core/options/types'
 import { intentInfo } from '../../../core/payoff/strategies'
+import type { ReferenceKind } from '../../../core/reference'
 import type { TokenBalance } from '../../../core/stellar/tokens'
-import { strikeUnits } from '../../../core/units'
+import { useMarket } from '../../../data'
 import type { MarketIndexRow } from '../../../data'
 import { Address, ButtonLink, DateTime, IconWarning, Link, RowHeader, Table, TableWrap, TBody, Td, Th, THead, Tr } from '../../../ui'
 import {
@@ -28,7 +31,8 @@ import {
   POST_REQUEST,
   TRADE,
   WRITE_FIRST,
-  cheapestTerms,
+  nearPriceHead,
+  nearTerms,
   noOffersOn,
   perUnitOf,
   shortRow,
@@ -36,7 +40,8 @@ import {
   tradeLabel,
   typeLine,
 } from '../copy'
-import { guidedSearch } from '../model'
+import { guidedSearch, nearReference } from '../model'
+import type { NearOffer } from '../model'
 import { Money } from '../parts'
 import { ASSET_ROUTE, RESERVES_ROUTE } from '../routing'
 import styles from './AssetsTable.module.css'
@@ -110,26 +115,65 @@ function Head({ label, unit }: { label: string; unit: string }) {
   return (
     <span className={styles.head}>
       <span>{label}</span>
-      <span className={styles.unit}>{unit}</span>
+      <span className={styles.headUnit}>{unit}</span>
     </span>
   )
 }
 
-/** The cheapest standard offer of one kind, with the terms it is for: "0.01" over "at 97.00, 13 Nov". */
-function Cheapest({ units, row, quote }: { units: bigint | null; row: BookRow | null; quote: TokenInfo }) {
-  if (units === null || row === null) return <span className={styles.none}>{NONE}</span>
-  const strike = strikeUnits(row)
+const KINDS: readonly OptionKind[] = ['put', 'call']
+
+/** The best offer of one kind near the reference price, with the terms it is for: "0.18" over "at 99.00, 13 Nov". */
+function Near({ offer, quote }: { offer: NearOffer | null; quote: TokenInfo }) {
+  if (offer === null) return <span className={styles.none}>{NONE}</span>
   return (
     <span className={styles.stack}>
-      <Money units={units} token={quote} bare />
-      {strike !== null ? <span className={styles.sub}>{cheapestTerms(formatUnits(strike, quote.decimals), formatUtcDay(row.expiry))}</span> : null}
+      <Money units={offer.perUnit} token={quote} bare />
+      <span className={styles.sub}>{nearTerms(formatUnits(offer.strikePerUnit, quote.decimals), formatUtcDay(offer.expiry))}</span>
     </span>
   )
 }
 
-function Held({ balance, token }: { balance: TokenBalance | undefined; token: TokenInfo }) {
+/** The asset's market, for the two premium columns. The same reads as the index, so it is there with the row. */
+function useNear(row: MarketIndexRow): Record<OptionKind, NearOffer | null> {
+  const market = useMarket(row.asset)
+  return market.data ? nearReference(market.data) : { put: null, call: null }
+}
+
+/** The two premium cells of a table row. */
+function NearCells({ row, quote }: { row: MarketIndexRow; quote: TokenInfo }) {
+  const near = useNear(row)
+  return (
+    <>
+      {KINDS.map((kind) => (
+        <Td key={kind} numeric>
+          <Near offer={near[kind]} quote={quote} />
+        </Td>
+      ))}
+    </>
+  )
+}
+
+/** The two premium facts of a card. */
+function NearFacts({ row, quote, source }: { row: MarketIndexRow; quote: TokenInfo; source: ReferenceKind | null }) {
+  const near = useNear(row)
+  return (
+    <>
+      {KINDS.map((kind) => (
+        <div key={kind}>
+          <dt>{nearPriceHead(kind, source)}</dt>
+          <dd>
+            <Near offer={near[kind]} quote={quote} />
+          </dd>
+        </div>
+      ))}
+    </>
+  )
+}
+
+/** A balance of the row's asset: bare in the table (one asset per row), with its code on a card. */
+function Held({ balance, token, bare = true }: { balance: TokenBalance | undefined; token: TokenInfo; bare?: boolean }) {
   if (!balance || balance.balance === null) return <span className={styles.none}>{NONE}</span>
-  return <Money units={balance.balance} token={token} bare />
+  return <Money units={balance.balance} token={token} bare={bare} />
 }
 
 export function AssetsTable({ rows, quote, nowSec, intent, holdings = null, short }: AssetsTableProps) {
@@ -137,6 +181,8 @@ export function AssetsTable({ rows, quote, nowSec, intent, holdings = null, shor
   // The source of the price, once in the header when every priced row has the same one.
   const labels = new Set(rows.filter((r) => r.reference.perUnit !== null).map((r) => r.reference.label))
   const sharedLabel = labels.size === 1 ? [...labels][0] : null
+  const sources = new Set(rows.filter((r) => r.reference.perUnit !== null).map((r) => r.reference.kind))
+  const source = sources.size === 1 ? [...sources][0] : null
   const showHeld = intent !== undefined && holdings !== null && intentInfo(intent).starts === 'asset'
   const action = (row: MarketIndexRow) => (intent ? INTENT_COPY[intent].choose(row.asset.code) : tradeLabel(row.asset.code))
   const actionText = intent ? intentInfo(intent).name : TRADE
@@ -158,12 +204,11 @@ export function AssetsTable({ rows, quote, nowSec, intent, holdings = null, shor
               {showHeld ? <Th numeric>{COL.hold}</Th> : null}
               <Th numeric>{COL.offers}</Th>
               <Th numeric>{COL.expiry}</Th>
-              <Th numeric>
-                <Head label={COL.put} unit={perUnitOf(quote.code)} />
-              </Th>
-              <Th numeric>
-                <Head label={COL.call} unit={perUnitOf(quote.code)} />
-              </Th>
+              {KINDS.map((kind) => (
+                <Th key={kind} numeric>
+                  <Head label={nearPriceHead(kind, source)} unit={perUnitOf(quote.code)} />
+                </Th>
+              ))}
               <Th>
                 <span className="ui-vh">{COL.action}</span>
               </Th>
@@ -221,12 +266,7 @@ export function AssetsTable({ rows, quote, nowSec, intent, holdings = null, shor
                           <span className={styles.none}>{NONE}</span>
                         )}
                       </Td>
-                      <Td numeric>
-                        <Cheapest units={s.lowestPutPerUnit} row={s.lowestPut} quote={quote} />
-                      </Td>
-                      <Td numeric>
-                        <Cheapest units={s.lowestCallPerUnit} row={s.lowestCall} quote={quote} />
-                      </Td>
+                      <NearCells row={row} quote={quote} />
                     </>
                   )}
                   <Td align="end" className={styles.actionCell}>
@@ -255,7 +295,7 @@ export function AssetsTable({ rows, quote, nowSec, intent, holdings = null, shor
               </div>
               {showHeld ? (
                 <p className={styles.cardHeld}>
-                  <span>{COL.hold}</span> <Held balance={holdings?.[row.asset.contractId]} token={row.asset} /> <span>{row.asset.code}</span>
+                  {COL.hold} <Held balance={holdings?.[row.asset.contractId]} token={row.asset} bare={false} />
                 </p>
               ) : null}
               {isShort(row) ? (
@@ -275,18 +315,7 @@ export function AssetsTable({ rows, quote, nowSec, intent, holdings = null, shor
                       <dt>{COL.offers}</dt>
                       <dd>{s.offers}</dd>
                     </div>
-                    <div>
-                      <dt>{COL.put}</dt>
-                      <dd>
-                        <Cheapest units={s.lowestPutPerUnit} row={s.lowestPut} quote={quote} />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>{COL.call}</dt>
-                      <dd>
-                        <Cheapest units={s.lowestCallPerUnit} row={s.lowestCall} quote={quote} />
-                      </dd>
-                    </div>
+                    <NearFacts row={row} quote={quote} source={source} />
                   </dl>
                 </div>
               )}

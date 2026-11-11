@@ -2,10 +2,4 @@
   .none {
     color: var(--muted);
   }
-
-  /* A link in an action column reads at the weight of the buttons around it. */
-  .link {
-    font-weight: 550;
-    white-space: nowrap;
-  }
 }

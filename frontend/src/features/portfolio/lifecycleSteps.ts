@@ -30,13 +30,19 @@ export interface LifecycleContext {
   fromRequest?: boolean
   /** This browser bought the option from its previous holder. */
   resold?: boolean
+  /**
+   * It is proven that this wallet paid the original premium (its own buy confirmed from this browser, or its own
+   * request filled into the option). Holding the option does not prove it: a resale elsewhere or a transfer also
+   * makes a holder, so without proof the first sale is told in the third person.
+   */
+  paid?: boolean
 }
 
 const DEADLINE_STEP = 'The deadline passes'
 
 /** The steps of an option's life in order, with the one the chain is at marked `current`. */
 export function lifecycleSteps(o: OptionOffer, ctx: LifecycleContext = { role: null }): LifecycleStep[] {
-  const { role, fromRequest = false, resold = false } = ctx
+  const { role, fromRequest = false, resold = false, paid = false } = ctx
   const qty = exactMoney(qtyOf(o))
   const strike = exactMoney(strikeOf(o))
   const premium = exactMoney(premiumOf(o))
@@ -45,9 +51,9 @@ export function lifecycleSteps(o: OptionOffer, ctx: LifecycleContext = { role: n
   const put = o.kind === 'put'
   const sold = o.holder !== null
   const maker = role === 'writer'
-  // A holder who bought from the previous holder did not take part in the first sale.
+  // "You" for the first sale only when this wallet's own payment is proven; a resale buyer did not take part in it.
   const holder = role === 'holder'
-  const firstBuyer = holder && !resold
+  const firstBuyer = holder && paid && !resold
 
   const created: LifecycleStep[] = fromRequest
     ? [

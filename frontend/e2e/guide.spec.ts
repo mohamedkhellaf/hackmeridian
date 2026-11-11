@@ -27,8 +27,18 @@ const SHELL_TOUR = ['Where things are', 'Connect wallet'] as const
 
 const startButton = (page: Page): Locator => page.getByRole('button', { name: GUIDE_COPY.start })
 const declineButton = (page: Page): Locator => page.getByRole('button', { name: GUIDE_COPY.decline })
-/** The one line the welcome leaves behind once it was answered. */
-const staysLine = (page: Page): Locator => page.getByText(isPhone(page) ? GUIDE_COPY.staysPhone : GUIDE_COPY.stays, { exact: true })
+/**
+ * The heading of the first section of Markets: it takes focus after "Not now", and back from a tour started from
+ * the welcome (whose button is gone by then).
+ */
+const intentsHeading = (page: Page): Locator => page.getByRole('main').getByRole('heading', { name: 'What do you want to do?', exact: true })
+/** The welcome leaves nothing behind once it is answered: no line saying where the guide lives. */
+const noLeftover = async (page: Page): Promise<void> => {
+  await expect(guideSlip(page)).toHaveCount(0)
+  await expect(page.getByRole('main').getByText(/guide stays|Show me around is/)).toHaveCount(0)
+}
+/** The last note's small print: where the control that starts the guide again is. */
+const closingLine = (page: Page): string => (isPhone(page) ? 'Show me around is under More.' : 'Show me around is in the settings menu, top right.')
 const noteTitle = (page: Page): Locator => guideNote(page).getByRole('heading')
 const noteButton = (page: Page, name: 'Next' | 'Back' | 'Done' | 'Close guide'): Locator => guideNote(page).getByRole('button', { name, exact: true })
 const settingsButton = (page: Page): Locator => page.getByRole('button', { name: 'Settings', exact: true })
@@ -137,22 +147,19 @@ test.describe('the welcome on Markets @both', () => {
     await expect(guideSlip(page)).toBeVisible()
   })
 
-  test('"Not now" leaves one line with focus on it, and nothing comes back', async ({ page }) => {
+  test('"Not now" takes the welcome away, leaves no line, puts focus on the first section; nothing comes back', async ({ page }) => {
     await openApp(page, '/markets')
-    const below = await boxOf(page.locator('[data-tour="intents"]'))
     await declineButton(page).click()
-    await expect(guideSlip(page)).toHaveCount(0)
-    await expect(staysLine(page)).toBeVisible()
-    await expect(staysLine(page)).toBeFocused()
+    await noLeftover(page)
+    // The button that had focus is gone: the heading of the first section takes it, and is read.
+    await expect(intentsHeading(page)).toBeFocused()
+    await expect(intentsHeading(page)).toBeInViewport()
     await expect(guideNote(page)).toHaveCount(0)
     expect(await stored(page)).toBe('{"tour":0}')
-    // From 768 px the line takes the room the welcome had: nothing under it moved.
-    if (!isPhone(page)) expect((await boxOf(page.locator('[data-tour="intents"]'))).y).toBeCloseTo(below.y, 0)
 
     await page.reload()
     await expect(pageHeading(page)).toBeVisible()
-    await expect(guideSlip(page)).toHaveCount(0)
-    await expect(staysLine(page)).toHaveCount(0)
+    await noLeftover(page)
 
     // A visitor who declined never gets the note on the mode switch by itself.
     await openApp(page, '/markets/bond')
@@ -181,8 +188,7 @@ test.describe('the welcome on Markets @both', () => {
     const other = await page.context().newPage()
     await openApp(other, '/markets')
     await declineButton(other).click()
-    await expect(guideSlip(page)).toHaveCount(0)
-    await expect(staysLine(page)).toHaveCount(0)
+    await noLeftover(page)
     await other.close()
   })
 })
@@ -202,17 +208,16 @@ test.describe('a tour of Markets @both', () => {
     // A dialog that is not modal: named by its title, described by the count and the body; the page stays in reach.
     await expect(guideNote(page)).toHaveRole('dialog')
     await expect(guideNote(page)).toHaveAccessibleName('What do you want to do?')
-    await expect(guideNote(page)).toHaveAccessibleDescription(/^Note 1 of 4 Each row is one thing you can do here/)
+    await expect(guideNote(page)).toHaveAccessibleDescription(/^Note 1 of 4 Pick what you want; the next step is choosing the asset\./)
     await expect(guideNote(page)).not.toHaveAttribute('aria-modal', 'true')
     expect(await page.locator('main').getAttribute('aria-hidden')).toBeNull()
     expect(await page.locator('main').getAttribute('inert')).toBeNull()
     // The control is described by the note while the note is open.
     const describedBy = (await ringed(page).getAttribute('aria-describedby')) ?? ''
-    await expect(page.locator(`[id="${describedBy}"]`)).toContainText('Each row is one thing you can do here')
+    await expect(page.locator(`[id="${describedBy}"]`)).toContainText('Pick what you want')
 
-    // The welcome is now its one line, and the tour is remembered.
-    await expect(guideSlip(page)).toHaveCount(0)
-    await expect(staysLine(page)).toBeVisible()
+    // The welcome is gone, with no band in its place during the tour, and the tour is remembered.
+    await noLeftover(page)
     expect(await stored(page)).toBe('{"tour":1}')
 
     const note = await noteBox(page)
@@ -226,6 +231,8 @@ test.describe('a tour of Markets @both', () => {
       expect(bar.y - (note.y + note.height)).toBeLessThan(24)
     } else {
       expect(intersect(note, await boxOf(ringed(page)))).toBe(false)
+      // The heading of the next section stays in sight: the note does not lie on it.
+      expect(intersect(note, await boxOf(page.getByRole('main').getByRole('heading', { name: 'Assets', exact: true })))).toBe(false)
     }
 
     // Nothing is timed: the note is still the first one a moment later.
@@ -254,10 +261,9 @@ test.describe('a tour of Markets @both', () => {
         const bar = await boxOf(tabBar(page))
         expect(note.y + note.height).toBeLessThanOrEqual(bar.y)
       }
-      // Only the last note says where the guide lives afterwards.
-      const closing = isPhone(page) ? 'This guide stays under More.' : 'This guide stays in Settings.'
-      if (i === 3) await expect(guideNote(page)).toContainText(closing)
-      else await expect(guideNote(page)).not.toContainText(closing)
+      // Only the last note names the control that starts the guide again.
+      if (i === 3) await expect(guideNote(page)).toContainText(closingLine(page))
+      else await expect(guideNote(page)).not.toContainText('Show me around is')
       if (i < 3) {
         await noteButton(page, 'Next').click()
         await expectAnnounced(page, new RegExp(`^Note ${i + 2} of 4\\. ${MARKETS_TOUR[i + 1].title.replace('?', '\\?')}`))
@@ -266,7 +272,9 @@ test.describe('a tour of Markets @both', () => {
     await noteButton(page, 'Done').click()
     await expect(guideNote(page)).toHaveCount(0)
     await expect(ringed(page)).toHaveCount(0)
-    await expect(staysLine(page)).toBeFocused()
+    // The welcome's button that started the tour is gone: focus comes back to the first section's heading.
+    await expect(intentsHeading(page)).toBeFocused()
+    await noLeftover(page)
     await expectAnnounced(page, 'Guide closed.')
     // The description the note lent to its control is taken back.
     expect(await page.locator('[data-tour="wallet"]').first().getAttribute('aria-describedby')).toBeNull()
@@ -299,7 +307,7 @@ test.describe('a tour of Markets @both', () => {
     // The first note has no Back: focus went to the main button.
     await expect(noteButton(page, 'Back')).toHaveCount(0)
     await expect(noteButton(page, 'Next')).toBeFocused()
-    await expectAnnounced(page, /^Note 1 of 4\. What do you want to do\? Each row/)
+    await expectAnnounced(page, /^Note 1 of 4\. What do you want to do\? Pick what you want/)
   })
 
   test('the close button ends it for good', async ({ page }) => {
@@ -308,7 +316,7 @@ test.describe('a tour of Markets @both', () => {
     await noteButton(page, 'Close guide').click()
     await expect(guideNote(page)).toHaveCount(0)
     await expect(ringed(page)).toHaveCount(0)
-    await expect(staysLine(page)).toBeFocused()
+    await expect(intentsHeading(page)).toBeFocused()
     await expectAnnounced(page, 'Guide closed.')
     await page.reload()
     await expect(pageHeading(page)).toBeVisible()
@@ -364,7 +372,7 @@ test.describe('the guide by keyboard', () => {
 
     await page.keyboard.press('Enter')
     await expect(guideNote(page)).toHaveCount(0)
-    await expect(staysLine(page)).toBeFocused()
+    await expect(intentsHeading(page)).toBeFocused()
   })
 
   test('Escape ends the tour at any note and gives focus back, never to the body', async ({ page }) => {
@@ -377,9 +385,9 @@ test.describe('the guide by keyboard', () => {
       await page.keyboard.press('Escape')
       await expect(guideNote(page)).toHaveCount(0)
       await expect(ringed(page)).toHaveCount(0)
-      // From the welcome, the button that started the tour is gone: its line takes focus. After a replay, the
-      // Settings button does.
-      await expect(at === 0 ? staysLine(page) : settingsButton(page)).toBeFocused()
+      // From the welcome, the button that started the tour is gone: the first section's heading takes focus.
+      // After a replay, the Settings button does.
+      await expect(at === 0 ? intentsHeading(page) : settingsButton(page)).toBeFocused()
       await expectAnnounced(page, 'Guide closed.')
     }
   })
@@ -516,11 +524,8 @@ test.describe('"Show me around" in Settings, or under More on a phone @both', ()
       await openApp(page, path)
       await replay(page)
       await expect(noteButton(page, titles.length > 1 ? 'Next' : 'Done')).toBeFocused()
-      // Started from Settings with the welcome still offered: the welcome becomes its line.
-      if (path === '/markets') {
-        await expect(guideSlip(page)).toHaveCount(0)
-        await expect(staysLine(page)).toBeVisible()
-      }
+      // Started from Settings with the welcome still offered: the welcome goes, and leaves no line.
+      if (path === '/markets') await noLeftover(page)
       await walk(page, titles)
       expect(await currentPath(page)).toBe(path)
       // Focus is back on what opened the menu or the sheet.
@@ -822,13 +827,13 @@ test.describe('where reaching for storage throws @both', () => {
 // --- Accessibility and reflow --------------------------------------------------------------------------------
 
 test.describe('axe and reflow @both', () => {
-  test('the welcome, and its line, are clean in both themes', async ({ page }) => {
+  test('the welcome, and the page once it is answered, are clean in both themes', async ({ page }) => {
     await openApp(page, '/markets')
     await expect(guideSlip(page)).toBeVisible()
     await expectNoAxeViolations(page)
     await expectNoHorizontalOverflow(page)
     await declineButton(page).click()
-    await expect(staysLine(page)).toBeVisible()
+    await expect(intentsHeading(page)).toBeFocused()
     await expectNoAxeViolations(page)
   })
 
@@ -938,7 +943,7 @@ test.describe('with a wallet connected @both', () => {
     await expect(guideSlip(page)).toBeVisible()
     await startButton(page).click()
     await walk(page, ['What do you want to do?', 'Assets', 'Where things are', 'Wallet menu'])
-    await expect(staysLine(page)).toBeFocused()
+    await expect(intentsHeading(page)).toBeFocused()
   })
 
   test('after a connect, the welcome is still there to be answered', async ({ page }) => {
@@ -947,6 +952,6 @@ test.describe('with a wallet connected @both', () => {
     await connect(page)
     await expect(guideSlip(page)).toBeVisible()
     await declineButton(page).click()
-    await expect(staysLine(page)).toBeFocused()
+    await expect(intentsHeading(page)).toBeFocused()
   })
 })

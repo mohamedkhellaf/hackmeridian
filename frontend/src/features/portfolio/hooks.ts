@@ -1,26 +1,38 @@
-// What the portfolio reads besides the positions themselves: which options this browser bought from a holder,
-// which were created by filling a request, and which tokens the contract holds less of than it owes.
+// What the portfolio reads besides the positions themselves: which options this browser bought from a holder or
+// from their maker, which were created by filling a request, and which tokens the contract holds less of than it owes.
 import { useEffect, useMemo, useState } from 'react'
 import type { CollateralHealth, OptionOffer, TokenInfo } from '../../core/options/types'
+import type { Bid } from '../../core/requests/types'
 import { shortfallFor } from '../../core/reserves/reserves'
 import { optionSubject, useActivity, useBids, useHealth } from '../../data'
 
-/** Option ids this wallet bought from their previous holder, from this browser's confirmed transactions. */
-export function useResaleBought(): ReadonlySet<string> {
+/** Subjects (`option:12`) of this wallet's confirmed transactions of `action`, made from this browser. */
+function useConfirmed(action: string): ReadonlySet<string> {
   const { entries } = useActivity()
-  return useMemo(() => new Set(entries.filter((e) => e.action === 'buy-resale' && e.phase === 'confirmed' && e.subject).map((e) => e.subject as string)), [entries])
+  return useMemo(() => new Set(entries.filter((e) => e.action === action && e.phase === 'confirmed' && e.subject).map((e) => e.subject as string)), [entries, action])
 }
 
 /** True when this browser bought the option from its previous holder: the original premium is then not what the wallet paid. */
 export function useResold(option: Pick<OptionOffer, 'id'> | null): boolean {
-  const bought = useResaleBought()
+  const bought = useConfirmed('buy-resale')
   return option ? bought.has(optionSubject(option.id)) : false
 }
 
-/** True when a filled request created the option: its buyer escrowed the premium before a maker filled it. */
-export function useFromRequest(option: Pick<OptionOffer, 'id'> | null): boolean {
+/** The filled request that created the option, or null: its buyer escrowed the premium before a maker filled it. */
+export function useFilledRequest(option: Pick<OptionOffer, 'id'> | null): Bid | null {
   const bids = useBids({ enabled: option !== null })
-  return useMemo(() => (option ? (bids.data ?? []).some((b) => b.state === 'filled' && b.optionId === option.id) : false), [bids.data, option])
+  return useMemo(() => (option ? ((bids.data ?? []).find((b) => b.state === 'filled' && b.optionId === option.id) ?? null) : null), [bids.data, option])
+}
+
+/**
+ * True only when it is proven that this wallet paid the option's original premium: its own buy from the maker,
+ * confirmed from this browser, or its own request that a maker filled into this option (read from the chain).
+ * Holding the option proves nothing: it may have come by a resale in another browser or by a transfer.
+ */
+export function usePaidOriginal(option: Pick<OptionOffer, 'id'> | null, me: string | null, request: Bid | null): boolean {
+  const bought = useConfirmed('buy')
+  if (!option || !me) return false
+  return bought.has(optionSubject(option.id)) || request?.buyer === me
 }
 
 const NO_HEALTH: CollateralHealth[] = []

@@ -65,7 +65,6 @@ export function Lifecycle() {
         {/* Column heads for wide screens. Each cell below repeats its own label for assistive technology and for phones. */}
         <div className={css.heads} aria-hidden="true">
           <span>{columns.step}</span>
-          <span>{columns.who}</span>
           <span>{columns.when}</span>
           <span>{columns.moves}</span>
           <span>{columns.recorded}</span>
@@ -83,10 +82,6 @@ export function Lifecycle() {
                 </h3>
               </div>
               <dl className={css.facts}>
-                <div className={css.fact}>
-                  <dt>{columns.who}</dt>
-                  <dd className={css.who}>{step.who}</dd>
-                </div>
                 <div className={css.fact}>
                   <dt>{columns.when}</dt>
                   <dd>{step.when}</dd>

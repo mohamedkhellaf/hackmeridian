@@ -18,6 +18,26 @@
     max-width: 34rem;
   }
 
+  /* No recorded vault value at this step: the label as on a figure, then where the scenario records it. */
+  .noValue {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .noValueLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
   /* The contract's name and number for a refusal: a quiet reference after the sentence. */
   .code {
     font-family: var(--font-mono);

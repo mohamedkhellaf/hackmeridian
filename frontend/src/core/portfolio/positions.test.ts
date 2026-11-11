@@ -66,19 +66,19 @@ describe('actions', () => {
     expect(actionKindOf(opt({ state: 'active' }), 'writer')).toBeNull()
   })
   it('labels carry the exact payout', () => {
-    expect(actionLabel(opt(), 'claim')).toBe('Claim 5.00 FUND') // put writer receives the underlying
-    expect(actionLabel(opt({ kind: 'call' }), 'claim')).toBe('Claim 50.00 USDx') // call writer receives the strike
-    expect(actionLabel(opt(), 'reclaim')).toBe('Reclaim 50.00 USDx')
-    expect(actionLabel(opt({ kind: 'call' }), 'reclaim')).toBe('Reclaim 5.00 FUND')
+    expect(actionLabel(opt(), 'claim')).toBe('Claim 5.00\u00A0FUND') // put writer receives the underlying
+    expect(actionLabel(opt({ kind: 'call' }), 'claim')).toBe('Claim 50.00\u00A0USDx') // call writer receives the strike
+    expect(actionLabel(opt(), 'reclaim')).toBe('Reclaim 50.00\u00A0USDx')
+    expect(actionLabel(opt({ kind: 'call' }), 'reclaim')).toBe('Reclaim 5.00\u00A0FUND')
     expect(actionLabel(opt(), 'exercise')).toBe('Exercise')
   })
 })
 
 describe('premiumOf', () => {
   it('is signed by role', () => {
-    expect(premiumOf(opt({ writer: OTHER, holder: ME, state: 'active' }), 'holder')).toEqual({ text: '2.00 USDx original premium (paid to the maker)', tone: 'muted' })
-    expect(premiumOf(opt({ holder: OTHER, state: 'active' }), 'writer')).toEqual({ text: '+2.00 USDx', tone: 'pos' })
-    expect(premiumOf(opt(), 'writer')).toEqual({ text: '2.00 USDx ask', tone: 'ask' })
+    expect(premiumOf(opt({ writer: OTHER, holder: ME, state: 'active' }), 'holder')).toEqual({ text: '2.00\u00A0USDx original premium (paid to the maker)', tone: 'muted' })
+    expect(premiumOf(opt({ holder: OTHER, state: 'active' }), 'writer')).toEqual({ text: '+2.00\u00A0USDx', tone: 'pos' })
+    expect(premiumOf(opt(), 'writer')).toEqual({ text: '2.00\u00A0USDx ask', tone: 'ask' })
     expect(premiumOf(opt({ state: 'expired' }), 'writer')).toEqual({ text: '–', tone: 'muted' })
   })
 })
@@ -105,8 +105,8 @@ describe('claim delivery applies to puts and calls alike', () => {
   it('a put writer claims the delivered underlying, a call writer the strike paid', () => {
     expect(claimAmount(exercisedPut)).toEqual({ token: FUND, amount: 5n * U })
     expect(claimAmount(exercisedCall)).toEqual({ token: USDX, amount: 50n * U })
-    expect(actionLabel(exercisedPut, 'claim')).toBe('Claim 5.00 FUND')
-    expect(actionLabel(exercisedCall, 'claim')).toBe('Claim 50.00 USDx')
+    expect(actionLabel(exercisedPut, 'claim')).toBe('Claim 5.00\u00A0FUND')
+    expect(actionLabel(exercisedCall, 'claim')).toBe('Claim 50.00\u00A0USDx')
   })
 
   it('both show up as waiting actions and as unclaimed proceeds', () => {

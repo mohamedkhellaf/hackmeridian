@@ -79,6 +79,17 @@
     }
   }
 
+  /* As the toolbar: under 400 px the asset select takes the first line whole. */
+  @media (max-width: 399.98px) {
+    .loadingBar {
+      flex-wrap: wrap;
+    }
+
+    .boneAsset {
+      flex-basis: 100%;
+    }
+  }
+
   .summary,
   .notice,
   .stale,

@@ -291,13 +291,13 @@ describe('rowActions', () => {
 describe('flagLimits', () => {
   it('is empty when the issuer can freeze and claw back', () => {
     expect(flagLimits(ALL_ON)).toEqual([])
-    // Authorization required does not gate any of the three actions.
+    // Approval required does not gate any of the three actions.
     expect(flagLimits({ ...ALL_ON, authRequired: false })).toEqual([])
   })
   it('names each action the flags rule out, once for the whole asset', () => {
     expect(flagLimits({ authRequired: false, authRevocable: false, clawback: false, authImmutable: false })).toEqual([
-      'Freeze is not available: Authorization revocable is off.',
-      'Claw back is not available: Clawback enabled is off.',
+      'Freeze is not available: this issuer cannot freeze.',
+      'Claw back is not available: this issuer cannot claw back.',
     ])
   })
 })
@@ -317,7 +317,7 @@ describe('clawback amount and confirmation', () => {
     }
   })
   it('refuses more than the balance, with both figures', () => {
-    expect(checkClawbackAmount('30.0000001', 30n * U, BOND)).toEqual({ ok: false, error: 'This balance is 30.00 BOND. Enter 30.00 or less.' })
+    expect(checkClawbackAmount('30.0000001', 30n * U, BOND)).toEqual({ ok: false, error: 'This balance is 30.00\u00a0BOND. Enter 30.00 or less.' })
     expect(checkClawbackAmount('30', 30n * U, BOND).ok).toBe(true)
   })
   it('accepts any positive amount when the balance was not read', () => {
@@ -419,8 +419,8 @@ describe('transactions and the log', () => {
   it('labels each action with its figures', () => {
     expect(actionLabel({ kind: 'authorize', asset: BOND, target: ALICE })).toBe('Authorize GAE6…ARFS for BOND')
     expect(actionLabel({ kind: 'freeze', asset: BOND, target: ESCROW })).toBe('Freeze CAIK…GKY6 for BOND')
-    expect(actionLabel({ kind: 'clawback', asset: BOND, target: ALICE, units: 25n * U })).toBe('Claw back 25.00 BOND from GAE6…ARFS')
-    expect(actionLabel({ kind: 'clawback', asset: BOND, target: ALICE, units: 12_345_678n })).toBe('Claw back 1.2345678 BOND from GAE6…ARFS')
+    expect(actionLabel({ kind: 'clawback', asset: BOND, target: ALICE, units: 25n * U })).toBe('Claw back 25.00\u00a0BOND from GAE6…ARFS')
+    expect(actionLabel({ kind: 'clawback', asset: BOND, target: ALICE, units: 12_345_678n })).toBe('Claw back 1.2345678\u00a0BOND from GAE6…ARFS')
   })
   it('round-trips the subject', () => {
     expect(parseIssuerSubject(issuerSubject(BOND_SAC, ALICE))).toEqual({ assetId: BOND_SAC, target: ALICE })
@@ -430,7 +430,7 @@ describe('transactions and the log', () => {
   it('says a confirmed action in one line', () => {
     expect(doneLabel({ kind: 'authorize', asset: BOND, target: ALICE })).toBe('Authorized GAE6…ARFS for BOND.')
     expect(doneLabel({ kind: 'freeze', asset: BOND, target: ESCROW })).toBe('Frozen CAIK…GKY6 for BOND.')
-    expect(doneLabel({ kind: 'clawback', asset: BOND, target: ALICE, units: 25n * U })).toBe('Clawed back 25.00 BOND from GAE6…ARFS.')
+    expect(doneLabel({ kind: 'clawback', asset: BOND, target: ALICE, units: 25n * U })).toBe('Clawed back 25.00\u00a0BOND from GAE6…ARFS.')
   })
   const entry = (id: string, action: string, startedAt: number, subject: string | null = issuerSubject(BOND_SAC, ALICE), label = id, phase = 'confirmed') => ({ id, action, label, subject, phase, hash: `h-${id}`, startedAt })
   it('keeps only issuer actions in the log, newest first, capped', () => {

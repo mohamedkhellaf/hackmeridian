@@ -111,6 +111,9 @@
 
   .check {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8) var(--s-24);
   }
 
   @container (max-width: 47.99rem) {

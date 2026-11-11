@@ -1,5 +1,5 @@
 import { deliveryAmount } from '../options/abi'
-import { formatUnits } from '../format/amount'
+import { formatUnits, withUnit } from '../format/amount'
 import { shortAddress } from '../options/format'
 import { requiredCollateral } from '../options/types'
 import type { Money, OptionOffer, TokenInfo } from '../options/types'
@@ -15,7 +15,8 @@ export function money(units: bigint, decimals: number): string {
   return formatUnits(units, decimals)
 }
 
-export const moneyWith = (units: bigint, t: TokenInfo) => `${money(units, t.decimals)} ${t.code}`
+/** `5.00 USDx`, figure and code joined by a no-break space (ruling F7). */
+export const moneyWith = (units: bigint, t: TokenInfo) => withUnit(money(units, t.decimals), t.code)
 
 /** The connected wallet's side of an option. A wallet that is both writer and holder counts as writer. */
 export function roleOf(o: OptionOffer, me: string | null): Role | null {

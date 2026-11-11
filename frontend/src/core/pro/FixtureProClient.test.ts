@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CURSOR, DEFAULT_SCENARIO, FixtureProClient, NOT_SCRIPTED, parseFixtures } from './FixtureProClient'
-import { deriveModel } from './replay'
+import { deriveModel, nextRequirementStep, stepActor } from './replay'
 
 const file = parseFixtures()
 const scenario = (n: string) => file.scenarios.find((s) => s.name === n)!
@@ -103,6 +103,35 @@ describe('replayed actions', () => {
     expect(r.ok && r.value.deficit).toBe(169_429_363_000n)
     expect(c.getModel().accounts.find((a) => a.id === 'MAKER_A')?.owed).toBe(169_429_363_000n)
     expect(c.getModel().vault.debtsOwed).toBe(169_429_363_000n)
+  })
+
+  it('returns the replayed step with its own arguments, so a receipt never shows a typed amount', async () => {
+    const c = new FixtureProClient()
+    // The amount passed in is not the recorded one: the step's own amount is what ran.
+    const r = await c.deposit('MAKER_A', 500n * 10_000_000n)
+    expect(r.ok).toBe(true)
+    expect(r.step).toEqual({ number: 4, op: 'deposit', args: ['MAKER_A', 264_999_381_940] })
+    expect(r.note).toBe('Step 4 of the scenario.')
+  })
+
+  it('says which steps ran before a replayed step that was not the next one', async () => {
+    const c = new FixtureProClient()
+    await c.deposit('MAKER_A', 0n)
+    const r = await c.withdraw('MAKER_A', 0n)
+    expect(r).toMatchObject({ ok: false, code: 209, step: { number: 8, op: 'withdraw', args: ['MAKER_A', 20_000_000_001] } })
+    expect(r.note).toBe('Step 8 of the scenario, after steps 5 to 7.')
+    const one = new FixtureProClient(file, 'happy_path_otm', 3)
+    expect((await one.createOffer({ writer: 'MAKER_A', seriesId: 0, qty: 1n, premium: 1n, quoteExpiry: 0 })).note).toBe('Step 5 of the scenario, after step 4.')
+  })
+
+  it('finds where the scenario next records a requirement, and who a step acts as', () => {
+    const sc = scenario('happy_path_otm')
+    expect(nextRequirementStep(sc, 4, 'MAKER_A')).toBe(6)
+    expect(nextRequirementStep(sc, 7, 'MAKER_A')).toBe(-1)
+    expect(nextRequirementStep(sc, 0, 'VAULT')).toBe(-1)
+    expect(nextRequirementStep(scenario('gap_to_vault'), 12, 'VAULT')).toBe(12)
+    expect(stepActor(sc.steps[3])).toBe('MAKER_A')
+    expect(stepActor(sc.steps[9])).toBeNull()
   })
 
   it('refuses with code 0 when the script has no such step', async () => {

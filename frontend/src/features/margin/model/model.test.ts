@@ -6,14 +6,16 @@ import type { Requirement, SeriesView } from '../../../core/pro/types'
 import * as copy from '../copy'
 import { coverageAt, coverageInputs, coveredUpTo, priceRange } from '../../../core/pro/coverage'
 import { HEALTH_WORD, healthLead, healthNext, healthOf, tenthsText } from './health'
-import { bpsPercent, lots, perLot, toChartNumber, usdx, usdxExact, usdxInput } from './money'
-import { callName, contractName, contractTitle, isAddress, partyName, scenarioCopy } from './names'
+import { bpsPercent, lots, perLot, perLotAtLeast, toChartNumber, usdx, usdxExact, usdxInput, withUnit } from './money'
+import { callName, contractName, contractTitle, isAddress, partyName, runsFirstText, scenarioCopy, stepPhrase } from './names'
 import { oracleView, snapshotAge, spanText } from './oracle'
 import { breakevenPerLot, callPayout } from './payout'
 import { expiredSeries, seriesSettlements, takeovers } from './settlement'
-import { parseLots, parseUsdx, premiumFloor, premiumPerLot, writeDraft } from './write'
+import { exactPerLot, parseLots, parseUsdx, premiumFloor, premiumPerLot, writeDraft } from './write'
 
 const U = 10_000_000n
+/** The non-breaking space that holds a figure to its unit. */
+const NB = '\u00a0'
 const req = (nlv: bigint, mm: bigint, im: bigint): Requirement => ({ nlv, mm, im, liability: 0n, expired: 0n, scan: 0n, smin: 0n, liq: 0n, worst: 0 })
 const series = (over: Partial<SeriesView> = {}): SeriesView => ({
   id: 0,
@@ -50,11 +52,11 @@ describe('money', () => {
     expect(usdxInput(5n * U)).toBe('5')
   })
   it('writes a share in basis points as a percentage, exactly', () => {
-    expect(bpsPercent(1000)).toBe('10 %')
-    expect(bpsPercent(9000)).toBe('90 %')
-    expect(bpsPercent(250)).toBe('2.5 %')
-    expect(bpsPercent(1)).toBe('0.01 %')
-    expect(bpsPercent(0)).toBe('0 %')
+    expect(bpsPercent(1000)).toBe(`10${NB}%`)
+    expect(bpsPercent(9000)).toBe(`90${NB}%`)
+    expect(bpsPercent(250)).toBe(`2.5${NB}%`)
+    expect(bpsPercent(1)).toBe(`0.01${NB}%`)
+    expect(bpsPercent(0)).toBe(`0${NB}%`)
   })
   it('converts to a number for drawings only', () => {
     expect(toChartNumber(235_075_984_000n)).toBeCloseTo(23507.5984, 6)
@@ -68,8 +70,8 @@ describe('health', () => {
     expect(h.state).toBe('liquidatable')
     expect(h.distance).toBe(204_378_473_000n)
     expect(h.aboveTenths).toBeNull()
-    expect(healthLead(h, true)).toBe('20,437.84 USDx below the liquidation level')
-    expect(healthNext(h)).toBe('A deposit of at least 20,437.8473 USDx brings the account value back to the liquidation level.')
+    expect(healthLead(h)).toBe(`20,437.84${NB}USDx below the liquidation level`)
+    expect(healthNext(h)).toBe(`A deposit of at least 20,437.8473${NB}USDx brings the account value back to the liquidation level.`)
   })
   it('is restricted between the two levels and says what a new position needs', () => {
     const h = healthOf(req(491_200_000_000n, 439_454_400_000n, 549_318_000_000n))
@@ -77,9 +79,9 @@ describe('health', () => {
     expect(h.distance).toBe(51_745_600_000n)
     expect(h.toOpen).toBe(58_118_000_000n)
     // (49,120.00 - 43,945.44) / 43,945.44 = 11.775 %, rounded down to a tenth
-    expect(tenthsText(h.aboveTenths!)).toBe('11.7 %')
-    expect(healthLead(h, false)).toBe('5,174.56 USDx above the liquidation level (11.7 %)')
-    expect(healthNext(h)).toBe('A new call needs 5,811.80 USDx more.')
+    expect(tenthsText(h.aboveTenths!)).toBe(`11.7${NB}%`)
+    expect(healthLead(h)).toBe(`5,174.56${NB}USDx above the liquidation level (11.7${NB}%)`)
+    expect(healthNext(h)).toBe(`A new call needs 5,811.80${NB}USDx more.`)
   })
   it('is open at or above the opening requirement, and exactly at the liquidation level is not liquidatable', () => {
     expect(healthOf(req(684_000_000_000n, 439_454_400_000n, 549_318_000_000n)).state).toBe('open')
@@ -89,14 +91,13 @@ describe('health', () => {
   it('assumes nothing without a requirement', () => {
     const h = healthOf(null)
     expect(h.state).toBe('unknown')
-    expect(healthLead(h, true)).toBe('This step of the scenario has no requirement for this account.')
-    expect(healthLead(h, false)).toBe('The margin requirement could not be read.')
+    expect(healthLead(h)).toBe('The margin requirement could not be read.')
     expect(healthNext(h)).toBeNull()
   })
   it('omits the percentage when the liquidation level is zero', () => {
     const h = healthOf(req(50n * U, 0n, 0n))
     expect(h.aboveTenths).toBeNull()
-    expect(healthLead(h, false)).toBe('50.00 USDx above the liquidation level')
+    expect(healthLead(h)).toBe(`50.00${NB}USDx above the liquidation level`)
     expect(healthNext(h)).toBeNull()
   })
   it('never calls a state healthy', () => {
@@ -137,13 +138,14 @@ describe('oracle', () => {
     expect(snapshotAge(model, { ...model.series[0], snapshot: null })).toBeNull()
   })
   it('writes spans with seconds under an hour', () => {
-    expect(spanText(0)).toBe('0 s')
-    expect(spanText(45)).toBe('45 s')
-    expect(spanText(120)).toBe('2 min')
-    expect(spanText(121)).toBe('2 min 1 s')
-    expect(spanText(3600)).toBe('1 h')
-    expect(spanText(3900)).toBe('1 h 5 min')
-    expect(spanText(86400 * 3 + 3600 * 4)).toBe('3 d 4 h')
+    // A figure never breaks from its unit: each pair is held by a non-breaking space.
+    expect(spanText(0)).toBe(`0${NB}s`)
+    expect(spanText(45)).toBe(`45${NB}s`)
+    expect(spanText(120)).toBe(`2${NB}min`)
+    expect(spanText(121)).toBe(`2${NB}min 1${NB}s`)
+    expect(spanText(3600)).toBe(`1${NB}h`)
+    expect(spanText(3900)).toBe(`1${NB}h 5${NB}min`)
+    expect(spanText(86400 * 3 + 3600 * 4)).toBe(`3${NB}d 4${NB}h`)
   })
 })
 
@@ -164,8 +166,11 @@ describe('payout of a long call', () => {
 })
 
 describe('write', () => {
-  it('parses whole lots only', () => {
+  it('parses whole lots only, grouped or not', () => {
     expect(parseLots('1000')).toBe(1000n)
+    expect(parseLots('1,000')).toBe(1000n)
+    expect(parseLots('12,345,678')).toBe(12_345_678n)
+    expect(parseLots('1,00')).toBeNull()
     expect(parseLots(' 5 ')).toBe(5n)
     expect(parseLots('0')).toBeNull()
     expect(parseLots('1.5')).toBeNull()
@@ -182,18 +187,39 @@ describe('write', () => {
     expect(premiumFloor(null, series())).toBeNull()
     expect(premiumFloor(1000n, series({ snapshot: null }))).toBeNull()
   })
+  it('takes the premium per lot and gives the contract the exact total', () => {
+    const d = writeDraft({ writer: 'MAKER_A', series: series(), qty: '1,000', perLot: '0.6191701' })
+    expect(d.each).toBe(6_191_701n)
+    expect(d.premium).toBe(6_191_701_000n)
+    expect(d.params).toEqual({ writer: 'MAKER_A', seriesId: 0, qty: 1000n, premium: 6_191_701_000n, quoteExpiry: 1_801_814_400 })
+  })
   it('flags a premium under the floor without blocking the order', () => {
-    const low = writeDraft({ writer: 'MAKER_A', series: series(), qty: '1000', premium: '30003.52' })
+    const low = writeDraft({ writer: 'MAKER_A', series: series(), qty: '1000', perLot: '30.0035' })
     expect(low.belowFloor).toBe(true)
-    expect(low.params).toEqual({ writer: 'MAKER_A', seriesId: 0, qty: 1000n, premium: 300_035_200_000n, quoteExpiry: 1_801_814_400 })
-    const exact = writeDraft({ writer: 'MAKER_A', series: series(), qty: '1000', premium: '30003.5218' })
+    expect(low.params).toEqual({ writer: 'MAKER_A', seriesId: 0, qty: 1000n, premium: 300_035_000_000n, quoteExpiry: 1_801_814_400 })
+    const exact = writeDraft({ writer: 'MAKER_A', series: series(), qty: '1000', perLot: '30.0035218' })
     expect(exact.belowFloor).toBe(false)
   })
+  it('states a per-lot minimum rounded up, so the stated figure is never refused', () => {
+    // A mark of 0.5628819 per lot: 0.5628 would fall under the floor, 0.5629 does not.
+    expect(perLotAtLeast(5_628_819n)).toBe('0.5629')
+    expect(perLotAtLeast(5_629_000n)).toBe('0.5629')
+    expect(perLotAtLeast(300_035_218n)).toBe('30.0036')
+    expect(1000n * 5_629_000n >= 1000n * 5_628_819n).toBe(true)
+  })
   it('has no order until every field is valid', () => {
-    expect(writeDraft({ writer: 'MAKER_A', series: series(), qty: '', premium: '10' }).params).toBeNull()
-    expect(writeDraft({ writer: 'MAKER_A', series: series(), qty: '10', premium: '' }).params).toBeNull()
-    expect(writeDraft({ writer: 'MAKER_A', series: series(), qty: '10', premium: '0' }).params).toBeNull()
-    expect(writeDraft({ writer: 'MAKER_A', series: undefined, qty: '10', premium: '5' }).params).toBeNull()
+    expect(writeDraft({ writer: 'MAKER_A', series: series(), qty: '', perLot: '10' }).params).toBeNull()
+    expect(writeDraft({ writer: 'MAKER_A', series: series(), qty: '10', perLot: '' }).params).toBeNull()
+    expect(writeDraft({ writer: 'MAKER_A', series: series(), qty: '10', perLot: '0' }).params).toBeNull()
+    expect(writeDraft({ writer: 'MAKER_A', series: undefined, qty: '10', perLot: '5' }).params).toBeNull()
+  })
+  it('writes a recorded total over its lots exactly, finer than a typed price allows', () => {
+    expect(exactPerLot(6_191_700_900n, 1000n)).toBe('0.61917009')
+    expect(exactPerLot(3_715_020_540n, 600n)).toBe('0.61917009')
+    expect(exactPerLot(6_191_700_000n, 1000n)).toBe('0.61917')
+    expect(exactPerLot(50n * U, 1n)).toBe('50')
+    expect(exactPerLot(1n, 3n)).toBeNull()
+    expect(exactPerLot(10n, 0n)).toBeNull()
   })
   it('gives the premium per lot rounded down', () => {
     expect(premiumPerLot(6_191_700_900n, 1000n)).toBe(6_191_700n)
@@ -283,7 +309,7 @@ describe('settlement', () => {
 describe('names', () => {
   it('names a contract by underlying, strike and kind', () => {
     expect(contractName(series())).toBe('EQTY 110.00 call')
-    expect(contractTitle(series())).toBe('EQTY 110.00 call, 5 Feb 2027')
+    expect(contractTitle(series())).toBe(`EQTY 110.00 call, 5${NB}Feb${NB}2027`)
     expect(contractName(undefined)).toBe('EQTY call')
   })
   it('turns replay parties into names and leaves addresses alone', () => {
@@ -296,6 +322,31 @@ describe('names', () => {
     expect(partyName(g)).toBe(g)
     expect(isAddress(g)).toBe(true)
     expect(isAddress('MAKER_A')).toBe(false)
+  })
+  it('names the steps a press runs first, and says nothing when it runs the next one', () => {
+    expect(stepPhrase('create_offer', 'MAKER_A')).toBe('write a call (Maker A)')
+    expect(stepPhrase('set_time', null)).toBe('move the clock forward')
+    expect(runsFirstText([])).toBe('')
+    expect(runsFirstText([{ number: 4, op: 'deposit', actor: 'MAKER_A' }])).toBe('Step 4 runs first: deposit margin (Maker A).')
+    expect(
+      runsFirstText([
+        { number: 5, op: 'create_offer', actor: 'MAKER_A' },
+        { number: 6, op: 'buy', actor: 'ALICE' },
+        { number: 7, op: 'get_requirement', actor: 'MAKER_A' },
+      ]),
+    ).toBe('Steps 5 to 7 run first: write a call (Maker A), buy a call (Alice), read the margin requirement (Maker A).')
+    expect(
+      runsFirstText([
+        { number: 9, op: 'set_time', actor: null },
+        { number: 10, op: 'publish_risk', actor: 'PUBLISHER' },
+        { number: 11, op: 'set_time', actor: null },
+        { number: 12, op: 'publish_risk', actor: 'PUBLISHER' },
+      ]),
+    ).toBe('Steps 9 to 12 run first: move the clock forward, publish a price snapshot (Publisher), move the clock forward and 1 more.')
+  })
+  it('holds a figure to its unit', () => {
+    expect(withUnit('20,437.84')).toBe(`20,437.84${NB}USDx`)
+    expect(withUnit('1,000', 'lots')).toBe(`1,000${NB}lots`)
   })
   it('has English copy for every recorded scenario', () => {
     const sim = new FixtureProClient()
@@ -333,6 +384,10 @@ describe('copy', () => {
   })
   it('has no em dash, arrow, exclamation mark or emoji', () => {
     for (const s of strings) expect(s, s).not.toMatch(/[—→←⇒!]|\p{Extended_Pictographic}/u)
+  })
+  it('calls the instant a deadline, never an expiry (ruling F11)', () => {
+    for (const s of strings) expect(s, s).not.toMatch(/\bexpiry\b/i)
+    expect(PRO_ERRORS[226].message).toBe('This position is owned by the vault and settles at the deadline.')
   })
   it('explains every early-exercise refusal with a known contract error', () => {
     expect(copy.EARLY_EXERCISE_REFUSALS.map((code) => PRO_ERRORS[code].name)).toEqual(['NoEarlyExercise', 'StaleSnapshot', 'OutOfTheMoney', 'SettlementPending', 'LiquidateFirst'])

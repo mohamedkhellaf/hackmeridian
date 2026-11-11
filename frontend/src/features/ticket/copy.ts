@@ -113,7 +113,7 @@ export function receiptReminder(mode: TicketMode, kind: OptionKind, holder?: Hol
     case 'write':
       return 'The collateral stays in the contract. You can cancel the offer and take it back while nobody has bought it.'
     case 'bid':
-      return 'A maker can fill this request until the deadline. Cancel it before that to take the premium back.'
+      return 'A maker can fill this request until the deadline. Until one does, you can cancel it and take the premium back, also after the deadline.'
     case 'fill':
       return 'The buyer can exercise until the deadline. After it, reclaim the collateral if the option was not exercised.'
     case 'list':
@@ -142,9 +142,20 @@ export const RESALE_NOTE = "You pay the seller, not the maker. The option's coll
 
 /** List for sale: what a listing is. */
 export function listingNote(quoteCode: string, repricing: boolean): string {
-  const base = `A buyer pays you this price in ${quoteCode} and becomes the holder. The collateral stays locked in the contract. The sale ends if you exercise, the option expires, or you cancel it.`
+  const base = `A buyer pays you the total in ${quoteCode} and becomes the holder. The collateral stays locked in the contract. The sale ends if you exercise, the option expires, or you cancel it.`
   return repricing ? `${base} Listing again replaces your current price.` : base
 }
+
+/** Cancelling a listing from the Change price ticket: the same words as the position page's dialog. */
+export const CANCEL_LISTING = 'Cancel listing'
+export const LISTING_CANCELLED = 'Listing cancelled'
+export const cancelListingTitle = (kind: OptionKind, code: string): string => `Cancel the listing of your ${kind} on ${code}`
+export const cancelListingSummary = (kind: OptionKind, qty: string, price: string): string => `Cancel the listing of your ${kind} on ${qty} at ${price}.`
+export const cancelListingCommitment = (kind: OptionKind, qty: string, price: string): string =>
+  `Your ${kind} on ${qty} will no longer be for sale at ${price}. You keep the option and can still exercise it before the deadline.`
+export const CANCEL_LISTING_REMINDER = 'The option stays yours. Exercise it from Portfolio before the deadline, or list it again.'
+export const NOT_LISTED = 'This option is no longer listed for sale.'
+export const NOT_HOLDER = 'Only the holder can cancel this listing.'
 
 /** Under the Original premium of a listing: the same words as the position page. */
 export const ORIGINAL_PREMIUM_HINT = 'Paid to the maker when the option was first bought. A later resale price is not recorded.'
@@ -214,9 +225,13 @@ export function outcomePair(side: 'long' | 'short', kind: OptionKind, w: Outcome
 export const giveUpValue = (strike: string, code: string): string => `Every rise above ${strike} per ${code}`
 export const giveUpHint = (qty: string): string => `You cannot owe more than the ${qty} you lock; it can still fall in price.`
 
-/** The read time and the checks that passed, as one sentence: "Read from the contract at 13:45:12 UTC: ...". */
-export function checksSentence(at: string | null, parts: readonly string[]): string {
+/**
+ * The read time and the checks that passed, as one sentence: "Read from the contract at 13:45:12 UTC: ...". On mock
+ * data nothing is read from a contract, and the line says so as Reserves does: "Mock data, 13:45:12 UTC: ...".
+ */
+export function checksSentence(at: string | null, parts: readonly string[], mock = false): string {
   const list = parts.length <= 1 ? (parts[0] ?? '') : parts.length === 2 ? `${parts[0]} and ${parts[1]}` : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`
+  if (mock) return at ? `Mock data, ${at}: ${list}.` : `Mock data: ${list}.`
   return at ? `Read from the contract at ${at}: ${list}.` : `Read from the contract: ${list}.`
 }
 

@@ -1,5 +1,5 @@
-// Withdraw a request (bid): the escrowed premium goes back to the buyer. Open and expired requests both hold
-// their premium until the buyer cancels.
+// Withdraw a request (bid): the escrowed premium goes back to the buyer. A request holds its premium until a maker
+// fills it or it is cancelled, before or after its deadline; after the deadline anyone may prune it, which refunds too.
 import { useState } from 'react'
 import type { RefObject } from 'react'
 import type { Bid } from '../../../core/requests/types'

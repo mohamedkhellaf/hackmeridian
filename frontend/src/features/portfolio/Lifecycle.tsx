@@ -64,9 +64,7 @@ export function Lifecycle({ option, className, ...ctx }: LifecycleProps) {
       <Timeline label="Lifecycle of this option" items={items} />
       {linked > 0 ? (
         <p className={css.note}>
-          Transactions made from this browser are linked. <ActivityLink tone="quiet" className={css.link}>
-            Open Activity
-          </ActivityLink>
+          Transactions made from this browser are linked. <ActivityLink tone="quiet">Open Activity</ActivityLink>
         </p>
       ) : null}
     </Card>

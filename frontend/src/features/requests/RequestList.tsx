@@ -1,23 +1,29 @@
 import { Address, Amount, Countdown, DateTime, Glyph, IconWarning, Marker, Tag, VisuallyHidden } from '../../ui'
-import { BOARD_CAPTION, COL, LAPSE_LINE, MINE_CAPTION, PREMIUM_TOTAL, RETURNED_LINE, STRANDED_LINE, YOURS, listTitle, perUnitOf, referenceLine, serialText, shortBy, strikeLine, youHold, youLock } from './copy'
+import type { RequestRow } from './board'
+import { BOARD_CAPTION, COL, LAPSE_LINE, MINE_CAPTION, RETURNED_LINE, STRANDED_LINE, STRIKE, YOURS, perAsset, IN_TOTAL, referenceLine, requestTitle, serialText } from './copy'
 import { RowActions } from './RowActions'
-import { lapsing, shortfallOf, warnBelowOf } from './view'
+import { lapsing, warnBelowOf } from './view'
 import type { RequestsViewProps } from './view'
 import styles from './RequestList.module.css'
 
+/** The premium per unit, the figure a request is priced by, under the highlighter on the wallet's own request. */
+function PerUnit({ row, marked }: { row: RequestRow; marked: boolean }) {
+  const amount = <Amount value={row.premiumPerUnit.text} exact={row.premiumPerUnit.exact} unit={row.premiumPerUnit.code} figure="serif" />
+  return marked ? <Marker>{amount}</Marker> : amount
+}
+
 /**
- * The board below 1200 px: per request, what is wanted and its premium, the strike with the reference price, the
- * deadline, then what it costs and the one action. One column on phones, two from 768 px.
+ * The board below 1200 px, one card per request, drawn as the asset page's Requests tab draws it on a phone (ruling
+ * F15): what is wanted and the premium per unit, the strike and the total, the deadline and the time left, then the
+ * buyer and the one action. One column on phones, two from 768 px.
  */
-export function RequestList({ rows, variant, selectedId, balances, emptyTokens, nowSec, explorerOf, onSell, onCancel }: RequestsViewProps) {
+export function RequestList({ rows, variant, selectedId, nowSec, explorerOf, onSell, onCancel }: RequestsViewProps) {
   const board = variant === 'board'
   return (
     <ul className={styles.list} aria-label={board ? BOARD_CAPTION : MINE_CAPTION}>
       {rows.map((row) => {
-        const shortfall = board ? shortfallOf(row, balances, emptyTokens) : null
         const reference = referenceLine(row)
         const closed = row.state === 'cancelled' || row.state === 'pruned'
-        const premium = <Amount value={row.premium.text} exact={row.premium.exact} unit={row.premium.code} figure="serif" />
         return (
           <li
             key={row.key}
@@ -30,21 +36,22 @@ export function RequestList({ rows, variant, selectedId, balances, emptyTokens, 
             <div className={styles.line}>
               <p className={styles.title}>
                 <Glyph name={row.glyph} size={12} className={styles.glyph} />
-                <span>{listTitle(row)}</span>
+                <span>{requestTitle(row)}</span>
               </p>
               <p className={styles.premium}>
-                <VisuallyHidden>{PREMIUM_TOTAL}: </VisuallyHidden>
-                {row.mine && board ? <Marker>{premium}</Marker> : premium}
+                <VisuallyHidden>{COL.premium}: </VisuallyHidden>
+                <PerUnit row={row} marked={row.mine && board} />
+                <span className={styles.per}>{perAsset(row)}</span>
               </p>
             </div>
             <div className={styles.line}>
               <p className={styles.terms}>
-                {strikeLine(row)}
+                <span className={styles.label}>{STRIKE}</span>
+                <Amount value={row.strike.text} exact={row.strike.exact} unit={row.strike.code} />
                 {reference ? <span className={styles.reference}>{reference}</span> : null}
               </p>
               <p className={styles.aside}>
-                <VisuallyHidden>{COL.premium}: </VisuallyHidden>
-                {perUnitOf(row)}
+                <Amount value={row.premium.text} exact={row.premium.exact} unit={row.premium.code} /> {IN_TOTAL}
               </p>
             </div>
             <div className={styles.line}>
@@ -67,28 +74,18 @@ export function RequestList({ rows, variant, selectedId, balances, emptyTokens, 
             <div className={styles.foot}>
               <div className={styles.facts}>
                 {board ? (
-                  <>
-                    {row.mine ? <span className={styles.yours}>{YOURS}</span> : <span className={styles.lock}>{youLock(row.lock)}</span>}
-                    {shortfall ? (
-                      <span className={styles.short}>
-                        <IconWarning size={14} />
-                        <span>{youHold(shortfall.have)}</span>
-                        <VisuallyHidden>{shortBy(shortfall.missing)}</VisuallyHidden>
-                      </span>
-                    ) : null}
-                    <span className={styles.ids}>
-                      <span className={styles.buyer}>
-                        <span>{COL.buyer}</span>
-                        <Address value={row.bid.buyer} explorerUrl={explorerOf(row.bid.buyer)} explorerLabel="View the buyer on the explorer" copyLabel={null} />
-                      </span>
-                      <span className={styles.serial}>{serialText(row.serial)}</span>
+                  <span className={styles.ids}>
+                    <span className={styles.buyer}>
+                      <span>{COL.buyer}</span>
+                      <Address value={row.bid.buyer} name={row.mine ? YOURS : undefined} explorerUrl={explorerOf(row.bid.buyer)} explorerLabel="View the buyer on the explorer" copyLabel={null} />
                     </span>
-                  </>
+                    <span>{serialText(row.serial)}</span>
+                  </span>
                 ) : (
                   <>
                     <span className={styles.state}>
                       <Tag state={row.stateName} />
-                      <span className={styles.serial}>{serialText(row.serial)}</span>
+                      <span>{serialText(row.serial)}</span>
                     </span>
                     {row.escrow === 'stranded' ? (
                       <span className={styles.stranded}>

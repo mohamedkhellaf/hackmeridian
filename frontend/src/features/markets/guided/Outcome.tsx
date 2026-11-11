@@ -1,12 +1,13 @@
 import { PAYOFF_CAPTION } from '../../../core/disclosures'
-import { formatUnits } from '../../../core/format'
+import { formatExact, formatUnits } from '../../../core/format'
+import { definitionOf } from '../../../core/glossary'
 import { breakevenPerUnit, mostYouCanLose, premiumPerUnit } from '../../../core/payoff/leg'
 import type { GuidedOutcome } from '../../../core/payoff/strategies'
 import type { OptionKind } from '../../../core/options/types'
-import { Card, KeyValue, KeyValueItem, VisuallyHidden } from '../../../ui'
+import { Amount, Card, KeyValue, KeyValueItem, Term, VisuallyHidden } from '../../../ui'
 import { OutcomeCards, WithWithoutChart } from '../../../viz'
 import type { Outcome as OutcomeCard } from '../../../viz'
-import { BREAKEVEN_HINT, CARDS_LABEL, FACT, GIVE_UP, INTENT_COPY, MAX_LOSS_HINT, READOUT_LABEL, SCENARIO, SLIDER_LABEL, outcomeSentence } from './copy'
+import { CARDS_LABEL, FACT, GIVE_UP, INTENT_COPY, MAX_LOSS_HINT, READOUT_LABEL, SCENARIO, SLIDER_LABEL, outcomeSentence } from './copy'
 import type { FactWords } from './copy'
 import { differenceText, num } from './useOutcome'
 import type { OutcomeView } from './useOutcome'
@@ -50,9 +51,11 @@ export interface OutcomeDetailProps {
 }
 
 /**
- * The with-and-without figure with its price handle, and beside it the two figures the ticket prints too:
- * Breakeven and Most you can lose, from core/payoff/leg (a written covered call has no loss figure; it says
- * what is given up). Every number in the figure is a hypothetical payoff from core/payoff/strategies.
+ * The with-and-without figure with its price handle across the column, and under it, as one ruled row, the two
+ * figures the ticket prints too: Breakeven and Most you can lose, from core/payoff/leg (a written covered call
+ * has no loss figure; it says what is given up). Every number in the figure is a hypothetical payoff from
+ * core/payoff/strategies. The read-out gives the two figures and their difference; the sentence for the price
+ * is read out with the handle, and the cards above already say it in words.
  */
 export function OutcomeDetail({ view, kind, side }: OutcomeDetailProps) {
   const { intent, words, asset, quote, qty, strikeTotal, premium, reference } = view.input
@@ -64,6 +67,7 @@ export function OutcomeDetail({ view, kind, side }: OutcomeDetailProps) {
   const loss = mostYouCanLose(leg, side === 'buy' ? 'long' : 'short')
   const perUnitPremium = premiumPerUnit(leg)
   const facts: FactWords = { ...words, premiumPerUnit: perUnitPremium !== null ? money(perUnitPremium) : '' }
+  const amount = (n: bigint) => <Amount value={money(n)} exact={formatExact(n, quote.decimals)} unit={q} figure="serif" />
 
   return (
     <div className={styles.detail}>
@@ -94,18 +98,11 @@ export function OutcomeDetail({ view, kind, side }: OutcomeDetailProps) {
               </p>
             )
           }}
-          readoutNote={(state) => (
-            <p className={styles.sentence} data-testid="outcome-sentence">
-              {sentenceAt(view, view.at(state.price))}
-            </p>
-          )}
         />
       </Card>
-      <KeyValue className={styles.facts} layout="stacked">
+      <KeyValue className={styles.facts} layout="stacked" variant="plain">
         {breakeven !== null ? (
-          <KeyValueItem label={FACT.breakeven} hint={BREAKEVEN_HINT[intent](facts)}>
-            {money(breakeven)} {q}
-          </KeyValueItem>
+          <KeyValueItem label={<Term definition={definitionOf('breakeven')}>{FACT.breakeven}</Term>}>{amount(breakeven)}</KeyValueItem>
         ) : null}
         {intent === 'earn-hold' ? (
           <KeyValueItem label={FACT.giveUp} hint={GIVE_UP.hint(words)}>
@@ -113,7 +110,7 @@ export function OutcomeDetail({ view, kind, side }: OutcomeDetailProps) {
           </KeyValueItem>
         ) : loss !== null ? (
           <KeyValueItem label={FACT.maxLoss} hint={MAX_LOSS_HINT[intent](facts)}>
-            {money(loss.amount)} {q}
+            {amount(loss.amount)}
           </KeyValueItem>
         ) : null}
       </KeyValue>

@@ -1,6 +1,6 @@
 // Small pieces shared by the steps of the ticket: amounts, deadlines, parties, the status lines of the
 // pre-trade re-check and its issues.
-import { Link as RouterLink } from '@tanstack/react-router'
+import { Link as RouterLink, useRouterState } from '@tanstack/react-router'
 import { explorerAddress } from '../../core/explorer'
 import { formatExact, formatUnits } from '../../core/format'
 import type { PreTradeIssue, PreTradeLine } from '../../core/options/preTrade'
@@ -14,16 +14,16 @@ import styles from './parts.module.css'
  * An exact amount as the term sheet prints it, always through the kit's Amount (one setting of the unit). When two
  * decimals hide digits, the figure opens the exact value on press.
  */
-export function MoneyText({ money, size }: { money: Money; size?: 'md' | 'lg' }) {
+export function MoneyText({ money, size, unit = money.token.code }: { money: Money; size?: 'md' | 'lg'; unit?: string }) {
   const shown = formatUnits(money.amount, money.token.decimals)
   const exact = formatExact(money.amount, money.token.decimals)
-  return <Amount value={shown} exact={exact} unit={money.token.code} figure="serif" size={size} />
+  return <Amount value={shown} exact={exact} unit={unit} figure="serif" size={size} />
 }
 
-/** A price per unit of underlying, with its exact value on request. */
-export function PriceText({ units, quote }: { units: bigint | null; quote: TokenInfo }) {
+/** A price per unit of underlying, with its exact value on request; `per` names the unit inside the figure ("USDx per FUND"). */
+export function PriceText({ units, quote, per }: { units: bigint | null; quote: TokenInfo; per?: string }) {
   if (units === null) return <span>–</span>
-  return <MoneyText money={{ token: quote, amount: units }} />
+  return <MoneyText money={{ token: quote, amount: units }} unit={per ? `${quote.code} per ${per}` : undefined} />
 }
 
 /** The deadline in UTC, the canonical form both sides of a trade read. */
@@ -82,43 +82,39 @@ export function StatusValue({ line }: { line: PreTradeLine }) {
   )
 }
 
-const ISSUE_LABEL: Partial<Record<PreTradeIssue['code'], string>> = {
-  'clawback-shortfall': 'Reserves',
-  'implausible-terms': 'Check terms',
-  'last-minutes': 'Deadline',
-  'price-changed': 'Price changed',
-  'exercise-unfunded': 'Exercise',
-  'below-exercise-value': 'Check terms',
-}
+/** A heading only where it names the event; a category word ("Blocked", "Warning") is never one. */
+const ISSUE_TITLE: Partial<Record<PreTradeIssue['code'], string>> = { 'price-changed': 'Price changed' }
 
-/** Where a wallet that cannot pay learns how to get test funds (the strip on Markets). */
-const FUNDS_HREF = '/markets' as const
+/**
+ * Not repeated as a notice: a guest is asked to connect by the action itself, an empty price by its own field, and
+ * a wallet that cannot pay reads the shortfall at its balance row and in the reason under the action, with the
+ * way to test funds beside it.
+ */
+const SAID_ELSEWHERE: ReadonlySet<PreTradeIssue['code']> = new Set(['not-connected', 'invalid-price', 'insufficient-funds', 'unfunded-account'])
 
 /**
  * What the re-check found. A blocking issue stops the action; a warning lets the user go on. Each says the
- * cause, the consequence and the fix with exact figures (the sentences come from core/options/preTrade). A wallet
- * that cannot pay gets the way to test funds.
+ * cause, the consequence and the fix with exact figures (the sentences come from core/options/preTrade).
  */
 export function Issues({ issues, only }: { issues: readonly PreTradeIssue[]; only?: 'block' | 'warn' }) {
-  // A guest is asked to connect by the action itself, and an empty price by its own field: neither is repeated here.
-  const shown = issues.filter((i) => i.code !== 'not-connected' && i.code !== 'invalid-price' && (only === undefined || i.level === only))
+  const shown = issues.filter((i) => !SAID_ELSEWHERE.has(i.code) && (only === undefined || i.level === only))
   if (shown.length === 0) return null
   return (
     <div className={styles.issues}>
       {shown.map((issue, i) => (
-        <Callout
-          key={`${issue.code}-${i}`}
-          variant={issue.level === 'block' ? 'danger' : 'warning'}
-          label={ISSUE_LABEL[issue.code] ?? (issue.level === 'block' ? 'Blocked' : 'Warning')}
-          actions={
-            issue.code === 'insufficient-funds' || issue.code === 'unfunded-account' ? (
-              <Link render={<RouterLink to={FUNDS_HREF} search={{ funds: '1' }} />}>{TEST_FUNDS_LINK}</Link>
-            ) : undefined
-          }
-        >
+        <Callout key={`${issue.code}-${i}`} variant={issue.level === 'block' ? 'danger' : 'warning'} title={ISSUE_TITLE[issue.code]}>
           {issue.message}
         </Callout>
       ))}
     </div>
   )
+}
+
+/**
+ * Where a wallet that cannot pay learns how to get test funds (the strip on Markets). The page it was opened from
+ * travels along, so the strip can lead back to the order.
+ */
+export function FundsLink() {
+  const from = useRouterState({ select: (s) => `${s.location.pathname}${s.location.searchStr}` })
+  return <Link render={<RouterLink to="/markets" search={{ funds: '1', from }} />}>{TEST_FUNDS_LINK}</Link>
 }

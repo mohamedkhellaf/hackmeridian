@@ -44,7 +44,6 @@ export function FlowError({ title, what, message, onRetry }: { title: string; wh
     <>
       <Callout
         variant="danger"
-        label="Not loaded"
         actions={
           <Button variant="secondary" size="sm" onClick={onRetry}>
             Try again

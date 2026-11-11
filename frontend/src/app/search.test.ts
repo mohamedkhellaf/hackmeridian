@@ -39,7 +39,7 @@ const ASSET_FIELDS: Record<keyof AssetSearch, true> = {
   ask: true,
   step: true,
 }
-const MARKETS_FIELDS: Record<keyof MarketsSearch, true> = { all: true, intent: true, funds: true }
+const MARKETS_FIELDS: Record<keyof MarketsSearch, true> = { all: true, intent: true, funds: true, from: true }
 const PORTFOLIO_FIELDS: Record<keyof PortfolioSearch, true> = { tab: true, closed: true }
 const POSITION_FIELDS: Record<keyof PositionSearch, true> = { do: true }
 const REQUESTS_FIELDS: Record<keyof RequestsSearch, true> = { asset: true, kind: true, sort: true, bid: true, new: true, mine: true, closed: true }
@@ -130,6 +130,16 @@ describe('the other routes', () => {
     expect(validateMarketsSearch({ all: 'true', intent: 'hedge' })).toEqual({ all: undefined, intent: undefined })
     expect(validateMarketsSearch({ funds: '1' })).toEqual({ funds: '1' })
     expect(validateMarketsSearch({ funds: 'yes' })).toEqual({ funds: undefined })
+  })
+
+  it('/markets keeps a return path only when it stays inside the app', () => {
+    const order = '/markets/bond?mode=guided&intent=floor&strike=99.00'
+    expect(validateMarketsSearch({ funds: '1', from: order })).toEqual({ funds: '1', from: order })
+    expect(validateMarketsSearch({ from: '/' })).toEqual({ from: '/' })
+    for (const bad of ['//evil.example/x', 'https://evil.example', 'markets/bond', '/\\evil.example', '/a\nb', '', `/${'a'.repeat(300)}`]) {
+      expect(validateMarketsSearch({ from: bad })).toEqual({ from: undefined })
+    }
+    expect(validateMarketsSearch({ from: `/${'a'.repeat(299)}` }).from).toHaveLength(300)
   })
 
   it('/issuer', () => {

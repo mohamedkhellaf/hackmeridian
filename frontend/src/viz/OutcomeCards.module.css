@@ -105,11 +105,13 @@
     overflow-wrap: anywhere;
   }
 
+  /* The unit as Amount sets it beside a serif figure: sans 500 at UI size, muted, never on its own line. */
   .unit {
     font-family: var(--font-sans);
     font-size: var(--ui-size);
-    font-weight: var(--ui-weight);
-    color: var(--text-2);
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
   }
 
   /* The signed amount takes the gain or loss colour and stays on one line; the words after it are text-2. */

@@ -82,13 +82,6 @@
     }
   }
 
-  .sum {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--s-4);
-    white-space: nowrap;
-  }
-
   .and {
     font-size: var(--ui-size);
     line-height: var(--ui-line);
@@ -100,15 +93,6 @@
     font-size: var(--figure-lg-size);
     line-height: var(--figure-lg-line);
     font-variant-numeric: tabular-nums lining-nums;
-  }
-
-  /* The unit once, small, after the figure: the same rank as the unit of a Stat. */
-  .unit {
-    font-family: var(--font-sans);
-    font-size: var(--label-size);
-    line-height: var(--label-line);
-    font-weight: 500;
-    color: var(--muted);
   }
 
   .hint {

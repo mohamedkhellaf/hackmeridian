@@ -86,19 +86,18 @@
       width: 100%;
     }
 
-    /* Disabled keeps its shape and quiets its ink. A loading button keeps its colours. */
+    /*
+     * Disabled keeps its shape and quiets its ink: no fill, a hairline, the disabled ink. A primary looks like a
+     * disabled secondary, never like a field (fields own the sunken fill). A loading button keeps its colours.
+     */
     &[data-disabled] {
       cursor: not-allowed;
     }
 
     &[data-disabled]:not([data-loading]) {
+      --button-bg: transparent;
       --button-fg: var(--disabled-fg);
       --button-border: var(--hairline);
-
-      &[data-variant='primary'] {
-        --button-bg: var(--sunken);
-        --button-border: var(--hairline);
-      }
 
       &[data-variant='quiet'] {
         --button-border: transparent;

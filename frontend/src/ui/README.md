@@ -57,6 +57,7 @@ No storage in `ui/`: the data layer persists the choices and calls the three `ap
 | `Tag` | contract state names only: `<Tag state="Active" />`; one shape, two tones |
 | `Badge` | `count`, `label` (accessible sentence, for example "2 actions waiting"), `tone: 'solid' \| 'quiet'` (a plain muted numeral after a tab label) |
 | `TableWrap`, `Table`, `THead`, `TBody`, `Tr`, `Th`, `Td`, `RowHeader` | native table; `TableWrap label maxHeight?` (the `.ui-table-wrap`; the header is sticky inside it); `Table density on caption fixed`; `Tr selected interactive`; cells take `numeric`, `align`, `pinned`, `strike`, `sunken`, `muted`; `Th sort onSort` |
+| `FactTable` | a short table of facts with a one-word answer and a sentence each (the issuer powers on `/issuer` and the About tab): `caption`, `columns {label, state, effect}`, `rows {key, label, state, on?, effect}`; a plain table from 768 px, a ruled list under it |
 | `KeyValue`, `KeyValueItem` | `dl > div > dt + dd`; `variant: 'ruled' \| 'plain'`, `figures: 'serif' \| 'sans'`, `layout: 'row' \| 'stacked'`; item `label`, `marked`, `hint` |
 | `Stat` | `label`, `value`, `unit`, `hint`, `size: 'md' \| 'lg'` |
 | `Card` | `title`, `headingLevel`, `actions`, `tone: 'surface' \| 'sunken' \| 'plain'`, `padding: 'none' \| 'sm' \| 'md'`, `as` |
@@ -72,7 +73,7 @@ No storage in `ui/`: the data layer persists the choices and calls the three `ap
 | `CopyButton` | `value`, `label` ("Copy address"), `copiedMessage` |
 | `DateTime` | `value` (Date, ms or ISO), `local: 'below' \| 'inline' \| 'none'`, `format: 'full' \| 'table'` |
 | `Countdown` | `to` (ms), `now` (ms, pass the ledger close time; without it the device clock ticks), `warnBelowMs`, `expiredLabel`, `label` |
-| `Amount` | pre-formatted strings: `value` (the magnitude), `exact`, `unit`, `direction: 'gain' \| 'loss'` (adds the sign, the colour and the spoken word), `figure: 'sans' \| 'serif'`, `size`, `srLabel` |
+| `Amount` | pre-formatted strings: `value` (the magnitude), `exact`, `unit`, `direction: 'gain' \| 'loss'` (adds the sign, the colour and the spoken word), `figure: 'sans' \| 'serif'`, `size`, `srLabel`. It owns the unit's style (sans 500, muted; UI size beside a serif figure, label size beside a sans one) and never breaks between figure and unit: features render figure and unit through it and keep no `.unit` rule of their own |
 | `Glyph` | `name`: `long-call`, `long-put`, `short-call`, `short-put`, `quote`, `reserve`, `margin`, `issuer`, `expiry` |
 | `Mark`, `Wordmark`, `Logo` | `Mark cut: 'two-ink' \| 'hollow' \| 'display'`, `size`, `label`; `Logo size` |
 | `Marker` | highlighter, one figure per surface: a term the user set or the breakeven on their own term sheet; `flash` for a changed figure |
@@ -108,9 +109,10 @@ Decisions worth knowing:
 
 | Piece | What it is |
 |---|---|
-| `ChoiceChips` | A wrapping radio group of chips with an optional second line. `appearance="control"` (forms: ink when chosen) or `"note"` (serif figures on a contract note; `marked` adds a tick). `value: null` means none is chosen. Used by the ticket and by guided mode. |
+| `ChoiceChips` | A wrapping radio group of chips with an optional second line. `appearance="control"` (forms) or `"note"` (serif figures on a contract note); in both the chosen chip takes the selection tint and an accent edge, and `marked` adds a tick (funded). `columns` is the most a row holds: fewer when the widest chip would not fit, balanced across rows; pass the chip count to fill one row edge to edge. `width` is ignored. `value: null` means none is chosen. Used by the ticket and by guided mode. |
 | `useMediaQuery(query)`, `useIsPhone()`, `useIsWide()`, `PHONE_QUERY`, `WIDE_QUERY` | The two breakpoints as hooks, for the few places where the markup itself differs by width (a table that becomes a list, the ticket's container). Layout alone stays in CSS. |
 | `Drawer presentation="page"` | On phones the drawer is a full page and its footer is the 64 px action bar, outside the scroller. |
+| `Drawer holdDismissal` | While true, Escape, the system Back and a press outside leave the drawer open; its close button still closes it. The ticket sets it while a transaction is between signature and ledger. |
 | `SwipeIgnore` | An area inside a `Drawer` or `Sheet` where a drag belongs to the content (a chart handle), not to the swipe that dismisses the panel. |
 | `Dialog` / `Drawer` / `Sheet` `finalFocus={false}` | Leaves focus alone on close: the caller moves it (to a result region that holds a button). |
 | `Select onOpenChange`, `onOpenChangeComplete`, `finalFocus` | For a select that sends focus elsewhere after a choice (a heading the choice scrolls to). Clear the target in `onOpenChange(true)`, so Escape still returns to the trigger. |

@@ -1,12 +1,12 @@
 // The closing block of the guided flow (E10): the deal in one sentence, the action, and the way to post terms of
 // one's own. From 1200 px the asset page renders it as the order rail's idle content; below that the guided
 // page renders it under the outcome cards, with a sticky action bar for when it is scrolled out of view.
-import { Link as RouterLink } from '@tanstack/react-router'
+import { Link as RouterLink, useLocation } from '@tanstack/react-router'
 import { useEffect, useLayoutEffect } from 'react'
-import { formatUnits } from '../../../core/format'
-import { Button, ButtonLink, Link } from '../../../ui'
+import { formatExact, formatUnits, serialOf } from '../../../core/format'
+import { Amount, Button, Link } from '../../../ui'
 import { useWallet } from '../../../wallet'
-import { ACTION, ACTION_REGION, BAR_FIGURE, CANNOT_PAY, GET_FUNDS, NEED_QTY_ACTION, VIEW } from './copy'
+import { ACTION, ACTION_REGION, BAR_FIGURE, CANNOT_PAY, GET_FUNDS, NEED_QTY_ACTION, OWN_SHORT, VIEW } from './copy'
 import type { GuidedModel, OwnItem } from './useGuidedModel'
 import { useGuidedModel } from './useGuidedModel'
 import { registerRailClosing } from './railClosing'
@@ -33,15 +33,20 @@ export function GuidedClosing({ assetId, placement = 'rail' }: GuidedClosingProp
 /** The same block from a model already read (the guided page renders it with its own model). */
 export function ClosingBlock({ model, placement }: { model: GuidedModel; placement: 'rail' | 'page' }) {
   const wallet = useWallet()
+  const location = useLocation()
   const { me, mine, primary, primaryLabel, ownTerms, side, summary, shortfall, quote } = model
   const money = (units: bigint) => formatUnits(units, quote.decimals)
-  const orderButton = (variant: 'primary' | 'secondary') => (
-    <Button variant={variant} disabled={primary === null} disabledReason={NEED_QTY_ACTION} onClick={() => primary && model.open(primary.ticket, primary.step)}>
-      {primaryLabel}
-    </Button>
-  )
+  // The funds strip links back here, so the order is one press away once the wallet is funded.
+  const from = `${location.pathname}${location.searchStr}`
   return (
     <section className={styles.root} data-placement={placement} aria-label={ACTION_REGION} data-testid="guided-closing">
+      {/* What the wallet already has here comes first, with the way to it; the sentence and the action under it
+          are then about another order, and say so. A second order is never the block's primary action. */}
+      {me !== null && mine ? (
+        <p className={styles.own} data-testid="guided-closing-own">
+          {OWN_SHORT[mine.kind](serialOf(mine.id))} <OwnLink item={mine} />
+        </p>
+      ) : null}
       {summary ? (
         <p className={styles.summary} data-testid="guided-summary">
           {summary}
@@ -50,7 +55,7 @@ export function ClosingBlock({ model, placement }: { model: GuidedModel; placeme
       {shortfall ? (
         <p className={styles.short}>
           {CANNOT_PAY(money(shortfall.have), money(shortfall.need), quote.code)}{' '}
-          <Link render={<RouterLink to="/markets" search={{ funds: '1' }} />}>{GET_FUNDS}</Link>
+          <Link render={<RouterLink to="/markets" search={{ funds: '1', from }} />}>{GET_FUNDS}</Link>
         </p>
       ) : null}
       <div className={styles.buttons}>
@@ -58,13 +63,10 @@ export function ClosingBlock({ model, placement }: { model: GuidedModel; placeme
           <Button variant="primary" onClick={() => void wallet.connect()}>
             {ACTION.connect}
           </Button>
-        ) : mine ? (
-          <>
-            <OwnLink item={mine} />
-            {orderButton('secondary')}
-          </>
         ) : (
-          orderButton('primary')
+          <Button variant={mine ? 'secondary' : 'primary'} disabled={primary === null} disabledReason={NEED_QTY_ACTION} onClick={() => primary && model.open(primary.ticket, primary.step)}>
+            {primaryLabel}
+          </Button>
         )}
         {me !== null && ownTerms ? (
           <Button variant="quiet" onClick={() => model.open(ownTerms, 'terms')}>
@@ -76,27 +78,10 @@ export function ClosingBlock({ model, placement }: { model: GuidedModel; placeme
   )
 }
 
-/** Where the wallet's own position, offer or request at these terms can be seen (and cancelled). */
-export function OwnLink({ item, quiet = false }: { item: OwnItem; quiet?: boolean }) {
-  if (item.kind === 'request') {
-    const label = VIEW.request
-    return quiet ? (
-      <Link render={<RouterLink to="/requests" />}>{label}</Link>
-    ) : (
-      <ButtonLink variant="primary" render={<RouterLink to="/requests" />}>
-        {label}
-      </ButtonLink>
-    )
-  }
-  const label = item.kind === 'offer' ? VIEW.offer : VIEW.position
-  const to = <RouterLink to="/portfolio/$id" params={{ id: item.id.toString() }} />
-  return quiet ? (
-    <Link render={to}>{label}</Link>
-  ) : (
-    <ButtonLink variant="primary" render={to}>
-      {label}
-    </ButtonLink>
-  )
+/** Where the wallet's own position, offer or request at these terms can be seen (and cancelled): a quiet link. */
+export function OwnLink({ item }: { item: OwnItem }) {
+  if (item.kind === 'request') return <Link render={<RouterLink to="/requests" />}>{VIEW.request}</Link>
+  return <Link render={<RouterLink to="/portfolio/$id" params={{ id: item.id.toString() }} />}>{item.kind === 'offer' ? VIEW.offer : VIEW.position}</Link>
 }
 
 /**
@@ -129,10 +114,7 @@ export function ActionBar({ model, hidden }: { model: GuidedModel; hidden: boole
       <p className={styles.barFigure}>
         {premium !== null ? (
           <>
-            <span className={styles.barLabel}>{figureLabel}</span>{' '}
-            <span className={styles.barAmount}>
-              {formatUnits(premium, quote.decimals)} <span className={styles.barUnit}>{quote.code}</span>
-            </span>
+            <span className={styles.barLabel}>{figureLabel}</span> <Amount value={formatUnits(premium, quote.decimals)} exact={formatExact(premium, quote.decimals)} unit={quote.code} figure="serif" />
           </>
         ) : null}
       </p>

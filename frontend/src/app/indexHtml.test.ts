@@ -116,7 +116,7 @@ describe('public/llms.txt', () => {
   })
 
   it('names the deployed contracts, their versions and the current deploy as core/deployments records them', () => {
-    expect(llms).toContain(`Options contract ${COVERED_CONTRACT.version}`)
+    expect(llms).toContain(`Covered contract ${COVERED_CONTRACT.version}`)
     expect(llms).toContain(`\`${COVERED_CONTRACT.contractId}\``)
     expect(llms).toContain(`[${COVERED_CONTRACT.version} deploy](https://stellar.expert/explorer/testnet/tx/${COVERED_CONTRACT.deployTx})`)
     expect(llms).toContain(`${MARGIN_CONTRACT.version}](https://stellar.expert/explorer/testnet/contract/${MARGIN_CONTRACT.contractId})`)

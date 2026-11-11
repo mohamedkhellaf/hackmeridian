@@ -30,12 +30,28 @@ export interface Series {
 }
 
 /**
- * The intent a link means. A link from the chain names an option kind and no intent: a call is a buy price to
- * lock (or, written, an income on what you hold), a put a floor (or, written, an income while waiting to buy).
+ * The side of the order ticket the URL opens: writing an offer or filling a request is the seller's side; buying
+ * an offer or a listing, or posting a request, the buyer's. Null when no ticket is open.
  */
-export function intentOf(search: Pick<AssetSearch, 'intent' | 'kind' | 'side'>): GuidedIntent {
+export function ticketSide(search: Pick<AssetSearch, 'side' | 'offer' | 'bid' | 'ask'>): 'buy' | 'write' | null {
+  if (search.side === 'write') return 'write'
+  if (search.side === 'buy' || search.side === 'bid') return 'buy'
+  if (search.bid !== undefined) return 'write'
+  if (search.offer !== undefined || search.ask !== undefined) return 'buy'
+  return null
+}
+
+/**
+ * The intent a link means. An open ticket with an option kind decides it, so the guided page and the ticket
+ * always describe the same order (F4): a written put is an income while waiting to buy, a written call an income
+ * on what you hold, a put bought or requested a floor, a call a buy price to lock. Otherwise the intent the link
+ * names; and a link from the chain, which names an option kind and no intent, reads the same way.
+ */
+export function intentOf(search: Pick<AssetSearch, 'intent' | 'kind' | 'side' | 'offer' | 'bid' | 'ask'>): GuidedIntent {
+  const side = ticketSide(search)
+  if (side !== null && search.kind) return intentFor(search.kind, side)
   if (search.intent) return search.intent
-  if (search.kind) return intentFor(search.kind, search.side === 'write' ? 'write' : 'buy')
+  if (search.kind) return intentFor(search.kind, 'buy')
   return 'floor'
 }
 

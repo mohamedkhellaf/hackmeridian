@@ -2,9 +2,9 @@
 // tab and the Portfolio's Orders tab read the same row, with the same figures, state words and deadline. No React.
 // Amounts stay exact integer units until they are formatted here; nothing is computed with floats.
 import { findReferenceAsset } from '../assets'
-import { formatExact, formatUnits } from '../format/amount'
+import { NBSP, formatExact, formatUnits } from '../format/amount'
 import { serialOf } from '../format/option'
-import { formatUtc } from '../format/time'
+import { URGENCY_15MIN_SECONDS, formatUtc } from '../format/time'
 import type { TokenInfo } from '../options/types'
 import { referenceFor } from '../reference'
 import { shortBy, perUnit } from '../units'
@@ -25,8 +25,8 @@ export const figureOf = (units: bigint, token: { decimals: number; code: string 
   code: token.code,
 })
 
-/** `2.00 USDx`: a figure with its unit. */
-export const figureText = (f: Figure): string => `${f.text} ${f.code}`
+/** `2.00 USDx`: a figure with its unit, joined by a no-break space so the two never part (ruling F7). */
+export const figureText = (f: Figure): string => `${f.text}${NBSP}${f.code}`
 
 /** The wallet's requests whose premium is still in the contract (open, or expired and not cancelled yet). */
 export const holdsEscrow = (b: Bid): boolean => b.state === 'open' || b.state === 'expired'
@@ -136,4 +136,58 @@ export function lockShortfall(row: Pick<RequestRow, 'lockUnits' | 'lockToken'>, 
   if (balance === null || balance === undefined) return null
   const missing = shortBy(balance, row.lockUnits)
   return missing > 0n ? { have: figureOf(balance, row.lockToken), missing: figureOf(missing, row.lockToken) } : null
+}
+
+// ------------------------------------------------------------------------------- how an open request is drawn
+// /requests and an asset's Requests tab draw a request the same way (ruling F15): these columns in this order, the
+// premium per unit with the total beneath it, the deadline as `13 Nov 2026, 08:00 UTC` with the time left beneath
+// it, and on phones the same card. The words live here so that the two pages cannot drift apart.
+
+/**
+ * The column headers. `asset` leads only on /requests, where the board spans assets; `state` takes the place of
+ * `buyer` in the wallet's own list.
+ */
+export const REQUEST_COLUMNS = {
+  asset: 'Asset',
+  kind: 'Kind',
+  strike: 'Strike',
+  quantity: 'Quantity',
+  deadline: 'Deadline',
+  premium: 'Premium per unit',
+  buyer: 'Buyer',
+  state: 'State',
+  action: 'Action',
+} as const
+
+export const FILL_REQUEST = 'Fill request'
+/** The one name of cancelling a request, before and after its deadline: either way the premium comes back (F9). */
+export const CANCEL_REQUEST = 'Cancel request'
+/** The wallet's own request, before its address in the buyer cell. */
+export const YOURS = 'Yours'
+/** Under a deadline less than 15 minutes away (brief D17): a fill signed now may land after it. */
+export const LAPSE_LINE = 'A fill may land too late'
+
+/** `No. 3`: the contract's id of the request, unpadded (ruling F1). */
+export const serialText = (serial: string): string => `No. ${serial}`
+/** The title of a phone card, what is wanted: `Put on 10.00 FUND`. */
+export const requestTitle = (row: Pick<RequestRow, 'kindWord' | 'quantity'>): string => `${row.kindWord} on ${figureText(row.quantity)}`
+/** After the total under the premium per unit (`2.80 USDx in total`); the figure is an Amount. */
+export const IN_TOTAL = 'in total'
+/** After the premium per unit on a phone card, where no column header names the unit: `per FUND`. */
+export const perAsset = (row: Pick<RequestRow, 'assetCode'>): string => `per ${row.assetCode}`
+
+/** Accessible names: the visible label first, then the data it acts on. */
+export const fillRequestLabel = (row: RequestRow): string => `${FILL_REQUEST}: ${row.terms}, you lock ${figureText(row.lock)}`
+export const cancelRequestLabel = (row: RequestRow): string => `${CANCEL_REQUEST} ${serialText(row.serial)}: ${row.terms}`
+
+/** Under 48 hours the countdown of the wallet's own open request takes the warning tone and a clock. */
+export const WARN_BELOW_MS = 48 * 3_600 * 1_000
+
+/** The warning tone of a countdown: only on the wallet's own request, whose premium waits on it. */
+export const warnBelowOf = (row: Pick<RequestRow, 'mine'>): number | undefined => (row.mine ? WARN_BELOW_MS : undefined)
+
+/** A request of another wallet with under 15 minutes left: a fill signed now may land after the deadline. */
+export function lapsing(row: Pick<RequestRow, 'mine' | 'state' | 'deadlineSec'>, nowSec: number): boolean {
+  const left = row.deadlineSec - nowSec
+  return !row.mine && row.state === 'open' && left > 0 && left <= URGENCY_15MIN_SECONDS
 }

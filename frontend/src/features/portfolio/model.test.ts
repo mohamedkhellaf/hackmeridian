@@ -38,12 +38,13 @@ describe('names and glyphs', () => {
   })
 
   it('names the option in a sentence and as a title', () => {
-    expect(optionPhrase(opt())).toBe('put on 5.00 FUND')
-    expect(optionTitle(opt({ kind: 'call' }))).toBe('Call on 5.00 FUND')
+    expect(optionPhrase(opt())).toBe('put on 5.00\u00A0FUND')
+    expect(optionTitle(opt({ kind: 'call' }))).toBe('Call on 5.00\u00A0FUND')
   })
 
-  it('prints the serial with six digits', () => {
-    expect(serialOf(184n)).toBe('000184')
+  it('prints the serial unpadded, as the contract numbers it', () => {
+    expect(serialOf(0n)).toBe('0')
+    expect(serialOf(184n)).toBe('184')
     expect(serialOf(1_234_567n)).toBe('1234567')
   })
 
@@ -61,9 +62,9 @@ describe('names and glyphs', () => {
 describe('figures', () => {
   it('truncates to two decimals in tables and keeps every digit in sentences', () => {
     const odd = { token: USDX, amount: 12_345_678n }
-    expect(money(odd)).toBe('1.23 USDx')
-    expect(exactMoney(odd)).toBe('1.2345678 USDx')
-    expect(exactMoney({ token: USDX, amount: 50_000_000n })).toBe('5.00 USDx')
+    expect(money(odd)).toBe('1.23\u00A0USDx')
+    expect(exactMoney(odd)).toBe('1.2345678\u00A0USDx')
+    expect(exactMoney({ token: USDX, amount: 50_000_000n })).toBe('5.00\u00A0USDx')
   })
 
   it('gives the strike per unit, floored, and a dash for a zero quantity', () => {
@@ -148,7 +149,7 @@ describe('showsCard', () => {
 
 describe('premium per unit and the rank of an open offer', () => {
   it('prints the premium per unit of underlying', () => {
-    expect(premiumPerUnitLine(opt())).toBe('0.36 per FUND')
+    expect(premiumPerUnitLine(opt())).toBe('0.36\u00A0per\u00A0FUND')
     expect(premiumPerUnitLine(opt({ underlyingQty: 0n }))).toBeNull()
   })
 

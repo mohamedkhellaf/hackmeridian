@@ -1,0 +1,10 @@
+@layer features {
+  /* The state word and its one action on one line, wrapping as a unit; right-aligned in a row's action column. */
+  .root {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--s-4) var(--s-12);
+  }
+}

@@ -1,23 +1,33 @@
 // Every string of the Requests page. Sentences are whole (never built from fragments); counts go through Intl.
 // Vocabulary (DESIGN.md, rulings R7 and E7): "request" everywhere a user reads, never "bid"; "deadline" for the
 // instant; a maker fills a request ("seller" is only a holder reselling); the buyer posted it.
+// The words of a request row (columns, actions, card lines) are shared with the asset page's Requests tab and live
+// with the row model in core/requests/rows (ruling F15); this file re-exports them under the page's names.
 import { countOf, formatList, groupDigits } from '../../core/format'
-import type { Figure, RequestRow, RequestSort } from './board'
-import { money } from './board'
+import {
+  CANCEL_REQUEST,
+  FILL_REQUEST,
+  LAPSE_LINE,
+  REQUEST_COLUMNS,
+  YOURS,
+  IN_TOTAL,
+  perAsset,
+  requestTitle,
+  serialText,
+} from '../../core/requests/rows'
+import type { RequestRow, RequestSort } from './board'
+
+export { CANCEL_REQUEST, FILL_REQUEST, IN_TOTAL, LAPSE_LINE, YOURS, perAsset, requestTitle, serialText }
+export { fillRequestLabel as fillLabel, cancelRequestLabel as cancelLabel } from '../../core/requests/rows'
 
 export const PAGE_TITLE = 'Requests'
 /** The one line that says what a request is. */
 export const PAGE_LEAD = "A request is a buyer's premium already escrowed in the contract, waiting for a maker."
 
 export const POST_REQUEST = 'Post a request'
-export const FILL_REQUEST = 'Fill request'
-export const CANCEL_REQUEST = 'Cancel request'
 export const KEEP_REQUEST = 'Keep request'
 export const VIEW_POSITION = 'View position'
 export const CONNECT_WALLET = 'Connect wallet'
-export const YOURS = 'Yours'
-/** The action on the wallet's own expired request: the premium is still in the contract until it is cancelled. */
-export const takeBack = (premium: Figure): string => `Take back ${money(premium)}`
 
 export const TAB_BOARD = 'Open requests'
 export const TAB_MINE = 'My requests'
@@ -43,51 +53,24 @@ export const SORT_OPTIONS: ReadonlyArray<{ value: RequestSort; label: string }> 
 export const CLEAR_FILTERS = 'Clear filters'
 export const SHOW_CLOSED = 'Show closed'
 
-export const COL = {
-  asset: 'Asset',
-  kind: 'Kind',
-  quantity: 'Quantity',
-  strike: 'Strike',
-  deadline: 'Deadline',
-  premium: 'Premium per unit',
-  buyer: 'Buyer',
-  lock: 'You lock',
-  state: 'State',
-  action: 'Action',
-} as const
-
-/** Read before the total premium of a list row, which has no column header. */
-export const PREMIUM_TOTAL = 'Premium in total'
+/** The columns, in the order both pages draw them (ruling F15). */
+export const COL = REQUEST_COLUMNS
+/** Before the strike on a phone card, where no column header names it. */
+export const STRIKE = REQUEST_COLUMNS.strike
 
 export const BOARD_CAPTION = 'Open requests a maker can fill now'
 export const MINE_CAPTION = 'My requests'
 
-export const perUnitOf = (row: Pick<RequestRow, 'premiumPerUnit' | 'assetCode'>): string => `${row.premiumPerUnit.text} per ${row.assetCode}`
-export const inTotal = (row: Pick<RequestRow, 'premium'>): string => `${money(row.premium)} in total`
-export const strikePerUnitOf = (row: Pick<RequestRow, 'strike' | 'assetCode'>): string => `${money(row.strike)} per ${row.assetCode}`
 /** The reference price under a strike, with its two-word source label and nothing more ("Demo price 10.20"). */
-export const referenceLine = (row: Pick<RequestRow, 'reference'>): string | null => (row.reference ? `${row.reference.label} ${row.reference.text}` : null)
-/** The first line of a phone row: what is wanted. */
-export const listTitle = (row: Pick<RequestRow, 'kindWord' | 'quantity'>): string => `${row.kindWord} on ${money(row.quantity)}`
-export const strikeLine = (row: Pick<RequestRow, 'strike'>): string => `Strike ${money(row.strike)}`
-export const youLock = (lock: Figure): string => `You lock ${money(lock)}`
-export const youHold = (have: Figure): string => `You hold ${money(have)}`
-export const serialText = (serial: string): string => `No. ${serial}`
+export const referenceLine = (row: Pick<RequestRow, 'reference'>): string | null => (row.reference ? `${row.reference.label}\u00A0${row.reference.text}` : null)
 
 /** Accessible names: the visible label first, then the data it acts on. */
-export const fillLabel = (row: RequestRow): string => `${FILL_REQUEST}: ${row.terms}, you lock ${money(row.lock)}`
-export const cancelLabel = (row: RequestRow): string => `${CANCEL_REQUEST} ${serialText(row.serial)}: ${row.terms}`
-export const takeBackLabel = (row: RequestRow): string => `${takeBack(row.premium)} from request ${serialText(row.serial)}: ${row.terms}`
 export const positionLabel = (row: RequestRow): string => `${VIEW_POSITION} of request ${serialText(row.serial)}: ${row.terms}`
 
 /** Under the state of an expired request of the wallet: the one fact the tag cannot say. */
 export const STRANDED_LINE = 'Premium still in the contract'
 export const RETURNED_LINE = 'Premium returned'
-/** Under a deadline less than 15 minutes away (brief D17): a fill signed now may land after it. */
-export const LAPSE_LINE = 'A fill may land too late'
-export const NOT_FOR_OWN = 'Not for your own request'
 export const NO_ACTION = 'No action'
-export const shortBy = (missing: Figure): string => `, ${money(missing)} short`
 
 /** The line under the board: how many requests are listed and what they hold in the contract. */
 export function boardSummary(shown: number, total: number, escrowed: string | null): string {
@@ -95,7 +78,8 @@ export function boardSummary(shown: number, total: number, escrowed: string | nu
   if (shown === total) return escrowed === null ? `${all}.` : `${all}. ${escrowed} of premium is escrowed in the contract.`
   return escrowed === null ? `${shown} of ${all} shown.` : `${shown} of ${all} shown, with ${escrowed} of premium escrowed in the contract.`
 }
-export const SEE_RESERVES = 'See reserves'
+/** One label per destination (ruling F19, ai-tells-16). */
+export const OPEN_RESERVES = 'Open Reserves'
 /** The page size of the board and the button that shows the next page. */
 export const PAGE_SIZE = 25
 export const showMore = (count: number): string => `Show ${count} more`
@@ -124,16 +108,14 @@ export const CHOOSER_LEAD = 'Choose the asset the option is on.'
 export const CHOOSER_LOADING = 'Loading the assets'
 export const CHOOSER_ERROR = 'The assets could not be read.'
 
-// ---- cancelling
-export const cancelTitle = (serial: string): string => `Cancel request ${serialText(serial)}`
-export const takeBackTitle = (serial: string): string => `Take back the premium of request ${serialText(serial)}`
+// ---- cancelling: one name before and after the deadline (ruling F9); the note says what comes back
+export const cancelTitle = (serial: string): string => `${CANCEL_REQUEST} ${serialText(serial)}`
 export const CANCELLED_TITLE = 'Request cancelled'
 export const CANCEL_TERMS = { request: 'Request', strike: 'Strike', deadline: 'Deadline', refund: 'Returned to your wallet' } as const
 export const confirmedInLedger = (ledger: number): string => `confirmed in ledger ${groupDigits(String(ledger))}`
 export const CANCEL_NOTE_OPEN = 'The contract returns the premium in the same transaction. Until a ledger confirms it, a maker can still fill the request.'
 export const CANCEL_NOTE_EXPIRED = 'Nobody filled it before the deadline. The contract returns the premium in the same transaction.'
 export const CANCELLING = 'Cancelling'
-export const TAKING_BACK = 'Taking back'
 export const TX_BUSY_REASON = 'Another transaction is in progress. Wait for it to finish.'
 export const DONE = 'Done'
 export const CLOSE = 'Close'

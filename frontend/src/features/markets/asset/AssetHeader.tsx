@@ -1,8 +1,9 @@
-// The head of an asset page, set on the page's own two columns: what the asset is, its reference price with the
-// one sentence that explains the label (its only home), the issuer, and in the rail column what the connected
-// wallet holds. On a phone: code and price on one line, the sentence under them, the holdings on one line; the
-// issuer is on the About tab there. A guest sees only what is known: no holdings slot.
-import { Link as RouterLink } from '@tanstack/react-router'
+// The head of an asset page, set on the page's own two columns: what the asset is and its reference price with
+// the one sentence that explains the label (its only home); in the right-hand column (the rail's, from 1200 px),
+// top-aligned with the code, what the connected wallet holds and the issuer, label beside value. On a phone: code
+// and price on one line, the sentence under them, the holdings on one line; the issuer is on the About tab there.
+// A guest sees only what is known: no holdings row.
+import { Link as RouterLink, useLocation } from '@tanstack/react-router'
 import { similarCodeFlag, tierOf } from '../../../core/assets'
 import { findReferenceAsset } from '../../../core/assets'
 import { formatCountdown, formatUtcTime } from '../../../core/format'
@@ -25,7 +26,7 @@ export interface AssetHeaderProps {
 const ERROR_BALANCE = (contractId: string): TokenBalance => ({ contractId, status: 'error', balance: null })
 const isEmpty = (b: TokenBalance | undefined): boolean => b !== undefined && b.status !== 'error' && (b.balance === null || b.balance === 0n)
 
-/** One holding: the figure right-aligned in its column, the code beside it, so two figures align on the decimal. */
+/** One holding: the figure and its code, one per line, starting where the label's value column starts. */
 function Holding({ balance, token }: { balance: TokenBalance | undefined; token: TokenInfo }) {
   if (!balance)
     return (
@@ -36,8 +37,7 @@ function Holding({ balance, token }: { balance: TokenBalance | undefined; token:
   if (balance.balance !== null)
     return (
       <span className={styles.holding}>
-        <Money units={balance.balance} token={token} figure="serif" bare />
-        <span className={styles.unit}>{token.code}</span>
+        <Money units={balance.balance} token={token} figure="serif" />
       </span>
     )
   const word = balance.status === 'ok' || balance.status === 'mock' ? BALANCE_WORD.error : BALANCE_WORD[balance.status]
@@ -51,6 +51,7 @@ function Holding({ balance, token }: { balance: TokenBalance | undefined; token:
 export function AssetHeader({ token, quote }: AssetHeaderProps) {
   const me = useMe()
   const search = useAssetSearch()
+  const location = useLocation()
   const reference = useReference(token)
   const balances = useBalancesById(me)
   const nowSec = useNowSec(30)
@@ -85,12 +86,6 @@ export function AssetHeader({ token, quote }: AssetHeaderProps) {
           {reference.note}
           {reference.asOf !== null ? ` Observed ${formatCountdown(Math.max(1, nowSec - reference.asOf))} ago, at ${formatUtcTime(reference.asOf)}.` : null}
         </p>
-        {token.issuer ? (
-          <p className={styles.issuer}>
-            <span className={styles.label}>{FACT.issuer}</span>
-            <ChainId value={token.issuer} length="medium" copyLabel="Copy the issuer address" explorerLabel="View the issuer on the explorer" />
-          </p>
-        ) : null}
         {similar ? (
           <p className={styles.similar}>
             <IconWarning size={16} />
@@ -104,19 +99,31 @@ export function AssetHeader({ token, quote }: AssetHeaderProps) {
           </p>
         ) : null}
       </div>
-      {me ? (
-        <div className={styles.hold}>
-          <p className={styles.label}>{FACT.balances}</p>
-          <p className={styles.holdings}>
-            <Holding balance={assetBalance} token={token} />
-            <Holding balance={quoteBalance} token={quote} />
-          </p>
-          {cannotPay ? (
-            <p className={styles.funds}>
-              <Link render={<RouterLink to={MARKETS_ROUTE} search={{ funds: '1' }} />}>{FUNDS_LINK}</Link>
-            </p>
+      {me || token.issuer ? (
+        <dl className={styles.side}>
+          {me ? (
+            <div className={styles.row} data-row="hold">
+              <dt className={styles.label}>{FACT.balances}</dt>
+              <dd className={styles.holdings}>
+                <Holding balance={assetBalance} token={token} />
+                <Holding balance={quoteBalance} token={quote} />
+                {cannotPay ? (
+                  <span className={styles.funds}>
+                    <Link render={<RouterLink to={MARKETS_ROUTE} search={{ funds: '1', from: `${location.pathname}${location.searchStr}` }} />}>{FUNDS_LINK}</Link>
+                  </span>
+                ) : null}
+              </dd>
+            </div>
           ) : null}
-        </div>
+          {token.issuer ? (
+            <div className={styles.row} data-row="issuer">
+              <dt className={styles.label}>{FACT.issuer}</dt>
+              <dd className={styles.issuer}>
+                <ChainId value={token.issuer} length="medium" copyLabel="Copy the issuer address" explorerLabel="View the issuer on the explorer" />
+              </dd>
+            </div>
+          ) : null}
+        </dl>
       ) : null}
     </header>
   )

@@ -30,12 +30,12 @@ import {
   LOADING,
   LOAD_ERROR_TITLE,
   NO_REQUESTS_IN_CONTRACT,
+  OPEN_RESERVES,
   PAGE_LEAD,
   PAGE_SIZE,
   PAGE_TITLE,
   POST_REQUEST,
   RETRY,
-  SEE_RESERVES,
   SHOW_CLOSED,
   TABS_LABEL,
   TAB_BOARD,
@@ -115,7 +115,6 @@ export function RequestsPage() {
   const remaining = matching.length - boardRows.length
   const totals = useMemo(() => boardTotals(boardRows.map((r) => r.bid)), [boardRows])
   const empty = useMemo(() => emptyCollateral(boardRows, balances), [boardRows, balances])
-  const emptyTokens = useMemo(() => new Set(empty.keys()), [empty])
   const openCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const b of open) counts.set(b.underlying.contractId, (counts.get(b.underlying.contractId) ?? 0) + 1)
@@ -187,7 +186,7 @@ export function RequestsPage() {
   const onSort = useCallback((next: RequestSort) => patch({ sort: next === DEFAULT_SORT ? undefined : next }, { replace: true }), [patch])
 
   const view = (rows: readonly RequestRow[], variant: RequestsViewProps['variant']) => {
-    const props: RequestsViewProps = { rows, variant, selectedId: bidId, balances, emptyTokens, nowSec, sort, onSort, explorerOf, onSell: sell, onCancel: openCancel }
+    const props: RequestsViewProps = { rows, variant, selectedId: bidId, nowSec, sort, onSort, explorerOf, onSell: sell, onCancel: openCancel }
     return wide ? <BoardTable {...props} /> : <RequestList {...props} />
   }
 
@@ -292,7 +291,7 @@ export function RequestsPage() {
                   ) : null}
                   <p className={styles.summary} data-testid="board-summary">
                     <span>{boardSummary(boardRows.length, open.length, totals.escrowed !== null && totals.quote ? formatMoney(totals.escrowed, totals.quote) : null)}</span>{' '}
-                    <Link render={<RouterLink to={RESERVES_ROUTE} />}>{SEE_RESERVES}</Link>
+                    <Link render={<RouterLink to={RESERVES_ROUTE} />}>{OPEN_RESERVES}</Link>
                   </p>
                 </>
               ) : open.length > 0 ? (

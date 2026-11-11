@@ -32,13 +32,21 @@
     align-items: baseline;
   }
 
-  /* The unit follows the figure after a thin fixed space. Marker raises its ink: muted does not hold on the wash. */
+  /*
+   * The one rule for a unit beside a figure (features keep no local unit style): sans 500, muted, after a thin
+   * fixed space. Beside a serif figure (16 or 22 px) it is UI size; beside a sans figure (tables, captions, text)
+   * it is label size. Marker raises its ink: muted does not hold on the wash.
+   */
   .unit {
     margin-inline-start: 0.3em;
     font-family: var(--font-sans);
-    font-size: 0.82em;
+    font-size: var(--label-size);
     font-weight: 500;
     color: var(--amount-unit, var(--muted));
+  }
+
+  .root[data-figure='serif'] .unit {
+    font-size: var(--ui-size);
   }
 
   .root[data-direction] .unit {

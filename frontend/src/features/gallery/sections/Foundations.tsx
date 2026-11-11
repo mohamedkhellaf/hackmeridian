@@ -27,8 +27,8 @@ const INKS: TokenSpec[] = [
   { name: '--text-2', use: 'Secondary text', min: 4.5 },
   { name: '--muted', use: 'Labels, captions', min: 4.5 },
   { name: '--accent', use: 'Links, focus ring, selection', min: 4.5 },
-  { name: '--gain', use: 'Gains, with a sign and a triangle', min: 4.5 },
-  { name: '--loss', use: 'Losses, with a sign and a triangle', min: 4.5 },
+  { name: '--gain', use: 'Gains, always with a sign', min: 4.5 },
+  { name: '--loss', use: 'Losses, always with a sign', min: 4.5 },
   { name: '--warn', use: 'Action needed, with a glyph and a word', min: 4.5 },
   { name: '--danger', use: 'Errors and destructive actions', min: 4.5 },
 ]
@@ -138,13 +138,13 @@ const TYPE: TypeStyle[] = [
   {
     name: 'Body',
     spec: 'Instrument Sans, 15/23, weight 420',
-    sample: 'A put is the right to sell a tokenized asset at a set price until a set date. The seller locks the full collateral in the contract before you pay.',
+    sample: 'A put is the right to sell a tokenized asset at a set price until a set date. The maker locks the full collateral in the contract before you pay.',
     className: 'ui-body',
   },
   { name: 'UI, navigation, buttons', spec: 'Instrument Sans, 13.5/20, weight 500', sample: 'Markets  Portfolio  Requests  Reserves', className: 'ui-text' },
   { name: 'Table header, label', spec: 'Instrument Sans, 12/16, weight 500, width 87.5%, muted', sample: 'Put premium per unit', className: 'ui-label' },
   { name: 'Caption', spec: 'Instrument Sans, 12/16, muted', sample: 'Read at ledger 58,331,204, 12 seconds ago.', className: 'ui-caption' },
-  { name: 'Mono', spec: 'IBM Plex Mono, 12/16, slashed zero. Ids, hashes and serial lines only', sample: 'No. 000184 · L 58,331,204', className: 'ui-mono' },
+  { name: 'Mono', spec: 'IBM Plex Mono, 12/16, slashed zero. Ids, hashes and serial lines only', sample: 'No. 184 · L 58,331,204', className: 'ui-mono' },
 ]
 
 const SPACE = [2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56, 72]

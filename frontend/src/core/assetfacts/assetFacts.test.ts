@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeFlagChange, describeFlags, parseAssetsResponse, parseHolderStatus, parseIssuerAccount, parseSacName } from './assetFacts'
+import { FLAG_LABELS, POWER_STATE, describeFlagChange, describeFlags, parseAssetsResponse, parseHolderStatus, parseIssuerAccount, parseSacName } from './assetFacts'
 
 const ISSUER = 'GDSX2WUFUT7KCMTUNG3IUQWIUQSC4XNKQ5NTGEZRKLTMLCSJTCUVBEVG'
 const ME = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7'
@@ -80,7 +80,21 @@ describe('describeFlags', () => {
 describe('describeFlagChange', () => {
   it('says whether the issuer can still change the flags, in the words both pages use', () => {
     const base = { authRequired: true, authRevocable: true, clawback: true }
-    expect(describeFlagChange({ ...base, authImmutable: false })).toEqual({ key: 'change', label: 'Change these settings', on: true, state: 'Yes', consequence: 'The issuer can turn any of these on or off later.' })
-    expect(describeFlagChange({ ...base, authImmutable: true })).toEqual({ key: 'change', label: 'Change these settings', on: false, state: 'No', consequence: 'Fixed. The issuer can never change them.' })
+    expect(describeFlagChange({ ...base, authImmutable: false })).toEqual({ key: 'change', label: 'Can change these', on: true, state: 'Yes', consequence: 'The issuer can turn any of these on or off later.' })
+    expect(describeFlagChange({ ...base, authImmutable: true })).toEqual({ key: 'change', label: 'Can change these', on: false, state: 'No', consequence: 'Fixed. The issuer can never change them.' })
+  })
+})
+
+describe('one vocabulary for the issuer powers (ruling F16)', () => {
+  it('labels the four powers in plain words, never with a Stellar flag name', () => {
+    expect(FLAG_LABELS).toEqual({ required: 'Approval required', revocable: 'Can freeze', clawback: 'Can claw back', change: 'Can change these' })
+    const all = { authRequired: true, authRevocable: true, clawback: true, authImmutable: false }
+    expect(describeFlags(all).map((f) => f.label)).toEqual(['Approval required', 'Can freeze', 'Can claw back'])
+    expect(describeFlagChange(all).label).toBe('Can change these')
+    for (const label of Object.values(FLAG_LABELS)) expect(label).not.toMatch(/AUTH_|Authorization|Clawback enabled/)
+  })
+
+  it('answers each power with Yes or No', () => {
+    expect(POWER_STATE).toEqual({ on: 'Yes', off: 'No' })
   })
 })

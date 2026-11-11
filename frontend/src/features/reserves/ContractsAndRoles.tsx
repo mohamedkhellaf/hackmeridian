@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { AssetFlags } from '../../core/assetfacts/assetFacts'
+import { FLAG_LABELS, POWER_STATE } from '../../core/assetfacts/assetFacts'
 import { REFERENCE_ASSETS, isReferenceAsset } from '../../core/assets'
 import { PRO_ENABLED, config } from '../../core/config'
 import { explorerTx } from '../../core/explorer'
@@ -12,9 +13,7 @@ import {
   COVERED_HEADING,
   FIELD,
   FLAGS_KEY,
-  FLAG_NO,
   FLAG_READING,
-  FLAG_YES,
   MARGIN_ADMIN,
   MARGIN_FACTS,
   MARGIN_FIXTURE_NOTE,
@@ -93,7 +92,9 @@ interface TokenFacts {
   notImmutable: boolean
 }
 
-const yesNo = (flag: boolean | undefined, flags: Flags | null | undefined): string => (flags === undefined ? FLAG_READING : flags === null || flag === undefined ? NO_VALUE : flag ? FLAG_YES : FLAG_NO)
+/** A flag's answer in the words of the powers table (core/assetfacts), the same on the About tab and the Issuer page. */
+const yesNo = (flag: boolean | undefined, flags: Flags | null | undefined): string =>
+  flags === undefined ? FLAG_READING : flags === null || flag === undefined ? NO_VALUE : flag ? POWER_STATE.on : POWER_STATE.off
 
 /** One token of a live build: the issuer flags are read from the network now, with the record as the fallback. */
 function useLiveToken(token: { contractId: string; code: string; issuer?: string }, role: 'quote' | 'underlying', enabled: boolean): TokenFacts {
@@ -166,13 +167,13 @@ function TokenBlock({ token }: { token: TokenFacts }) {
           <ChainId value={token.contractId} length="short" what={`the ${token.code} token contract`} />
         </KeyValueItem>
         <KeyValueItem label={TOKEN_COLUMNS.issuer}>{token.issuer ? <ChainId value={token.issuer} length="short" what={`the ${token.code} issuer`} /> : NO_VALUE}</KeyValueItem>
-        <KeyValueItem label={TOKEN_COLUMNS.required}>
+        <KeyValueItem label={FLAG_LABELS.required}>
           <FlagValue flag={token.flags?.authRequired} flags={token.flags} />
         </KeyValueItem>
-        <KeyValueItem label={TOKEN_COLUMNS.revocable}>
+        <KeyValueItem label={FLAG_LABELS.revocable}>
           <FlagValue flag={token.flags?.authRevocable} flags={token.flags} />
         </KeyValueItem>
-        <KeyValueItem label={TOKEN_COLUMNS.clawback}>
+        <KeyValueItem label={FLAG_LABELS.clawback}>
           <FlagValue flag={token.flags?.clawback} flags={token.flags} />
         </KeyValueItem>
       </KeyValue>
@@ -210,9 +211,9 @@ function TokenList({ tokens, recordedBuild }: { tokens: readonly TokenFacts[]; r
                 <Th>{TOKEN_COLUMNS.token}</Th>
                 <Th>{TOKEN_COLUMNS.contract}</Th>
                 <Th>{TOKEN_COLUMNS.issuer}</Th>
-                <Th>{TOKEN_COLUMNS.required}</Th>
-                <Th>{TOKEN_COLUMNS.revocable}</Th>
-                <Th>{TOKEN_COLUMNS.clawback}</Th>
+                <Th>{FLAG_LABELS.required}</Th>
+                <Th>{FLAG_LABELS.revocable}</Th>
+                <Th>{FLAG_LABELS.clawback}</Th>
               </Tr>
             </THead>
             <TBody>

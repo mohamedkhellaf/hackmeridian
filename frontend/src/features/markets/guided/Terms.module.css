@@ -71,7 +71,8 @@
     white-space: nowrap;
   }
 
-  .unit {
+  /* The time beside the deadline's day: the UI face, as the unit beside the strike. */
+  .time {
     font-family: var(--font-sans);
     font-size: var(--ui-size);
     font-weight: var(--ui-weight);

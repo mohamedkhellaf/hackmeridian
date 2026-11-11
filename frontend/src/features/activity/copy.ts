@@ -66,7 +66,7 @@ export const CONNECT = 'Connect wallet'
 export const EMPTY_TITLE = 'No transactions yet.'
 /** After Clear finished took the last rows away: "yet" would be untrue. */
 export const EMPTY_CLEARED = 'No transactions listed.'
-export const EMPTY_ACTION = 'Go to markets'
+export const EMPTY_ACTION = 'Go to Markets'
 
 /** Announced after the finished entries are cleared. */
 export const cleared = (count: number): string => (count === 1 ? 'One finished transaction removed from the list.' : `${count} finished transactions removed from the list.`)

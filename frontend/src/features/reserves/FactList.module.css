@@ -28,15 +28,19 @@
   .fact dd {
     min-width: 0;
     margin: 0;
-    max-width: 40rem;
+    max-width: var(--measure);
     color: var(--text-2);
     text-wrap: pretty;
   }
 
-  /* A contract's record: longer terms ("Deploy transaction") and ids printed in full. */
+  /* A contract's record: longer terms ("Deploy transaction") and ids printed in full, on one line from 768 px. */
   .root[data-variant='record'] .fact {
     grid-template-columns: 10rem minmax(0, 1fr);
     align-items: baseline;
+  }
+
+  .root[data-variant='record'] .fact dd {
+    max-width: 40rem;
   }
 
   .source {

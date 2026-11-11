@@ -38,13 +38,13 @@ describe('lifecycleSteps', () => {
 
   it('speaks to the viewer about its own steps and states the exact legs', () => {
     const holder = lifecycleSteps(opt(), { role: 'holder' }).find((s) => s.id === 'window')!
-    expect(holder.text).toBe('You can exercise at any time: deliver 5.00 FUND and receive 50.00 USDx in the same transaction.')
+    expect(holder.text).toBe('You can exercise at any time: deliver 5.00\u00A0FUND and receive 50.00\u00A0USDx in the same transaction.')
     const viewer = lifecycleSteps(opt()).find((s) => s.id === 'window')!
-    expect(viewer.text).toBe('The holder can exercise at any time: deliver 5.00 FUND and receive 50.00 USDx in the same transaction.')
+    expect(viewer.text).toBe('The holder can exercise at any time: deliver 5.00\u00A0FUND and receive 50.00\u00A0USDx in the same transaction.')
     const call = lifecycleSteps(opt({ kind: 'call' }), { role: 'holder' }).find((s) => s.id === 'window')!
-    expect(call.text).toContain('pay 50.00 USDx and receive 5.00 FUND')
+    expect(call.text).toContain('pay 50.00\u00A0USDx and receive 5.00\u00A0FUND')
     const maker = lifecycleSteps(opt({ writer: ME, holder: MAKER }), { role: 'writer' })
-    expect(maker[0].text).toBe('You locked 50.00 USDx in the contract and asked a premium of 1.80 USDx.')
+    expect(maker[0].text).toBe('You locked 50.00\u00A0USDx in the contract and asked a premium of 1.80\u00A0USDx.')
     expect(maker.find((s) => s.id === 'after')!.text).toContain('You claim what an exercise left')
   })
 
@@ -59,23 +59,33 @@ describe('lifecycleSteps', () => {
   })
 
   it('tells both kinds of maker what waits to be claimed', () => {
-    expect(lifecycleSteps(opt({ state: 'exercised', writer: MAKER })).at(-1)!.text).toBe('5.00 FUND waits in the contract until the maker claims it.')
-    expect(lifecycleSteps(opt({ kind: 'call', state: 'exercised' }), { role: 'writer' }).at(-1)!.text).toBe('50.00 USDx waits in the contract until you claim it.')
+    expect(lifecycleSteps(opt({ state: 'exercised', writer: MAKER })).at(-1)!.text).toBe('5.00\u00A0FUND waits in the contract until the maker claims it.')
+    expect(lifecycleSteps(opt({ kind: 'call', state: 'exercised' }), { role: 'writer' }).at(-1)!.text).toBe('50.00\u00A0USDx waits in the contract until you claim it.')
   })
 
   it('gives a resale its own step, and never says the reseller paid the original premium', () => {
     const steps = lifecycleSteps(opt(), { role: 'holder', resold: true })
     expect(steps.map((s) => s.id)).toEqual(['offered', 'bought', 'resold', 'window', 'at-deadline', 'after'])
-    expect(steps.find((s) => s.id === 'bought')!.text).toBe('A buyer paid the premium of 1.80 USDx to the maker and became the holder.')
+    expect(steps.find((s) => s.id === 'bought')!.text).toBe('A buyer paid the premium of 1.80\u00A0USDx to the maker and became the holder.')
     expect(steps.find((s) => s.id === 'resold')!.actions).toEqual(['buy-resale'])
   })
 
   it('starts an option made by filling a request with the request', () => {
-    const steps = lifecycleSteps(opt(), { role: 'holder', fromRequest: true })
+    const steps = lifecycleSteps(opt(), { role: 'holder', fromRequest: true, paid: true })
     expect(steps.map((s) => s.title).slice(0, 2)).toEqual(['Requested', 'Request filled'])
-    expect(steps[0].text).toBe('You escrowed a premium of 1.80 USDx for this option.')
+    expect(steps[0].text).toBe('You escrowed a premium of 1.80\u00A0USDx for this option.')
     expect(steps[1].createdBy).toEqual(['fill-bid'])
     expect(steps.some((s) => s.id === 'bought')).toBe(false)
+    // A holder whose own request it was not is told about the buyer in the third person.
+    expect(lifecycleSteps(opt(), { role: 'holder', fromRequest: true })[0].text).toBe('A buyer escrowed a premium of 1.80\u00A0USDx for this option.')
+  })
+
+  it('says "you paid" only when the payment of this wallet is proven', () => {
+    const bought = (ctx: Parameters<typeof lifecycleSteps>[1]) => lifecycleSteps(opt(), ctx).find((s) => s.id === 'bought')!.text
+    expect(bought({ role: 'holder', paid: true })).toBe('You paid the premium of 1.80\u00A0USDx to the maker and became the holder.')
+    // Holding the option proves nothing: it may have come by a resale elsewhere or a transfer.
+    expect(bought({ role: 'holder' })).toBe('A buyer paid the premium of 1.80\u00A0USDx to the maker and became the holder.')
+    expect(bought({ role: 'holder', paid: true, resold: true })).toBe('A buyer paid the premium of 1.80\u00A0USDx to the maker and became the holder.')
   })
 
   it('names the contract calls whose transaction a done step can link', () => {

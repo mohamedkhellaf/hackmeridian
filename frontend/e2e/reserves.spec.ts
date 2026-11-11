@@ -160,7 +160,7 @@ test.describe('Reserves', () => {
     const write = ticket.getByRole('button', { name: /^Write put/ })
     await expect(write).toBeVisible()
     await write.click()
-    await expect(ticket.getByText(/Offer No\. \d{6}/).first()).toBeVisible()
+    await expect(ticket.getByText(/Offer No\. \d+/).first()).toBeVisible()
     await ticket.getByRole('button', { name: 'Done' }).click()
 
     await goTo(page, 'Reserves')
@@ -306,7 +306,7 @@ test.describe('Contracts and roles', () => {
       const word = (on: boolean) => (on ? 'Yes' : 'No')
       await expect(row.getByRole('cell')).toHaveText([/.+/, /.+/, word(token.flags.authRequired), word(token.flags.authRevocable), word(token.flags.clawback)])
     }
-    await expect(roles(page)).toContainText('USDx has no flag set today. Its issuer account is not immutable, so it could set them later.')
+    await expect(roles(page)).toContainText('The USDx issuer has none of these powers today, and can change these later.')
   })
 
   test('sets Margin apart and says what its admin and its publisher can and cannot do', async ({ page }) => {
@@ -370,5 +370,32 @@ test.describe('Reserves on a phone', () => {
     await openReserves(page)
     await toggle(page, 'USDx').click()
     await expectNoAxeViolations(page)
+  })
+})
+
+test.describe('Reserves at 320 px', () => {
+  test.use({ viewport: { width: 320, height: 700 }, isMobile: true, hasTouch: true })
+
+  test('the four columns fit, the widest difference and an open split included', async ({ page }) => {
+    await openReserves(page)
+    // The widest cell the statement can hold: a difference under a cent, in the short weight, with its word.
+    await stageShortfall(page, 'C_MOCK_EQTY', 1n)
+    await stageShortfall(page, 'C_MOCK_BOND', 65_000_000n)
+    await refresh(page)
+    await expect(tokenRow(page, 'EQTY').getByTestId('difference')).toContainText('under 0.01')
+    await toggle(page, 'USDx').click()
+    await expect(statement(page).getByTestId('item-sum')).toBeVisible()
+
+    await expectNoHorizontalOverflow(page)
+    expect(await statement(page).evaluate((table) => table.parentElement!.scrollWidth <= table.parentElement!.clientWidth + 1)).toBe(true)
+    for (const header of await statement(page).getByRole('columnheader').all()) await expect(header).toBeInViewport({ ratio: 1 })
+    for (const code of ['USDx', 'EQTY']) {
+      const cell = (await tokenRow(page, code).getByTestId('difference').boundingBox())!
+      expect(cell.x + cell.width, code).toBeLessThanOrEqual(320)
+    }
+    // The token code and the first figure do not touch.
+    const code = await toggle(page, 'USDx').locator('span').nth(1).boundingBox()
+    const figure = await tokenRow(page, 'USDx').getByTestId('locked').locator('[aria-hidden="true"]').first().boundingBox()
+    expect(figure!.x - (code!.x + code!.width)).toBeGreaterThanOrEqual(8)
   })
 })

@@ -54,7 +54,8 @@ export interface OptionsClient {
   getBid(id: bigint): Promise<Bid>
   // Open requests by this buyer; null before v1.5.
   buyerOpenCount(buyer: string): Promise<number | null>
-  // Buyer escrows `totalPremium` (quote token) in the contract; refunded on cancel or expiry.
+  // Buyer escrows `totalPremium` (quote token) in the contract. Nothing refunds it by itself: the buyer cancels
+  // (before or after the deadline), or anyone prunes the request after the deadline, and either returns it.
   createBid(bid: NewBid, buyer: string, opts?: TxOptions): Promise<TxResult & { id: bigint }>
   cancelBid(id: bigint, buyer: string, opts?: TxOptions): Promise<TxResult>
   // Writer locks the collateral and receives the escrowed premium; the option is Active with holder = buyer.

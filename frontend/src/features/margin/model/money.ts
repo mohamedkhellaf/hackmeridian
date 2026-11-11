@@ -5,6 +5,14 @@ import { USDX_DECIMALS } from '../../../core/pro/types'
 
 export const QUOTE = 'USDx'
 
+/** Between a figure and its unit in running text: the two never break apart. */
+export const NBSP = '\u00a0'
+
+/** A figure and its unit for a sentence, an accessible name or a label: `20,437.84 USDx`, unbreakable. */
+export function withUnit(figure: string, unit: string = QUOTE): string {
+  return `${figure}${NBSP}${unit}`
+}
+
 /** `23,507.59`, or a dash when the source has no value. */
 export function usdx(v: bigint | null | undefined): string {
   return v == null ? NO_VALUE : formatUnits(v, USDX_DECIMALS)
@@ -18,6 +26,13 @@ export function usdxExact(v: bigint): string {
 /** A per-lot price at 4 decimals, so a column of marks lines up. */
 export function perLot(v: bigint | null | undefined): string {
   return v == null ? NO_VALUE : formatUnits(v, USDX_DECIMALS, { dp: 4 })
+}
+
+/** The lowest per-lot price at 4 decimals that is not under `v`: a minimum stated at 4 decimals rounds up. */
+export function perLotAtLeast(v: bigint): string {
+  const step = 10n ** BigInt(USDX_DECIMALS - 4)
+  const up = v % step === 0n ? v : (v / step + 1n) * step
+  return formatUnits(up, USDX_DECIMALS, { dp: 4 })
 }
 
 /** Whole lots, grouped: `1,000`. */
@@ -41,5 +56,5 @@ export function bpsPercent(bps: number): string {
   const b = Math.max(0, Math.trunc(bps))
   const whole = Math.floor(b / 100)
   const frac = (b % 100).toString().padStart(2, '0').replace(/0+$/, '')
-  return `${whole}${frac ? `.${frac}` : ''} %`
+  return `${whole}${frac ? `.${frac}` : ''}${NBSP}%`
 }

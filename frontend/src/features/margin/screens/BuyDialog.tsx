@@ -6,13 +6,14 @@ import { Button, Dialog, Drawer, KeyValue, KeyValueItem, Slider, SwipeIgnore, us
 import { Waterfall } from '../../../viz'
 import { BUY_PAYOUT_LINE, PAYOUT_ORDER } from '../copy'
 import { coverageAt, coverageInputs, coveredUpTo, priceRange, splitSentence } from '../../../core/pro/coverage'
-import { QUOTE, bpsPercent, lots, perLot, usdx } from '../model/money'
-import { UNDERLYING, contractTitle } from '../model/names'
+import { QUOTE, bpsPercent, lots, perLot, usdx, withUnit } from '../model/money'
+import { UNDERLYING, contractTitle, numbered, partyName } from '../model/names'
 import { breakevenPerLot } from '../model/payout'
 import { premiumPerLot } from '../model/write'
 import { Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
 import { UNSETTLED_REASON, UnsettledNote } from '../parts/UnsettledNote'
+import { RunsFirst } from '../parts/RunsFirst'
 import { useReplayable } from '../parts/useReplayable'
 import css from './BuyDialog.module.css'
 
@@ -68,17 +69,22 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
 
   const buy = () => {
     onClose()
-    void act({ label: 'Buy', done: 'Bought' }, (opts) => client.buy(me, offer.id, opts), (id) => ({
+    void act({ label: 'Buy', done: 'Bought' }, (opts) => client.buy(me, offer.id, opts), (id, step) => ({
       facts: [
+        // The replay plays the recorded buy of this offer: its buyer is named when it is another account.
+        ...(step && step.args[0] !== me ? [{ label: 'Buyer', value: partyName(String(step.args[0])) }] : []),
         { label: 'Premium paid', value: offer.premium },
         { label: 'Contract', value: contractTitle(series) },
         { label: 'Quantity', value: `${lots(offer.qty)} lots` },
-        ...(series ? [{ label: 'Expiry', value: formatUtc(series.expiry), hint: left > 0 ? `${formatCountdown(left)} left` : undefined }] : []),
-        ...(id === null ? [] : [{ label: 'Position', value: `No. ${id}` }]),
+        ...(series ? [{ label: 'Deadline', value: formatUtc(series.expiry), hint: left > 0 ? `${formatCountdown(left)} left` : undefined }] : []),
+        ...(id === null ? [] : [{ label: 'Position', value: numbered(id) }]),
       ],
       next: { label: 'View your positions', to: '/margin/positions' },
     }))
   }
+  // Fixtures: the recorded buy of this offer. When another account made it, the action says so before the press.
+  const recorded = replay.next('buy', (args) => args[1] === offer.id)
+  const recordedBuyer = recorded && typeof recorded.args[0] === 'string' && recorded.args[0] !== me ? partyName(recorded.args[0]) : null
 
   // On a phone the page has its close button at the top; the bar at the bottom carries the one action.
   const footer = (
@@ -92,16 +98,18 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
           aria-describedby={lineId}
           onClick={buy}
         >
-          Buy for {usdx(offer.premium)} {QUOTE}
+          Buy for {withUnit(usdx(offer.premium))}
+          {recordedBuyer ? ` as ${recordedBuyer}` : ''}
         </Button>
       ) : (
         <Button variant="primary" onClick={connect}>
           Connect wallet
         </Button>
       )}
-      <p id={lineId} className={css.line}>
-        {BUY_PAYOUT_LINE}
-      </p>
+      <div className={css.line}>
+        <p id={lineId}>{BUY_PAYOUT_LINE}</p>
+        <RunsFirst step={recorded} />
+      </div>
     </>
   )
 
@@ -111,12 +119,12 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
       <div className={css.columns}>
         <section className={css.terms} aria-label="Terms">
           <KeyValue>
-            <KeyValueItem label="Premium, paid now" hint={each !== null ? `${perLot(each)} ${QUOTE} per lot. ${bpsPercent(fee)} goes to the vault as a reserve fee, the rest to the writer.` : undefined} marked>
+            <KeyValueItem label="Premium, paid now" hint={each !== null ? `${withUnit(perLot(each))} per lot. ${bpsPercent(fee)} goes to the vault as a reserve fee, the rest to the writer.` : undefined}>
               <Usdx v={offer.premium} unit figure="serif" />
             </KeyValueItem>
             <KeyValueItem label="Contract">{contractTitle(series)}</KeyValueItem>
             <KeyValueItem label="Quantity">{lots(offer.qty)} lots</KeyValueItem>
-            <KeyValueItem label="Expiry" hint={series && left > 0 ? `${formatCountdown(left)} left` : undefined}>
+            <KeyValueItem label="Deadline" hint={series && left > 0 ? `${formatCountdown(left)} left` : undefined}>
               {series ? formatUtc(series.expiry) : 'Not available'}
             </KeyValueItem>
             <KeyValueItem label="Breakeven">
@@ -147,7 +155,7 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
                   max={range.max}
                   step={range.step}
                   largeStep={range.step * 10}
-                  valueText={(v) => `${money(v)} ${QUOTE}`}
+                  valueText={(v) => withUnit(money(v))}
                   onValueChange={setAssumed}
                   marks={[{ value: range.min, label: `Strike ${money(range.min)}` }]}
                 />
@@ -155,7 +163,7 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
               {/* Reserves the height of the tallest drawing, so the dialog does not move under the pointer. */}
               <div className={css.figure}>
                 <Waterfall
-                  heading={`Owed ${money(split.due)} ${QUOTE}`}
+                  heading={`Owed ${withUnit(money(split.due))}`}
                   label={`Hypothetical. ${splitSentence(money(split.due), money(split.fromWriter), money(split.fromVault), split.deficit > 0 ? money(split.deficit) : null, QUOTE)}`}
                   paidLabel={split.due > 0 ? `Paid ${money(split.paid)} of ${money(split.due)}` : undefined}
                   segments={[
@@ -167,8 +175,8 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
               </div>
               <PayoutOrder />
               <p className={css.cover}>
-                Hypothetical, at today&apos;s figures ({money(inputs.writerMargin)} {QUOTE} of writer cash, {money(inputs.vault)} {QUOTE} in the vault): a deficit starts above a settlement price of{' '}
-                {money(cover)} {QUOTE}, or lower if the vault also pays other positions or the writer&apos;s cash falls.
+                Hypothetical, at today&apos;s figures ({withUnit(money(inputs.writerMargin))} of writer cash, {withUnit(money(inputs.vault))} in the vault): a deficit starts above a settlement price
+                of {withUnit(money(cover))}, or lower if the vault also pays other positions or the writer&apos;s cash falls.
               </p>
             </>
           ) : (

@@ -9,12 +9,14 @@ describe('the checks sentence', () => {
   it('folds the lines that passed into one sentence with the read time; the rest stay rows', () => {
     const o = written({ kind: 'call', state: 'exercised' })
     const c = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o })
-    expect(checksSentence('14:32:16 UTC', c.lines)).toBe('Read from the contract at 14:32:16 UTC: the option is exercised and 50.00 USDx waits in the contract.')
-    expect(checksSentence(null, [{ label: 'Option', status: 'ok', text: 'Active' }, { label: 'FUND balance', status: 'ok', text: '120.00 FUND' }])).toBe(
-      'Read from the contract: the option is active and you hold 120.00 FUND.',
+    expect(checksSentence('14:32:16\u00A0UTC', c.lines)).toBe('Read from the contract at 14:32:16\u00A0UTC: the option is exercised and 50.00\u00A0USDx waits in the contract.')
+    expect(checksSentence(null, [{ label: 'Option', status: 'ok', text: 'Active' }, { label: 'FUND balance', status: 'ok', text: '120.00\u00A0FUND' }])).toBe(
+      'Read from the contract: the option is active and you hold 120.00\u00A0FUND.',
     )
     expect(checksSentence(null, [{ label: 'Option', status: 'pending', text: 'Checking' }])).toBeNull()
-    expect(readTime(Date.UTC(2026, 10, 13, 14, 32, 16))).toBe('14:32:16 UTC')
+    // Mock data is not read from a contract, and the line says so.
+    expect(checksSentence('14:32:16\u00A0UTC', c.lines, true)).toBe('Mock data, 14:32:16\u00A0UTC: the option is exercised and 50.00\u00A0USDx waits in the contract.')
+    expect(readTime(Date.UTC(2026, 10, 13, 14, 32, 16))).toBe('14:32:16\u00A0UTC')
     expect(readTime(0)).toBeNull()
   })
 })
@@ -37,7 +39,7 @@ describe('simpleCheck', () => {
     const o = written({ kind: 'call', state: 'exercised' })
     const c = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o })
     expect(c).toMatchObject({ blocked: false, pending: false, problem: null })
-    expect(c.lines).toMatchObject([{ label: 'Option', status: 'ok', text: 'Exercised. 50.00 USDx in the contract' }])
+    expect(c.lines).toMatchObject([{ label: 'Option', status: 'ok', text: 'Exercised. 50.00\u00A0USDx in the contract' }])
   })
 
   it('during a clawback shortfall stops saying the amount is in the contract, and warns without blocking', () => {
@@ -78,7 +80,7 @@ describe('simpleCheck', () => {
 
   it('lets a writer reclaim an expired option, once', () => {
     const o = written({ state: 'expired', expiry: NOW - 60 })
-    expect(simpleCheck('reclaim', o, { me: ME, nowSec: NOW, option: o }).lines[0].text).toBe('Expired. 50.00 USDx in the contract')
+    expect(simpleCheck('reclaim', o, { me: ME, nowSec: NOW, option: o }).lines[0].text).toBe('Expired. 50.00\u00A0USDx in the contract')
     const again = simpleCheck('reclaim', o, { me: ME, nowSec: NOW, option: { ...o, state: 'reclaimed' } })
     expect(again.blocked).toBe(true)
     expect(again.problem).toContain('already reclaimed')
@@ -107,7 +109,7 @@ describe('simpleCheck', () => {
     expect(ok.blocked).toBe(false)
     expect(ok.lines).toMatchObject([
       { label: 'Option', status: 'ok', text: 'Active, held by you' },
-      { label: 'Listing', status: 'ok', text: 'For sale at 2.00 USDx' },
+      { label: 'Listing', status: 'ok', text: 'For sale at 2.00\u00A0USDx' },
     ])
     const gone = simpleCheck('unlist', o, { me: ME, nowSec: NOW, option: o, ask: null })
     expect(gone.blocked).toBe(true)
@@ -125,8 +127,8 @@ describe('simpleCheck', () => {
 
 describe('cancelBidCheck', () => {
   it('lets the buyer take an open or an expired request back, with the escrowed figure', () => {
-    expect(cancelBidCheck({ me: ME, bid: bid() }).lines[0]).toMatchObject({ label: 'Request', status: 'ok', text: 'Open. 2.00 USDx escrowed' })
-    expect(cancelBidCheck({ me: ME, bid: bid({ state: 'expired' }) }).lines[0].text).toBe('Expired. 2.00 USDx escrowed')
+    expect(cancelBidCheck({ me: ME, bid: bid() }).lines[0]).toMatchObject({ label: 'Request', status: 'ok', text: 'Open. 2.00\u00A0USDx escrowed' })
+    expect(cancelBidCheck({ me: ME, bid: bid({ state: 'expired' }) }).lines[0].text).toBe('Expired. 2.00\u00A0USDx escrowed')
   })
 
   it('refuses when a maker filled it first, and says where the option is', () => {

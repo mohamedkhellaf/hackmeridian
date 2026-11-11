@@ -63,7 +63,8 @@ describe("the guide's words", () => {
   })
 
   it('use no directional word: a note must make sense wherever it is placed', () => {
-    for (const text of COPY_STRINGS) expect(text, text).not.toMatch(/\b(left|right|above|below|beside|top|bottom|underneath|over here)\b/i)
+    // The closing line names where the settings menu sits on the screen, which does not depend on the note.
+    for (const text of COPY_STRINGS.filter((t) => t !== copy.CLOSING_LINE)) expect(text, text).not.toMatch(/\b(left|right|above|below|beside|top|bottom|underneath|over here)\b/i)
   })
 
   it("use the product's one word per thing: request, deadline, maker", () => {
@@ -77,10 +78,8 @@ describe("the guide's words", () => {
     expect(copy.soloAnnouncement('Guided and Chain', 'Body.')).toBe('Note. Guided and Chain. Body. Press Escape to close.')
   })
 
-  it('say where the guide lives in the words of the layout', () => {
-    expect(copy.CLOSING_LINE).toContain('Settings')
-    expect(copy.CLOSING_LINE_PHONE).toContain('More')
-    expect(GUIDE_COPY.stays).toContain('Settings')
-    expect(GUIDE_COPY.staysPhone).toContain('More')
+  it('name the control that starts the guide again, as the layout shows it', () => {
+    expect(copy.CLOSING_LINE).toBe(`${GUIDE_COPY.start} is in the settings menu, top right.`)
+    expect(copy.CLOSING_LINE_PHONE).toBe(`${GUIDE_COPY.start} is under More.`)
   })
 })

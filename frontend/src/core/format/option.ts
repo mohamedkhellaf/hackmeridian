@@ -5,8 +5,11 @@ import { strikeUnits } from '../units'
 import type { Sized } from '../units'
 import { NO_VALUE, formatExact, formatUnits } from './amount'
 
-/** `No. 000012`'s digits: the contract id of an offer, an option or a request, padded to six. */
-export const serialOf = (id: bigint): string => id.toString().padStart(6, '0')
+/**
+ * The contract id of an offer, an option or a request, as the contract numbers it: `0`, `26`, `184` (ruling F1:
+ * never padded). The only formatter of an id; screens write it as `No. 0`, `Offer No. 26`, `Option No. 58`.
+ */
+export const serialOf = (id: bigint): string => id.toString()
 
 /** The kind as a word that starts a label: `Put`, `Call`. Lower-case it inside a sentence. */
 export const KIND_WORD: Readonly<Record<OptionKind, string>> = { put: 'Put', call: 'Call' }

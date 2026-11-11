@@ -1,11 +1,12 @@
 // The welcome on the Markets index: one line of welcome, one sentence, two buttons, in the page flow between the
 // page header and the first section. It never opens anything by itself and never takes focus. Once the visitor
-// answers it (or starts the guide from Settings), it becomes one line saying where the guide lives, until they
-// leave Markets; after that it is never shown again in this browser.
-import { useEffect, useRef, useState } from 'react'
-import { GUIDE_COPY, GUIDE_RETURN_ATTRIBUTE, canOfferTour } from '../../../core/guide'
+// answers it, or a tour starts from anywhere, it goes, and it is never shown again in this browser. Where the
+// guide lives afterwards is said once, in the last note of a tour.
+import { useState } from 'react'
+import type { RefObject } from 'react'
+import { GUIDE_COPY, canOfferTour } from '../../../core/guide'
 import { useGuide } from '../../../data'
-import { Button, useIsPhone } from '../../../ui'
+import { Button } from '../../../ui'
 import styles from './GuideSlip.module.css'
 
 export interface GuideSlipProps {
@@ -13,44 +14,28 @@ export interface GuideSlipProps {
   displaced: boolean
   /** A connected wallet's balances are still loading: too early to say which of the two belongs here. */
   pending: boolean
+  /** Takes focus after "Not now", which took away the button that had it: the heading of the first section. */
+  after: RefObject<HTMLElement | null>
 }
 
-type Phase = 'none' | 'offered' | 'parked' | 'gone'
+type Phase = 'none' | 'offered' | 'gone'
 
-export function GuideSlip({ displaced, pending }: GuideSlipProps) {
+export function GuideSlip({ displaced, pending, after }: GuideSlipProps) {
   const { seen, persistent, run, start, decline } = useGuide()
-  const phone = useIsPhone()
-  const line = useRef<HTMLParagraphElement>(null)
   const [phase, setPhase] = useState<Phase>('none')
-  const [declined, setDeclined] = useState(false)
 
   const open = canOfferTour({ seen, persistent })
-  // Offered once nothing is stored and the page knows the funds strip is not coming. Answered in this tab (a
-  // button here, or a tour that is running), it parks as one line; answered in another tab, it just goes.
+  // Offered once nothing is stored and the page knows the funds strip is not coming. Answered here or in another
+  // tab, or overtaken by a tour started from Settings, it goes.
   let next = phase
-  if (phase === 'none' && open && !pending && !displaced) next = 'offered'
-  else if (phase === 'offered' && !open) next = declined || run !== null ? 'parked' : 'gone'
+  if (phase === 'none' && open && !pending && !displaced && run === null) next = 'offered'
+  else if (phase === 'offered' && (!open || run !== null)) next = 'gone'
   if (next !== phase) setPhase(next)
 
-  // "Not now" took the button that had focus away: focus goes to the line, which is then read.
-  useEffect(() => {
-    if (phase === 'parked' && declined) line.current?.focus()
-  }, [phase, declined])
-
-  if (displaced || next === 'none' || next === 'gone') return null
-
-  if (next === 'parked') {
-    return (
-      <div className={styles.root} data-state="parked">
-        <p ref={line} tabIndex={-1} className={styles.line} {...{ [GUIDE_RETURN_ATTRIBUTE]: '' }}>
-          {phone ? GUIDE_COPY.staysPhone : GUIDE_COPY.stays}
-        </p>
-      </div>
-    )
-  }
+  if (displaced || next !== 'offered') return null
 
   return (
-    <div className={styles.root} data-state="offered">
+    <div className={styles.root}>
       <div className={styles.text}>
         <h2 className={styles.title}>{GUIDE_COPY.welcomeTitle}</h2>
         <p className={styles.body}>{GUIDE_COPY.welcomeBody}</p>
@@ -62,7 +47,8 @@ export function GuideSlip({ displaced, pending }: GuideSlipProps) {
         <Button
           variant="quiet"
           onClick={() => {
-            setDeclined(true)
+            // Before the welcome goes, so focus never falls to the page: the heading is then read.
+            after.current?.focus({ preventScroll: true })
             decline()
           }}
         >

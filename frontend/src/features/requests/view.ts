@@ -1,12 +1,10 @@
 // What the table (from 1200 px) and the list (below it) both take, so the page can render either from one set of
-// props, and the few rules both apply the same way.
-import { URGENCY_15MIN_SECONDS } from '../../core/format'
+// props. The rules a row follows (the warning tone, the 15-minute line) live with the row model in
+// core/requests/rows, shared with the asset page's Requests tab.
 import type { TokenBalance } from '../../core/stellar/tokens'
-import { lockShortfall } from './board'
 import type { RequestRow, RequestSort } from './board'
 
-/** Under 48 hours the countdown of the wallet's own open request takes the warning tone and a clock. */
-export const WARN_BELOW_MS = 48 * 3_600 * 1_000
+export { WARN_BELOW_MS, lapsing, warnBelowOf } from '../../core/requests/rows'
 
 export interface RequestsViewProps {
   rows: readonly RequestRow[]
@@ -14,10 +12,6 @@ export interface RequestsViewProps {
   variant: 'board' | 'mine'
   /** The request the ticket is showing. */
   selectedId: bigint | null
-  /** The wallet's balances by token contract id, when known. Only feeds the "You hold" hint. */
-  balances: Record<string, TokenBalance> | undefined
-  /** Tokens the wallet holds none of: said once above the board, so their rows carry no hint. */
-  emptyTokens: ReadonlySet<string>
   /** Unix seconds, stepped: decides the "may expire" line. */
   nowSec: number
   /** The order of the board. The table's Deadline and Premium headers set it; the list has a control above it. */
@@ -27,13 +21,6 @@ export interface RequestsViewProps {
   explorerOf: (address: string) => string | undefined
   onSell: (row: RequestRow) => void
   onCancel: (row: RequestRow) => void
-}
-
-/** What the wallet is missing to lock the collateral of a request, when its balance is known, above zero and too low. */
-export function shortfallOf(row: RequestRow, balances: Record<string, TokenBalance> | undefined, emptyTokens: ReadonlySet<string>): ReturnType<typeof lockShortfall> {
-  const held = balances?.[row.lockToken.contractId]
-  if (row.mine || !held || held.status !== 'ok' || emptyTokens.has(row.lockToken.contractId)) return null
-  return lockShortfall(row, held.balance)
 }
 
 /** A balance that is known to be nothing: zero, or no account or trustline to hold the token. */
@@ -50,13 +37,4 @@ export function emptyCollateral(rows: readonly RequestRow[], balances: Record<st
     if (!out.has(id) && holdsNone(balances[id])) out.set(id, row.lockToken.code)
   }
   return out
-}
-
-/** The warning tone of a countdown: only on the wallet's own open request, whose premium is about to need taking back. */
-export const warnBelowOf = (row: RequestRow): number | undefined => (row.mine ? WARN_BELOW_MS : undefined)
-
-/** A request of another wallet with under 15 minutes left: a fill signed now may land after the deadline. */
-export const lapsing = (row: RequestRow, nowSec: number): boolean => {
-  const left = row.deadlineSec - nowSec
-  return !row.mine && row.state === 'open' && left > 0 && left <= URGENCY_15MIN_SECONDS
 }

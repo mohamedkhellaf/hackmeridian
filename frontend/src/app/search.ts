@@ -40,6 +40,8 @@ export type MarketsSearch = {
   intent?: Intent
   /** Show the "Get test funds" strip to any connected wallet, not only one without the quote token. */
   funds?: '1'
+  /** The order that sent the visitor to the funds strip: an internal path with its search, for "Back to your order". */
+  from?: string
 }
 
 /** /portfolio */
@@ -91,6 +93,19 @@ export const isDecimalParam = (value: string): boolean => /^\d{1,19}(\.\d{1,7})?
 /** An id as the contract prints it: a u64 in decimal, no sign, no leading zero. */
 export const isIdParam = (value: string): boolean => /^(0|[1-9]\d{0,19})$/.test(value) && BigInt(value) <= 0xffff_ffff_ffff_ffffn
 
+/**
+ * A path inside this app, as a "back" link may carry it: starts with one `/` (never `//`, which a browser reads as
+ * another host), no backslash or control character, at most 300 characters. The search part is kept as is.
+ */
+export function isInternalPathParam(value: string): boolean {
+  if (value.length > 300 || !value.startsWith('/') || value.startsWith('//')) return false
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i)
+    if (code < 0x20 || code === 0x7f || code === 0x5c) return false
+  }
+  return true
+}
+
 /** A real UTC calendar day, `YYYY-MM-DD`. */
 export function isDayParam(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
@@ -123,7 +138,7 @@ export const AssetSearchSchema = v.object({
   step: word(['terms', 'review']),
 })
 
-export const MarketsSearchSchema = v.object({ all: flag, intent: word(INTENTS), funds: flag })
+export const MarketsSearchSchema = v.object({ all: flag, intent: word(INTENTS), funds: flag, from: text(isInternalPathParam) })
 
 export const PortfolioSearchSchema = v.object({ tab: word(['holding', 'written', 'orders']), closed: flag })
 

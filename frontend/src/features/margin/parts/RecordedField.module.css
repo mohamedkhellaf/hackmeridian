@@ -1,0 +1,18 @@
+@layer features {
+  /* Read, not typed: the well loses its control border and its fill, so it does not ask to be edited. */
+  .locked [data-amount] {
+    background: transparent;
+    border-color: var(--hairline);
+  }
+
+  .locked input {
+    cursor: default;
+  }
+
+  .none {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+}

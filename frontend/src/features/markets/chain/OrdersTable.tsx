@@ -1,22 +1,23 @@
-// Orders as one table: the book of a series (offers above the gap line, requests below; ruling E9), or the
-// "Other offers" list. Every row carries its number, who posted it (Maker, Seller or Buyer), its exact terms and
-// the one action it allows. Columns have fixed widths, so a figure or a busy button never moves its neighbours.
+// Orders as one table: the book of a series (offers above the gap line, requests below; ruling E9), "Your orders" or
+// the "Other offers" list. Every row carries its number as the contract has it (ruling F1), who posted it (Maker,
+// Seller or Buyer), its exact terms and the one action it allows. Columns have fixed widths, so a figure or a busy
+// button never moves its neighbours; the spare width goes to the column that can use it.
 import { Fragment } from 'react'
 import { explorerAccount } from '../../../core/explorer'
-import { formatExact, formatUnits } from '../../../core/format'
+import { formatExact, formatUnits, serialOf } from '../../../core/format'
 import { seriesRefOf } from '../../../core/market/selection'
 import { Address, Amount, DateTime, Glyph, IconWarning, Marker, TBody, THead, Table, TableWrap, Td, Th, Tr, shortenAddress } from '../../../ui'
 import { COPY, KIND_WORD, REASON_LABEL, SOURCE_LABEL } from './copy'
 import { premiumText, strikeText } from './model'
 import { OrderAction } from './OrderAction'
-import { isMine, notesOf, orderNumber } from './orders'
+import { idOf, isMine, notesOf } from './orders'
 import type { OrderLine, OrdersProps } from './orders'
 import styles from './OrdersTable.module.css'
 
-/** A request row's action ("Fill request") is wider than "Buy": its column makes room only when one is there. */
-const hasFill = (sections: OrdersProps['sections']): boolean => sections.some((s) => s.lines.some((l) => l.action.kind === 'fill'))
+/** "Fill request" and "Written by you" are wider than "Buy": the action column makes room only when one is there. */
+const hasWide = (sections: OrdersProps['sections']): boolean => sections.some((s) => s.lines.some((l) => l.action.kind === 'fill' || (l.action.kind === 'none' && l.action.note !== 'Yours')))
 
-export function OrdersTable({ label, sections, gap = null, showSeries = false, showReason = true, onSelect, sharedReason = null, ticketKey = null, health, explorer, busy, onTake, onCancel }: OrdersProps) {
+export function OrdersTable({ label, sections, gap = null, showSeries = false, showReason = true, onSelect, allMine = false, sharedReason = null, ticketKey = null, health, explorer, busy, onTake, onCancel }: OrdersProps) {
   const reasonCol = showSeries && showReason
   // With its own "Reason" column the reason is not repeated as a note.
   const notes = new Map(sections.flatMap((s) => s.lines.map((line) => [line.row.key, notesOf(line, health, !showSeries, sharedReason)] as const)))
@@ -31,6 +32,7 @@ export function OrdersTable({ label, sections, gap = null, showSeries = false, s
     const perUnit = line.perUnit === null ? '–' : premiumText(line.perUnit, row.quote.decimals)
     const total = formatUnits(row.totalPremium, row.quote.decimals)
     const note = notes.get(row.key) ?? { warnings: [], reason: null }
+    const id = idOf(row)
     return (
       <Tr key={row.key} selected={row.key === ticketKey} data-order={row.key} data-source={row.source}>
         {showSeries ? (
@@ -55,11 +57,13 @@ export function OrdersTable({ label, sections, gap = null, showSeries = false, s
             </span>
           </Td>
         ) : null}
-        <Td className={styles.no}>{orderNumber(row)}</Td>
+        <Td numeric className={styles.no}>
+          {id === null ? null : serialOf(id)}
+        </Td>
         <Td className={styles.fromCell}>
           <span className={styles.from}>
             <span className={styles.source}>{SOURCE_LABEL[row.source]}</span>
-            {mine ? (
+            {allMine ? null : mine ? (
               <span className={styles.own}>{COPY.yoursRow}</span>
             ) : (
               <Address value={row.counterparty} copyLabel={null} explorerUrl={explorer ? explorerAccount(row.counterparty) : undefined} explorerLabel={`View ${shortenAddress(row.counterparty)} on the explorer`} />
@@ -113,24 +117,24 @@ export function OrdersTable({ label, sections, gap = null, showSeries = false, s
   }
 
   return (
-    <div className={styles.root} data-layout={showSeries ? 'series' : 'book'}>
+    <div className={styles.root} data-layout={showSeries ? 'series' : 'book'} data-mine={allMine || undefined}>
       <TableWrap label={label}>
         <Table density={showSeries ? 'comfortable' : 'compact'} fixed caption={label} className={styles.table}>
           <colgroup>
             {showSeries ? <col className={styles.seriesCol} /> : null}
             <col className={styles.noCol} />
-            <col />
+            <col className={styles.fromCol} />
             <col className={styles.qtyCol} />
             <col className={styles.perUnitCol} />
             {showSeries ? null : <col className={styles.totalCol} />}
             {reasonCol ? <col className={styles.whyCol} /> : null}
             {hasNotes ? <col className={styles.noteCol} /> : null}
-            <col className={styles.actionColW} data-wide={hasFill(sections) || undefined} />
+            <col className={styles.actionColW} data-wide={hasWide(sections) || undefined} />
           </colgroup>
           <THead>
             <tr>
               {showSeries ? <Th>{COPY.colSeries}</Th> : null}
-              <Th>{COPY.colNo}</Th>
+              <Th numeric>{COPY.colNo}</Th>
               <Th>{COPY.colFrom}</Th>
               <Th numeric>{COPY.colQty}</Th>
               <Th numeric>{COPY.colPerUnit}</Th>

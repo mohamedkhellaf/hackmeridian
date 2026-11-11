@@ -17,7 +17,7 @@ export interface NoteTerm {
 }
 
 export interface ContractNoteProps {
-  /** The option, offer or request id as printed: "000184". */
+  /** The option, offer or request id as printed, unpadded: "184". */
   serial?: string
   /**
    * A ledger number printed beside the serial ("L 58,331,204"), read out as "latest ledger": the ledger of the
@@ -136,7 +136,7 @@ export interface EmptyNoteProps {
   action?: ReactNode
   /** Deprecated: still rendered under the sentence until the last caller stops passing it. Add nothing new here. */
   children?: ReactNode
-  /** `sm` for a desk screen that stacks several empty tables: less room, a smaller sentence. */
+  /** `sm` for a desk screen that stacks several empty tables: less room around the sentence (and, on a slip, a smaller one). */
   size?: 'md' | 'sm'
   /**
    * The blank contract note: a solid hairline frame, the perforated edge and the "No. ------" serial line. Only
@@ -149,8 +149,9 @@ export interface EmptyNoteProps {
 }
 
 /**
- * The empty state. Plain by default: one serif sentence, at most one short line and one action, no frame.
- * With `slip`, the same words on a blank contract note.
+ * The empty state. Plain by default: one serif sentence a rank under the heading above it (figure size, secondary
+ * ink), at most one short line and one action, no frame. With `slip`, the same words, larger, on a blank contract
+ * note.
  */
 export function EmptyNote({ title, hint, action, children, size = 'md', slip = false, headingLevel = 3, className }: EmptyNoteProps) {
   const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4'

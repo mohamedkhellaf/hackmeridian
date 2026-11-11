@@ -15,7 +15,7 @@
   }
 
   .lede {
-    max-width: 42rem;
+    max-width: var(--measure);
     font-size: var(--body-size);
     line-height: var(--body-line);
     color: var(--text-2);
@@ -24,7 +24,7 @@
 
   /* A fact about this build, set apart by a rule on its left rather than by a tinted panel. */
   .note {
-    max-width: 42rem;
+    max-width: var(--measure);
     margin-top: var(--s-6);
     padding-inline-start: var(--s-12);
     border-inline-start: 2px solid var(--rule);
@@ -125,7 +125,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-6);
-    max-width: 46rem;
+    max-width: var(--measure);
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     color: var(--muted);
@@ -195,7 +195,7 @@
   }
 
   .roleSummary {
-    max-width: 40rem;
+    max-width: var(--measure);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
@@ -219,7 +219,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-4);
-    max-width: 40rem;
+    max-width: var(--measure);
     margin: 0;
     padding-inline-start: var(--s-16);
     font-size: var(--ui-size);

@@ -1,6 +1,6 @@
 // The terms form of the write and bid tickets, without React: defaults from the standard grid, the draft the
 // one validator of core builds from the fields, and which field an error belongs to.
-import { formatCountdown } from '../../core/format'
+import { NBSP, formatCountdown } from '../../core/format'
 import { buildOffer } from '../../core/maker/buildOffer'
 import { parseAmount } from '../../core/options/format'
 import type { NewOffer, OptionKind, SupportedAssets, TokenInfo } from '../../core/options/types'
@@ -192,7 +192,7 @@ export function utcDateTimeFields(ts: number): { date: string; time: string } {
 
 /** The second line of an expiry chip: whole days from one day up (`9 d`), else the countdown (`3 h 12 min`). */
 export function chipCountdown(secondsLeft: number): string {
-  return secondsLeft >= DAY_SECONDS ? `${Math.floor(secondsLeft / DAY_SECONDS)} d` : formatCountdown(secondsLeft)
+  return secondsLeft >= DAY_SECONDS ? `${Math.floor(secondsLeft / DAY_SECONDS)}${NBSP}d` : formatCountdown(secondsLeft)
 }
 
 const sameDecimal = (a: string, b: string, decimals: number): boolean => {

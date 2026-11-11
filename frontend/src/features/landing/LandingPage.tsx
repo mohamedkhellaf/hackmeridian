@@ -94,13 +94,11 @@ function TopNav() {
   )
 }
 
+/** The foot of the page: one sentence and the way into the app, with no heading of its own. */
 function Closing() {
   return (
-    <section className={css.closing} aria-labelledby="closing-heading">
+    <div className={css.closing} data-testid="landing-closing">
       <div className={css.closingInner}>
-        <h2 id="closing-heading" className={css.closingHeading}>
-          {CLOSING.heading}
-        </h2>
         <p className={css.closingBody}>
           {CLOSING.bodyBefore}
           <Link render={<RouterLink to="/markets" search={{ funds: '1' }} />}>{CLOSING.bodyLink}</Link>
@@ -110,7 +108,7 @@ function Closing() {
           {CLOSING.primary}
         </ButtonLink>
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -237,7 +235,6 @@ export function LandingPage() {
         <section className={css.hero} aria-labelledby="hero-heading">
           <div className={css.heroInner}>
             <div className={css.heroText}>
-              <p className={css.heroLabel}>{HERO.label}</p>
               <h1 id="hero-heading" className={css.h1}>
                 {HERO.h1}
               </h1>

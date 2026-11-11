@@ -1,7 +1,7 @@
 // Exact integer-unit helpers shared by every core module: one copy of "amount with its code", "per unit of
 // underlying" and the cross-multiplied comparisons. Token amounts are bigint from chain to screen; nothing here
 // rounds up (bigint division floors) and nothing uses `number`.
-import { formatExact, formatUnits } from './format/amount'
+import { NBSP, formatExact, formatUnits } from './format/amount'
 
 /** The minimum a token needs to be formatted with its unit. `TokenInfo` satisfies it. */
 export interface UnitToken {
@@ -10,14 +10,14 @@ export interface UnitToken {
 }
 
 /**
- * `5.00 FUND`: two decimals, grouped, truncated, `<0.01` for a non-zero dust amount (core/format `formatUnits`, the
+ * `5.00 FUND`, figure and code joined by a no-break space (ruling F7): two decimals, grouped, truncated, `<0.01` for a non-zero dust amount (core/format `formatUnits`, the
  * one rule for amounts on screen). Exact digits belong in the Amount popover: use `amtExact` only for a figure the
  * user must act on to the last unit, such as a shortfall.
  */
-export const amt = (units: bigint, t: UnitToken): string => `${formatUnits(units, t.decimals)} ${t.code}`
+export const amt = (units: bigint, t: UnitToken): string => `${formatUnits(units, t.decimals)}${NBSP}${t.code}`
 
 /** `470.0055 USDx`: every digit, at least two decimals. For a shortfall, which truncation would understate. */
-export const amtExact = (units: bigint, t: UnitToken): string => `${formatExact(units, t.decimals)} ${t.code}`
+export const amtExact = (units: bigint, t: UnitToken): string => `${formatExact(units, t.decimals)}${NBSP}${t.code}`
 
 /** Decimal string without grouping or padding (`12.5`), for prefilling an input. Round-trips through `parseAmount`. */
 export function plainAmount(units: bigint, decimals: number): string {

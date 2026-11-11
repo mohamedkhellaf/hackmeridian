@@ -1,15 +1,20 @@
 import { useId } from 'react'
 import type { ReactNode } from 'react'
-import { IconSelect, Marker } from '../../../ui'
+import { Amount, IconSelect, Marker } from '../../../ui'
 import css from './Term.module.css'
 
 interface TermLook {
-  /** The value as it is typeset on the note: "10.00". */
+  /** The value as it is typeset on the note: an asset code, a `TermAmount`, a date. */
   figure: ReactNode
-  /** Its unit or qualifier, once, after the figure: "USDx", "08:00 UTC". */
-  unit?: ReactNode
+  /** What follows a date on the same line: "08:00 UTC", "2026, 01:56 UTC". An amount carries its own unit. */
+  rest?: ReactNode
   /** The visitor's own term goes under the highlighter. */
   marked?: boolean
+}
+
+/** An amount on the note: the kit's `Amount` at the size of the terms, its unit drawn by `Amount` itself. */
+export function TermAmount({ value, unit }: { value: string; unit: string }) {
+  return <Amount value={value} unit={unit} figure="serif" className={css.amount} />
 }
 
 export interface TermValueProps extends TermLook {
@@ -17,13 +22,13 @@ export interface TermValueProps extends TermLook {
 }
 
 /** A fixed term of the note, as `dt` and `dd`: the parent is a `dl`. */
-export function TermValue({ label, figure, unit, marked = false }: TermValueProps) {
+export function TermValue({ label, figure, rest, marked = false }: TermValueProps) {
   return (
     <div className={css.term}>
       <dt className={css.label}>{label}</dt>
       <dd className={css.value}>
         <span className={css.figure}>{marked ? <Marker>{figure}</Marker> : figure}</span>
-        {unit ? <span className={css.unit}>{unit}</span> : null}
+        {rest ? <span className={css.rest}>{rest}</span> : null}
       </dd>
     </div>
   )
@@ -42,7 +47,7 @@ export interface TermSelectProps<V extends string> extends TermLook {
  * lies over it, so the keyboard, a screen reader and a phone's own picker all work without a line of script.
  * The ui kit's `Select` is a boxed form control and cannot carry the highlighter: see README.md.
  */
-export function TermSelect<V extends string>({ label, value, onChange, options, figure, unit, marked = false }: TermSelectProps<V>) {
+export function TermSelect<V extends string>({ label, value, onChange, options, figure, rest, marked = false }: TermSelectProps<V>) {
   const id = useId()
   return (
     <div className={css.term}>
@@ -53,9 +58,9 @@ export function TermSelect<V extends string>({ label, value, onChange, options, 
         <span className={css.figure} aria-hidden="true">
           {marked ? <Marker>{figure}</Marker> : figure}
         </span>
-        {unit ? (
-          <span className={css.unit} aria-hidden="true">
-            {unit}
+        {rest ? (
+          <span className={css.rest} aria-hidden="true">
+            {rest}
           </span>
         ) : null}
         <IconSelect className={css.caret} size={14} />

@@ -6,8 +6,10 @@ const BOND = { decimals: 7 }
 const USDX = { decimals: 7 }
 
 describe('option words', () => {
-  it('pads a serial to six digits', () => {
-    expect(serialOf(12n)).toBe('000012')
+  it('prints the contract id unpadded (ruling F1)', () => {
+    expect(serialOf(0n)).toBe('0')
+    expect(serialOf(12n)).toBe('12')
+    expect(serialOf(184n)).toBe('184')
     expect(serialOf(1234567n)).toBe('1234567')
   })
   it('names the kind', () => {

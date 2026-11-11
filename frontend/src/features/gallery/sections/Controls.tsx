@@ -4,6 +4,7 @@ import {
   Button,
   ButtonLink,
   Checkbox,
+  ChoiceChips,
   Combobox,
   Glyph,
   IconButton,
@@ -46,6 +47,8 @@ export function ControlsSection() {
   const [mode, setMode] = useState('guided')
   const [kind, setKind] = useState('put')
   const [date, setDate] = useState('13')
+  const [chipStrike, setChipStrike] = useState('99')
+  const [chipDate, setChipDate] = useState('20')
   const [closed, setClosed] = useState(false)
   const [price, setPrice] = useState(9.2)
 
@@ -70,7 +73,7 @@ export function ControlsSection() {
             Exercise
           </Button>
           <Button variant="quiet" size="sm">
-            Request
+            Post a request
           </Button>
           <Button variant="danger" size="sm">
             Freeze
@@ -115,7 +118,7 @@ export function ControlsSection() {
         </Example>
         <Example label="A link that looks like a button stays a link">
           <ButtonLink variant="primary" href="#controls">
-            Open Markets
+            Go to Markets
           </ButtonLink>
           <ButtonLink variant="secondary" href="#controls">
             View position
@@ -162,14 +165,7 @@ export function ControlsSection() {
           validate={(v) => (/^0*\.?0*$/.test(v) ? 'Enter a quantity above 0.' : undefined)}
           hint="Up to 7 decimals. Clear it and leave the field to see the validation."
         />
-        <AmountField
-          label="Premium, total"
-          unit="USDx"
-          decimals={7}
-          value={premium}
-          onValueChange={setPremium}
-          hint="What the buyer pays you for the whole quantity."
-        />
+        <AmountField label="Premium per BOND" unit="USDx" decimals={7} value={premium} onValueChange={setPremium} />
         <AmountField
           label="You pay"
           unit="USDx"
@@ -228,7 +224,7 @@ export function ControlsSection() {
 
       <Specimen title="Checkbox" note="A consent gate carries the full sentence the user agrees to; it gates the action." layout="stack">
         <Checkbox checked={consent} onCheckedChange={setConsent} description="The action button stays disabled until this is ticked.">
-          I have read the terms above and understand that nothing settles by itself.
+          I want to exercise although the option is out of the money at the demo price.
         </Checkbox>
         <div className={styles.cluster}>
           <Checkbox checked={some} onCheckedChange={setSome}>
@@ -314,12 +310,45 @@ export function ControlsSection() {
         </Example>
       </Specimen>
 
+      <Specimen
+        title="Choice chips"
+        note="One choice among values that need more room than a strip, as on the guided note. The chosen chip takes the selection tint and an accent edge, never the primary fill; a tick marks a chip with a funded offer behind it."
+      >
+        <Example label="On a note: strikes, one chosen, two funded">
+          <ChoiceChips
+            appearance="note"
+            label="Floor, per unit"
+            value={chipStrike}
+            onValueChange={setChipStrike}
+            columns={5}
+            chips={[
+              { value: '97', label: '97.00', name: '97.00, funded', marked: true },
+              { value: '98', label: '98.00' },
+              { value: '99', label: '99.00', name: '99.00, funded', marked: true },
+              { value: '100', label: '100.00' },
+              { value: '101', label: '101.00' },
+            ]}
+          />
+        </Example>
+        <Example label="In a form: deadlines with days left">
+          <ChoiceChips
+            label="Deadline"
+            value={chipDate}
+            onValueChange={setChipDate}
+            columns={4}
+            chips={[
+              { value: '13', label: '13 Nov', detail: '2 d' },
+              { value: '20', label: '20 Nov', detail: '9 d' },
+              { value: '27', label: '27 Nov', detail: '16 d' },
+              { value: '25', label: '25 Dec', detail: '44 d' },
+            ]}
+          />
+        </Example>
+      </Specimen>
+
       <Specimen title="Switch" note="An immediate setting, named after the setting and not the state. The only pill in the system.">
         <Switch checked={closed} onCheckedChange={setClosed}>
           Show closed positions
-        </Switch>
-        <Switch checked onCheckedChange={() => {}}>
-          Compact tables
         </Switch>
         <Switch checked={false} disabled onCheckedChange={() => {}}>
           Disabled

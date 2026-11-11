@@ -125,7 +125,7 @@ test.describe('Activity', () => {
     // The button is gone with the note that held it: focus goes to the page title, not to the page body.
     await expect(pageHeading(page)).toBeFocused()
     await expect(main(page).getByRole('heading', { name: 'No transactions yet.' })).toBeVisible()
-    await expect(main(page).getByRole('link', { name: 'Go to markets' })).toHaveAttribute('href', /^\/markets/)
+    await expect(main(page).getByRole('link', { name: 'Go to Markets' })).toHaveAttribute('href', /^\/markets/)
     // Still said, also with a wallet connected and nothing to list.
     await expect(main(page)).toContainText(LOCAL_ONLY)
     await expect(main(page)).not.toContainText('Wallet ')
@@ -136,7 +136,7 @@ test.describe('Activity', () => {
     await expect(rows(page)).toHaveCount(0)
 
     const ticket = await writeOffer(page)
-    await expect(ticket.getByText(/Offer No\. \d{6}/).first()).toBeVisible()
+    await expect(ticket.getByText(/Offer No\. \d+/).first()).toBeVisible()
     await ticket.getByRole('button', { name: 'Done' }).click()
     await goToActivity(page)
 
@@ -155,7 +155,7 @@ test.describe('Activity', () => {
     const table = page.getByRole('table', { name: 'Transactions from this browser' })
     await expect(table.getByRole('columnheader')).toHaveText(['Transaction', 'State', /^Time, UTC/, 'Hash', 'Where it shows'])
     // The day is said once, as the heading of its rows; a confirmed row is one line, with no note under it.
-    await expect(table.getByRole('rowheader', { name: /^\d{1,2} [A-Z][a-z]{2} \d{4}$/ })).toHaveCount(1)
+    await expect(table.getByRole('rowheader', { name: /^\d{1,2}\s[A-Z][a-z]{2}\s\d{4}$/ })).toHaveCount(1)
     expect((await row.boundingBox())!.height).toBeLessThan(50)
 
     // The entry records the option the contract created, so the link goes to that option, not to a list.
@@ -168,15 +168,17 @@ test.describe('Activity', () => {
 
   test('a cancelled request is listed with a link back to the requests', async ({ page }) => {
     await open(page, '/requests', { connect: true })
-    const mine = page.getByTestId('request-row').filter({ hasText: 'No. 000000' })
-    await mine.getByRole('button', { name: /^Cancel request No\. 000000/ }).click()
-    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 000000' })
+    // Ids are printed unpadded: request 0 is "No. 0". The row's text runs on into the next cell, so the number is
+    // matched as its own element.
+    const mine = page.getByTestId('request-row').filter({ has: page.getByText('No. 0', { exact: true }) })
+    await mine.getByRole('button', { name: /^Cancel request No\. 0\b/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 0' })
     await dialog.getByRole('button', { name: 'Cancel request', exact: true }).click()
     // The dialog takes the outcome as its title once the transaction is through.
     await page.getByRole('dialog').getByRole('button', { name: 'Done' }).click()
     await goToActivity(page)
 
-    const row = rowOf(page, /Cancel request for put on 2\.00 BOND/)
+    const row = rowOf(page, /Cancel request for put on 2\.00\sBOND/)
     await expect(state(row)).toHaveText('Confirmed')
     await row.getByRole('link', { name: 'Request 0' }).click()
     await expect(page).toHaveURL((url) => url.pathname === '/requests' && url.searchParams.get('mine') === '1')
@@ -323,7 +325,7 @@ test.describe('Activity on a phone', () => {
     await open(page, '/activity', { connect: true })
     await stageEntries(page, ADDR_A, STAGED)
     await expect(rows(page)).toHaveCount(5)
-    await expect(main(page).getByRole('heading', { level: 2 })).toHaveText(['Waiting for an outcome', /^\d{1,2} [A-Z][a-z]{2} \d{4}$/])
+    await expect(main(page).getByRole('heading', { level: 2 })).toHaveText(['Waiting for an outcome', /^\d{1,2}\s[A-Z][a-z]{2}\s\d{4}$/])
     await expect(page.getByRole('list', { name: 'Waiting for an outcome' }).getByRole('listitem')).toHaveCount(2)
     await expect(page.getByRole('table')).toHaveCount(0)
     await expectNoHorizontalOverflow(page)
@@ -333,7 +335,7 @@ test.describe('Activity on a phone', () => {
     await expect(failed).toContainText('The network fee was charged.')
     await expect(failed).not.toContainText('Started')
     await expect(failed).toContainText(HASH)
-    await expect(failed.locator('time')).toHaveText(/^\d{2}:\d{2} UTC$/)
+    await expect(failed.locator('time')).toHaveText(/^\d{2}:\d{2}\sUTC$/)
     expect((await failed.getByRole('link', { name: 'Position 31' }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
 
     const check = rowOf(page, 'Write call on 2.00 FUND').getByRole('button', { name: 'Check again' })
@@ -345,7 +347,7 @@ test.describe('Activity on a phone', () => {
   test('a transaction made on a phone shows up in the list @phone', async ({ page }) => {
     await open(page, '/activity', { connect: true })
     const ticket = await writeOffer(page)
-    await expect(ticket.getByText(/Offer No\. \d{6}/).first()).toBeVisible()
+    await expect(ticket.getByText(/Offer No\. \d+/).first()).toBeVisible()
     await ticket.getByRole('button', { name: 'Done' }).click()
     await goToActivity(page)
     await expect(state(rowOf(page, 'Write put on 1.00 BOND'))).toHaveText('Confirmed')

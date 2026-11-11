@@ -58,7 +58,17 @@
   }
 
   .glyph {
+    flex: none;
     color: var(--text);
+  }
+
+  /* The name is the way into Markets on that intent. On touch it gets a finger-sized row. */
+  .nameLink {
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--touch);
+    }
   }
 
   .statement {
@@ -78,10 +88,11 @@
     margin-block: var(--s-8) var(--s-4);
   }
 
+  /* The row sits on the foot of its column, so the three stay level whatever the text above them needs. */
   .facts {
     display: flex;
     flex-direction: column;
-    margin: 0;
+    margin: auto 0 0;
     border-top: 1px solid var(--hairline);
   }
 
@@ -105,22 +116,6 @@
       margin: 0;
       color: var(--text);
       text-wrap: pretty;
-    }
-  }
-
-  /* The action sits on the foot of its column, so the three stay level whatever the text above them needs. */
-  .action {
-    align-self: flex-start;
-    display: inline-flex;
-    align-items: center;
-    margin-top: auto;
-    padding-top: var(--s-4);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: 500;
-
-    @media (pointer: coarse) {
-      min-height: var(--touch);
     }
   }
 

@@ -47,11 +47,10 @@ export const SECTIONS: readonly SectionInfo[] = [
 
 // ---------------------------------------------------------------------------------------------- 1. what this is
 
-/** Three sentences, no more. */
-export const WHAT_THIS_IS: readonly [string, string, string] = [
-  'StellSec is a venue for options on tokenized assets, on Stellar Testnet: a put is the right to sell a set quantity of an asset at a set price until a deadline, and a call is the right to buy it.',
+/** Two sentences: the rules table under them carries the rest (style, settlement, premium). */
+export const WHAT_THIS_IS: readonly [string, string] = [
+  'StellSec is a venue for options on tokenized assets, on Stellar: a put is the right to sell a set quantity of an asset at a set price until a deadline, and a call is the right to buy it.',
   'The maker, who writes and sells the option, locks the whole collateral in the contract before anyone can buy: the full strike for a put, the full quantity of the asset for a call.',
-  'The buyer pays a premium once and can exercise at any time before the deadline; exercise swaps the tokens against the strike in one transaction.',
 ]
 
 export const RULES_TITLE = 'The rules in brief'
@@ -129,7 +128,7 @@ export const lifecycleBranches = (x: WorkedExample): LifecycleBranch[] => [
       {
         when: 'Before the deadline',
         title: 'The holder exercises',
-        text: `The holder delivers ${x.qtyText} into the contract and receives the ${x.strikeTotalText} that were locked. Exercise is physical: the asset itself changes hands. If any part fails, nothing moves.`,
+        text: `The holder delivers ${x.qtyText} into the contract and receives the ${x.strikeTotalText} that were locked.`,
         state: 'Exercised',
       },
       {
@@ -207,7 +206,7 @@ export interface IntentCopy {
   maxLossHint?: (x: WorkedExample) => string
   maxGainHint?: (x: WorkedExample) => string
   /**
-   * A written call: the writer cannot owe more than the asset already locked, so the note prints what is given up
+   * A written call: the maker cannot owe more than the asset already locked, so the note prints what is given up
    * in place of a loss figure.
    */
   givesUp?: { value: (x: WorkedExample) => string; hint: (x: WorkedExample) => string }

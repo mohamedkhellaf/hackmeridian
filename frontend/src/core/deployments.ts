@@ -65,7 +65,7 @@ export interface TokenRecord {
  * automatically); revocable and clawback stay on. Checked against Horizon on 11 Nov 2026: all three read
  * "not required, revocable, clawback".
  */
-const TEAM_ISSUER_FLAGS: TokenRecord['flags'] = { authRequired: false, authRevocable: true, clawback: true }
+export const TEAM_ISSUER_FLAGS: TokenRecord['flags'] = { authRequired: false, authRevocable: true, clawback: true }
 
 const quote = QUOTE_ASSETS.testnet
 

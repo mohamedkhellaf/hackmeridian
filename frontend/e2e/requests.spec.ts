@@ -3,8 +3,10 @@
  * (or taking back the premium of an expired request) as a staged transaction, and the two tickets the page opens
  * (post a request, fill a request).
  *
- * The mock market seeds four open requests: No. 000000 by wallet A (put on BOND), No. 000001 by wallet B (put on
- * FUND), No. 000002 (put on FUND) and No. 000003 (call on EQTY) by two fictional hedgers.
+ * The mock market seeds four open requests: No. 0 by wallet A (put on BOND), No. 1 by wallet B (put on FUND), No. 2
+ * (put on FUND) and No. 3 (call on EQTY) by two fictional hedgers. Ids are printed unpadded (ruling F1).
+ *
+ * Figures and their units, dates and times are joined by no-break spaces (ruling F7): patterns match them with `\s`.
  *
  * The ticket's own steps are tested in ticket.spec.ts; here they are driven only as far as this page needs, with
  * matchers that follow the ticket's purpose rather than its exact words.
@@ -18,7 +20,7 @@ import { ADDR_A, connect, connectButton, expectNoAxeViolations, expectNoHorizont
 const LEAD = "A request is a buyer's premium already escrowed in the contract, waiting for a maker."
 
 const rows = (page: Page): Locator => page.getByTestId('request-row')
-const row = (page: Page, serial: string): Locator => rows(page).filter({ hasText: `No. ${serial}` })
+const row = (page: Page, serial: string): Locator => rows(page).filter({ hasText: new RegExp(`No\\.\\s${serial}(?!\\d)`) })
 const boardTab = (page: Page): Locator => page.getByRole('tab', { name: /^Open requests/ })
 const mineTab = (page: Page): Locator => page.getByRole('tab', { name: /^My requests/ })
 const postButton = (page: Page): Locator => page.getByRole('button', { name: 'Post a request' }).first()
@@ -31,8 +33,8 @@ const search = (page: Page): URLSearchParams => new URL(page.url()).searchParams
 async function perUnitFigures(page: Page): Promise<number[]> {
   const names = await rows(page).evaluateAll((list) => list.map((el) => el.querySelector('button[aria-label]')?.getAttribute('aria-label') ?? ''))
   return names.map((name) => {
-    const qty = Number(/ on ([\d,.]+) [A-Z]+ at /.exec(name)?.[1].replace(/,/g, ''))
-    const premium = Number(/premium ([\d,.]+) USDx/.exec(name)?.[1].replace(/,/g, ''))
+    const qty = Number(/ on ([\d,.]+)\s[A-Z]+ at /.exec(name)?.[1].replace(/,/g, ''))
+    const premium = Number(/premium ([\d,.]+)\sUSDx/.exec(name)?.[1].replace(/,/g, ''))
     return premium / qty
   })
 }
@@ -53,12 +55,18 @@ async function setDeadline(page: Page, id: number, offsetSec: number): Promise<v
   )
 }
 
-/** Wallet A's request No. 000000, an hour past its deadline with the premium still in the contract. */
+/** Wallet A's request No. 0, an hour past its deadline with the premium still in the contract. */
 const expireOwnRequest = (page: Page): Promise<void> => setDeadline(page, 0, -3_600)
 
 /** The deadline of every row on screen, in row order, as epoch milliseconds. */
 async function deadlines(page: Page): Promise<number[]> {
   return rows(page).evaluateAll((list) => list.map((el) => Date.parse(el.querySelector('time')?.getAttribute('datetime') ?? '')))
+}
+
+/** The premium of a request, read from the accessible name of its action, which ends with it ("premium 0.92 USDx"). */
+async function premiumOf(action: Locator): Promise<string> {
+  const name = (await action.getAttribute('aria-label')) ?? ''
+  return /premium ([\d,.]+)\sUSDx/.exec(name)?.[1] ?? ''
 }
 
 async function chooseOption(page: Page, label: string, option: string | RegExp): Promise<void> {
@@ -78,29 +86,50 @@ test.describe('Requests board', () => {
     // The tabs carry no count: the summary line says it once, in words.
     await expect(boardTab(page)).toHaveText('Open requests')
     await expect(mineTab(page)).toHaveText('My requests')
-    await expect(page.getByTestId('board-summary')).toContainText(/^4 open requests\. [\d,.]+ USDx of premium is escrowed in the contract\./)
+    await expect(page.getByTestId('board-summary')).toContainText(/^4 open requests\. [\d,.]+\sUSDx of premium is escrowed in the contract\./)
     // No explainer under the board.
     await expect(page.getByRole('heading', { name: 'How a request works' })).toHaveCount(0)
 
-    // One row in full: asset, kind as glyph and word, quantity, strike with the labelled reference price, deadline
-    // with countdown, premium per unit with the total beneath, buyer, and the collateral a maker would lock.
-    const fund = row(page, '000002')
+    // The columns of ruling F15, in its order, after the asset (the board spans assets). The asset Requests tab has
+    // the same ones without the asset (see "the same drawing on both pages" below).
+    await expect(page.getByRole('table', { name: /^Open requests/ }).getByRole('columnheader')).toHaveText([
+      'Asset',
+      'Kind',
+      'Strike',
+      'Quantity',
+      'Deadline',
+      'Premium per unit',
+      'Buyer',
+      'Action',
+    ])
+
+    // One row in full: asset with the request's number, kind as glyph and word, the strike (serif, as on every
+    // page) with the labelled reference price, quantity, deadline with countdown, premium per unit with the total
+    // beneath, buyer. What a maker locks is in the accessible name of the action and in the ticket.
+    const fund = row(page, '2')
     await expect(fund.getByRole('rowheader')).toContainText('FUND')
     await expect(fund.getByRole('rowheader')).toContainText('Fund share')
     await expect(fund).toContainText('Put')
+    await expect(fund).toContainText('No. 2')
     await expect(fund).toContainText('10.00 FUND')
-    await expect(fund).toContainText(/Demo price \d+\.\d{2}/)
-    await expect(fund).toContainText(/\d+\.\d{2} USDx in total/)
-    await expect(fund.locator('time')).toHaveText(/^\d{1,2} [A-Z][a-z]{2} \d{4}, 08:00 UTC$/)
+    const strike = fund.locator('td[data-strike]')
+    await expect(strike).toContainText(/Demo price\s\d+\.\d{2}/)
+    expect(await strike.evaluate((td) => getComputedStyle(td).fontFamily)).toMatch(/Serif/)
+    await expect(fund).toContainText(/USDx\s*in total/)
+    await expect(fund.locator('time')).toHaveText(/^\d{1,2}\s[A-Z][a-z]{2}\s\d{4},\s08:00\sUTC$/)
     await expect(fund.getByRole('timer')).toHaveAttribute('aria-label', /^Time left: /)
     await expect(fund).toContainText('GHED…AAAA')
+    await expect(fund).not.toContainText('You lock')
     // The buyer's address carries no copy button on the board.
     await expect(fund.getByRole('button', { name: /copy/i })).toHaveCount(0)
     const fill = fund.getByRole('button', { name: /^Fill request/ })
-    await expect(fill).toHaveAccessibleName(/^Fill request: put on 10\.00 FUND at [\d.]+ USDx, until .+ UTC, premium [\d.]+ USDx, you lock [\d,.]+ USDx$/)
+    await expect(fill).toHaveAccessibleName(/^Fill request: put on 10\.00\sFUND at [\d.]+\sUSDx, until .+\sUTC, premium [\d.]+\sUSDx, you lock [\d,.]+\sUSDx$/)
 
     // A call locks the asset itself.
-    await expect(row(page, '000003').getByRole('button', { name: /^Fill request/ })).toHaveAccessibleName(/you lock 4\.00 EQTY$/)
+    await expect(row(page, '3').getByRole('button', { name: /^Fill request/ })).toHaveAccessibleName(/you lock 4\.00\sEQTY$/)
+
+    // One label per destination (ruling F19).
+    await expect(page.getByTestId('board-summary').getByRole('link', { name: 'Open Reserves' })).toHaveAttribute('href', /\/reserves$/)
 
     // The default order is the soonest deadline, and the Deadline header says so.
     const when = await deadlines(page)
@@ -196,84 +225,98 @@ test.describe('Requests board', () => {
     await expect(page.getByRole('heading', { name: 'Connect a wallet to see your requests.' })).toBeVisible()
     await page.getByRole('tabpanel').getByRole('button', { name: 'Connect wallet' }).click()
     await expect(walletButton(page)).toBeVisible()
-    await expect(row(page, '000000')).toContainText('BOND')
-    await expect(row(page, '000000')).toContainText('Open')
+    await expect(row(page, '0')).toContainText('BOND')
+    await expect(row(page, '0')).toContainText('Open')
     // The tag says it: no caption restates where the premium of an open request is.
-    await expect(row(page, '000000')).not.toContainText('Premium in the contract')
+    await expect(row(page, '0')).not.toContainText('Premium in the contract')
   })
 
   test('the wallet own request reads Yours and is cancelled as a staged transaction', async ({ page }) => {
     await openApp(page, '/requests', { connect: true })
-    const mine = row(page, '000000')
+    const mine = row(page, '0')
     await expect(mine).toContainText('Yours')
     await expect(mine.getByRole('button', { name: /^Fill request/ })).toHaveCount(0)
     // The wallet's own figure (the premium per unit) sits under the highlighter; the total is beneath it.
     await expect(mine.locator('mark')).toContainText(/[\d.]+\s*USDx/)
-    const premium = /([\d.]+ USDx) in total/.exec((await mine.innerText()).replace(/\s+/g, ' '))?.[1] ?? ''
-    expect(premium).toMatch(/^[\d.]+ USDx$/)
+    const action = mine.getByRole('button', { name: /^Cancel request No\. 0\b/ })
+    // Row actions are one secondary button per action, the same on every row (ruling F14).
+    await expect(action).toHaveAttribute('data-variant', 'secondary')
+    const premium = await premiumOf(action)
+    expect(premium).toMatch(/^[\d.]+$/)
 
-    await mine.getByRole('button', { name: /^Cancel request No\. 000000/ }).click()
-    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 000000' })
+    await action.click()
+    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 0' })
     await expect(dialog).toBeVisible()
     await expect(dialog).toContainText('Put on 2.00 BOND')
-    await expect(dialog).toContainText(/Strike\s*[\d.]+ USDx per BOND/)
+    await expect(dialog).toContainText(/Strike\s*[\d.]+\sUSDx/)
     await expect(dialog).toContainText('Returned to your wallet')
     await expect(dialog).toContainText(premium)
-    await expect(dialog.getByRole('button', { name: 'Keep request' })).toBeVisible()
-    const top = (await dialog.boundingBox())?.y
+    const keep = dialog.getByRole('button', { name: 'Keep request' })
+    await expect(keep).toBeVisible()
+    // At rest the dialog takes the room its content needs: no empty stage between the note and the actions.
+    const note = dialog.getByText(/^The contract returns the premium in the same transaction\./)
+    const gap = ((await keep.boundingBox())?.y ?? 0) - (((await note.boundingBox())?.y ?? 0) + ((await note.boundingBox())?.height ?? 0))
+    expect(gap).toBeLessThan(64)
 
     await dialog.getByRole('button', { name: 'Cancel request', exact: true }).click()
     // The stages are named while the transaction runs, then the outcome stays on screen with its hash, under a
-    // title that says what happened. The dialog keeps its place throughout.
+    // title that says what happened.
     await expect(page.getByRole('dialog').getByRole('list', { name: 'Transaction progress' })).toBeVisible()
     const done = page.getByRole('dialog', { name: 'Request cancelled' })
     await expect(done.getByTestId('cancel-outcome')).toContainText('Transaction')
     await expect(done).toContainText('Returned to your wallet')
     await expect(done).toContainText(premium)
-    expect(Math.abs(((await done.boundingBox())?.y ?? 0) - (top ?? 0))).toBeLessThanOrEqual(2)
-    await done.getByRole('button', { name: 'Done' }).click()
+    // After the outcome too: the hash line and then the actions.
+    const outcome = done.getByTestId('cancel-outcome')
+    const doneButton = done.getByRole('button', { name: 'Done' })
+    const after = ((await doneButton.boundingBox())?.y ?? 0) - (((await outcome.boundingBox())?.y ?? 0) + ((await outcome.boundingBox())?.height ?? 0))
+    expect(after).toBeLessThan(64)
+    await doneButton.click()
     await expect(done).toBeHidden()
 
     // Not optimistic: the row left because the contract was read again.
     await expect(rows(page)).toHaveCount(3)
-    await expect(row(page, '000000')).toHaveCount(0)
+    await expect(row(page, '0')).toHaveCount(0)
     await mineTab(page).click()
     // A cancelled request is closed: it waits behind "Show closed".
     await expect(page.getByRole('heading', { name: 'You have no open requests.' })).toBeVisible()
     await page.getByRole('switch', { name: 'Show closed' }).click()
-    await expect(row(page, '000000')).toContainText('Cancelled')
-    await expect(row(page, '000000').getByRole('button')).toHaveCount(0)
+    await expect(row(page, '0')).toContainText('Cancelled')
+    await expect(row(page, '0').getByRole('button')).toHaveCount(0)
 
     // And it is on record in Activity (in the wallet menu at this width).
     await walletButton(page).click()
     await page.getByRole('menuitem', { name: /^Activity/ }).click()
     await expect(page).toHaveURL(/\/activity/)
-    await expect(page.getByText(/Cancel request for put on 2\.00 BOND/).first()).toBeVisible()
+    await expect(page.getByText(/Cancel request for put on 2\.00\sBOND/).first()).toBeVisible()
   })
 
-  test('an expired request with its premium still in the contract comes first and is taken back', async ({ page }) => {
+  test('an open request past its deadline comes first and can still be cancelled for its premium (ruling F9)', async ({ page }) => {
     await openApp(page, '/requests?mine=1', { connect: true })
-    await expect(row(page, '000000')).toContainText('Open')
+    await expect(row(page, '0')).toContainText('Open')
     await expireOwnRequest(page)
 
-    const expired = row(page, '000000')
+    const expired = row(page, '0')
     await expect(expired).toContainText('Expired')
     await expect(expired).toContainText('Premium still in the contract')
-    await expect(rows(page).first()).toContainText('No. 000000')
-    const premium = /([\d.]+ USDx) in total/.exec((await expired.innerText()).replace(/\s+/g, ' '))?.[1] ?? ''
-    const action = expired.getByRole('button', { name: new RegExp(`^Take back ${premium.replace('.', '\\.')}`) })
+    await expect(rows(page).first()).toContainText('No. 0')
+    // The action keeps its one name after the deadline.
+    const action = expired.getByRole('button', { name: /^Cancel request No\. 0\b/ })
     await expect(action).toBeVisible()
+    const premium = await premiumOf(action)
     // It left the board of open requests.
     await boardTab(page).click()
-    await expect(row(page, '000000')).toHaveCount(0)
+    await expect(row(page, '0')).toHaveCount(0)
     await mineTab(page).click()
 
     await action.click()
-    const dialog = page.getByRole('dialog', { name: 'Take back the premium of request No. 000000' })
-    await expect(dialog).toContainText('Nobody filled it before the deadline.')
+    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 0' })
+    await expect(dialog).toContainText('Nobody filled it before the deadline. The contract returns the premium in the same transaction.')
+    await expect(dialog).toContainText('Returned to your wallet')
+    await expect(dialog).toContainText(premium)
     await expect(dialog.getByRole('button', { name: 'Keep request' })).toHaveCount(0)
     await expect(dialog.getByRole('button', { name: 'Close' }).last()).toBeVisible()
-    await dialog.getByRole('button', { name: `Take back ${premium}` }).click()
+    await dialog.getByRole('button', { name: 'Cancel request', exact: true }).click()
     const done = page.getByRole('dialog', { name: 'Request cancelled' })
     await expect(done.getByTestId('cancel-outcome')).toContainText('Transaction')
     await done.getByRole('button', { name: 'Done' }).click()
@@ -283,16 +326,16 @@ test.describe('Requests board', () => {
   test('the warning tone is for the wallet own request; a request about to lapse says so in words', async ({ page }) => {
     await openApp(page, '/requests', { connect: 'b' })
     await expect(rows(page)).toHaveCount(4)
-    // Wallet A's No. 000000 has 9 minutes left; wallet B's own No. 000001 has 5 hours.
+    // Wallet A's No. 0 has 9 minutes left; wallet B's own No. 1 has 5 hours.
     await setDeadline(page, 0, 9 * 60)
     await setDeadline(page, 1, 5 * 3_600)
-    const lapsing = row(page, '000000')
+    const lapsing = row(page, '0')
     await expect(lapsing).toContainText('A fill may land too late')
     // Another wallet's countdown stays neutral, even with minutes left; the wallet's own takes the warning tone.
     await expect(lapsing.getByRole('timer')).toHaveAttribute('data-state', 'running')
-    await expect(row(page, '000001').getByRole('timer')).toHaveAttribute('data-state', 'warn')
-    await expect(row(page, '000001')).not.toContainText('A fill may land too late')
-    await expect(row(page, '000002')).not.toContainText('A fill may land too late')
+    await expect(row(page, '1').getByRole('timer')).toHaveAttribute('data-state', 'warn')
+    await expect(row(page, '1')).not.toContainText('A fill may land too late')
+    await expect(row(page, '2')).not.toContainText('A fill may land too late')
   })
 
   test('a wallet that holds none of a collateral token is told once, with the way to test funds', async ({ page }) => {
@@ -308,13 +351,13 @@ test.describe('Requests board', () => {
   test('a long board shows 25 requests at a time and keeps its header in view', async ({ page }) => {
     await openApp(page, '/requests')
     await expect(rows(page)).toHaveCount(4)
-    // Thirty more open requests, copies of No. 000002 with their own numbers.
+    // Thirty more open requests, copies of No. 2 with their own numbers.
     await page.evaluate(async () => {
       const hook = (window as unknown as { __stellsec?: { mock(): Promise<unknown>; queryClient: { invalidateQueries(): Promise<void> } } }).__stellsec
       if (!hook) throw new Error('The E2E hook is missing: the app was not built with VITE_E2E=1.')
       const mock = (await hook.mock()) as { bids: { id: bigint; expiry: number }[] }
       const template = mock.bids.find((b) => b.id === 2n)
-      if (!template) throw new Error('Request No. 000002 is not seeded.')
+      if (!template) throw new Error('Request No. 2 is not seeded.')
       for (let i = 0; i < 30; i++) mock.bids.push({ ...template, id: BigInt(100 + i), expiry: template.expiry + (i + 1) * 3_600 })
       await hook.queryClient.invalidateQueries()
     })
@@ -336,12 +379,12 @@ test.describe('Requests board', () => {
 
   test('keeping the request closes the dialog and sends nothing', async ({ page }) => {
     await openApp(page, '/requests', { connect: true })
-    await row(page, '000000').getByRole('button', { name: /^Cancel request/ }).click()
-    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 000000' })
+    await row(page, '0').getByRole('button', { name: /^Cancel request/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 0' })
     await dialog.getByRole('button', { name: 'Keep request' }).click()
     await expect(dialog).toBeHidden()
     await expect(rows(page)).toHaveCount(4)
-    await expect(row(page, '000000')).toContainText('Yours')
+    await expect(row(page, '0')).toContainText('Yours')
   })
 
   test('a failed read says so and offers a retry', async ({ page }) => {
@@ -380,7 +423,10 @@ test.describe('Requests tickets', () => {
     const ticket = page.getByRole('dialog')
     await expect(ticket).toContainText('Request a put on EQTY')
     await expect(ticket.getByRole('radio', { name: 'Buy', exact: true })).toHaveCount(0)
-    await ticket.getByRole('radio', { name: /UTC, in \d+ d/ }).nth(1).click()
+    // The ticket may show its seeded terms first, with the choices behind "Change terms".
+    const changeTerms = ticket.getByText('Change terms', { exact: true })
+    if ((await changeTerms.count()) > 0 && !(await ticket.getByRole('radio', { name: /UTC, in \d+\sd/ }).first().isVisible())) await changeTerms.click()
+    await ticket.getByRole('radio', { name: /UTC, in \d+\sd/ }).nth(1).click()
     await ticket.getByRole('radio', { name: /^24\.00/ }).click()
     await ticket.getByRole('textbox', { name: /^Quantity/ }).fill('3')
     // The premium is typed per unit or as the total, depending on the ticket's form: 1.50 USDx in total either way.
@@ -392,7 +438,7 @@ test.describe('Requests tickets', () => {
     await ticket.getByRole('button', { name: /^Post request/ }).click()
 
     // The receipt names the request by its number, with the transaction.
-    await expect(ticket).toContainText('No. 000004')
+    await expect(ticket).toContainText(/No\.\s4(?!\d)/)
     await expect(ticket).toContainText('Transaction')
     await ticket.getByRole('button', { name: 'Done' }).click()
     await expect(ticket).toBeHidden()
@@ -401,15 +447,16 @@ test.describe('Requests tickets', () => {
     expect(search(page).has('asset')).toBe(false)
 
     await expect(rows(page)).toHaveCount(5)
-    const posted = row(page, '000004')
+    const posted = row(page, '4')
     await expect(posted.getByRole('rowheader')).toContainText('EQTY')
     await expect(posted).toContainText('Put')
     await expect(posted).toContainText('3.00 EQTY')
     await expect(posted).toContainText('24.00 USDx')
-    await expect(posted).toContainText('1.50 USDx in total')
+    await expect(posted).toContainText(/1\.50\sUSDx/)
+    await expect(posted).toContainText('in total')
     await expect(posted).toContainText('Yours')
     await expect(posted.locator('mark')).toContainText('0.50')
-    await expect(posted.getByRole('button', { name: /^Cancel request No\. 000004/ })).toBeVisible()
+    await expect(posted.getByRole('button', { name: /^Cancel request No\. 4\b/ })).toBeVisible()
     await expect(page.getByTestId('board-summary')).toContainText('5 open requests.')
   })
 
@@ -456,11 +503,12 @@ test.describe('Requests tickets', () => {
 
   test('fill a request from the second wallet and land on the position', async ({ page }) => {
     await openApp(page, '/requests', { connect: 'b' })
-    // Wallet B posted No. 000001; it fills wallet A's No. 000000 (a put on 2.00 BOND, 196.00 USDx to lock).
-    await expect(row(page, '000001')).toContainText('Yours')
-    const target = row(page, '000000')
-    await expect(target).toContainText('196.00 USDx')
-    await target.getByRole('button', { name: /^Fill request/ }).click()
+    // Wallet B posted No. 1; it fills wallet A's No. 0 (a put on 2.00 BOND, 196.00 USDx to lock).
+    await expect(row(page, '1')).toContainText('Yours')
+    const target = row(page, '0')
+    const fill = target.getByRole('button', { name: /^Fill request/ })
+    await expect(fill).toHaveAccessibleName(/you lock 196\.00\sUSDx$/)
+    await fill.click()
     expect(search(page).get('bid')).toBe('0')
     await expect(target).toHaveAttribute('data-selected', 'true')
 
@@ -480,18 +528,18 @@ test.describe('Requests tickets', () => {
     // The request left the board, and its buyer finds the same position from My requests.
     await goTo(page, 'Requests')
     await expect(rows(page)).toHaveCount(3)
-    await expect(row(page, '000000')).toHaveCount(0)
+    await expect(row(page, '0')).toHaveCount(0)
     // By address: `switchAccount(page, 'a')` clears `?as=`, and the root route's retained search puts it back.
     await switchAccount(page, ADDR_A)
     await mineTab(page).click()
-    await expect(row(page, '000000')).toContainText('Filled')
-    await row(page, '000000').getByRole('link', { name: /^View position/ }).click()
+    await expect(row(page, '0')).toContainText('Filled')
+    await row(page, '0').getByRole('link', { name: /^View position/ }).click()
     await expect(page).toHaveURL(new RegExp(`/portfolio/${optionId}(\\?|$)`))
   })
 
   test('a guest opens the fill ticket and is asked to connect, never shown a dead button', async ({ page }) => {
     await openApp(page, '/requests')
-    await row(page, '000002').getByRole('button', { name: /^Fill request/ }).click()
+    await row(page, '2').getByRole('button', { name: /^Fill request/ }).click()
     const ticket = page.getByRole('dialog')
     await expect(ticket).toContainText('Fill a request for a put on FUND')
     await expect(ticket.getByRole('button', { name: 'Connect wallet' })).toBeVisible()
@@ -502,7 +550,7 @@ test.describe('Requests tickets', () => {
 })
 
 test.describe('Requests on a phone @phone', () => {
-  test('two lines of terms per request, one line of controls, 44 px targets, no sideways scroll', async ({ page }) => {
+  test('the card of a request, the filters on two lines under 400 px, 44 px targets, no sideways scroll', async ({ page }) => {
     await openApp(page, '/requests', { connect: true })
     expect(isPhone(page)).toBe(true)
     await expect(page.getByRole('table')).toHaveCount(0)
@@ -510,18 +558,28 @@ test.describe('Requests on a phone @phone', () => {
     await expect(list.getByRole('listitem')).toHaveCount(4)
     await expectNoHorizontalOverflow(page)
 
+    // The card of ruling F15, the same as on the asset Requests tab: what is wanted and the premium per unit, the
+    // strike and the total, the deadline and the time left, the buyer and the number.
     const first = rows(page).first()
-    await expect(first).toContainText(/(Put|Call) on [\d.]+ [A-Z]+/)
-    await expect(first).toContainText(/Strike [\d.]+ USDx/)
-    await expect(first).toContainText(/Demo price [\d.]+/)
-    await expect(first).toContainText(/You lock [\d,.]+ [A-Za-z]+/)
+    await expect(first).toContainText(/(Put|Call) on [\d.]+\s[A-Z]+/)
+    await expect(first).toContainText(/per (EQTY|FUND|BOND)/)
+    await expect(first).toContainText(/Strike\s*[\d.]+\sUSDx/)
+    await expect(first).toContainText(/Demo price\s[\d.]+/)
+    await expect(first).toContainText('in total')
     await expect(first).toContainText('Buyer')
+    await expect(first).toContainText(/No\.\s\d/)
+    await expect(first).not.toContainText('You lock')
 
-    // The filters and the order sit on one line.
+    // Under 400 px the asset select takes the first line whole, so the chosen asset is never cut short; the kind
+    // switch and the order share the second.
     const asset = page.getByRole('combobox', { name: 'Asset' })
+    const kindSwitch = page.getByRole('radiogroup', { name: 'Kind' })
     const sortButton = page.getByRole('button', { name: /^Sort/ })
-    const [assetBox, sortBox] = [await asset.boundingBox(), await sortButton.boundingBox()]
-    expect(Math.abs((assetBox?.y ?? 0) - (sortBox?.y ?? 100))).toBeLessThanOrEqual(2)
+    const [assetBox, kindBox, sortBox] = [await asset.boundingBox(), await kindSwitch.boundingBox(), await sortButton.boundingBox()]
+    expect(assetBox?.width ?? 0).toBeGreaterThan(300)
+    expect(Math.abs((kindBox?.y ?? 0) - (sortBox?.y ?? 100))).toBeLessThanOrEqual(2)
+    expect(kindBox?.y ?? 0).toBeGreaterThan((assetBox?.y ?? 0) + (assetBox?.height ?? 0) - 1)
+    await expect(asset).toContainText('All assets')
 
     for (const control of [
       postButton(page),
@@ -545,8 +603,8 @@ test.describe('Requests on a phone @phone', () => {
     expect(search(page).get('sort')).toBe('premium')
 
     // Cancelling is a short confirmation: a sheet, with the same staged transaction.
-    await row(page, '000000').getByRole('button', { name: /^Cancel request/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Cancel request No. 000000' })
+    await row(page, '0').getByRole('button', { name: /^Cancel request/ }).click()
+    const sheet = page.getByRole('dialog', { name: 'Cancel request No. 0' })
     await expect(sheet).toBeVisible()
     await expectNoHorizontalOverflow(page)
     await sheet.getByRole('button', { name: 'Cancel request', exact: true }).click()
@@ -558,8 +616,45 @@ test.describe('Requests on a phone @phone', () => {
     await mineTab(page).click()
     await page.getByRole('switch', { name: 'Show closed' }).click()
     await expect(page.getByRole('list', { name: /^My requests/ }).getByRole('listitem')).toHaveCount(1)
-    await expect(row(page, '000000')).toContainText('Cancelled')
+    await expect(row(page, '0')).toContainText('Cancelled')
     await expectNoHorizontalOverflow(page)
+  })
+})
+
+test.describe('the same drawing on both pages (ruling F15) @both', () => {
+  test('/requests and the asset Requests tab draw an open request with the same columns, figures and card', async ({ page }) => {
+    await openApp(page, '/requests?asset=fund')
+    await expect(rows(page)).toHaveCount(2)
+    const board = row(page, '2')
+    const boardText = ((await board.textContent()) ?? '').replace(/\s+/g, ' ')
+    const fillName = (await board.getByRole('button', { name: /^Fill request/ }).getAttribute('aria-label')) ?? ''
+    expect(fillName).toMatch(/^Fill request: /)
+
+    await page.goto('/markets/fund?tab=requests')
+    const main = page.getByRole('main')
+    if (isPhone(page)) {
+      // One card on both pages: the same lines, the same action.
+      const card = main.getByRole('list', { name: 'Open requests on FUND' }).getByRole('listitem').filter({ has: page.getByRole('link', { name: fillName, exact: true }) })
+      await expect(card).toContainText('No. 2')
+      await expect(card).toContainText(/Put on 10\.00\sFUND/)
+      await expect(card).toContainText('per FUND')
+      await expect(card).toContainText('in total')
+      await expect(card).toContainText('Buyer')
+      await expect(card.getByRole('link', { name: /^Fill request/ })).toHaveAccessibleName(fillName)
+      for (const text of ['Put on 10.00', 'per FUND', 'in total', 'Buyer', 'No. 2']) expect(boardText).toContain(text)
+      return
+    }
+    const table = main.getByRole('table', { name: 'Open requests on FUND' })
+    await expect(table.getByRole('columnheader')).toHaveText(['Kind', 'Strike', 'Quantity', 'Deadline', 'Premium per unit', 'Buyer', 'Action'])
+    const tabRow = table.locator('tbody tr').filter({ has: page.getByRole('link', { name: fillName, exact: true }) })
+    await expect(tabRow).toContainText('No. 2')
+    // The same figures and deadline format, the strike in the serif, and the same action with the same name.
+    await expect(tabRow.locator('time')).toHaveText(/^\d{1,2}\s[A-Z][a-z]{2}\s\d{4},\s08:00\sUTC$/)
+    await expect(tabRow).toContainText(/USDx\s*in total/)
+    expect(await tabRow.locator('td[data-strike]').evaluate((td) => getComputedStyle(td).fontFamily)).toMatch(/Serif/)
+    await expect(tabRow.getByRole('link', { name: /^Fill request/ })).toHaveAccessibleName(fillName)
+    for (const text of ['Put', 'No. 2', '10.00 FUND', 'in total']) expect(boardText).toContain(text)
+    await expect(tabRow.getByRole('link', { name: /^Fill request/ })).toHaveAttribute('data-variant', 'secondary')
   })
 })
 
@@ -591,8 +686,8 @@ test.describe('Requests accessibility @both', () => {
 
   test('axe: the cancel confirmation and the asset chooser', async ({ page }) => {
     await openApp(page, '/requests', { connect: true })
-    await row(page, '000000').getByRole('button', { name: /^Cancel request/ }).click()
-    await expect(page.getByRole('dialog', { name: 'Cancel request No. 000000' })).toBeVisible()
+    await row(page, '0').getByRole('button', { name: /^Cancel request/ }).click()
+    await expect(page.getByRole('dialog', { name: 'Cancel request No. 0' })).toBeVisible()
     await expectNoAxeViolations(page)
     await page.getByRole('dialog').getByRole('button', { name: 'Keep request' }).click()
 
@@ -616,10 +711,10 @@ test.describe('Requests accessibility @both', () => {
     await page.keyboard.press('Enter')
     expect(search(page).get('sort')).toBe('premium')
 
-    const cancel = row(page, '000000').getByRole('button', { name: /^Cancel request/ })
+    const cancel = row(page, '0').getByRole('button', { name: /^Cancel request/ })
     await cancel.focus()
     await page.keyboard.press('Enter')
-    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 000000' })
+    const dialog = page.getByRole('dialog', { name: 'Cancel request No. 0' })
     await expect(dialog).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()

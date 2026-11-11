@@ -49,7 +49,7 @@ import { moneyText, priceText } from './fmt'
 import { chipCountdown, draftOf, gridFor, initialForm, isOnGrid, parseUtcDateTime, premiumTotalText, strikeText, strikeUnitsOf, takeOver, utcDateTimeFields } from './form'
 import type { FormField, Grid, TermsForm } from './form'
 import type { FormIntent, TicketIntent } from './intent'
-import { PriceText } from './parts'
+import { MoneyText, PriceText } from './parts'
 import type { ReceiptView } from './ReceiptStep'
 import { breakevenRow, deadlineRow, kindRow, leadRow, moneyRow, mostYouCanLoseRow, quantityRow, receiptTerms, strikeRow } from './rows'
 import { FlowError, FlowGone, FlowLoading } from './states'
@@ -67,7 +67,11 @@ const KINDS: { value: OptionKind; label: string }[] = [
 /** The count of open orders is shown only near the contract's cap. */
 const NEAR_CAP = 5
 
-export function OrderFlow(props: { intent: FormIntent; startAt?: 'terms' | 'review'; onIntentChange?: (next: TicketIntent) => void }) {
+/**
+ * `customTerms` (default true) offers "Custom terms" for an off-list strike and deadline. Off in the asset page's
+ * guided mode, whose card shows only listed series: the ticket then never describes a series the card cannot.
+ */
+export function OrderFlow(props: { intent: FormIntent; startAt?: 'terms' | 'review'; onIntentChange?: (next: TicketIntent) => void; customTerms?: boolean }) {
   const assets = useAssets()
   const title = LOADING_TITLE[props.intent.mode]
   if (!assets.data) {
@@ -105,8 +109,8 @@ function useBestRequest(series: SeriesTermsRef | null, me: string | null, nowSec
 
 const IN_FLIGHT = new Set(['checking', 'signing', 'submitting', 'pending', 'unknown'])
 
-function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; underlying: TokenInfo; startAt?: 'terms' | 'review'; onIntentChange?: (next: TicketIntent) => void }) {
-  const { intent, assets, underlying: u, onIntentChange } = props
+function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; underlying: TokenInfo; startAt?: 'terms' | 'review'; onIntentChange?: (next: TicketIntent) => void; customTerms?: boolean }) {
+  const { intent, assets, underlying: u, onIntentChange, customTerms = true } = props
   const mode = intent.mode
   const q = assets.quote
   const decimals = useMemo(() => ({ underlying: u.decimals, quote: q.decimals }), [u.decimals, q.decimals])
@@ -121,8 +125,9 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
 
   const [form, setForm] = useState<TermsForm>(() => initialForm(intent, grid, reference.perUnit, decimals))
   const [custom, setCustom] = useState(() => !isOnGrid(form, grid, q.decimals))
-  // A ticket opened on a series shows it as rows; the pickers wait behind "Change terms".
-  const [changing, setChanging] = useState(() => !(intent.strike !== undefined && intent.expiry !== undefined && isOnGrid(form, grid, q.decimals)))
+  // The terms are three rows and the pickers wait behind "Change terms" whenever a strike and a deadline are set,
+  // the defaults included: the quantity and the premium then sit on the ticket's first screen.
+  const [changing, setChanging] = useState(() => form.strike.trim() === '' || form.expiry === null)
   const [when, setWhen] = useState(() => (form.expiry === null ? { date: '', time: '08:00' } : utcDateTimeFields(form.expiry)))
   // A new generation of the flow starts at Terms: new terms from the chain after a review or a settled
   // transaction, or "Write another" on the receipt. The transaction is reset with it.
@@ -218,7 +223,6 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
     onIntentChange && mode === 'write' && requestPays && bestRequest ? (
       <Callout
         variant="info"
-        label="Request"
         actions={
           <Button variant="secondary" size="sm" onClick={() => onIntentChange({ mode: 'fill', bidId: bestRequest.id })}>
             Fill request
@@ -230,7 +234,6 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
     ) : onIntentChange && offerCheaper && bestBuyable ? (
       <Callout
         variant="warning"
-        label="Offer"
         actions={
           <Button variant="secondary" size="sm" onClick={() => onIntentChange({ mode: 'buy', offerId: bestBuyable.id })}>
             Buy that offer
@@ -253,7 +256,7 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
   const refNote = reference.perUnit !== null ? `${reference.label} ${formatUnits(reference.perUnit, q.decimals)}` : undefined
 
   const lowestRow: NoteTerm = lowest
-    ? { label: 'Lowest open offer in this series', value: priceText(premiumPerUnit(lowest), q), hint: `Per ${u.code}. Offer No. ${serialOf(lowest.id)}, for ${moneyText({ token: u, amount: lowest.underlyingQty })}.` }
+    ? { label: 'Lowest open offer in this series', value: <PriceText units={premiumPerUnit(lowest)} quote={q} per={u.code} />, hint: `Offer No. ${serialOf(lowest.id)}, for ${moneyText({ token: u, amount: lowest.underlyingQty })}.` }
     : { label: 'Lowest open offer in this series', value: 'None open' }
 
   const dash = '–'
@@ -265,7 +268,7 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
 
   const option = leg ? optionPhrase(leg.kind, moneyText({ token: u, amount: leg.underlyingQty }), priceText(strikePerUnit(leg), q), formatUtc(leg.expiry)) : ''
   const escrow = premium ? bidEscrowDisclosure(moneyText(premium)) : null
-  const total = premium ? moneyText(premium) : dash
+  const total = premium ? <MoneyText money={premium} size="lg" /> : dash
 
   const pickers = (
     <>
@@ -282,55 +285,49 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
         }}
       />
       <ChoiceChips label={`Strike, ${q.code} per ${u.code}`} aside={refNote} value={chosenStrike} chips={strikeChips} onValueChange={(strike) => change({ strike })} />
-      <details className={styles.custom} open={custom} onToggle={(e) => setCustom(e.currentTarget.open)}>
-        <summary className={styles.customSummary}>{CUSTOM_TERMS_LABEL}</summary>
-        <div className={styles.customBody}>
-          <p className={styles.hint}>{CUSTOM_TERMS_HINT}</p>
-          <AmountField label={`Strike, ${q.code} per ${u.code}`} value={form.strike} onValueChange={(strike) => change({ strike }, false)} onBlur={mirrorNow} unit={q.code} decimals={q.decimals} validate={() => fieldError('strike')} />
-          <div className={styles.pair}>
-            <TextField
-              label="Deadline date, UTC"
-              value={when.date}
-              placeholder="2026-12-18"
-              autoComplete="off"
-              onValueChange={(date) => {
-                setWhen({ ...when, date })
-                change({ expiry: parseUtcDateTime(date, when.time) }, false)
-              }}
-              onBlur={mirrorNow}
-              error={form.expiry === null ? (when.date.trim() === '' ? undefined : 'Use the form 2026-12-18.') : fieldError('expiry')}
-            />
-            <TextField
-              label="Time, UTC"
-              value={when.time}
-              placeholder="08:00"
-              autoComplete="off"
-              onValueChange={(time) => {
-                setWhen({ ...when, time })
-                change({ expiry: parseUtcDateTime(when.date, time) }, false)
-              }}
-              onBlur={mirrorNow}
-            />
+      {customTerms ? (
+        <details className={styles.custom} open={custom} onToggle={(e) => setCustom(e.currentTarget.open)}>
+          <summary className={styles.customSummary}>{CUSTOM_TERMS_LABEL}</summary>
+          <div className={styles.customBody}>
+            <p className={styles.hint}>{CUSTOM_TERMS_HINT}</p>
+            <AmountField label={`Strike, ${q.code} per ${u.code}`} value={form.strike} onValueChange={(strike) => change({ strike }, false)} onBlur={mirrorNow} unit={q.code} decimals={q.decimals} validate={() => fieldError('strike')} />
+            <div className={styles.pair}>
+              <TextField
+                label="Deadline date, UTC"
+                value={when.date}
+                placeholder="2026-12-18"
+                autoComplete="off"
+                onValueChange={(date) => {
+                  setWhen({ ...when, date })
+                  change({ expiry: parseUtcDateTime(date, when.time) }, false)
+                }}
+                onBlur={mirrorNow}
+                error={form.expiry === null ? (when.date.trim() === '' ? undefined : 'Use the form 2026-12-18.') : fieldError('expiry')}
+              />
+              <TextField
+                label="Time, UTC"
+                value={when.time}
+                placeholder="08:00"
+                autoComplete="off"
+                onValueChange={(time) => {
+                  setWhen({ ...when, time })
+                  change({ expiry: parseUtcDateTime(when.date, time) }, false)
+                }}
+                onBlur={mirrorNow}
+              />
+            </div>
           </div>
-        </div>
-      </details>
+        </details>
+      ) : null}
     </>
   )
 
-  const strikeShown: NoteTerm = {
-    label: 'Strike',
-    value: (
-      <>
-        <PriceText units={strikeUnits} quote={q} /> per {u.code}
-      </>
-    ),
-  }
+  const strikeShown: NoteTerm = { label: 'Strike', value: <PriceText units={strikeUnits} quote={q} per={u.code} /> }
   const terms = (
     <div className={styles.form}>
       {capFull ? (
         <Callout
           variant="danger"
-          label="Blocked"
           actions={
             mode === 'write' ? (
               <Link render={<RouterLink to={'/portfolio' as never} search={{ tab: 'orders' } as never} />}>Your open offers</Link>
@@ -394,7 +391,9 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
       : mode === 'write'
         ? [leadRow('You lock', collateral), moneyRow('You receive', premium, 'From the buyer, only when someone takes the offer.')]
         : [leadRow('You escrow', premium, <span data-testid="escrow-line">{escrow}</span>)]
-  const details: NoteTerm[] = leg ? [strikeRow(leg), quantityRow(leg), deadlineRow(leg.expiry), breakevenRow(leg), mostYouCanLoseRow(leg, side), ...capRow] : []
+  // A maker's worst case (or what a written call gives up) is decided on beside the money; a buyer's is the premium.
+  const figures: NoteTerm[] = leg ? (side === 'short' ? [breakevenRow(leg), mostYouCanLoseRow(leg, side)] : [breakevenRow(leg)]) : []
+  const details: NoteTerm[] = leg ? [strikeRow(leg), quantityRow(leg), deadlineRow(leg.expiry), ...(side === 'long' ? [mostYouCanLoseRow(leg, side)] : []), ...capRow] : []
 
   const deal: Deal = {
     mode,
@@ -408,6 +407,7 @@ function OrderTicket(props: { intent: FormIntent; assets: SupportedAssets; under
     termsError,
     warnOnTerms: true,
     money,
+    figures,
     details,
     notices: crossLine ?? undefined,
     outcome: leg ? outcomeFor(leg, side) : undefined,

@@ -6,6 +6,33 @@
     min-width: 0;
   }
 
+  /* The table and, above it, which positions are shown and why an early exercise can be refused. */
+  .positions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+
+    /* The explanation sits at the right, also when nothing is listed to its left. */
+    & > :last-child {
+      margin-inline-start: auto;
+    }
+  }
+
+  .count {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
   .hint,
   .waiting {
     color: var(--muted);
@@ -26,7 +53,7 @@
   /* A long settlement line wraps instead of widening the table past its column. */
   .wrap {
     display: inline-block;
-    min-width: 8rem;
+    min-width: 6.5rem;
     max-width: 13rem;
     white-space: normal;
   }
@@ -46,7 +73,7 @@
   }
 
   .why {
-    max-width: 20rem;
+    max-width: 13rem;
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     color: var(--text-2);

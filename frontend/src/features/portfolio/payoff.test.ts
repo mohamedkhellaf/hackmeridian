@@ -11,7 +11,7 @@ describe('positionPayoff', () => {
   it('draws the holder of a put as the long put of the payoff package', () => {
     const m = positionPayoff(opt(), reference(982))!
     expect(m.side).toBe('long')
-    expect(m.title).toBe('Payoff at the deadline, long put on 5.00 FUND')
+    expect(m.title).toBe('Payoff at the deadline, long put on 5.00\u00A0FUND')
     for (const s of PRICES) expect(m.pnlAt(s)).toBeCloseTo(longPut(LEG, s).total, 9)
     expect(m.strike).toEqual({ value: 10, label: '10.00' })
     expect(m.breakevens).toEqual([{ value: expect.closeTo(9.64, 9), label: '9.64' }])

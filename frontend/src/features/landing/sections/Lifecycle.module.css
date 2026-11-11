@@ -1,7 +1,7 @@
 @layer features {
-  /* A settlement ledger: five ruled rows, the same five columns in each. */
+  /* A settlement ledger: five ruled rows, the same four columns in each. The step's title names who acts. */
   .ledger {
-    --ledger-columns: minmax(0, 1.75fr) minmax(0, 0.8fr) minmax(0, 1.15fr) minmax(0, 1.5fr) minmax(0, 0.95fr);
+    --ledger-columns: minmax(0, 1.6fr) minmax(0, 1.35fr) minmax(0, 1.8fr) minmax(0, 0.95fr);
 
     border-top: 1px solid var(--rule);
   }
@@ -87,11 +87,6 @@
       color: var(--text-2);
       text-wrap: pretty;
     }
-  }
-
-  .fact dd.who {
-    color: var(--text);
-    font-weight: 550;
   }
 
   .recorded {

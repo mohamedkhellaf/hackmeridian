@@ -1,8 +1,11 @@
 import { useLayoutEffect, useState } from 'react'
 import type { RefObject } from 'react'
 
-/** Below this width of its column the mirrored chain takes its phone layout (the request under the offer). */
-export const NARROW_CHAIN_PX = 560
+/**
+ * Below this width of its column the mirrored chain takes its phone layout (each half's size under its figure):
+ * four halves of figure and size, the strike, and the word "yours" at the edge of a side need about 680 px.
+ */
+export const NARROW_CHAIN_PX = 680
 
 /** Below this width the book of a series (six fixed columns) becomes a list. */
 export const NARROW_BOOK_PX = 640

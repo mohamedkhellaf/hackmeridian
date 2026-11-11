@@ -36,7 +36,7 @@ export function BuyFlow({ intent, onIntentChange }: { intent: Extract<TicketInte
     if (query.isError) {
       // An id the contract does not have is not a failed read: there is nothing to try again.
       if (isNotFoundMessage(errorText(query.error))) return <FlowGone title={LOADING_TITLE.buy} sentence="This offer does not exist." hint={`The contract has no option No. ${serialOf(intent.offerId)}. Pick an offer in the chain.`} />
-      return <FlowError title={LOADING_TITLE.buy} what={`Offer ${serialOf(intent.offerId)}`} onRetry={() => void query.refetch()} />
+      return <FlowError title={LOADING_TITLE.buy} what={`Offer No. ${serialOf(intent.offerId)}`} onRetry={() => void query.refetch()} />
     }
     return <FlowLoading title={LOADING_TITLE.buy} />
   }
@@ -120,7 +120,8 @@ function BuyTicket({ offer, readAt, nowSec, onIntentChange }: { offer: OptionOff
     fix,
     serial: `Offer No. ${serialOf(offer.id)}`,
     money: [leadRow('You pay', premium, PREMIUM_DISCLOSURE), moneyRow('Collateral locked', collateral)],
-    details: [strikeRow(offer), quantityRow(offer), deadlineRow(offer.expiry), breakevenRow(offer), mostYouCanLoseRow(offer, 'long'), partyRow('Maker', offer.writer, me)],
+    figures: [breakevenRow(offer)],
+    details: [strikeRow(offer), quantityRow(offer), deadlineRow(offer.expiry), mostYouCanLoseRow(offer, 'long'), partyRow('Maker', offer.writer, me)],
     readAt,
     outcome: outcomeFor(offer, 'long'),
     commitment: COMMITMENT.buy,

@@ -2,7 +2,7 @@
 
 The public page at `/` (`LandingPage`, loaded lazily by the router and rendered without the app shell). It has
 its own layout: a thin network line (chain builds only), a sticky navigation bar, the hero, six sections, a
-closing line and the legal footer.
+closing line (one sentence and the button, no heading) and the legal footer.
 
 ## Files
 
@@ -67,17 +67,21 @@ Figures printed as proof (each once, in the Proof table), and what each counts:
 
 - **Owner's direction of 11 Nov 2026 (brief 0.1) and the adversary pass.** No disclaimer taglines and nothing said
   twice. A mock build has no status line: its one "Mock data" label is on the hero note. A chain build keeps the
-  line above the navigation (network, ledger, contract). The network is named where the visitor acts on it
-  ("Try it on Testnet", the Limits row). Each limit is told once, in the Limits table (plus the one step of "How it
-  works" where it happens); each figure and each transaction hash has one home. There is no stat row, no
+  line above the navigation (network, ledger, contract); that line is the only place the landing names the
+  network. Each limit is told once, in the Limits list (plus the one step of "How it works" where it happens); each
+  figure and each transaction hash has one home. There is no stat row, no
   questions section and no ornament. Margin is a plain panel on the sunken ground, with no tag and no glyph. The
   footer is the app's legal footer (`COPYRIGHT_NOTICE`, `LEGAL_NOTICE`) plus the two lines the Stellar brand policy
   asks for, two link groups and the contract.
 - **Order of the sections.** What you can do, what is different, how it works, proof, Margin, limits: no two
   sections with the heading in the margin touch, and the navigation (How it works, Proof, Limits) is in page order.
-- **One primary button per view.** "Try it on Testnet" is the ink button; "Open app" and "Open this offer" are
-  outlined.
-- **The hero note.** "I hold" picks the asset and shows its code; the lot is in the line under the terms ("This
+- **One primary button per view.** "Open the markets" is the ink button, in the hero and again at the foot of the
+  page (one label for one destination; ruling F17); "Open app" and "Open this offer" are outlined. There is no
+  eyebrow above the headline.
+- **Round 3 cuts (ruling F17).** The three intent names are the links into Markets (each says ", choose an asset"
+  to a screen reader); "How it works" has no "Who acts" column, as each step title names who acts; Limits is one
+  ruled list of sentences that each stand on their own, with no table head; the closing has no heading.
+- **The hero note.** "Asset" picks the asset and shows its code; the lot is in the line under the terms ("This
   offer covers 10.00 FUND for 1.90 USDx ..."), because offers are whole lots, and each floor and deadline in the
   lists says which lot it would show. A lot changed by the visitor's own pick fades in under the marker flash.
   The floor is the note's one marked figure. When a change of deadline leaves the chosen floor without an offer,
@@ -99,7 +103,11 @@ Figures printed as proof (each once, in the Proof table), and what each counts:
 - **Navigation.** The bar is sticky on the page ground with a hairline; sections land under it
   (`scroll-margin-top`). On a phone the bar holds the mark and "Open app", and the three section links sit in one
   quiet row under it.
-- **Phones.** Proof and Limits rows become blocks under 600 px (claim, then evidence), with the table roles set
-  explicitly. Standalone links and stacked hashes get a finger-sized row on coarse pointers.
+- **Figures and units.** Every figure with a unit is the kit's `Amount` (the floor term through `TermAmount`, the
+  two outcome figures, the premium under each intent figure), so one rule draws every unit (ruling F7). The time
+  after the deadline's date ("08:00 UTC") is not an amount; `Term.module.css` sets it as `Amount` sets a unit
+  beside a serif figure.
+- **Phones.** Proof rows become blocks under 600 px (claim, then evidence), with the table roles set explicitly.
+  Standalone links (the intent names among them) and stacked hashes get a finger-sized row on coarse pointers.
 - **Sections** use a twelve-column grid from 1000 px: the heading stays in the left margin (sticky, under the
   bar) while the content runs beside it, except the two wide ones (what you can do, how it works), which stack.

@@ -57,10 +57,14 @@ an asset page, two anywhere else. A component writes its anchor with `{...guideA
   transaction is in flight, for at most 3 s; then it gives up and records nothing.
 - **Count**: "2 of 4", from the notes present. A note whose control is missing or hidden is left out.
 - **Placement**: beside the control. On phones the two tall groups dock their note above the tab bar while the
-  mark stays on the group. The mode note sits above the switch from 768 px, so it never lies on the order panel.
+  mark stays on the group. From 768 px the intents note sits under the end of the list, clear of the Assets
+  heading. The mode note sits above the switch from 768 px, so it never lies on the order panel.
+- **Where the guide lives**: said once, as small print on the last note of a tour ("Show me around is in the
+  settings menu, top right." / "under More" on phones). The welcome leaves no line behind.
 - **Ways out**: Done, the close button, Escape (from anywhere), a click or tap outside, a change of page, or the
-  loss of every control. Focus goes back to what had it before; if that is gone, to the welcome's line
-  (`data-tour-return`); else to the page heading. After a press outside it stays on what was pressed.
+  loss of every control. Focus goes back to what had it before; if that is gone, and always for a tour started
+  from the welcome (whose button goes when the tour starts), to the element the page marks `data-tour-return`
+  (the intents heading on Markets); else to the page heading. After a press outside it stays on what was pressed.
 - **The mode note by itself**: never takes focus, never scrolls the page, is announced politely, and is dropped
   without a record when the address carries an order ticket, the switch is not in the viewport, something else
   is open or a transaction is in flight.

@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { FIXTURE_DEFAULT_PARTY } from '../../../core/pro/createClient'
 import { proErrorName } from '../../../core/pro/errors'
+import { stepActor } from '../../../core/pro/replay'
 import type { HistoryEntry } from '../../../core/pro/types'
 import { usePro } from '../../../data'
 import { Button, Card, IconChevronLeft, IconChevronRight, Select, Slider, useIsPhone } from '../../../ui'
@@ -26,8 +27,8 @@ const STEP_COLUMNS: ReadonlyArray<DeskColumn<HistoryEntry>> = [
 
 /**
  * Fixture builds only: which recorded scenario is replayed, at which step, and as which account. It is a tool
- * beside the product, so it sits last on the page, on the sunken ground, and starts collapsed on phones. This is
- * the one place that says how a replayed action works; a result says which step ran.
+ * beside the product, so it sits last on the page, on the sunken ground, and starts collapsed on phones. A form
+ * on the page shows the recorded amounts of the step it would replay; a result says which step ran.
  */
 export function ReplayCard() {
   const { sim, model, me, setMe } = usePro()
@@ -44,7 +45,8 @@ export function ReplayCard() {
   const total = sim.stepCount
   const scenario = sim.file.scenarios.find((s) => s.name === sim.scenarioName)
   const next = scenario?.steps[at]
-  const nextActor = next && typeof next.args[0] === 'string' && /^[A-Z][A-Z0-9_]*$/.test(next.args[0]) ? partyName(next.args[0]) : null
+  const actor = next ? stepActor(next) : null
+  const nextActor = actor ? partyName(actor) : null
   const recent = model.history.slice(-RECENT).reverse()
 
   return (
@@ -67,7 +69,6 @@ export function ReplayCard() {
         </p>
       )}
       <div id={bodyId} className={css.body} hidden={!open}>
-        <p className={css.lead}>A button on the page runs the next recorded step of its kind, with that step's amounts.</p>
         <div className={css.controls}>
           <div className={css.control}>
             <Select

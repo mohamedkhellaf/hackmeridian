@@ -1,8 +1,67 @@
-import { useId } from 'react'
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { IconCheck } from './icons'
+import { chipColumns } from './internal/chipColumns'
 import { cx } from './internal/cx'
 import styles from './ChoiceChips.module.css'
+
+const px = (value: string): number => Number.parseFloat(value) || 0
+
+/** The narrowest track a chip's first line fits in: its in-flow content, the label's padding, the chip's edge. */
+function chipNeed(chip: HTMLElement, label: HTMLElement): number {
+  const chipStyle = getComputedStyle(chip)
+  const labelStyle = getComputedStyle(label)
+  let content = 0
+  let items = 0
+  for (const child of Array.from(label.children)) {
+    if (getComputedStyle(child).position === 'absolute') continue
+    content += child.getBoundingClientRect().width
+    items += 1
+  }
+  content += Math.max(0, items - 1) * px(labelStyle.columnGap)
+  return Math.ceil(
+    content +
+      px(labelStyle.paddingLeft) +
+      px(labelStyle.paddingRight) +
+      px(chipStyle.paddingLeft) +
+      px(chipStyle.paddingRight) +
+      px(chipStyle.borderLeftWidth) +
+      px(chipStyle.borderRightWidth),
+  )
+}
+
+/** Measures the grid and its chips before the first paint and on every resize; `aim` until measured. */
+function useChipColumns(count: number, aim: number, contentKey: string) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [columns, setColumns] = useState(aim)
+  useLayoutEffect(() => {
+    const grid = ref.current
+    if (!grid) return
+    const read = () => {
+      const chips = Array.from(grid.children) as HTMLElement[]
+      let need = 0
+      for (const chip of chips) {
+        const label = chip.querySelector<HTMLElement>('[data-chip-label]')
+        if (label) need = Math.max(need, chipNeed(chip, label))
+      }
+      setColumns(chipColumns(count, aim, grid.clientWidth, need, px(getComputedStyle(grid).columnGap)))
+    }
+    read()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(read)
+    observer.observe(grid)
+    // A web font that arrives late changes every figure's width.
+    let live = true
+    void document.fonts?.ready.then(() => {
+      if (live) read()
+    })
+    return () => {
+      live = false
+      observer.disconnect()
+    }
+  }, [count, aim, contentKey])
+  return [ref, columns] as const
+}
 
 export interface ChoiceChip<V extends string = string> {
   value: V
@@ -25,15 +84,17 @@ export interface ChoiceChipsProps<V extends string = string> {
   value: V | null
   onValueChange: (value: V) => void
   chips: ReadonlyArray<ChoiceChip<V>>
-  /** How many columns the grid aims for (default 5). */
+  /**
+   * How many columns the grid aims for (default 5). Fewer when the widest chip would not fit, balanced across the
+   * rows. Pass the number of chips to fill one row edge to edge, so stacked groups end on the same edge.
+   */
   columns?: number
   /**
-   * `control` (default): compact chips, ink when chosen, for forms.
-   * `note`: serif figures typeset on a contract note; a tick when `marked`. The grid drops to five, then three
-   * columns as its container narrows.
+   * `control` (default): compact chips for forms. `note`: serif figures typeset on a contract note. In both the
+   * chosen chip takes the selection tint and a tick marks a `marked` chip.
    */
   appearance?: 'control' | 'note'
-  /** `fixed` keeps a few chips from stretching across the whole row (`note` only). */
+  /** Deprecated and ignored: every chip grid fills its row, so two stacked groups end on the same edge. */
   width?: 'even' | 'fixed'
   className?: string
 }
@@ -51,10 +112,11 @@ export function ChoiceChips<V extends string = string>({
   chips,
   columns = 5,
   appearance = 'control',
-  width = 'even',
   className,
 }: ChoiceChipsProps<V>) {
   const id = useId()
+  const contentKey = chips.map((chip) => `${chip.label}${chip.marked ? '*' : ''}`).join('|')
+  const [gridRef, fitted] = useChipColumns(chips.length, columns, `${appearance}:${contentKey}`)
   return (
     <div className={cx(styles.root, className)} data-appearance={appearance}>
       <div className={styles.head}>
@@ -64,11 +126,11 @@ export function ChoiceChips<V extends string = string>({
         {aside ? <span className={styles.aside}>{aside}</span> : null}
       </div>
       <div
+        ref={gridRef}
         role="radiogroup"
         aria-labelledby={`${id}-label`}
         className={styles.grid}
-        data-width={width}
-        style={{ ['--chip-columns' as string]: String(Math.max(1, columns)) }}
+        style={{ ['--chip-columns' as string]: String(Math.max(1, fitted)) }}
       >
         {chips.map((chip) => (
           <label key={chip.value} className={styles.chip} data-checked={chip.value === value || undefined} data-marked={chip.marked || undefined}>
@@ -81,7 +143,7 @@ export function ChoiceChips<V extends string = string>({
               onChange={() => onValueChange(chip.value)}
               aria-label={chip.name}
             />
-            <span className={styles.label}>
+            <span className={styles.label} data-chip-label="">
               <span>{chip.label}</span>
               {chip.marked ? <IconCheck className={styles.tick} size={12} /> : null}
             </span>

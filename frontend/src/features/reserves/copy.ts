@@ -46,7 +46,8 @@ export const ITEM_COPY = {
   active: { label: 'Active', meaning: 'Collateral of sold options, before their deadline' },
   pendingReclaim: { label: 'Pending reclaim', meaning: 'Collateral of expired options the maker has not reclaimed' },
   unclaimed: { label: 'Unclaimed', meaning: 'Proceeds of exercised options the maker has not claimed' },
-  escrowed: { label: 'Escrowed', meaning: 'Premiums of open requests, refunded if cancelled or expired' },
+  // The contract never refunds by itself: a premium leaves when a maker fills the request or it is taken back.
+  escrowed: { label: 'Escrowed', meaning: 'Premiums of open requests, held until a maker fills the request or the premium is taken back' },
 } as const
 
 /** Names the split on a phone, where its amounts cannot sit in the Locked column. */
@@ -136,18 +137,20 @@ export const COVERED_FACTS: readonly { label: string; text: string }[] = [
 export const TOKENS_HEADING = 'Token contracts'
 export const TOKENS_CAPTION = 'Token contracts, issuers and issuer flags'
 export const TOKENS_NOTE = 'An issuer that can freeze or claw back can do so to any holder, the contract included.'
-/** Column headers of the token table. The three flag columns say what the issuer can do, in plain words. */
-export const TOKEN_COLUMNS = { token: 'Token', contract: 'Token contract', issuer: 'Issuer', required: 'Approval required', revocable: 'Can freeze', clawback: 'Can claw back' } as const
-export const FLAG_YES = 'Yes'
-export const FLAG_NO = 'No'
+/**
+ * Column headers of the token table. The three flag columns that follow them say what the issuer can do: their
+ * names and answers are core/assetfacts's (`FLAG_LABELS`, `POWER_STATE`), the one vocabulary of the asset About
+ * tab, the Issuer page and this table. Kept out of this file so the e2e specs can import it without the app config.
+ */
+export const TOKEN_COLUMNS = { token: 'Token', contract: 'Token contract', issuer: 'Issuer' } as const
 export const FLAG_READING = 'Reading'
 /** The Stellar names of the three columns, for readers who know them. */
 export const FLAGS_KEY = 'On Stellar these are the issuer flags AUTH_REQUIRED, AUTH_REVOCABLE and AUTH_CLAWBACK_ENABLED.'
 /** `Flags of RWA and BOND could not be read. They are shown as recorded on 26 Oct 2026.` */
 export const flagsFromRecord = (codes: string): string => `Issuer flags of ${codes} could not be read. They are shown as recorded on 26 Oct 2026.`
 export const flagsUnread = (codes: string): string => `Issuer flags of ${codes} could not be read.`
-/** `USDx has no flag set today. Its issuer account is not immutable, so it could set them later.` */
-export const notImmutableNote = (code: string): string => `${code} has no flag set today. Its issuer account is not immutable, so it could set them later.`
+/** `The USDx issuer has none of these powers today, and can change these later.` */
+export const notImmutableNote = (code: string): string => `The ${code} issuer has none of these powers today, and can change these later.`
 
 export const MARGIN_HEADING = 'Margin contract'
 export const MARGIN_LEDE =
@@ -166,13 +169,13 @@ export interface RoleCopy {
 
 export const MARGIN_ADMIN: RoleCopy = {
   role: 'Admin',
-  summary: 'Lists the series that can be traded, each a strike and an expiry. It cannot publish a price or change the market parameters, which are fixed at deployment.',
+  summary: 'Lists the series that can be traded, each a strike and a deadline. It cannot publish a price or change the market parameters, which are fixed at deployment.',
 }
 
 export const MARGIN_PUBLISHER: RoleCopy = {
   role: 'Publisher',
   summary:
-    'Publishes the risk snapshots and, once after expiry, the settlement price of each series. These prices decide every liquidation, early exercise and payout. The contract checks a snapshot’s consistency (mark within arbitrage bounds, extreme-scenario floor, freshness, rising sequence), not the price itself.',
+    'Publishes the risk snapshots and, once after the deadline, the settlement price of each series. These prices decide every liquidation, early exercise and payout. The contract checks a snapshot’s consistency (mark within arbitrage bounds, extreme-scenario floor, freshness, rising sequence), not the price itself.',
 }
 
 /** What neither role can do, said once for both. */

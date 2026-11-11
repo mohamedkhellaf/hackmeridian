@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { TokenInfo } from '../../core/options/types'
 import type { Bid } from '../../core/requests/types'
 import type { TokenBalance } from '../../core/stellar/tokens'
-import type { MarketIndexRow } from '../../data'
-import { accessCase, assetRequests, choosingSearch, fundingProgress, fundsLead, guidedSearch, indexList, needsTestFunds, obviousAsset } from './model'
+import type { ReferencePrice } from '../../core/reference'
+import type { ExpiryColumn, GridCell, MarketIndexRow, MarketView } from '../../data'
+import { accessCase, assetRequests, choosingSearch, fundingProgress, fundsLead, guidedSearch, indexList, nearReference, needsTestFunds, obviousAsset } from './model'
 
 const token = (code: string): TokenInfo => ({ contractId: `C_${code}`, code, decimals: 7, issuer: 'GISSUER' })
 const USDX = token('USDX')
@@ -36,6 +37,51 @@ describe('indexList', () => {
 
   it('is empty for an empty contract', () => {
     expect(indexList([], false)).toEqual({ rows: [], hidden: 0, all: true })
+  })
+})
+
+describe('nearReference', () => {
+  const U = 10_000_000n
+  const demo = (perUnit: bigint | null): ReferencePrice => ({ kind: perUnit === null ? 'none' : 'demo', perUnit, label: 'Demo price', note: '', asOf: null })
+  const cell = (bestPerUnit: bigint | null): GridCell => ({ bestPerUnit }) as GridCell
+  const ladder = [98n * U, 99n * U, 100n * U, 101n * U]
+  /** A column with the given best premiums per strike (put, call); `offers` counts the priced cells. */
+  const column = (expiry: number, prices: Record<string, [bigint | null, bigint | null]>): ExpiryColumn => {
+    const rows = ladder.map((k) => {
+      const [put, call] = prices[String(k / U)] ?? [null, null]
+      return { strikePerUnit: k, put: cell(put), call: cell(call) }
+    })
+    const offers = rows.reduce((n, r) => n + Number(r.put.bestPerUnit !== null) + Number(r.call.bestPerUnit !== null), 0)
+    return { expiry, rows, offers } as unknown as ExpiryColumn
+  }
+  const view = (price: bigint | null, columns: ExpiryColumn[]): Pick<MarketView, 'reference' | 'ladder' | 'columns'> => ({ reference: demo(price), ladder, columns })
+
+  it('takes the strike nearest the reference price on the nearest deadline that has offers', () => {
+    const v = view((9940n * U) / 100n, [
+      column(100, {}),
+      column(200, { '98': [U / 100n, null], '99': [18n * (U / 100n), 2n * U], '100': [U, null] }),
+      column(300, { '99': [U / 10n, U / 10n] }),
+    ])
+    expect(nearReference(v)).toEqual({
+      put: { perUnit: 18n * (U / 100n), strikePerUnit: 99n * U, expiry: 200 },
+      call: { perUnit: 2n * U, strikePerUnit: 99n * U, expiry: 200 },
+    })
+  })
+
+  it('has nothing for a kind with no offer at that strike, even when another strike has one', () => {
+    const v = view(99n * U, [column(200, { '98': [U, U], '99': [U / 2n, null] })])
+    expect(nearReference(v)).toEqual({ put: { perUnit: U / 2n, strikePerUnit: 99n * U, expiry: 200 }, call: null })
+  })
+
+  it('takes the lower strike on a tie', () => {
+    const v = view((995n * U) / 10n, [column(200, { '99': [U, null], '100': [2n * U, null] })])
+    expect(nearReference(v).put?.strikePerUnit).toBe(99n * U)
+  })
+
+  it('has nothing without a reference price or without any offer', () => {
+    expect(nearReference(view(null, [column(200, { '99': [U, U] })]))).toEqual({ put: null, call: null })
+    expect(nearReference(view(99n * U, [column(200, {})]))).toEqual({ put: null, call: null })
+    expect(nearReference(view(99n * U, []))).toEqual({ put: null, call: null })
   })
 })
 

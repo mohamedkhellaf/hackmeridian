@@ -10,15 +10,15 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import type { FocusEvent } from 'react'
 import { PAYOFF_CAPTION } from '../../../core/disclosures'
 import { explorerAddress, explorerTx, isMockId } from '../../../core/explorer'
-import { formatMoney, formatUnits, formatUtc, formatUtcDay, formatUtcTime, groupDigits, isoUtc, plural } from '../../../core/format'
-import { Address, announce, Button, ButtonLink, ContractNote, Link, Marker, useIsPhone } from '../../../ui'
+import { formatMoney, formatUnits, formatUtc, formatUtcDay, formatUtcTime, groupDigits, isoUtc, plural, serialOf } from '../../../core/format'
+import { Address, Amount, announce, Button, ButtonLink, ContractNote, Link, Marker, useIsPhone } from '../../../ui'
 import { WithWithoutChart } from '../../../viz'
 import { LOT_SLOT, WIDGET } from '../copy'
 import { RECORDED_PUT, RECORDED_PUT_TX } from '../recorded'
 import type { LivePick, LiveState } from '../live/types'
 import { floorFigure, floorOutcome } from './floor'
 import type { FloorFigure, FloorTerms } from './floor'
-import { TermSelect, TermValue } from './Term'
+import { TermAmount, TermSelect, TermValue } from './Term'
 import css from './HeroWidget.module.css'
 
 export interface HeroWidgetProps {
@@ -27,7 +27,6 @@ export interface HeroWidgetProps {
   onPick: (pick: LivePick) => void
 }
 
-import { serialOf } from '../../../core/format/option'
 const ledgerText = (ledger: number): string => groupDigits(String(ledger))
 
 /** The window's height, for a chart that keeps the outcomes and the action on a short laptop screen. */
@@ -95,7 +94,7 @@ function FloorBody({ figure, terms, reference, height }: BodyProps) {
         <div className={css.outcome}>
           <dt className={css.outcomeLabel}>{WIDGET.ifPrice(code, outcome.priceText)}</dt>
           <dd className={css.outcomeFigure} data-testid="hero-with">
-            {outcome.withText} <span className={css.outcomeUnit}>{quote}</span>
+            <Amount value={outcome.withText} unit={quote} figure="serif" className={css.outcomeAmount} />
           </dd>
           <dd className={css.outcomeNote}>
             {outcome.exercised
@@ -106,7 +105,7 @@ function FloorBody({ figure, terms, reference, height }: BodyProps) {
         <div className={css.outcome}>
           <dt className={css.outcomeLabel}>{WIDGET.without}</dt>
           <dd className={css.outcomeFigure} data-secondary="true" data-testid="hero-without">
-            {outcome.withoutText} <span className={css.outcomeUnit}>{quote}</span>
+            <Amount value={outcome.withoutText} unit={quote} figure="serif" className={css.outcomeAmount} />
           </dd>
           <dd className={css.outcomeNote}>
             <span className={css.verdict} data-direction={outcome.direction}>
@@ -202,13 +201,13 @@ export function HeroWidget({ live: reported, onPick }: HeroWidgetProps) {
   // The aside says only what the tag does not: that the example is recorded, a resale, or read from mock data.
   const aside = offer ? (offer.source === 'resale' ? WIDGET.resaleAside : live?.mock ? WIDGET.openAsideMock : null) : WIDGET.recordedAside
 
-  const lotText = `${figure.text.qty} ${code}`
-  const totalText = `${figure.text.premium} ${q.code}`
+  const lotText = `${figure.text.qty}\u00a0${code}`
+  const totalText = `${figure.text.premium}\u00a0${q.code}`
   const lotLine = offer
     ? (offer.source === 'resale' ? WIDGET.lotResale : WIDGET.lotOpen)(LOT_SLOT, totalText, figure.text.premiumPerUnit)
     : WIDGET.lotRecorded(LOT_SLOT, totalText, figure.text.premiumPerUnit)
   const [lotBefore, lotAfter] = lotLine.split(LOT_SLOT)
-  const lotOf = (qty: bigint): string => `${formatUnits(qty, terms.underlying.decimals)} ${code}`
+  const lotOf = (qty: bigint): string => `${formatUnits(qty, terms.underlying.decimals)}\u00a0${code}`
 
   return (
     <div
@@ -251,8 +250,7 @@ export function HeroWidget({ live: reported, onPick }: HeroWidgetProps) {
                     ? WIDGET.floorOptionBare(formatMoney(s.value, q), lotOf(s.qty))
                     : WIDGET.floorOption(formatMoney(s.value, q), formatUnits(s.perUnit, q.decimals), lotOf(s.qty)),
               }))}
-              figure={figure.text.strike}
-              unit={q.code}
+              figure={<TermAmount value={figure.text.strike} unit={q.code} />}
               marked
             />
             <TermSelect
@@ -261,14 +259,14 @@ export function HeroWidget({ live: reported, onPick }: HeroWidgetProps) {
               onChange={(expiry) => onPick({ assetId: choices.assetId, strike: offer.strikePerUnit, expiry: Number(expiry) })}
               options={choices.expiries.map((e) => ({ value: String(e.value), label: e.qty === null ? formatUtc(e.value) : WIDGET.untilOption(formatUtc(e.value), lotOf(e.qty)) }))}
               figure={until}
-              unit={untilRest}
+              rest={untilRest}
             />
           </div>
         ) : (
           <dl className={css.terms} aria-label={WIDGET.termsLabel}>
             <TermValue label={WIDGET.hold} figure={code} />
-            <TermValue label={WIDGET.floor} figure={figure.text.strike} unit={q.code} marked />
-            <TermValue label={WIDGET.until} figure={until} unit={untilRest} />
+            <TermValue label={WIDGET.floor} figure={<TermAmount value={figure.text.strike} unit={q.code} />} marked />
+            <TermValue label={WIDGET.until} figure={until} rest={untilRest} />
           </dl>
         )}
         <p className={css.meta} data-testid="hero-meta">

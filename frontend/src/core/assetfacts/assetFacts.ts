@@ -1,4 +1,5 @@
 import { config } from '../config'
+import { TEAM_ISSUER_FLAGS } from '../deployments'
 import { getJson } from '../stellar/horizon'
 import { isMockToken } from '../stellar/tokens'
 
@@ -108,13 +109,25 @@ export const ISSUER_POWERS_TITLE = 'What the issuer can do'
 /** Column heads of the issuer powers table. */
 export const POWERS_COLUMNS = { power: 'Power', state: 'State', effect: 'Effect' } as const
 
-/** The state word of a power. */
-export const POWER_STATE = { on: 'On', off: 'Off' } as const
+/**
+ * The issuer powers in plain words (ruling F16): the one vocabulary of the asset About tab, the Issuer page and the
+ * Reserves token table. Stellar's own flag names (AUTH_REQUIRED, AUTH_REVOCABLE, AUTH_CLAWBACK_ENABLED,
+ * AUTH_IMMUTABLE) appear only in the footnote that maps them, never as a label.
+ */
+export const FLAG_LABELS = {
+  required: 'Approval required',
+  revocable: 'Can freeze',
+  clawback: 'Can claw back',
+  change: 'Can change these',
+} as const
+
+/** The state word of a power, the same on the three pages: each label is a yes-or-no question. */
+export const POWER_STATE = { on: 'Yes', off: 'No' } as const
 
 /** The fourth row of the powers: whether the issuer can still change the three flags. */
 export interface FlagChangeFact {
   key: 'change'
-  label: 'Change these settings'
+  label: typeof FLAG_LABELS.change
   on: boolean
   state: 'Yes' | 'No'
   consequence: string
@@ -123,8 +136,8 @@ export interface FlagChangeFact {
 /** Whether the flags can still change: no once the issuer set AUTH_IMMUTABLE. */
 export function describeFlagChange(f: AssetFlags): FlagChangeFact {
   return f.authImmutable
-    ? { key: 'change', label: 'Change these settings', on: false, state: 'No', consequence: 'Fixed. The issuer can never change them.' }
-    : { key: 'change', label: 'Change these settings', on: true, state: 'Yes', consequence: 'The issuer can turn any of these on or off later.' }
+    ? { key: 'change', label: FLAG_LABELS.change, on: false, state: POWER_STATE.off, consequence: 'Fixed. The issuer can never change them.' }
+    : { key: 'change', label: FLAG_LABELS.change, on: true, state: POWER_STATE.on, consequence: 'The issuer can turn any of these on or off later.' }
 }
 
 /** One line per authorization flag, phrased as what it means for a holder or for the Covered contract. */
@@ -132,7 +145,7 @@ export function describeFlags(f: AssetFlags): FlagFact[] {
   return [
     {
       key: 'required',
-      label: 'Authorization required',
+      label: FLAG_LABELS.required,
       on: f.authRequired,
       consequence: f.authRequired
         ? 'Holders need the issuer’s approval before they can hold this token, including the Covered contract.'
@@ -140,7 +153,7 @@ export function describeFlags(f: AssetFlags): FlagFact[] {
     },
     {
       key: 'revocable',
-      label: 'Authorization revocable',
+      label: FLAG_LABELS.revocable,
       on: f.authRevocable,
       consequence: f.authRevocable
         ? 'The issuer can freeze a holder’s balance at any time, which can block transfers and exercise.'
@@ -148,7 +161,7 @@ export function describeFlags(f: AssetFlags): FlagFact[] {
     },
     {
       key: 'clawback',
-      label: 'Clawback enabled',
+      label: FLAG_LABELS.clawback,
       on: f.clawback,
       consequence: f.clawback
         ? 'The issuer can take tokens back, including from the Covered contract.'
@@ -170,18 +183,17 @@ export interface AssetFacts {
 }
 
 /**
- * Fixture flags for the three mock assets, so the demo can show an issuer power that is on and one that is off.
- * Only the issuer's flags are given: no trustline count and no holder count is invented (`record` stays null).
+ * Fixture flags for the three mock assets. They share one issuer account (`MOCK_ISSUER`), and on Stellar these flags
+ * belong to the issuer account, so the three read the same (ruling F16). They mirror the recorded Testnet issuer
+ * (`TEAM_ISSUER_FLAGS`): approval not required, can freeze, can claw back, and the flags can still change. Only the
+ * issuer's flags are given: no trustline count and no holder count is invented (`record` stays null).
  */
-const MOCK_FLAGS: Readonly<Record<string, AssetFlags>> = {
-  FUND: { authRequired: false, authRevocable: true, clawback: true, authImmutable: false },
-  BOND: { authRequired: true, authRevocable: true, clawback: true, authImmutable: false },
-  EQTY: { authRequired: true, authRevocable: true, clawback: false, authImmutable: false },
-}
+const MOCK_ISSUER_FLAGS: AssetFlags = { ...TEAM_ISSUER_FLAGS, authImmutable: false }
+const MOCK_CODES: ReadonlySet<string> = new Set(['FUND', 'BOND', 'EQTY'])
 
-/** The facts of a mock asset: flags from the fixture table (every power off for a code it does not know). */
+/** The facts of a mock asset: the mock issuer's flags (every power off for a code it does not know). */
 export function mockAssetFacts(code: string, issuer: string | null = null): AssetFacts {
-  const flags = MOCK_FLAGS[code] ?? { authRequired: false, authRevocable: false, clawback: false, authImmutable: false }
+  const flags = MOCK_CODES.has(code) ? MOCK_ISSUER_FLAGS : { authRequired: false, authRevocable: false, clawback: false, authImmutable: false }
   return { code, issuer, native: false, record: null, issuerInfo: { homeDomain: null, locked: false, flags }, partial: false, mock: true }
 }
 

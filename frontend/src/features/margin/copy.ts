@@ -2,43 +2,23 @@
 // three bullets and its consent label live in core/disclosures.ts and are imported from there, never retyped.
 //
 // Wording limits (AGENTS.md, brief section 0): a Margin position is never called guaranteed, insured, safe,
-// fully backed or fully collateralized; a price is "the publisher price", never a market or oracle price.
+// fully backed or fully collateralized; a price is "the publisher price", never a market or oracle price. The
+// instant a series ends is "the deadline", as in Covered (ruling F11); contract and refusal names keep "expired".
 import type { MarginScreen } from './screen'
 
 export interface ScreenCopy {
   /** The nav label, and the page heading (the section name is already in the top bar and the sentences). */
   nav: string
   title: string
-  /** One line saying what the page is. */
-  description: string
 }
 
+// No line under the title: the required Margin sentences are the one paragraph there (rulings E22, F11).
 export const SCREENS: Record<MarginScreen, ScreenCopy> = {
-  account: {
-    nav: 'Account',
-    title: 'Account',
-    description: 'The cash you post against the calls you wrote, and how far it stands from liquidation.',
-  },
-  trade: {
-    nav: 'Trade',
-    title: 'Trade',
-    description: 'Uncovered calls, settled in cash. The writer posts partial margin, not the full underlying.',
-  },
-  positions: {
-    nav: 'Positions',
-    title: 'Positions',
-    description: 'Uncovered calls and who holds them. Exercise early, or settle and claim after expiry.',
-  },
-  liquidations: {
-    nav: 'Liquidations',
-    title: 'Liquidations',
-    description: 'A writer below the liquidation level can be taken over, by the vault or by another writer.',
-  },
-  vault: {
-    nav: 'Vault',
-    title: 'Vault',
-    description: 'The pre-funded backstop. It pays holders after the writer margin, as far as it reaches.',
-  },
+  account: { nav: 'Account', title: 'Account' },
+  trade: { nav: 'Trade', title: 'Trade' },
+  positions: { nav: 'Positions', title: 'Positions' },
+  liquidations: { nav: 'Liquidations', title: 'Liquidations' },
+  vault: { nav: 'Vault', title: 'Vault' },
 }
 
 export const SCREEN_ORDER: readonly MarginScreen[] = ['account', 'trade', 'positions', 'liquidations', 'vault']
@@ -69,14 +49,14 @@ export const EARLY_EXERCISE_REFUSALS: readonly number[] = [226, 207, 223, 225, 2
 
 /** Beside an Exercise early button that the model expects to be refused: the reason in a few words. */
 export const REFUSAL_SHORT: Record<number, string> = {
-  226: 'Owned by the vault: settles at expiry.',
+  226: 'Owned by the vault: settles at the deadline.',
   207: 'The snapshot is too old for early exercise.',
   223: 'Out of the money at the latest snapshot.',
   225: 'A settlement price is pending.',
   224: 'The writer must be taken over first.',
 }
 
-/** The three calls after expiry, in order. */
+/** The three calls after the deadline, in order. */
 export const AFTER_EXPIRY_STEPS = {
   books: 'Settle the writer books',
   series: 'Settle the series against the vault',

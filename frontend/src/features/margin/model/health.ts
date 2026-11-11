@@ -1,7 +1,7 @@
 // Where a margin account stands against its two requirements, in words. Every figure is a value of
 // get_requirement or the difference of two of them; nothing here is a margin formula.
 import type { Requirement } from '../../../core/pro/types'
-import { usdx, usdxExact } from './money'
+import { usdx, usdxExact, withUnit } from './money'
 
 /**
  * liquidatable  account value below the liquidation level (NLV < MM): anyone can take the account over
@@ -40,24 +40,24 @@ export const HEALTH_WORD: Record<HealthState, string> = {
 
 /** `55.6 %` from tenths of a percent. */
 export function tenthsText(tenths: bigint): string {
-  return `${(tenths / 10n).toString()}.${(tenths % 10n).toString()} %`
+  return `${(tenths / 10n).toString()}.${(tenths % 10n).toString()}\u00a0%`
 }
 
 /**
  * The distance to liquidation, the line that leads the account: "20,437.84 USDx below the liquidation level".
- * Truncated like every other figure. `simulated` picks the wording for a missing requirement (a replay step
- * without one, or a failed read).
+ * Truncated like every other figure. Without a requirement on the contract build the read failed; a replay step
+ * without one says instead where the scenario records it (the Account screen words that).
  */
-export function healthLead(h: Health, simulated: boolean): string {
+export function healthLead(h: Health): string {
   const share = h.aboveTenths !== null ? ` (${tenthsText(h.aboveTenths)})` : ''
   switch (h.state) {
     case 'liquidatable':
-      return `${usdx(h.distance)} USDx below the liquidation level`
+      return `${withUnit(usdx(h.distance))} below the liquidation level`
     case 'restricted':
     case 'open':
-      return `${usdx(h.distance)} USDx above the liquidation level${share}`
+      return `${withUnit(usdx(h.distance))} above the liquidation level${share}`
     default:
-      return simulated ? 'This step of the scenario has no requirement for this account.' : 'The margin requirement could not be read.'
+      return 'The margin requirement could not be read.'
   }
 }
 
@@ -68,9 +68,9 @@ export function healthLead(h: Health, simulated: boolean): string {
 export function healthNext(h: Health): string | null {
   switch (h.state) {
     case 'liquidatable':
-      return `A deposit of at least ${usdxExact(h.distance)} USDx brings the account value back to the liquidation level.`
+      return `A deposit of at least ${withUnit(usdxExact(h.distance))} brings the account value back to the liquidation level.`
     case 'restricted':
-      return `A new call needs ${usdxExact(h.toOpen)} USDx more.`
+      return `A new call needs ${withUnit(usdxExact(h.toOpen))} more.`
     default:
       return null
   }

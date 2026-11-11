@@ -15,7 +15,7 @@ import { claimAmount } from '../core/portfolio/positions'
 import type { Bid, NewBid } from '../core/requests/types'
 import { TxError } from '../core/tx/errors'
 import type { TxOptions, TxReceipt } from '../core/tx/types'
-import { formatUnits, formatUtc } from '../core/format'
+import { formatUnits, formatUtc, withUnit } from '../core/format'
 import { exactStrikePerUnit } from '../core/series'
 import { amt } from '../core/units'
 import { keys } from './keys'
@@ -42,7 +42,7 @@ const on = (o: Terms): string => `${o.kind} on ${amt(o.underlyingQty, o.underlyi
 type Series = Terms & { totalStrike: bigint; expiry: number }
 function strike(o: Series, quote: TokenInfo): string {
   const perUnit = exactStrikePerUnit(o)
-  return perUnit === null ? `total strike ${amt(o.totalStrike, quote)}` : `strike ${formatUnits(perUnit, quote.decimals)} ${quote.code} per ${o.underlying.code}`
+  return perUnit === null ? `total strike ${amt(o.totalStrike, quote)}` : `strike ${withUnit(formatUnits(perUnit, quote.decimals), quote.code)} per ${o.underlying.code}`
 }
 const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 /** `Strike 10.20 USDx per FUND, deadline 13 Nov 2026, 08:00 UTC`: for a label that already names kind and quantity. */
@@ -221,7 +221,7 @@ export const useBuyResale = (options?: MutationOptions): CoveredTx<[option: Opti
 /** Post a request (bid) and escrow its premium. `run(newBid)`; the result carries the new bid `id`. */
 export const useCreateBid = (options?: MutationOptions): CoveredTx<[bid: NewBid], TxResult & { id: bigint }> => useCoveredTx(CREATE_BID, options)
 
-/** Buyer withdraws an open request; the escrowed premium is refunded. `run(bid)`. */
+/** Buyer cancels a request, open or past its deadline; the escrowed premium comes back. `run(bid)`. */
 export const useCancelBid = (options?: MutationOptions): CoveredTx<[bid: Bid], TxResult> => useCoveredTx(CANCEL_BID, options)
 
 /** Maker fills a request: locks the collateral, receives the escrowed premium. `run(bid)`; the result carries the new `optionId`. */

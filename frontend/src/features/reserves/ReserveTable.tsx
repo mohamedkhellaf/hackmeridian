@@ -149,7 +149,7 @@ function BreakdownPhone({ row, groupId }: { row: ReserveRow; groupId: string }) 
 }
 
 /** The difference with its word in a slot of its own, so the figures of every row end on the same edge. */
-function Difference({ row, figure }: { row: ReserveRow; figure: 'sans' | 'serif' }) {
+function Difference({ row }: { row: ReserveRow }) {
   if (row.difference === null) {
     return (
       <>
@@ -161,7 +161,7 @@ function Difference({ row, figure }: { row: ReserveRow; figure: 'sans' | 'serif'
   const word = row.state === 'short' || row.state === 'over' ? DIFFERENCE_WORD[row.state] : null
   return (
     <span className={css.difference} data-state={row.state}>
-      <Amount value={differenceShown(row)} exact={differenceExact(row)} srLabel={differenceSpoken(row)} figure={figure} />
+      <Amount value={differenceShown(row)} exact={differenceExact(row)} srLabel={differenceSpoken(row)} />
       <span className={css.word} aria-hidden="true">
         {word}
       </span>
@@ -191,8 +191,7 @@ const onOwnControl = (event: MouseEvent<HTMLElement>): boolean => (event.target 
 function ReserveRows({ row, open, phone, onToggle }: { row: ReserveRow; open: boolean; phone: boolean; onToggle: () => void }) {
   const groupId = useId()
   const { token } = row
-  // Serif key figures from 768 px; on a phone the three columns keep the table face, or "under 0.01" overflows.
-  const figure = phone ? 'sans' : 'serif'
+  // The figures keep the table face, as every money column does; the token code is the serif word of the row.
   return (
     <>
       <Tr
@@ -220,7 +219,7 @@ function ReserveRows({ row, open, phone, onToggle }: { row: ReserveRow; open: bo
         </RowHeader>
         <Td numeric className={css.figureCell} data-testid="locked" data-units={row.locked.toString()}>
           <Changed value={row.locked.toString()}>
-            <Amount value={amountText(row.locked, token)} exact={exactText(row.locked, token)} figure={figure} />
+            <Amount value={amountText(row.locked, token)} exact={exactText(row.locked, token)} />
           </Changed>
         </Td>
         <Td numeric className={css.figureCell} data-testid="held" data-units={row.held === null ? undefined : row.held.toString()}>
@@ -228,13 +227,13 @@ function ReserveRows({ row, open, phone, onToggle }: { row: ReserveRow; open: bo
             <span className={css.unavailable}>{HELD_UNAVAILABLE}</span>
           ) : (
             <Changed value={row.held.toString()}>
-              <Amount value={amountText(row.held, token)} exact={exactText(row.held, token)} figure={figure} />
+              <Amount value={amountText(row.held, token)} exact={exactText(row.held, token)} />
             </Changed>
           )}
         </Td>
         <Td numeric className={css.figureCell} data-testid="difference" data-units={row.difference === null ? undefined : row.difference.toString()}>
           <Changed value={row.difference?.toString()}>
-            <Difference row={row} figure={figure} />
+            <Difference row={row} />
           </Changed>
         </Td>
       </Tr>

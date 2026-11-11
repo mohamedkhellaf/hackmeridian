@@ -1,13 +1,13 @@
 // Cancelling the wallet's own offer or request from the book: one short confirmation that says what comes back,
 // then the transaction's stages in the same dialog. The outcome is also recorded in Activity by the data layer.
 import { explorerTx } from '../../../core/explorer'
-import { formatMoney, formatUnits, formatUtc } from '../../../core/format'
+import { formatExact, formatUnits, formatUtc } from '../../../core/format'
 import type { BookRow } from '../../../core/market/book'
 import { seriesRefOf } from '../../../core/market/selection'
 import { requiredCollateral } from '../../../core/options/types'
 import { stoppedStage } from '../../../core/tx/machine'
 import { describeTx, useCancelBid, useCancelOffer, useOptionsClient, useUnsettledTx } from '../../../data'
-import { Button, Dialog, KeyValue, KeyValueItem, TxLink, TxStepper, UnsettledNotice } from '../../../ui'
+import { Amount, Button, Dialog, KeyValue, KeyValueItem, TxLink, TxStepper, UnsettledNotice } from '../../../ui'
 import { COPY } from './copy'
 import { strikeText } from './model'
 import styles from './CancelDialog.module.css'
@@ -79,10 +79,12 @@ function CancelBody({ row, onClose }: { row: BookRow; onClose: () => void }) {
         <KeyValueItem label="Series">
           {ref ? `${row.underlying.code} ${strikeText(ref.strikePerUnit, row.quote.decimals)} ${row.kind}` : `${row.underlying.code} ${row.kind}`}
         </KeyValueItem>
-        <KeyValueItem label="Quantity">{formatMoney(row.underlyingQty, row.underlying)}</KeyValueItem>
+        <KeyValueItem label="Quantity">
+          <Amount value={formatUnits(row.underlyingQty, row.underlying.decimals)} exact={formatExact(row.underlyingQty, row.underlying.decimals)} unit={row.underlying.code} />
+        </KeyValueItem>
         <KeyValueItem label="Deadline">{formatUtc(row.expiry)}</KeyValueItem>
         <KeyValueItem label={isBid ? COPY.premiumRefunded : COPY.collateralReturned} marked>
-          {formatUnits(back.amount, back.token.decimals)} {back.token.code}
+          <Amount value={formatUnits(back.amount, back.token.decimals)} exact={formatExact(back.amount, back.token.decimals)} unit={back.token.code} />
         </KeyValueItem>
       </KeyValue>
       {idle && unsettled ? <UnsettledNotice onCheck={unsettled.check}>{unsettled.reason}</UnsettledNotice> : null}

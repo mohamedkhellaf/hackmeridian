@@ -1,7 +1,7 @@
 // Every string of the chain view. Sentences are whole (never assembled from fragments in a component); counts
 // go through core/format `countOf`, lists through `formatList`. One word per thing (DESIGN.md, ruling R7): a
 // buyer's order is a request, the instant is the deadline, whoever wrote the option is the maker.
-import { countOf, plural } from '../../../core/format'
+import { NBSP, countOf, plural } from '../../../core/format'
 import type { OptionKind } from '../../../core/options/types'
 import type { ReferenceKind } from '../../../core/reference'
 import type { NonStandardReason } from '../../../core/series'
@@ -70,12 +70,16 @@ export const COPY = {
   strike: 'Strike',
   offer: 'Offer',
   request: 'Request',
-  askPrice: 'Ask for a price',
   yours: 'yours',
   /** The one instruction of chain mode, shown under the chain while nothing is selected (ruling E9). */
   selectHint: 'Select a premium to see its offers and requests.',
   selectHintNoBids: 'Select a premium to see its offers.',
-  units: (quote: string, asset: string, deadline: string) => `Premiums per 1 ${asset} in ${quote}, offer sizes in ${asset}. Deadline ${deadline}.`,
+  /** In place of the instruction when the deadline shown has no order at all (ruling F2). */
+  noOrders: 'No orders on this deadline yet. Press a strike to post a request or write the first offer.',
+  noOrdersNoBids: 'No orders on this deadline yet. Press a strike to write the first offer.',
+  /** The line under the deadlines. On a phone it also carries the number of orders on the deadline shown (ruling F3). */
+  units: (quote: string, asset: string, deadline: string, orders: number | null = null) =>
+    `Premiums per 1${NBSP}${asset} in ${quote}, sizes in ${asset}. Deadline ${deadline}${orders ? `, ${countOf(orders, ORDERS)}` : ''}.`,
   shaded: (phrase: string) => `Shaded cells are in the money at ${phrase}.`,
   noReference: 'No reference price for this asset, so moneyness is not shown.',
   deadlinePassed: (day: string, shown: string) => `The ${day} deadline has passed. Showing ${shown}.`,
@@ -115,8 +119,8 @@ export const COPY = {
   gap: (spread: string) => `${spread} between the best offer and the best request.`,
   crossed: (spread: string) => `The best request is ${spread} above the best offer.`,
   level: 'The best request equals the best offer.',
-  youHold: (qty: string, code: string, kind: OptionKind) => `You hold ${qty} ${code} of this ${kind}.`,
-  youWrote: (qty: string, code: string, kind: OptionKind) => `You wrote ${qty} ${code} of this ${kind}.`,
+  youHold: (qty: string, code: string, kind: OptionKind) => `You hold ${qty}${NBSP}${code} of this ${kind}.`,
+  youWrote: (qty: string, code: string, kind: OptionKind) => `You wrote ${qty}${NBSP}${code} of this ${kind}.`,
   viewPosition: 'View position',
   best: 'Best',
   yoursRow: 'Yours',

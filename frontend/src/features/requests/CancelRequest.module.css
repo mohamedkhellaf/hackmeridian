@@ -5,25 +5,22 @@
     gap: var(--s-16);
   }
 
+  /*
+   * At rest and after the outcome the stage takes the room its content needs. While the transaction runs, a centred
+   * dialog holds the stepper's height (four stages, a two-line help and the hash line beneath), so it does not grow
+   * from one stage to the next. On phones the dialog is a bottom sheet: its actions stay at the thumb, so it takes
+   * only the room it needs throughout.
+   */
   .stage {
     display: flex;
     flex-direction: column;
     gap: var(--s-16);
   }
 
-  /*
-   * A centred dialog holds the stepper's height in every phase, so it keeps its size and its title and actions
-   * stay put. On phones the dialog is a bottom sheet: its actions stay at the thumb, so it takes only the room it needs.
-   */
   @media (min-width: 768px) {
-    .stage {
-      min-height: var(--cancel-stage-h);
+    .stage:not([data-phase='idle'], [data-phase='confirmed']) {
+      min-height: calc(var(--s-40) * 5);
     }
-  }
-
-  /* Four stages with a two-line note and the hash line beneath: the tallest the stage area gets. */
-  .body {
-    --cancel-stage-h: calc(var(--s-40) * 5);
   }
 
   .note {

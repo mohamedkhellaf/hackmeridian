@@ -7,7 +7,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { BANNED_PRICE_TERMS, BANNED_TAGLINES, BANNED_WORDS, COPYRIGHT_NOTICE, MARGIN_BANNED_WORDS, PAYOFF_CAPTION, findBannedWords, legalNotice } from '../src/core/disclosures'
-import { HERO, LIMITS, NAV, PROOF, WIDGET } from '../src/features/landing/copy'
+import { CLOSING, HERO, INTENTS, LIMITS, NAV, PROOF, WIDGET } from '../src/features/landing/copy'
 import { PHONE, bodyText, countVisible, currentPath, expectAnnounced, expectNoAxeViolations, expectNoHorizontalOverflow, openApp, pageHeading } from './helpers'
 
 const LIVE_CHUNK = '**/features/landing/live/LiveBook.tsx*'
@@ -16,6 +16,8 @@ const HEAVY = /stellar-sdk|stellar_stellar-sdk|wallets-kit|mockClient|mockSeed|s
 
 const widget = (page: Page) => page.getByTestId('hero-widget')
 const slider = (page: Page) => widget(page).getByRole('slider')
+/** The hero's own "Open the markets": the closing at the foot of the page carries the same label. */
+const heroPrimary = (page: Page) => page.getByRole('region', { name: HERO.h1 }).getByRole('link', { name: HERO.primary, exact: true })
 const withFigure = (page: Page) => page.getByTestId('hero-with')
 const withoutFigure = (page: Page) => page.getByTestId('hero-without')
 
@@ -89,13 +91,14 @@ test.describe('Landing', () => {
     await openApp(page, '/')
     await expect(widget(page)).toHaveAttribute('data-state', 'recorded')
     await expect(page.getByTestId('hero-aside')).toHaveText(WIDGET.recordedAside)
-    await expect(widget(page)).toContainText('No. 000008')
+    await expect(widget(page)).toContainText(/No\.\s8\b/)
     await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, EQTY')
     await expect(page.getByTestId('hero-meta')).toHaveText('This option covered 5.00 EQTY for 1.00 USDx (0.20 per unit), paid once to the maker.')
     await expect(page.getByTestId('hero-source')).toHaveText('Exercised at ledger 5,390,522. The maker had locked 50.00 USDx in the contract.')
     // The recorded put: 5.00 EQTY, floor 10.00, premium 1.00. At 8.00 that is 49.00 with the put and 40.00 without.
-    await expect(withFigure(page)).toHaveText('49.00 USDx')
-    await expect(withoutFigure(page)).toHaveText('40.00 USDx')
+    // Each figure is an Amount: its spoken text comes first, then the figure and its unit as drawn.
+    await expect(withFigure(page)).toHaveText(/^49\.00\sUSDx/)
+    await expect(withoutFigure(page)).toHaveText(/^40\.00\sUSDx/)
 
     // The page asks for the lazy chunk by itself, after load and idle. Nothing heavy came before it.
     await expect.poll(() => requests.some((url) => url.includes('/landing/live/LiveBook'))).toBe(true)
@@ -106,9 +109,10 @@ test.describe('Landing', () => {
     // "Mock data" is said once on the page, on the note it describes; the source line ends at what is locked.
     await expect(page.getByTestId('hero-aside')).toHaveText(WIDGET.openAsideMock)
     expect(await countPainted(page, 'Mock data')).toBe(1)
-    await expect(widget(page)).toContainText(/Offer No\. \d{6}/)
-    await expect(page.getByTestId('hero-source')).toHaveText(/^Maker\s*\S+ locked [\d,.]+ USDx\.$/)
-    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+ FUND for [\d,.]+ USDx \([\d,.]+ per unit\), paid once to the maker\.$/)
+    await expect(widget(page)).toContainText(/Offer No\.\s\d+/)
+    // A figure and its unit are joined by a no-break space: the patterns below say \s there.
+    await expect(page.getByTestId('hero-source')).toHaveText(/^Maker\s*\S+ locked [\d,.]+\sUSDx\.$/)
+    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+\sFUND for [\d,.]+\sUSDx \([\d,.]+ per unit\), paid once to the maker\.$/)
     await expectAnnounced(page, WIDGET.announceOpen)
     // Only now was the (mock) chain client loaded.
     expect(requests.some((url) => /mockClient/.test(url))).toBe(true)
@@ -148,7 +152,7 @@ test.describe('Landing', () => {
     await expect(handle).toHaveAttribute('aria-valuenow', price ?? '')
 
     // Leaving the note lets it show the open offer, without the "print" of a confirmed trade.
-    await page.getByRole('link', { name: HERO.primary }).focus()
+    await heroPrimary(page).focus()
     await expect(widget(page)).toHaveAttribute('data-state', 'open')
     await expect(widget(page)).not.toHaveAttribute('data-held', /.*/)
     await expect(widget(page).locator('article')).not.toHaveAttribute('data-printing', /.*/)
@@ -172,7 +176,7 @@ test.describe('Landing', () => {
     await expect(handle).toHaveAttribute('aria-valuenow', (await handle.getAttribute('aria-valuemax')) ?? '')
     expect(await withFigure(page).innerText()).not.toBe(before.with)
     await expect(widget(page)).toContainText('less with the put')
-    await expect(handle).toHaveAttribute('aria-valuetext', /With the put [\d,.]+ USDx\. Without [\d,.]+ USDx\./)
+    await expect(handle).toHaveAttribute('aria-valuetext', /With the put [\d,.]+\sUSDx\. Without [\d,.]+\sUSDx\./)
 
     // Page Up and Page Down move ten steps; Home goes to the bottom of the range.
     await page.keyboard.press('Home')
@@ -183,16 +187,16 @@ test.describe('Landing', () => {
   test('the three inputs change the offer the note shows', async ({ page }) => {
     await openLanding(page)
     const terms = widget(page).getByRole('group', { name: WIDGET.termsLabel })
-    const asset = terms.getByLabel(WIDGET.hold)
-    const floor = terms.getByLabel(WIDGET.floor)
-    const until = terms.getByLabel(WIDGET.until)
+    const asset = terms.getByLabel(WIDGET.hold, { exact: true })
+    const floor = terms.getByLabel(WIDGET.floor, { exact: true })
+    const until = terms.getByLabel(WIDGET.until, { exact: true })
     await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, FUND')
-    // "I hold" picks the asset, and shows the asset; the lot is said in the line under the terms.
+    // "Asset" picks the asset, and shows its code; the lot is said in the line under the terms.
     await expect(asset.locator('..')).toContainText('FUND')
-    await expect(page.getByTestId('hero-meta')).toContainText(/covers [\d,.]+ FUND/)
+    await expect(page.getByTestId('hero-meta')).toContainText(/covers [\d,.]+\sFUND/)
     // Each floor and each deadline says which lot it would show.
-    await expect(floor.locator('option').first()).toHaveText(/, for [\d,.]+ FUND$/)
-    await expect(until.locator('option').first()).toHaveText(/, for [\d,.]+ FUND$/)
+    await expect(floor.locator('option').first()).toHaveText(/, for [\d,.]+\sFUND$/)
+    await expect(until.locator('option').first()).toHaveText(/, for [\d,.]+\sFUND$/)
     const serial = () => widget(page).locator('p', { hasText: /Offer No\./ }).first().innerText()
     const first = await serial()
 
@@ -217,12 +221,12 @@ test.describe('Landing', () => {
     // Another asset starts from that asset's own default terms.
     await asset.selectOption({ label: 'BOND, bond' })
     await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, BOND')
-    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+ BOND for [\d,.]+ USDx \([\d,.]+ per unit\), paid once to the maker\.$/)
+    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+\sBOND for [\d,.]+\sUSDx \([\d,.]+ per unit\), paid once to the maker\.$/)
   })
 
   test('"Open this offer" opens the asset page with the ticket on that offer', async ({ page }) => {
     await openLanding(page)
-    const id = Number(((await widget(page).innerText()).match(/Offer No\. (\d{6})/) ?? [])[1])
+    const id = Number(((await widget(page).innerText()).match(/Offer No\.\s(\d+)/) ?? [])[1])
     await widget(page).getByRole('link', { name: WIDGET.open }).click()
     await expect(page).toHaveURL((url) => url.pathname === '/markets/fund')
     const url = new URL(page.url())
@@ -230,9 +234,9 @@ test.describe('Landing', () => {
     expect(url.searchParams.get('offer')).toBe(String(id))
   })
 
-  test('"Try it on Testnet" and "Open app" lead into the app', async ({ page }) => {
+  test('"Open the markets" and "Open app" lead into the app', async ({ page }) => {
     await openLanding(page)
-    await page.getByRole('link', { name: HERO.primary }).click()
+    await heroPrimary(page).click()
     // With an open offer in the note, the guided flow opens on the same asset and terms.
     await expect(page).toHaveURL((url) => url.pathname === '/markets/fund')
     const guided = new URL(page.url()).searchParams
@@ -249,10 +253,10 @@ test.describe('Landing', () => {
     await expect(page.locator('footer.shell-footer')).toBeVisible()
   })
 
-  test('before an offer is read, "Try it on Testnet" opens Markets on the floor intent', async ({ page }) => {
+  test('before an offer is read, "Open the markets" opens Markets on the floor intent', async ({ page }) => {
     await page.route(LIVE_CHUNK, () => {})
     await openApp(page, '/')
-    await page.getByRole('link', { name: HERO.primary }).click()
+    await heroPrimary(page).click()
     expect(await currentPath(page)).toBe('/markets?intent=floor')
   })
 
@@ -275,33 +279,47 @@ test.describe('Landing', () => {
     }
   })
 
-  test('the sections are there, in order, with the Limits table', async ({ page }) => {
+  test('the sections are there, in order, with the Limits list', async ({ page }) => {
     await openLanding(page)
+    // No eyebrow above the headline: the headline is the first text of the hero.
+    const heroText = await page.locator('#hero-heading').evaluate((h1) => (h1.parentElement?.firstElementChild === h1 ? 'h1 first' : 'something above the h1'))
+    expect(heroText).toBe('h1 first')
+    // The closing has no heading of its own: the last section heading is Limits.
     const sections = await page.locator('main h2').evaluateAll((els) => els.map((el) => (el.textContent ?? '').trim()))
-    expect(sections).toEqual(['Long put, FUND', 'What you can do', 'What is different', 'How it works', 'Proof', 'Margin', 'Limits', 'Try a put.'])
+    expect(sections).toEqual(['Long put, FUND', 'What you can do', 'What is different', 'How it works', 'Proof', 'Margin', 'Limits'])
 
-    // The three intents, named as everywhere else in the app.
-    for (const name of ['Set a floor', 'Earn on what you hold', 'Earn while waiting to buy']) {
-      await expect(page.locator('#what-you-can-do').getByRole('heading', { level: 3, name, exact: true })).toBeVisible()
+    // The three intents, named as everywhere else in the app. Each name is the link into Markets on that intent.
+    const intents = page.locator('#what-you-can-do')
+    for (const [name, intent] of [
+      ['Set a floor', 'floor'],
+      ['Earn on what you hold', 'earn-hold'],
+      ['Earn while waiting to buy', 'earn-buy'],
+    ] as const) {
+      await expect(intents.getByRole('heading', { level: 3, name: new RegExp(`^${name}`) })).toBeVisible()
+      await expect(intents.getByRole('heading', { level: 3, name: new RegExp(`^${name}`) })).toHaveText(name)
+      await expect(intents.getByRole('link', { name: `${name}${INTENTS.linkContext}`, exact: true })).toHaveAttribute('href', `/markets?intent=${intent}`)
     }
-    // Five rows, each saying who acts. The deadline row is the other branch of the exercise: it carries "or".
+    await expect(intents.getByRole('link')).toHaveCount(3)
+    await expect(intents).not.toContainText('Choose an asset')
+
+    // Five rows. Each title names who acts; there is no "Who acts" column. The deadline row is the other branch of
+    // the exercise: it carries "or".
     const steps = page.getByRole('list', { name: /steps of an option/ }).getByRole('listitem')
     await expect(steps).toHaveCount(5)
-    await expect(steps.nth(2)).toContainText('The holder')
+    await expect(page.locator('#how-it-works')).not.toContainText('Who acts')
+    await expect(steps.nth(2).getByRole('heading', { level: 3 })).toHaveText('Step 3: The holder exercises')
     await expect(steps.nth(3).getByRole('heading', { level: 3 })).toHaveText('Step 3, or: The deadline passes')
     await expect(steps.nth(4).getByRole('heading', { level: 3 })).toHaveText('Step 4: The maker collects')
     // One transaction link per step, nothing under it; no state tags.
     await expect(page.locator('#how-it-works')).not.toContainText('Fee ')
     await expect(page.locator('#how-it-works')).not.toContainText('State after')
 
-    const limits = page.getByRole('table', { name: LIMITS.tableCaption })
+    // Limits: one ruled list of sentences, no table and no column heads.
+    const limits = page.getByTestId('limits-list')
     await expect(limits).toBeVisible()
-    await expect(limits.getByRole('columnheader')).toHaveText([LIMITS.exists, LIMITS.missing])
-    await expect(limits.getByRole('row')).toHaveCount(LIMITS.rows.length + 1)
-    await expect(limits).toContainText('The contracts are tested in CI.')
-    await expect(limits).toContainText('No independent auditor has reviewed them.')
-    await expect(limits).toContainText('Nothing is exercised for you.')
-    await expect(limits).toContainText('It cannot stop the issuer from freezing an account or clawing tokens back.')
+    await expect(page.locator('#limits table, #limits th')).toHaveCount(0)
+    await expect(limits.getByRole('listitem')).toHaveText(LIMITS.items.map((item) => item.text))
+    await expect(page.locator('#limits')).not.toContainText('What exists')
 
     // Proof: eight claims, one piece of evidence each.
     const proof = page.getByRole('table', { name: PROOF.tableCaption })
@@ -334,8 +352,8 @@ test.describe('Landing', () => {
     expect(await countPainted(page, PAYOFF_CAPTION)).toBe(2)
     await expect(page.locator('figcaption', { hasText: /Fig\. \d/ })).toHaveCount(0)
 
-    // The network is named where the visitor acts on it: the hero's button (and the Limits row, in words).
-    expect(await countPainted(page, 'Testnet')).toBe(1)
+    // A mock build names no network: the status line that names it is on a chain build only.
+    expect(await countPainted(page, 'Testnet')).toBe(0)
 
     // The footer is the app's legal footer: the copyright line and the notice of this build (a mock build here),
     // once each.
@@ -353,8 +371,10 @@ test.describe('Landing', () => {
 
   test('the closing line links "a few test tokens" to the steps for getting them', async ({ page }) => {
     await openLanding(page)
-    const link = page.locator('#closing-heading').locator('..').getByRole('link', { name: 'a few test tokens' })
-    await expect(link).toHaveAttribute('href', '/markets?funds=1')
+    const closing = page.getByTestId('landing-closing')
+    await expect(closing.getByRole('heading')).toHaveCount(0)
+    await expect(closing.getByRole('link', { name: CLOSING.bodyLink })).toHaveAttribute('href', '/markets?funds=1')
+    await expect(closing.getByRole('link', { name: CLOSING.primary })).toHaveAttribute('href', '/markets')
   })
 
   test('is accessible in both themes, with the recorded example and with an open offer', async ({ page }) => {
@@ -378,12 +398,12 @@ test.describe('Landing', () => {
 
     // From the main landmark: the two hero actions, then the three inputs, then the price handle.
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('link', { name: HERO.primary })).toBeFocused()
+    await expect(heroPrimary(page)).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: new RegExp(`^${HERO.secondary}`) })).toBeFocused()
     for (const label of [WIDGET.hold, WIDGET.floor, WIDGET.until]) {
       await page.keyboard.press('Tab')
-      const field = widget(page).getByLabel(label)
+      const field = widget(page).getByLabel(label, { exact: true })
       await expect(field).toBeFocused()
       // The select itself is invisible: the ring is drawn on the typeset term around it.
       const ring = await field.evaluate((el) => getComputedStyle(el.parentElement as Element).boxShadow)
@@ -412,11 +432,12 @@ test.describe('Landing on a phone @phone', () => {
       page.getByRole('link', { name: NAV.openApp }),
       nav.getByRole('link', { name: NAV.lifecycle }),
       nav.getByRole('link', { name: NAV.limits }),
-      page.getByRole('link', { name: HERO.primary }),
-      widget(page).getByLabel(WIDGET.hold),
-      widget(page).getByLabel(WIDGET.floor),
-      widget(page).getByLabel(WIDGET.until),
+      heroPrimary(page),
+      widget(page).getByLabel(WIDGET.hold, { exact: true }),
+      widget(page).getByLabel(WIDGET.floor, { exact: true }),
+      widget(page).getByLabel(WIDGET.until, { exact: true }),
       widget(page).getByRole('link', { name: WIDGET.open }),
+      page.locator('#what-you-can-do').getByRole('link').first(),
     ]
     for (const target of targets) {
       const box = await target.boundingBox()

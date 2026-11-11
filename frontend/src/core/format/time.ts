@@ -3,8 +3,11 @@
 // The canonical form is UTC, `13 Nov 2026, 08:00 UTC`; local time is secondary. Expiry is decided by ledger close
 // time on chain, so every countdown here is an estimate from the wall clock and floors (it never shows more time
 // than is left).
+//
+// A date, a time or a duration never breaks inside (ruling F7): every space within `13 Nov 2026`, `08:00 UTC` and
+// `3 h 12 min` is a no-break space (U+00A0). The only place a line may break is after the comma of the full form.
 
-import { NO_VALUE } from './amount'
+import { NBSP, NO_VALUE } from './amount'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
@@ -19,31 +22,31 @@ function utc(ts: number): Date | null {
 /** `13 Nov 2026, 08:00 UTC` for unix seconds. The canonical form of every deadline. */
 export function formatUtc(ts: number): string {
   const d = utc(ts)
-  return d ? `${formatUtcDate(ts)}, ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC` : NO_VALUE
+  return d ? `${formatUtcDate(ts)}, ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}${NBSP}UTC` : NO_VALUE
 }
 
 /** `13 Nov 2026` (UTC day). */
 export function formatUtcDate(ts: number): string {
   const d = utc(ts)
-  return d ? `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` : NO_VALUE
+  return d ? `${d.getUTCDate()}${NBSP}${MONTHS[d.getUTCMonth()]}${NBSP}${d.getUTCFullYear()}` : NO_VALUE
 }
 
 /** `13 Nov` (UTC day), for expiry tabs and chips where the year is clear from context. */
 export function formatUtcDay(ts: number): string {
   const d = utc(ts)
-  return d ? `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}` : NO_VALUE
+  return d ? `${d.getUTCDate()}${NBSP}${MONTHS[d.getUTCMonth()]}` : NO_VALUE
 }
 
 /** `08:00 UTC`. */
 export function formatUtcTime(ts: number): string {
   const d = utc(ts)
-  return d ? `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC` : NO_VALUE
+  return d ? `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}${NBSP}UTC` : NO_VALUE
 }
 
 /** `13:45:12 UTC`, to the second: when a read was made or until when a transaction can still be included. */
 export function formatUtcClock(ts: number): string {
   const d = utc(ts)
-  return d ? `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())} UTC` : NO_VALUE
+  return d ? `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())}${NBSP}UTC` : NO_VALUE
 }
 
 /**
@@ -90,7 +93,7 @@ export function formatLocal(ts: number, timeZone?: string): string {
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? ''
   const month = MONTHS[Number(get('month')) - 1] ?? ''
   const zone = zoneLabel(get('timeZoneName'))
-  return `${Number(get('day'))} ${month} ${get('year')}, ${get('hour')}:${get('minute')}${zone ? ` ${zone}` : ''}`
+  return `${Number(get('day'))}${NBSP}${month}${NBSP}${get('year')}, ${get('hour')}:${get('minute')}${zone ? `${NBSP}${zone}` : ''}`
 }
 
 /** Whole seconds from `nowSec` to `expiryTs`. Negative once the deadline has passed. */
@@ -99,7 +102,8 @@ export function secondsUntil(expiryTs: number, nowSec: number): number {
 }
 
 /**
- * Time left as `2 d 4 h`, `3 h 12 min`, `8 min`, `<1 min`; `expired` at zero or below.
+ * Time left as `2 d 4 h`, `3 h 12 min`, `8 min`, `<1 min`; `expired` at zero or below. Every space is a no-break
+ * space, so a duration stays on one line (ruling F7).
  * Floors every unit, drops a zero second unit (`2 d`, `3 h`) and drops hours from ten days up (`45 d`).
  */
 export function formatCountdown(secondsLeft: number): string {
@@ -108,6 +112,10 @@ export function formatCountdown(secondsLeft: number): string {
   const d = Math.floor(s / 86_400)
   const h = Math.floor((s % 86_400) / 3_600)
   const m = Math.floor((s % 3_600) / 60)
+  return countdownWords(d, h, m).replaceAll(' ', NBSP)
+}
+
+function countdownWords(d: number, h: number, m: number): string {
   if (d >= 10) return `${d} d`
   if (d > 0) return h > 0 ? `${d} d ${h} h` : `${d} d`
   if (h > 0) return m > 0 ? `${h} h ${m} min` : `${h} h`

@@ -10,14 +10,16 @@ import { requiredCollateral } from '../../core/options/types'
 import { claimAmount } from '../../core/portfolio/positions'
 import type { Bid } from '../../core/requests/types'
 import { bidSubject, optionSubject, useSubjectBusy, useTxBusy } from '../../data'
-import type { TodoView } from '../../data'
+import type { TodoView, UnsettledTx } from '../../data'
 import { Amount, Button, Countdown, DateTime, IconWarning } from '../../ui'
-import { BUSY_REASON, CANCEL_REQUEST, LAST_MINUTES_NOTE, SHORT_LINE, TODO_HEADING, VIEW_POSITION, exerciseCover, expiredRequestCopy, todoCopy } from './copy'
+import { CANCEL_REQUEST, LAST_MINUTES_NOTE, NOTE_TERMS, SHORT_LINE, TODO_HEADING, VIEW_POSITION, exerciseCover, expiredRequestCopy, todoCopy } from './copy'
 import type { TodoCopy } from './copy'
 import { isShort } from './hooks'
 import { PositionLink, ReservesLink } from './links'
 import { ACTION_NAME, exerciseShortOf, optionPhrase, showsCard } from './model'
 import type { PositionAction } from './model'
+import { UnsettledAction } from './Unsettled'
+import { unsettledOn, waitReason } from './waiting'
 import css from './TodoStrip.module.css'
 
 const HOURS_48 = 48 * 3_600_000
@@ -32,6 +34,8 @@ export interface TodoStripProps {
   balances?: Readonly<Record<string, { balance: bigint | null }>>
   onAction: (option: OptionOffer, action: PositionAction) => void
   onCancelRequest: (bid: Bid) => void
+  /** An earlier transaction of the wallet whose outcome is unknown: its card shows so, the other cards' actions wait. */
+  unsettled?: UnsettledTx | null
 }
 
 function ShortLine({ token }: { token: TokenInfo }) {
@@ -44,21 +48,23 @@ function ShortLine({ token }: { token: TokenInfo }) {
   )
 }
 
-function OptionButton({ t, action, primary, onAction }: { t: TodoView; action: PositionAction; primary: boolean; onAction: TodoStripProps['onAction'] }) {
+function OptionButton({ t, action, primary, onAction, unsettled }: { t: TodoView; action: PositionAction; primary: boolean; onAction: TodoStripProps['onAction']; unsettled?: UnsettledTx | null }) {
   const working = useSubjectBusy(optionSubject(t.option.id))
   const busy = useTxBusy()
+  const wait = waitReason(busy, working, unsettled)
   return (
-    <Button variant={primary ? 'primary' : 'secondary'} loading={working} disabled={busy && !working} disabledReason={BUSY_REASON} onClick={() => onAction(t.option, action)}>
+    <Button variant={primary ? 'primary' : 'secondary'} loading={working} disabled={wait.disabled} disabledReason={wait.reason} onClick={() => onAction(t.option, action)}>
       {ACTION_NAME[action]}
     </Button>
   )
 }
 
-function RequestButton({ b, primary, onCancel }: { b: Bid; primary: boolean; onCancel: (bid: Bid) => void }) {
+function RequestButton({ b, primary, onCancel, unsettled }: { b: Bid; primary: boolean; onCancel: (bid: Bid) => void; unsettled?: UnsettledTx | null }) {
   const working = useSubjectBusy(bidSubject(b.id))
   const busy = useTxBusy()
+  const wait = waitReason(busy, working, unsettled)
   return (
-    <Button variant={primary ? 'primary' : 'secondary'} loading={working} disabled={busy && !working} disabledReason={BUSY_REASON} onClick={() => onCancel(b)}>
+    <Button variant={primary ? 'primary' : 'secondary'} loading={working} disabled={wait.disabled} disabledReason={wait.reason} onClick={() => onCancel(b)}>
       {CANCEL_REQUEST}
     </Button>
   )
@@ -75,15 +81,20 @@ function Card({ copy, tone, testId, children, action }: { copy: TodoCopy; tone: 
   )
 }
 
-function OptionCard({ t, primary, short, balances, onAction }: { t: TodoView; primary: boolean; short: readonly TokenInfo[]; balances?: TodoStripProps['balances']; onAction: TodoStripProps['onAction'] }) {
+type OptionCardProps = { t: TodoView; primary: boolean; short: readonly TokenInfo[]; balances?: TodoStripProps['balances']; onAction: TodoStripProps['onAction']; unsettled?: UnsettledTx | null }
+
+function OptionCard({ t, primary, short, balances, onAction, unsettled }: OptionCardProps) {
   const copy = todoCopy(t)
   const o = t.option
   const uncovered = t.kind === 'exercise' ? exerciseShortOf(o, balances) : null
   const value = t.kind === 'exercise' && t.moneyness === 'in' && t.reference ? t.exerciseValue : null
   // The token the contract pays out: an exercise and a reclaim pay the collateral, a claim what the exercise left.
   const payout = t.kind === 'claim' ? claimAmount(o).token : t.kind === 'reclaim' || t.kind === 'exercise' ? requiredCollateral(o).token : null
-  const action = copy.action ? (
-    <OptionButton t={t} action={copy.action} primary={primary} onAction={onAction} />
+  const own = unsettledOn(unsettled, optionSubject(o.id))
+  const action = own ? (
+    <UnsettledAction unsettled={own} size="md" />
+  ) : copy.action ? (
+    <OptionButton t={t} action={copy.action} primary={primary} onAction={onAction} unsettled={unsettled} />
   ) : (
     <PositionLink id={o.id} className={css.link} aria-label={`${VIEW_POSITION}: ${copy.title}`}>
       {VIEW_POSITION}
@@ -92,10 +103,14 @@ function OptionCard({ t, primary, short, balances, onAction }: { t: TodoView; pr
   return (
     <Card copy={copy} tone={t.tone === 'urgent' ? 'urgent' : copy.action ? 'action' : 'quiet'} testId={`todo-${t.kind}-${o.id}`} action={action}>
       {value !== null && value > 0n ? (
-        <p className={css.value}>
-          <span className={css.valueLabel}>Exercise value</span>
-          <Amount value={formatUnits(value, o.quote.decimals)} exact={formatExact(value, o.quote.decimals)} unit={o.quote.code} direction="gain" figure="serif" />
-        </p>
+        // What exercising is worth at the reference, drawn as a value, not as a gain: the premium is not counted.
+        <div className={css.value}>
+          <p className={css.valueRow}>
+            <span className={css.valueLabel}>{NOTE_TERMS.exerciseValue}</span>
+            <Amount value={formatUnits(value, o.quote.decimals)} exact={formatExact(value, o.quote.decimals)} unit={o.quote.code} figure="serif" />
+          </p>
+          <p className={css.valueHint}>{NOTE_TERMS.exerciseValueHint}</p>
+        </div>
       ) : null}
       {uncovered ? <p className={css.short}>{exerciseCover(o, uncovered.have, uncovered.need)}</p> : null}
       {t.kind === 'exercise' && t.urgency === 'within15min' ? (
@@ -117,17 +132,19 @@ function OptionCard({ t, primary, short, balances, onAction }: { t: TodoView; pr
   )
 }
 
-function RequestCard({ b, primary, short, onCancel }: { b: Bid; primary: boolean; short: readonly TokenInfo[]; onCancel: (bid: Bid) => void }) {
+function RequestCard({ b, primary, short, onCancel, unsettled }: { b: Bid; primary: boolean; short: readonly TokenInfo[]; onCancel: (bid: Bid) => void; unsettled?: UnsettledTx | null }) {
   const premium = { token: b.quote, amount: b.totalPremium }
   const copy = expiredRequestCopy(premium, optionPhrase(b))
+  const own = unsettledOn(unsettled, bidSubject(b.id))
+  const action = own ? <UnsettledAction unsettled={own} size="md" /> : <RequestButton b={b} primary={primary} onCancel={onCancel} unsettled={unsettled} />
   return (
-    <Card copy={copy} tone="action" testId={`todo-request-${b.id}`} action={<RequestButton b={b} primary={primary} onCancel={onCancel} />}>
+    <Card copy={copy} tone="action" testId={`todo-request-${b.id}`} action={action}>
       {isShort(b.quote, short) ? <ShortLine token={b.quote} /> : null}
     </Card>
   )
 }
 
-export function TodoStrip({ items, expiredRequests, short, balances, onAction, onCancelRequest }: TodoStripProps) {
+export function TodoStrip({ items, expiredRequests, short, balances, onAction, onCancelRequest, unsettled }: TodoStripProps) {
   const cards = items.filter(showsCard)
   if (cards.length === 0 && expiredRequests.length === 0) return null
   // Real actions first (in-the-money exercises, claims, reclaims, then expired requests), the quiet reminders last.
@@ -142,13 +159,13 @@ export function TodoStrip({ items, expiredRequests, short, balances, onAction, o
       </h2>
       <ul className={css.list}>
         {acting.map((t, i) => (
-          <OptionCard key={t.key} t={t} primary={i === 0} short={short} balances={balances} onAction={onAction} />
+          <OptionCard key={t.key} t={t} primary={i === 0} short={short} balances={balances} onAction={onAction} unsettled={unsettled} />
         ))}
         {expiredRequests.map((b) => (
-          <RequestCard key={`request:${b.id}`} b={b} primary={b.id === primaryRequest} short={short} onCancel={onCancelRequest} />
+          <RequestCard key={`request:${b.id}`} b={b} primary={b.id === primaryRequest} short={short} onCancel={onCancelRequest} unsettled={unsettled} />
         ))}
         {quiet.map((t) => (
-          <OptionCard key={t.key} t={t} primary={false} short={short} balances={balances} onAction={onAction} />
+          <OptionCard key={t.key} t={t} primary={false} short={short} balances={balances} onAction={onAction} unsettled={unsettled} />
         ))}
       </ul>
     </section>

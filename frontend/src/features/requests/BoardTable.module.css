@@ -14,69 +14,69 @@
 
   /*
    * Fixed columns, sized for their longest expected content at 1200 px (the narrowest width the table is shown at),
-   * so nothing moves when the wallet connects or a figure changes. The cells keep 8 px of side padding to fit.
+   * so nothing moves when the wallet connects or a figure changes. The cells keep the kit's padding.
    */
-  .table {
-    --cell-px: var(--s-8);
-  }
-
   .colAsset {
-    width: 12%;
+    width: 12.5%;
   }
 
   .colKind {
-    width: 6%;
-  }
-
-  .colQty {
-    width: 10.5%;
+    width: 8%;
   }
 
   .colStrike {
-    width: 10%;
+    width: 11.5%;
+  }
+
+  .colQty {
+    width: 11%;
   }
 
   .colDeadline {
-    width: 15%;
+    width: 17%;
   }
 
   .colPremium {
-    width: 12.5%;
-  }
-
-  .colLock {
-    width: 11%;
+    width: 13%;
   }
 
   .colBuyer {
-    width: 11%;
+    width: 14%;
   }
 
   .colAction {
-    width: 12.5%;
+    width: 13%;
   }
 
-  /* My requests has no collateral or buyer column: the state and its one action take the room. */
+  /* My requests: the state and its one line ("Premium still in the contract") take the buyer's room and more. */
+  .colState {
+    width: 21%;
+  }
+
   .table[data-variant='mine'] {
     & .colAsset {
-      width: 11%;
+      width: 11.5%;
+    }
+
+    & .colKind {
+      width: 7.5%;
+    }
+
+    & .colStrike {
+      width: 10.5%;
     }
 
     & .colQty {
       width: 10%;
     }
 
-    & .colPremium {
-      width: 11%;
+    & .colDeadline {
+      width: 16%;
     }
-  }
 
-  .colState {
-    width: 17.5%;
-  }
-
-  .colActionMine {
-    width: 19%;
+    & .colPremium {
+      width: 10.5%;
+    }
   }
 
   .asset {
@@ -92,16 +92,6 @@
     line-height: var(--ui-line);
     font-weight: 600;
     color: var(--text);
-  }
-
-  .serial {
-    display: block;
-    font-family: var(--font-mono);
-    font-size: var(--mono-size);
-    line-height: var(--mono-line);
-    font-weight: 400;
-    font-feature-settings: 'zero';
-    color: var(--muted);
   }
 
   .kind {
@@ -120,9 +110,16 @@
     &[data-align='end'] {
       align-items: flex-end;
     }
+
+    &[data-align='center'] {
+      align-items: center;
+    }
   }
 
-  /* A caption line keeps one height, also when it carries the clock of a countdown, so rows stay even. */
+  /*
+   * A caption line keeps one height, also when it carries the clock of a countdown, so rows stay even. It is set in
+   * the sans whatever its cell (the strike cell is serif).
+   */
   .sub,
   .warn,
   .stranded {
@@ -130,6 +127,7 @@
     align-items: center;
     gap: var(--s-4);
     height: var(--caption-line);
+    font-family: var(--font-sans);
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     font-weight: 400;
@@ -142,8 +140,8 @@
   }
 
   /*
-   * The two warnings in words (15 minutes left, a wallet short of collateral) may take two lines in a narrow
-   * column: then they run as text, the glyph on the first line.
+   * The warnings in words (15 minutes left, a premium still in the contract) may take two lines in a narrow column:
+   * then they run as text, the glyph on the first line.
    */
   .wraps {
     display: block;
@@ -170,10 +168,6 @@
     & svg {
       color: var(--warn);
     }
-  }
-
-  .none {
-    color: var(--muted);
   }
 
   /* Cancelled and returned requests, shown on request: secondary ink. */

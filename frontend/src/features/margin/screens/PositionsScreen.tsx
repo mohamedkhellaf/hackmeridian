@@ -10,7 +10,7 @@ import { Button, Callout, EmptyNote, IconInfo, KeyValue, KeyValueItem, Link, Pop
 import type { TagAppearance, TimelineItem } from '../../../ui'
 import { AFTER_EXPIRY_STEPS, EARLY_EXERCISE_REFUSALS, REFUSAL_SHORT } from '../copy'
 import { QUOTE, lots, usdx } from '../model/money'
-import { contractTitle, partyName } from '../model/names'
+import { contractTitle, numbered, partyName } from '../model/names'
 import { oracleView, spanText } from '../model/oracle'
 import { callPayout } from '../model/payout'
 import { expiredSeries } from '../model/settlement'
@@ -21,8 +21,10 @@ import type { DeskColumn } from '../parts/DeskTable'
 import { NoValue, Sub, Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
 import type { ResultView } from '../parts/marginUi'
+import { RunsFirst } from '../parts/RunsFirst'
 import { Section } from '../parts/Section'
 import { useLast } from '../parts/useLast'
+import { useReplayable } from '../parts/useReplayable'
 import css from './PositionsScreen.module.css'
 
 const PHASE_LOOK: Record<Phase, TagAppearance> = {
@@ -91,12 +93,13 @@ const settleVaultWhat = (v: { shortfall: bigint; vaultPaid: bigint; deficit: big
 })
 
 /**
- * Every Margin position with the call that moves it on. While live: early exercise. After expiry, a block per
- * series carries the two calls anyone can make (settle the books, settle the series), and each row its claim.
+ * Every Margin position with the call that moves it on. While live: early exercise. After the deadline, a block
+ * per series carries the two calls anyone can make (settle the books, settle the series), and each row its claim.
  */
 export function PositionsScreen() {
   const { client, model, me, simulated, busy } = usePro()
   const { act, canAct, connect } = useMarginUi()
+  const replay = useReplayable()
   const [exercising, setExercising] = useState<PositionRow | null>(null)
   const [chosenScope, setScope] = useState<Scope | null>(null)
   const oracle = oracleView(model)
@@ -153,6 +156,8 @@ export function PositionsScreen() {
     if (other && !simulated) return <span className={css.waiting}>Holder only</span>
     const name = `${a.label}, position ${p.id}${other ? `, as ${partyName(p.holder)}` : ''}`
     const expected = a.kind === 'exercise' ? expectedRefusals(row, oracle.exerciseOpen, writerBelow(row)) : []
+    // A claim runs at once: the steps it replays first are said beside it. An exercise says so in its dialog.
+    const claimStep = a.kind === 'exercise' ? null : replay.next('claim', (args) => args[0] === p.holder && args[1] === p.id)
     return (
       <span className={css.act}>
         <span className={css.actRow}>
@@ -172,6 +177,7 @@ export function PositionsScreen() {
             ) : null}
           </span>
         ) : null}
+        <RunsFirst step={claimStep} />
       </span>
     )
   }
@@ -196,7 +202,7 @@ export function PositionsScreen() {
       cell: (r) => (
         <>
           {r.position.bookOwner ? <Who id={r.position.bookOwner} me={me} /> : <NoValue />}
-          {r.settlesAtExpiry ? <span className={css.hint}>Settles at expiry</span> : null}
+          {r.settlesAtExpiry ? <span className={css.hint}>Settles at the deadline</span> : null}
         </>
       ),
     },
@@ -228,54 +234,44 @@ export function PositionsScreen() {
   const snap = target?.series?.snapshot ?? null
   const pays = target && snap && target.series ? callPayout(target.position.qty, snap.spot, target.series.strike) : null
   const writerCash = target ? model.accounts.find((a) => a.id === target.position.bookOwner)?.cash : undefined
+  // In the replay the acting account can run another holder's exercise: the payout row then names that holder.
+  const holderIsMe = target !== null && target.position.holder === me
+  const exerciseStep = target ? replay.next('exercise', (args) => args[0] === target.position.holder && args[1] === target.position.id) : null
 
   return (
     <div className={css.root}>
-      {expired.length > 0 ? (
-        <Section title="After expiry" note={AFTER_EXPIRY_STEPS.anyone}>
-          <div className={css.expired}>
-            {expired.map((e) => (
-              <SettleBlock key={e.series.id} e={e} />
-            ))}
-          </div>
-        </Section>
-      ) : null}
-
-      <Section
-        title="Positions"
-        aside={
-          <>
-            {me !== '' && all.length > 0 ? (
-              <Segmented
-                label="Positions shown"
-                size="sm"
-                value={scope}
-                onValueChange={(v) => setScope(v)}
-                options={[
-                  { value: 'yours', label: 'Yours', count: mine.length },
-                  { value: 'all', label: 'All', count: all.length },
-                ]}
-              />
-            ) : all.length > 0 ? (
-              <span>{countOf(all.length, { one: 'position', other: 'positions' })}</span>
-            ) : null}
-            <Popover
-              title="When early exercise is refused"
-              trigger={
-                <Button size="sm" variant="quiet" iconStart={<IconInfo />}>
-                  When early exercise is refused
-                </Button>
-              }
-            >
-              <ul className={css.reasons}>
-                {EARLY_EXERCISE_REFUSALS.map((code) => (
-                  <RefusalLine key={code} code={code} />
-                ))}
-              </ul>
-            </Popover>
-          </>
-        }
-      >
+      {/* The page heading already says Positions: the table comes first, with no second heading of the same word. */}
+      <div className={css.positions}>
+        <div className={css.tools}>
+          {me !== '' && all.length > 0 ? (
+            <Segmented
+              label="Positions shown"
+              size="sm"
+              value={scope}
+              onValueChange={(v) => setScope(v)}
+              options={[
+                { value: 'yours', label: 'Yours', count: mine.length },
+                { value: 'all', label: 'All', count: all.length },
+              ]}
+            />
+          ) : all.length > 0 ? (
+            <span className={css.count}>{countOf(all.length, { one: 'position', other: 'positions' })}</span>
+          ) : null}
+          <Popover
+            title="When early exercise is refused"
+            trigger={
+              <Button size="sm" variant="quiet" iconStart={<IconInfo />}>
+                When early exercise is refused
+              </Button>
+            }
+          >
+            <ul className={css.reasons}>
+              {EARLY_EXERCISE_REFUSALS.map((code) => (
+                <RefusalLine key={code} code={code} />
+              ))}
+            </ul>
+          </Popover>
+        </div>
         <DeskTable
           caption="Margin positions"
           columns={columns}
@@ -283,13 +279,23 @@ export function PositionsScreen() {
           rowKey={(r) => r.position.id}
           empty={
             all.length > 0 ? (
-              <EmptyNote size="sm" title={`${partyName(me)} holds no position and wrote none that was bought.`} />
+              <EmptyNote size="sm" headingLevel={2} title={`${partyName(me)} holds no position and wrote none that was bought.`} />
             ) : (
-              <EmptyNote title="No position has been opened yet." action={<Link render={<RouterLink to="/margin/trade" />}>See the open offers</Link>} />
+              <EmptyNote headingLevel={2} title="No position has been opened yet." action={<Link render={<RouterLink to="/margin/trade" />}>See the open offers</Link>} />
             )
           }
         />
-      </Section>
+      </div>
+
+      {expired.length > 0 ? (
+        <Section title="After the deadline" note={AFTER_EXPIRY_STEPS.anyone}>
+          <div className={css.expired}>
+            {expired.map((e) => (
+              <SettleBlock key={e.series.id} e={e} />
+            ))}
+          </div>
+        </Section>
+      ) : null}
 
       <ConfirmDialog
         open={exercising !== null}
@@ -303,22 +309,23 @@ export function PositionsScreen() {
         {target ? (
           <>
             <KeyValue>
-              <KeyValueItem label="Publisher price" hint={snap && oracle.age !== null ? `Snapshot No. ${snap.seq}, ${spanText(oracle.age)} old` : undefined}>
+              <KeyValueItem label="Publisher price" hint={snap && oracle.age !== null ? `Snapshot ${numbered(snap.seq)}, ${spanText(oracle.age)} old` : undefined}>
                 <Usdx v={snap?.spot} unit figure="serif" none="No snapshot" />
               </KeyValueItem>
               <KeyValueItem label="Strike">
                 <Usdx v={target.series?.strike} unit figure="serif" />
               </KeyValueItem>
-              <KeyValueItem label="You receive" hint={snap ? `At snapshot No. ${snap.seq}` : undefined} marked>
+              <KeyValueItem label={holderIsMe ? 'You receive' : `${partyName(target.position.holder)} receives`} hint={snap ? `At snapshot ${numbered(snap.seq)}` : undefined} marked={holderIsMe}>
                 <Usdx v={pays} unit figure="serif" none="No snapshot" />
               </KeyValueItem>
               <KeyValueItem label="Paid from">{target.position.bookOwner ? <Who id={target.position.bookOwner} me={me} length="medium" /> : <NoValue />}</KeyValueItem>
               <KeyValueItem label="Writer cash in the contract">
                 <Usdx v={writerCash} unit figure="serif" none="Not available" />
               </KeyValueItem>
-              <KeyValueItem label="Expiry">{target.series ? formatUtc(target.series.expiry) : <NoValue />}</KeyValueItem>
+              <KeyValueItem label="Deadline">{target.series ? formatUtc(target.series.expiry) : <NoValue />}</KeyValueItem>
             </KeyValue>
             <p>The contract pays quantity times the publisher price over the strike at the snapshot current when the call runs, from the writer margin. An early exercise never draws on the vault.</p>
+            <RunsFirst step={exerciseStep} />
             {expected.length > 0 ? (
               <Callout variant="warning" title="As things stand, the contract will refuse this.">
                 <ul className={css.reasons}>
@@ -339,7 +346,10 @@ export function PositionsScreen() {
 function SettleBlock({ e }: { e: ExpiredSeries }) {
   const { client, busy } = usePro()
   const { act, canAct, connect } = useMarginUi()
+  const replay = useReplayable()
   const title = contractTitle(e.series)
+  const nextBook = e.step === 'settle-books' && e.nextBook ? replay.next('settle', (args) => args[0] === e.nextBook!.id) : null
+  const nextSeries = e.step === 'settle-series' ? replay.next('settle_vault', (args) => args[0] === e.series.id) : null
   const status = (mine: number): TimelineItem['status'] => {
     const order = { 'await-price': 0, 'settle-books': 0, 'settle-series': 1, claim: 2, done: 3 }[e.step]
     return order > mine ? 'done' : order === mine ? 'current' : 'upcoming'
@@ -371,6 +381,7 @@ function SettleBlock({ e }: { e: ExpiredSeries }) {
                   </Button>,
                 )
               : null}
+            <RunsFirst step={nextBook} />
           </span>
         ),
     },
@@ -379,8 +390,9 @@ function SettleBlock({ e }: { e: ExpiredSeries }) {
       actor: 'Anyone',
       status: status(1),
       description:
-        e.step === 'settle-series'
-          ? action(
+        e.step === 'settle-series' ? (
+          <span className={css.stepLine}>
+            {action(
               <Button
                 size="sm"
                 disabled={busy}
@@ -389,8 +401,10 @@ function SettleBlock({ e }: { e: ExpiredSeries }) {
               >
                 Settle the series
               </Button>,
-            )
-          : undefined,
+            )}
+            <RunsFirst step={nextSeries} />
+          </span>
+        ) : undefined,
     },
     {
       title: AFTER_EXPIRY_STEPS.claims,

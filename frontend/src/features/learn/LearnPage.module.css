@@ -93,7 +93,7 @@
     color: var(--text);
   }
 
-  /* Phones: one step down, so the three sentences fit a screen. */
+  /* Phones: one step down, so the two sentences fit a screen. */
   @container (max-width: 36rem) {
     .standfirst {
       font-size: var(--h2-size);

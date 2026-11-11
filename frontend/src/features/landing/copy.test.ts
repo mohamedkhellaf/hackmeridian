@@ -51,7 +51,7 @@ describe('landing copy', () => {
   })
 
   it('ends sentences with a full stop and starts them with a capital', () => {
-    const sentences = [copy.HERO.h1, copy.HERO.lede, copy.MARGIN.body, copy.MARGIN.isolation, ...copy.DIFFERENT.items.map((d) => d.body), ...copy.LIMITS.rows.flatMap((r) => [r.exists, r.missing])]
+    const sentences = [copy.HERO.h1, copy.HERO.lede, copy.MARGIN.body, copy.MARGIN.isolation, ...copy.DIFFERENT.items.map((d) => d.body), ...copy.LIMITS.items.map((i) => i.text)]
     for (const text of sentences) {
       expect(text, text).toMatch(/^[A-Z0-9]/)
       expect(text, text).toMatch(/\.$/)
@@ -73,7 +73,7 @@ describe('landing copy', () => {
     expect(Object.keys(copy)).not.toContain('QUESTIONS')
     expect(Object.keys(copy.HERO).filter((k) => k.startsWith('fact'))).toEqual([])
     expect(copy.DIFFERENT.items.every((d) => !('limit' in d))).toBe(true)
-    // "Nothing is exercised for you" lives in the Limits table only.
+    // "Nothing is exercised for you" lives in the Limits list only.
     expect(ALL.filter((t) => t.includes('Nothing is exercised for you'))).toHaveLength(1)
   })
 
@@ -83,8 +83,28 @@ describe('landing copy', () => {
     expect(copy.WIDGET.lotResale('10.00 FUND', '1.90 USDx', '0.19')).toContain('to the seller')
   })
 
-  it('names the network only where the visitor acts on it', () => {
+  it('names the network only as the state of a chain build', () => {
     const testnet = ALL.filter((t) => /testnet/i.test(t))
-    expect(testnet.sort()).toEqual([copy.HERO.primary, copy.STATUS.testnet].sort())
+    expect(testnet).toEqual([copy.STATUS.testnet])
+  })
+
+  it('has no eyebrow, no closing heading and one label for the way into Markets (ruling F17)', () => {
+    expect('label' in copy.HERO).toBe(false)
+    expect('heading' in copy.CLOSING).toBe(false)
+    expect(copy.HERO.primary).toBe('Open the markets')
+    expect(copy.CLOSING.primary).toBe(copy.HERO.primary)
+    expect(copy.WIDGET.markets).toBe(copy.HERO.primary)
+    // The intent names are the links: no repeated "Choose an asset" under each.
+    expect(ALL.filter((t) => t.includes('Choose an asset'))).toEqual([])
+  })
+
+  it('names who acts in each step title only, and lists the limits as plain sentences (ruling F17)', () => {
+    expect(Object.keys(copy.LIFECYCLE.columns)).not.toContain('who')
+    for (const step of copy.LIFECYCLE.steps) expect(Object.keys(step)).not.toContain('who')
+    expect(Object.keys(copy.LIMITS)).toEqual(['heading', 'items'])
+  })
+
+  it('labels the widget\'s asset term like the rest of the app (ruling F18)', () => {
+    expect(copy.WIDGET.hold).toBe('Asset')
   })
 })

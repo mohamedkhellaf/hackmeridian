@@ -4,7 +4,7 @@
 // No em dashes, arrows, exclamation marks or emoji; sentence case.
 //
 // Owner's direction of 11 Nov 2026 (brief 0.1): no disclaimer taglines, no line that is there to sound careful.
-// A fact is told once on the page: each limit in the Limits table (plus the one step where it happens), each
+// A fact is told once on the page: each limit in the Limits list (plus the one step where it happens), each
 // figure and each transaction hash in one place. The network is named where the visitor acts on it.
 
 // The repository and document addresses live in core/links, shared with the app footer and Learn.
@@ -39,12 +39,11 @@ export const NAV = {
 } as const
 
 export const HERO = {
-  label: 'Options on tokenized assets, on Stellar',
   h1: 'Set the lowest price you would sell at.',
   /** One mechanism sentence (brief 4.1). That the maker's collateral is locked first is said by the note's source
    * line, with its figure, and by "What is different". */
   lede: 'A put is the right to sell a tokenized fund, bond or equity at a set price until a set date.',
-  primary: 'Try it on Testnet',
+  primary: 'Open the markets',
   secondary: 'Read the contract',
 } as const
 
@@ -59,7 +58,7 @@ export const WIDGET = {
   serialOffer: 'Offer No.',
   serialOption: 'No.',
   termsLabel: 'Terms of this put',
-  hold: 'I hold',
+  hold: 'Asset',
   floor: 'Floor, per unit',
   until: 'Until',
   assetOption: (code: string, type: string) => `${code}, ${type.toLowerCase()}`,
@@ -77,13 +76,13 @@ export const WIDGET = {
   floorLevel: (strike: string) => `Floor ${strike}`,
   withLabel: 'With the put',
   withoutLabel: 'Without',
-  chartTitle: (qty: string, code: string, strike: string) => `What ${qty} ${code} would be worth at the deadline, with and without a put at ${strike}`,
+  chartTitle: (qty: string, code: string, strike: string) => `What ${qty}\u00a0${code} would be worth at the deadline, with and without a put at ${strike}`,
   slider: (code: string) => `Assumed ${code} price at the deadline`,
   xLabel: (code: string, quote: string) => `${code} price at the deadline, ${quote} per unit`,
   ifPrice: (code: string, price: string) => `If ${code} is at ${price} at the deadline, with the put`,
   without: 'Without',
   sellAtFloor: (qty: string, strike: string, premium: string) => `Sell ${qty} at ${strike}, less the ${premium} you paid.`,
-  keepAsset: (qty: string, code: string, worth: string, premium: string) => `Keep ${qty} ${code} worth ${worth}, less the ${premium} you paid.`,
+  keepAsset: (qty: string, code: string, worth: string, premium: string) => `Keep ${qty}\u00a0${code} worth ${worth}, less the ${premium} you paid.`,
   more: (amount: string, quote: string) => `+${amount} ${quote} more with the put.`,
   less: (amount: string, quote: string) => `−${amount} ${quote} less with the put.`,
   same: 'The same with and without the put.',
@@ -105,7 +104,7 @@ export const WIDGET = {
     ledger === null ? 'No put on the standard dates and strikes is open right now.' : `No put on the standard dates and strikes is open in the contract at ledger ${ledger}.`,
   otherOffers: { one: 'One other offer is open.', other: (count: string) => `${count} other offers are open.` },
   stillRecorded: 'The example above is recorded.',
-  markets: 'See the markets',
+  markets: 'Open the markets',
   request: 'Post a request',
   error: 'Could not read the open offers. The example above is recorded.',
   retry: 'Try again',
@@ -114,11 +113,11 @@ export const WIDGET = {
 
 export interface IntentCopy {
   id: 'floor' | 'earn-hold' | 'earn-buy'
+  /** The intent's name, which is also the link into Markets on that intent. */
   name: string
   statement: string
+  /** Labels the recorded premium in the row under the figure. */
   flowLabel: 'You pay' | 'You are paid'
-  action: string
-  actionContext: string
 }
 
 export const INTENTS = {
@@ -129,29 +128,22 @@ export const INTENTS = {
       name: 'Set a floor',
       statement: 'Keep the right to sell at a price you choose, until a date you choose.',
       flowLabel: 'You pay',
-      action: 'Choose an asset',
-      actionContext: ' to set a floor',
     },
     {
       id: 'earn-hold',
       name: 'Earn on what you hold',
       statement: 'Lock what you hold and agree to sell it at a higher price if a buyer asks before the deadline.',
       flowLabel: 'You are paid',
-      action: 'Choose an asset',
-      actionContext: ' to earn on what you hold',
     },
     {
       id: 'earn-buy',
       name: 'Earn while waiting to buy',
       statement: 'Lock USDx and agree to buy at a lower price if a holder asks before the deadline.',
       flowLabel: 'You are paid',
-      action: 'Choose an asset',
-      actionContext: ' to earn while waiting to buy',
     },
   ] satisfies IntentCopy[],
-  /** The recorded premium of each example, in the one row under its figure. */
-  paid: (premium: string) => `${premium}, once, now`,
-  received: (premium: string) => `${premium}, now`,
+  /** Follows the intent's name in the link's accessible name: where the link leads. */
+  linkContext: ', choose an asset',
   floorFigure: (qty: string, strike: string) => `Hold ${qty} and buy a put at ${strike}.`,
   earnHoldFigure: (qty: string, strike: string) => `Hold ${qty} and write a call at ${strike}.`,
   earnBuyFigure: (collateral: string, strike: string) => `Set ${collateral} aside and write a put at ${strike}.`,
@@ -167,27 +159,27 @@ export const INTENTS = {
 
 export interface LifecycleStepCopy {
   id: 'write' | 'buy' | 'exercise' | 'deadline' | 'collect'
+  /** Names who acts: there is no separate column for it. */
   title: string
-  who: string
   when: string
 }
 
 export const LIFECYCLE = {
   heading: 'How it works',
   lead: (date: string) => `Option No. 8 was written, bought, exercised and claimed on ${date}. Each step is one transaction, signed by the party named.`,
-  tableCaption: 'The steps of an option: who acts, by when, what moves, and the recorded transaction',
-  columns: { step: 'Step', who: 'Who acts', when: 'By when', moves: 'What moves', recorded: 'Transaction' },
+  tableCaption: 'The steps of an option: by when, what moves, and the recorded transaction',
+  columns: { step: 'Step', when: 'By when', moves: 'What moves', recorded: 'Transaction' },
   /** The deadline row is the alternative to the exercise: it carries "or" where the others carry a number. */
   or: 'or',
   stepLabel: (n: number) => `Step ${n}: `,
   orLabel: (n: number) => `Step ${n}, or: `,
   noTx: 'No transaction.',
   steps: [
-    { id: 'write', title: 'The maker writes the offer', who: 'The maker', when: 'Any time. The offer names its own deadline, at most two years ahead.' },
-    { id: 'buy', title: 'A buyer pays the premium', who: 'The buyer', when: 'Before the deadline, while the offer is open.' },
-    { id: 'exercise', title: 'The holder exercises', who: 'The holder', when: 'Before the deadline, by ledger close time.' },
-    { id: 'deadline', title: 'The deadline passes', who: 'Nobody', when: 'At the deadline.' },
-    { id: 'collect', title: 'The maker collects', who: 'The maker', when: 'Any time after an exercise, or after the deadline.' },
+    { id: 'write', title: 'The maker writes the offer', when: 'Any time. The offer names its own deadline, at most two years ahead.' },
+    { id: 'buy', title: 'A buyer pays the premium', when: 'Before the deadline, while the offer is open.' },
+    { id: 'exercise', title: 'The holder exercises', when: 'Before the deadline, by ledger close time.' },
+    { id: 'deadline', title: 'The deadline passes', when: 'At the deadline.' },
+    { id: 'collect', title: 'The maker collects', when: 'Any time after an exercise, or after the deadline.' },
   ] satisfies LifecycleStepCopy[],
   movesWrite: (collateral: string) => `${collateral} from the maker into the contract.`,
   movesBuy: (premium: string) => `${premium} from the buyer to the maker. It is not refunded.`,
@@ -250,50 +242,30 @@ export const MARGIN = {
   off: 'Margin is not part of this build.',
 } as const
 
+/** One ruled list of plain sentences, each standing on its own (ruling F17). */
 export const LIMITS = {
   heading: 'Limits',
-  tableCaption: 'What exists and what does not',
-  exists: 'What exists',
-  missing: 'What does not',
-  rows: [
-    { id: 'audit', exists: 'The contracts are tested in CI.', missing: 'No independent auditor has reviewed them.' },
-    {
-      id: 'mainnet',
-      exists: 'The contract is deployed on the Stellar test network.',
-      missing: 'It is not deployed on the public network. Its tokens are test assets with no monetary value.',
-    },
-    {
-      id: 'assets',
-      exists: 'Three assets and a quote token are listed, all issued by the team.',
-      missing: 'They stand for no real instrument, and no outside issuer is involved.',
-    },
+  items: [
+    { id: 'audit', text: 'No independent auditor has reviewed the contracts.' },
+    { id: 'mainnet', text: 'The contract is not deployed on the public network; its tokens are test assets with no monetary value.' },
+    { id: 'assets', text: 'The three assets and the quote token are issued by the team and stand for no real instrument.' },
     {
       id: 'makers',
-      exists: 'The offers on the book are written by the team’s own accounts.',
-      missing: 'There are no independent makers, no depth and no pricing model behind the premiums.',
+      text: 'The offers are written by the team’s own accounts: there are no independent makers, no depth and no pricing model behind the premiums.',
     },
-    {
-      id: 'settle',
-      exists: 'Every option has a deadline, decided by ledger close time.',
-      missing: 'Nothing is exercised for you. An option not exercised before its deadline expires.',
-    },
+    { id: 'settle', text: 'Nothing is exercised for you: an option not exercised before its deadline expires.' },
     {
       id: 'issuer',
-      exists: 'The contract reads the issuer’s authorization from the asset itself.',
-      missing: 'It cannot stop the issuer from freezing an account or clawing tokens back. That can block settlement, and the premium is not refunded.',
+      text: 'The contract cannot stop the issuer from freezing an account or clawing tokens back. That can block settlement, and the premium is not refunded.',
     },
-    {
-      id: 'clawback',
-      exists: 'The Reserves page compares, per token, what the contract owes with what it holds.',
-      missing: 'After a clawback shortfall there is no refund: the remaining payouts are first come, first served.',
-    },
+    { id: 'clawback', text: 'After a clawback shortfall there is no refund: the remaining payouts are first come, first served.' },
   ],
 } as const
 
+/** No heading (ruling F17): one sentence and the button. */
 export const CLOSING = {
-  heading: 'Try a put.',
-  /** One sentence; the middle words link to the app's steps for getting test tokens. */
-  bodyBefore: 'It takes a wallet and ',
+  /** One sentence; the last words link to the app's steps for getting test tokens. */
+  bodyBefore: 'To try a put, you need a wallet and ',
   bodyLink: 'a few test tokens',
   bodyAfter: '.',
   primary: 'Open the markets',

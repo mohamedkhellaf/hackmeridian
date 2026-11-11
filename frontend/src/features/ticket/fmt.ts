@@ -1,18 +1,17 @@
-// Text forms used across the ticket. Amounts are exact integers, truncated to two decimals, never rounded up.
-import { formatUnits } from '../../core/format'
+// Text forms used across the ticket. Amounts are exact integers, truncated to two decimals, never rounded up. A
+// figure is joined to its unit, and a time is joined inside, by a no-break space (core/format): neither breaks.
+import { formatMoney, formatUtcClock } from '../../core/format'
 import type { PreTradeIssue } from '../../core/options/preTrade'
 import type { Money, TokenInfo } from '../../core/options/types'
 
 /** `5.00 USDx`. */
-export const moneyText = (m: Money): string => `${formatUnits(m.amount, m.token.decimals)} ${m.token.code}`
+export const moneyText = (m: Money): string => formatMoney(m.amount, m.token)
 
 /** A per-unit price in quote units: `0.36 USDx`. An en dash when there is none. */
-export const priceText = (units: bigint | null, quote: TokenInfo): string => (units === null ? '\u2013' : `${formatUnits(units, quote.decimals)} ${quote.code}`)
+export const priceText = (units: bigint | null, quote: TokenInfo): string => (units === null ? '\u2013' : formatMoney(units, quote))
 
 /** `08:01:30 UTC`: the end of a transaction's validity window needs its seconds. */
-export function utcClock(ts: number): string {
-  return `${new Date(ts * 1000).toISOString().slice(11, 19)} UTC`
-}
+export const utcClock = (ts: number): string => formatUtcClock(ts)
 
 /** The first blocking issue of the re-check, as the reason a button is disabled. */
 export function firstBlocker(issues: readonly PreTradeIssue[] | undefined): PreTradeIssue | null {

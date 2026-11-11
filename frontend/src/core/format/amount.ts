@@ -95,8 +95,11 @@ export function formatExact(units: bigint, decimals: number, opts: FormatExactOp
  */
 export const noBreak = (text: string): string => text.replaceAll(' ', NBSP)
 
-/** `withUnit('1,080.00', 'USDx')` is `1,080.00 USDx`. Pass `THIN_NBSP` or `NBSP` as the separator in dense cells. */
-export function withUnit(text: string, code: string, separator: string = ' '): string {
+/**
+ * `withUnit('1,080.00', 'USDx')` is `1,080.00 USDx`, joined by a no-break space so the figure never breaks from its
+ * unit (ruling F7). Pass `THIN_NBSP` as the separator in dense cells.
+ */
+export function withUnit(text: string, code: string, separator: string = NBSP): string {
   return `${text}${separator}${code}`
 }
 
@@ -107,11 +110,11 @@ export interface UnitToken {
 }
 
 /**
- * `formatMoney(50_000_000n, USDX)` is `5.00 USDx`: `formatUnits` followed by the token code.
- * (Not named `formatAmount`: core/options/format already has one with another signature.)
+ * `formatMoney(50_000_000n, USDX)` is `5.00 USDx`: `formatUnits` followed by the token code, joined by a no-break
+ * space (ruling F7). (Not named `formatAmount`: core/options/format already has one with another signature.)
  */
 export function formatMoney(units: bigint, token: UnitToken, opts: FormatUnitsOptions & { separator?: string } = {}): string {
-  return withUnit(formatUnits(units, token.decimals, opts), token.code, opts.separator ?? ' ')
+  return withUnit(formatUnits(units, token.decimals, opts), token.code, opts.separator ?? NBSP)
 }
 
 export interface FormatNumberOptions {

@@ -16,18 +16,6 @@
     text-wrap: pretty;
   }
 
-  .replayLine {
-    margin-top: calc(var(--s-12) * -1);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    color: var(--text-2);
-  }
-
-  .strong {
-    font-weight: 600;
-    color: var(--text);
-  }
-
   .loading {
     display: flex;
     flex-direction: column;

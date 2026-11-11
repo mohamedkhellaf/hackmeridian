@@ -1,17 +1,17 @@
 @layer features {
   /*
-   * The page's own columns: from 1200 px the holdings sit in the rail column, on the x of the ticket below them.
-   * From 768 px: the code on one line, then the price figure, its sentence and the issuer on one baseline.
+   * The page's own columns: what the asset is on the left; on the right (the rail's column from 1200 px, on the x of
+   * the ticket below it) what the wallet holds and the issuer, label beside value, top-aligned with the code.
    * Under 768 px: code and price on one line, the sentence under them, the holdings on one line.
    */
   .root {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      'back hold'
-      'main hold';
+      'back .'
+      'main side';
     gap: var(--s-12) var(--s-32);
-    align-items: end;
+    align-items: start;
     min-width: 0;
   }
 
@@ -23,10 +23,10 @@
   .main {
     grid-area: main;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      'title title title'
-      'figure source issuer';
+      'title title'
+      'figure source';
     align-items: baseline;
     gap: var(--s-4) var(--s-16);
     min-width: 0;
@@ -94,15 +94,6 @@
     text-wrap: pretty;
   }
 
-  .issuer {
-    grid-area: issuer;
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--s-8);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-  }
-
   .label {
     font-size: var(--label-size);
     line-height: var(--label-line);
@@ -136,41 +127,43 @@
     line-height: var(--ui-line);
   }
 
-  .hold {
-    grid-area: hold;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--s-2);
+  /* The right-hand column: one grid for both rows, so the two labels and the two values each share an edge. */
+  .side {
+    grid-area: side;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--s-4) var(--s-16);
+    margin: 0;
+    min-width: 0;
+    /* The first figure sits on the code's line. */
+    padding-top: calc((var(--h1-line) - var(--figure-line)) / 2);
+  }
+
+  .row {
+    display: contents;
+  }
+
+  .holdings,
+  .issuer {
+    margin: 0;
     min-width: 0;
   }
 
-  /* The two figures right-aligned on their decimals, each code in a column beside its figure. */
+  /* The holdings one per line, left-aligned under each other at the value edge. */
   .holdings {
-    display: grid;
-    grid-template-columns: auto auto;
-    column-gap: var(--s-6);
-    font-size: var(--figure-size);
-    line-height: var(--figure-line);
-    font-variant-numeric: tabular-nums lining-nums;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
   }
 
   .holding {
-    display: contents;
-
-    & > :first-child {
-      justify-self: end;
-    }
-  }
-
-  .unit {
-    color: var(--muted);
-    font-size: var(--ui-size);
+    display: inline-flex;
+    align-items: baseline;
   }
 
   .word {
-    grid-column: 1 / -1;
-    justify-self: end;
     font-size: var(--ui-size);
     line-height: var(--figure-line);
     font-weight: 500;
@@ -182,13 +175,16 @@
     line-height: var(--ui-line);
   }
 
+  .issuer {
+    display: inline-flex;
+    align-items: baseline;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
   @media (min-width: 1200px) {
     .root {
       grid-template-columns: minmax(0, 1fr) var(--rail-w);
-    }
-
-    .hold {
-      align-items: flex-start;
     }
   }
 
@@ -198,7 +194,7 @@
       grid-template-areas:
         'back'
         'main'
-        'hold';
+        'side';
       gap: var(--s-8);
     }
 
@@ -210,30 +206,21 @@
       gap: var(--s-2) var(--s-12);
     }
 
-    /* The issuer has its row on the About tab. */
-    .issuer {
-      display: none;
+    .side {
+      padding-top: 0;
     }
 
-    .hold {
-      flex-direction: row;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--s-2) var(--s-12);
+    /* The issuer has its row on the About tab. */
+    .row[data-row='issuer'] {
+      display: none;
     }
 
     /* One line: the two holdings side by side. */
     .holdings {
-      display: flex;
+      flex-direction: row;
       flex-wrap: wrap;
       align-items: baseline;
       gap: 0 var(--s-12);
-    }
-
-    .holding {
-      display: inline-flex;
-      align-items: baseline;
-      gap: var(--s-4);
     }
   }
 }

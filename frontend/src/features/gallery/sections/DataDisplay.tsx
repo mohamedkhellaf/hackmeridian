@@ -28,23 +28,23 @@ import styles from '../Gallery.module.css'
 import { EXPLORER, SAMPLE_ADDRESS, SAMPLE_CONTRACT, SAMPLE_DEADLINE, SAMPLE_HASH, SAMPLE_NOW } from './sample'
 
 const CHAIN = [
-  { strike: '9.00', call: '1.08', callMakers: 3, put: '0.12', putMakers: 1 },
-  { strike: '9.50', call: '0.71', callMakers: 2, put: '0.24', putMakers: 2 },
-  { strike: '10.00', call: '0.38', callMakers: 2, put: '0.36', putMakers: 2, mine: true },
-  { strike: '10.50', call: '0.19', callMakers: 1, put: '0.74', putMakers: 1 },
-  { strike: '11.00', call: '0.09', callMakers: 1, put: null, putMakers: 0 },
+  { strike: '9.00', call: '1.08', put: '0.12' },
+  { strike: '9.50', call: '0.71', put: '0.24' },
+  { strike: '10.00', call: '0.38', put: '0.36', mine: true },
+  { strike: '10.50', call: '0.19', put: '0.74' },
+  { strike: '11.00', call: '0.09', put: null },
 ]
 
 const POSITIONS = [
-  { id: '000184', asset: 'BOND', kind: 'Long put', glyph: 'long-put' as const, strike: '10.00', qty: '5', premium: '1.80', state: 'Active' },
-  { id: '000171', asset: 'FUND', kind: 'Short call', glyph: 'short-call' as const, strike: '11.00', qty: '20', premium: '3.80', state: 'Offered' },
-  { id: '000150', asset: 'EQTY', kind: 'Long call', glyph: 'long-call' as const, strike: '24.00', qty: '2', premium: '0.90', state: 'Exercised' },
-  { id: '000122', asset: 'BOND', kind: 'Short put', glyph: 'short-put' as const, strike: '9.50', qty: '10', premium: '2.40', state: 'Expired' },
+  { id: '184', asset: 'BOND', kind: 'Long put', glyph: 'long-put' as const, strike: '10.00', qty: '5.00', premium: '1.80', state: 'Active' },
+  { id: '171', asset: 'FUND', kind: 'Short call', glyph: 'short-call' as const, strike: '11.00', qty: '20.00', premium: '3.80', state: 'Offered' },
+  { id: '150', asset: 'EQTY', kind: 'Long call', glyph: 'long-call' as const, strike: '24.00', qty: '2.00', premium: '0.90', state: 'Exercised' },
+  { id: '122', asset: 'BOND', kind: 'Short put', glyph: 'short-put' as const, strike: '9.50', qty: '10.00', premium: '2.40', state: 'Expired' },
 ]
 
 export function DataSection() {
   const [sort, setSort] = useState<SortDirection>('asc')
-  const rows = [...POSITIONS].sort((a, b) => (sort === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id)))
+  const rows = [...POSITIONS].sort((a, b) => (sort === 'desc' ? Number(b.id) - Number(a.id) : Number(a.id) - Number(b.id)))
   return (
     <Section
       id="data"
@@ -53,7 +53,7 @@ export function DataSection() {
     >
       <Specimen
         title="Table, the chain"
-        note="A native table, ruled like a statement: header underline, row hairlines, no box, no zebra. Calls left, strike in the centre on the sunken tone, puts right. Your own figure carries the highlighter."
+        note="A native table, ruled like a statement: header underline, row hairlines, no box, no zebra. Calls left, strike in the centre on the sunken tone, puts right. An empty half shows nothing at rest. Your own figure carries the highlighter."
         layout="stack"
       >
         <TableWrap label="BOND option chain, 13 Nov 2026">
@@ -65,37 +65,27 @@ export function DataSection() {
                     <Glyph name="long-call" /> Call premium
                   </span>
                 </Th>
-                <Th numeric>Makers</Th>
                 <Th strike>Strike</Th>
                 <Th numeric>
                   <span className={styles.inlineGlyph}>
                     <Glyph name="long-put" /> Put premium
                   </span>
                 </Th>
-                <Th numeric>Makers</Th>
               </Tr>
             </THead>
             <TBody>
               {CHAIN.map((row) => (
                 <Tr key={row.strike} interactive>
                   <Td numeric>{row.call}</Td>
-                  <Td numeric muted>
-                    {row.callMakers}
-                  </Td>
                   <Td strike>{row.strike}</Td>
                   <Td numeric>
                     {row.put === null ? (
-                      <Button size="sm" variant="quiet">
-                        Request
-                      </Button>
+                      <span className="ui-vh">No offer</span>
                     ) : row.mine ? (
                       <Marker>{row.put}</Marker>
                     ) : (
                       row.put
                     )}
-                  </Td>
-                  <Td numeric muted>
-                    {row.putMakers}
                   </Td>
                 </Tr>
               ))}
@@ -119,10 +109,10 @@ export function DataSection() {
                 <Th>Asset</Th>
                 <Th>Kind</Th>
                 <Th numeric>Strike (USDx)</Th>
-                <Th numeric>Qty</Th>
+                <Th numeric>Quantity</Th>
                 <Th numeric>Premium (USDx)</Th>
                 <Th>Deadline (UTC)</Th>
-                <Th>Counterparty</Th>
+                <Th>Maker</Th>
                 <Th>State</Th>
                 <Th pinned>
                   <span className="ui-vh">Action</span>
@@ -131,7 +121,7 @@ export function DataSection() {
             </THead>
             <TBody>
               {rows.map((row) => (
-                <Tr key={row.id} interactive selected={row.id === '000184'}>
+                <Tr key={row.id} interactive selected={row.id === '184'}>
                   <Td>
                     <span className="ui-mono">{row.id}</span>
                   </Td>
@@ -155,9 +145,11 @@ export function DataSection() {
                   </Td>
                   <Td pinned>
                     {row.state === 'Active' ? (
-                      <Button size="sm">Exercise</Button>
+                      <Button size="sm" variant="secondary">
+                        Exercise
+                      </Button>
                     ) : row.state === 'Offered' ? (
-                      <Button size="sm" variant="quiet">
+                      <Button size="sm" variant="secondary">
                         Cancel offer
                       </Button>
                     ) : null}
@@ -175,27 +167,29 @@ export function DataSection() {
             <Amount value="1.80" unit="USDx" figure="serif" />
           </KeyValueItem>
           <KeyValueItem label="Breakeven" marked>
-            9.64
+            <Amount value="9.64" unit="USDx" figure="serif" />
           </KeyValueItem>
           <KeyValueItem label="Most you can lose">
             <Amount value="1.80" unit="USDx" figure="serif" />
           </KeyValueItem>
-          <KeyValueItem label="Deadline" hint="09:00 your time (UTC+1)">
-            13 Nov 2026, 08:00 UTC
+          <KeyValueItem label="Deadline">
+            <DateTime value={SAMPLE_DEADLINE} local="below" />
           </KeyValueItem>
         </KeyValue>
         <KeyValue variant="plain" figures="sans">
-          <KeyValueItem label="Authorization required">Yes</KeyValueItem>
-          <KeyValueItem label="Revocable">Yes</KeyValueItem>
-          <KeyValueItem label="Clawback">Enabled</KeyValueItem>
+          <KeyValueItem label="Approval required">No</KeyValueItem>
+          <KeyValueItem label="Can freeze">Yes</KeyValueItem>
+          <KeyValueItem label="Can claw back">Yes</KeyValueItem>
           <KeyValueItem label="Issuer">
             <Address value={SAMPLE_ADDRESS} copyLabel={null} />
           </KeyValueItem>
         </KeyValue>
         <KeyValue layout="stacked">
-          <KeyValueItem label="I hold">5.00 BOND</KeyValueItem>
+          <KeyValueItem label="Quantity">
+            <Amount value="5.00" unit="BOND" figure="serif" />
+          </KeyValueItem>
           <KeyValueItem label="Floor, per unit" marked>
-            10.00 USDx
+            <Amount value="10.00" unit="USDx" figure="serif" />
           </KeyValueItem>
         </KeyValue>
       </Specimen>
@@ -204,7 +198,7 @@ export function DataSection() {
         <div className={styles.statRow}>
           <Stat size="lg" label="Premium paid" value="1.80" unit="USDx" />
           <Stat size="lg" label="Premium earned" value="3.80" unit="USDx" />
-          <Stat size="lg" label="Collateral locked" value="220.00" unit="USDx" hint="In the Covered contract" />
+          <Stat size="lg" label="Locked" value="220.00" unit="USDx" hint="In the Covered contract" />
         </div>
         <div className={styles.statRow}>
           <Stat label="Reference price" value="9.82" unit="USDx" hint="Demo price" />
@@ -230,12 +224,12 @@ export function DataSection() {
 
       <Specimen
         title="Amount"
-        note="Shown truncated at the asset's fixed decimals, never rounded up. The exact value is one focus or press away, in a popover, never in a title attribute. A signed figure has its sign, a triangle and a word for screen readers."
+        note="Shown truncated at the asset's fixed decimals, never rounded up. The exact value is one press away, in a popover, never in a title attribute. A signed figure has its sign and a word for screen readers."
       >
         <Example label="Plain, unit as a suffix">
           <Amount value="1,250.00" unit="USDx" />
         </Example>
-        <Example label="With the exact value behind it: focus or press">
+        <Example label="With the exact value behind it: press">
           <Amount value="0.36" exact="0.3600001" unit="USDx" />
         </Example>
         <Example label="Gain and loss">
@@ -245,6 +239,33 @@ export function DataSection() {
         <Example label="Serif figures">
           <Amount value="48.20" unit="USDx" figure="serif" size="lg" />
           <Amount value="8.20" exact="8.2000000" unit="USDx" figure="serif" direction="gain" />
+        </Example>
+      </Specimen>
+
+      <Specimen
+        title="Figure and unit"
+        note="One rule, set in Amount: the unit is sans and muted, at UI size beside a serif figure and at label size beside a sans one. A figure never parts from its unit. Features keep no unit style of their own."
+      >
+        <Example label="Caption, 12 px">
+          <span className="ui-caption">
+            <Amount value="0.36" unit="USDx" />
+          </span>
+        </Example>
+        <Example label="Table and interface, 13.5 px">
+          <span className="ui-text">
+            <Amount value="1,250.00" unit="USDx" />
+          </span>
+        </Example>
+        <Example label="Figure, 16 px">
+          <Amount value="1.80" unit="USDx" figure="serif" />
+        </Example>
+        <Example label="Large figure, 22 px">
+          <Amount value="48.20" unit="USDx" figure="serif" size="lg" />
+        </Example>
+        <Example label="Under the highlighter">
+          <Marker>
+            <Amount value="10.00" unit="USDx" figure="serif" />
+          </Marker>
         </Example>
       </Specimen>
 

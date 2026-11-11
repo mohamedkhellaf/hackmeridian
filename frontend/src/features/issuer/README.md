@@ -12,7 +12,8 @@ option on the asset can do, which is why the console lives in this app.
 Everyone reads the same three blocks: the Covered contract as a statement (held, reserved for open options, open
 options and, on Testnet, its authorization; a danger callout when the issuer has not authorized it, the state that
 stops every option on the asset), **What the issuer can do** (the flags as the same table, in the same words, as
-the asset's About tab) and the asset's facts in the rail. One quiet line under the title says who is looking.
+the asset's About tab: one kit component, `FactTable`, on both pages, a plain table from 768 px and a ruled list of
+name, state and effect under it) and the asset's facts in the rail. One quiet line under the title says who is looking.
 
 | State | What the page shows |
 |---|---|
@@ -69,7 +70,7 @@ history on chain.
 - A row has at most two controls: the action its state calls for (Authorize, or Freeze) as the button, and a menu
   with the rest; Claw back is always in the menu. A row offers nothing until its first read lands.
 - What the issuer's flags rule out for the whole asset is not offered in any row; one sentence above the accounts
-  says so (`Freeze is not available: Authorization revocable is off.`).
+  says so (`Freeze is not available: this issuer cannot freeze.`).
 - **Authorize** runs at once: it takes nothing away. When the issuer cannot revoke it cannot be undone, and it asks
   first, saying so.
 - **Freeze** asks first, saying what freezing blocks, settlement of options included, with what the account or the

@@ -13,5 +13,5 @@ export const glyphOf = (side: Side, kind: OptionKind): PayoffGlyph => `${side}-$
 /** "Long put", "Short call". */
 export const positionWords = (side: Side, kind: OptionKind): string => `${side === 'long' ? 'Long' : 'Short'} ${kind}`
 
-/** "000184": an id as a serial line prints it. */
+/** "184": an id as the contract numbers it, unpadded everywhere. */
 export { serialOf } from '../../core/format/option'

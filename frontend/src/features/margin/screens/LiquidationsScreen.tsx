@@ -7,7 +7,7 @@ import { VAULT } from '../../../core/pro/types'
 import { usePro } from '../../../data'
 import { Button, Callout, EmptyNote, KeyValue, KeyValueItem, Link, useIsPhone } from '../../../ui'
 import { HEALTH_WORD, healthOf } from '../model/health'
-import { QUOTE, lots, usdxExact } from '../model/money'
+import { QUOTE, lots, usdx, usdxExact, withUnit } from '../model/money'
 import { contractTitle, partyName } from '../model/names'
 import { takeovers } from '../model/settlement'
 import type { Takeover } from '../model/settlement'
@@ -17,6 +17,7 @@ import type { DeskColumn } from '../parts/DeskTable'
 import { Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
 import type { ResultView } from '../parts/marginUi'
+import { RunsFirst } from '../parts/RunsFirst'
 import { Footnote, Section } from '../parts/Section'
 import { useLast } from '../parts/useLast'
 import { useReplayable } from '../parts/useReplayable'
@@ -113,10 +114,17 @@ export function LiquidationsScreen() {
         )
         if (own) {
           // Your own account: the way out is a deposit; the vault takeover stays available, as the contract allows it.
+          // Shown at two decimals like the figures beside it; the exact amount, which a truncated one falls short
+          // of, is in the link's name and on Account.
           const distance = a.cushion !== null && a.cushion < 0n ? -a.cushion : null
           return (
             <span className={css.actions}>
-              <Link render={<RouterLink to="/margin" />}>{distance !== null ? `Deposit ${usdxExact(distance)} ${QUOTE}` : 'Deposit on Account'}</Link>
+              <Link
+                render={<RouterLink to="/margin" />}
+                aria-label={distance !== null ? `Deposit ${withUnit(usdx(distance))}, at least ${withUnit(usdxExact(distance))}, on Account` : undefined}
+              >
+                {distance !== null ? `Deposit ${withUnit(usdx(distance))}` : 'Deposit on Account'}
+              </Link>
               {toVault}
             </span>
           )
@@ -157,6 +165,7 @@ export function LiquidationsScreen() {
   const account = shown?.account
   const mode = shown?.mode ?? 'vault'
   const notBelow = account ? account.cushion !== null && account.cushion >= 0n : false
+  const takeoverStep = account ? replay.next('liquidate', (args) => args[1] === account.id && args[2] === (mode === 'vault' ? VAULT : me)) : null
 
   return (
     <div className={css.root}>
@@ -223,6 +232,7 @@ export function LiquidationsScreen() {
               </p>
             )}
             <p>The contract has no view of the takeover price before the call, so it is not shown here; the result gives it.</p>
+            <RunsFirst step={takeoverStep} />
             {notBelow ? (
               <Callout variant="warning" title="This account is not below its liquidation level.">
                 <p>

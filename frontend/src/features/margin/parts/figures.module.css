@@ -13,13 +13,14 @@
     }
   }
 
+  /* An id is a plain number in the sans face (ruling F1: mono is kept for addresses, hashes and the note's serial). */
   .sub {
     margin-inline-start: var(--s-6);
-    font-family: var(--font-mono);
-    font-size: var(--mono-size);
-    line-height: var(--mono-line);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
     font-weight: 400;
-    font-feature-settings: 'zero';
+    font-variant-numeric: tabular-nums;
     color: var(--muted);
     white-space: nowrap;
   }

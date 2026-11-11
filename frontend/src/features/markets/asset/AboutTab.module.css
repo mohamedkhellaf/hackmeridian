@@ -1,10 +1,13 @@
 @layer features {
-  /* One column at reading width: access first (it decides whether the rest is actionable), then the facts. */
+  /*
+   * One column: access first (it decides whether the rest is actionable), then the facts. Two measures: prose at
+   * --measure, and the facts list and the powers table at the column's one width, so the blocks end on one edge.
+   */
   .root {
     display: flex;
     flex-direction: column;
     gap: var(--s-40);
-    max-width: 48rem;
+    max-width: 40rem;
     min-width: 0;
   }
 
@@ -46,88 +49,6 @@
     font-size: var(--body-size);
     line-height: var(--body-line);
     color: var(--text);
-  }
-
-  /* Labels and values close enough to read across: the list is as wide as its facts need. */
-  .facts {
-    max-width: 34rem;
-  }
-
-  .powersList {
-    display: none;
-  }
-
-  /* The powers table reads as sentences: cells wrap, and the first column names the power. */
-  .powers {
-    & td,
-    & th[scope='row'] {
-      height: auto;
-      padding-block: var(--s-12);
-      white-space: normal;
-      vertical-align: top;
-    }
-  }
-
-  .power {
-    width: 13rem;
-  }
-
-  .state {
-    width: 6rem;
-    color: var(--text-2);
-    font-weight: 500;
-
-    &[data-on] {
-      color: var(--text);
-      font-weight: 600;
-    }
-  }
-
-  .effect {
-    color: var(--text-2);
-    text-wrap: pretty;
-  }
-
-  /* Narrow: each power is a stacked row, name and state on one line and the effect under it at full width. */
-  @container (max-width: 39.99rem) {
-    .powersTable {
-      display: none;
-    }
-
-    .powersList {
-      display: flex;
-      flex-direction: column;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      border-top: 1px solid var(--rule);
-
-      & > li {
-        display: flex;
-        flex-direction: column;
-        gap: var(--s-2);
-        padding-block: var(--s-12);
-        border-bottom: 1px solid var(--hairline);
-        font-size: var(--ui-size);
-        line-height: var(--ui-line);
-      }
-
-      & .power,
-      & .state {
-        width: auto;
-      }
-
-      & .power {
-        font-weight: 500;
-      }
-    }
-
-    .powerHead {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--s-12);
-    }
   }
 
   .means {

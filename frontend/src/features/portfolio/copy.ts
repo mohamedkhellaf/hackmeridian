@@ -7,7 +7,7 @@ import { claimAmount } from '../../core/portfolio/positions'
 import type { Role } from '../../core/portfolio/positions'
 import type { BidState } from '../../core/requests/types'
 import type { PositionView, TodoView } from '../../data'
-import { exactMoney, money, optionPhrase, qtyOf, referenceFigure, referenceName, strikeOf, strikeText } from './model'
+import { exactMoney, money, optionPhrase, qtyOf, referenceFigure, referenceName, referencePhrase, strikeOf, strikeText } from './model'
 import type { PositionAction } from './model'
 
 export const PAGE_TITLE = 'Portfolio'
@@ -36,6 +36,7 @@ export const TODO_HEADING = 'To do'
 
 export interface TodoCopy {
   title: string
+  /** One sentence under the title, or empty when the title and the button say it all. */
   body: string
   /** The action the card offers, or null when the card only links to the position. */
   action: PositionAction | null
@@ -80,13 +81,13 @@ export function todoCopy(t: TodoView): TodoCopy {
     }
     case 'claim': {
       const amount = exactMoney(t.amount ?? claimAmount(o))
-      return { title: `Claim ${amount} from your exercised ${o.kind}`, body: 'It waits in the contract until you claim it.', action: 'claim' }
+      return { title: `Claim ${amount} from your exercised ${o.kind}`, body: '', action: 'claim' }
     }
     case 'reclaim': {
       const amount = exactMoney(t.amount ?? requiredCollateral(o))
       return {
         title: o.holder ? `Reclaim ${amount} from your expired ${o.kind}` : `Reclaim ${amount} from your expired offer`,
-        body: 'It stays in the contract until you reclaim it.',
+        body: '',
         action: 'reclaim',
       }
     }
@@ -105,11 +106,11 @@ export function exerciseCover(o: Pick<OptionOffer, 'kind'>, have: Money, need: M
 export const expiredLine = (o: Pick<OptionOffer, 'kind' | 'underlying' | 'underlyingQty' | 'expiry'>): string =>
   `Your ${optionPhrase(o)} expired on ${formatUtc(o.expiry)} without being exercised.`
 
-/** A request of this wallet past its deadline: the premium stays in the contract until it is cancelled. */
+/** A request of this wallet past its deadline: a cancel takes the escrowed premium back. The body names the request. */
 export function expiredRequestCopy(premium: Money, phrase: string): TodoCopy {
   return {
     title: `Take back ${exactMoney(premium)} from your expired request`,
-    body: `No maker filled your request for a ${phrase}. The premium stays in the contract until you cancel it.`,
+    body: `No maker filled your request for a ${phrase}.`,
     action: null,
   }
 }
@@ -192,8 +193,19 @@ export function strikeAgainst(p: PositionView): string | null {
   return priceAbove ? `${label} ${figure}, above the strike ${k}` : `${label} ${figure}, below the strike ${k}`
 }
 
-/** What an open offer locks in the contract: a cancellation returns it. */
-export const YOU_LOCK = (amount: string): string => `You lock ${amount}`
+/** What a written option or an open offer of the wallet locks in the contract, as the second line of its row. */
+export const LOCKS = (amount: string): string => `Locks ${amount}`
+
+/**
+ * What an in-the-money holding is worth if exercised, at the labelled reference, as the second line of its row:
+ * `Exercise value 4.00 at the demo price 10.20`. The premium is not counted. Null when it is not in the money.
+ */
+export function exerciseValueLine(p: PositionView): string | null {
+  const o = p.option
+  const at = referencePhrase(p.reference, o.quote)
+  if (p.exerciseValue === null || p.exerciseValue <= 0n || at === null) return null
+  return `Exercise value ${formatUnits(p.exerciseValue, o.quote.decimals)} ${at}`
+}
 
 /** The premium of a row on a phone, with what it was. */
 export function phonePremium(p: PositionView): string {
@@ -265,6 +277,8 @@ export const NOTE_TERMS = {
   premiumHint: 'Paid to the maker when the option was first sold. A later resale price is not recorded.',
   resoldHint: 'Paid to the maker when the option was first sold. You bought it from a holder, so it is not what you paid.',
   breakeven: 'Breakeven',
+  /** A holder whose own price is not proven: the breakeven comes from the original premium and says so. */
+  breakevenOriginal: 'Breakeven at the original premium',
   deadline: 'Deadline',
   collateral: { held: 'Collateral in the contract', paidOut: 'Collateral paid out', returned: 'Collateral returned', owed: 'Collateral' },
   maker: 'Maker',
@@ -484,6 +498,16 @@ export function makerCalendarDescription(o: OptionOffer): string {
 
 /** Added to the required caption: what the drawn line includes. */
 export const PREMIUM_INCLUDED = 'Premium included.'
+/**
+ * For a holder whose own price is not proven: the line comes from the original premium, and the caption says so
+ * for the whole figure (its breakeven included, whose short label keeps its place on a phone). The two extremes
+ * speak to the holder, so they carry the qualifier themselves.
+ */
+export const ORIGINAL_PREMIUM_INCLUDED = 'Original premium included.'
+export const ORIGINAL_PREMIUM_LABELS = {
+  maxGain: 'Most you can gain at the original premium',
+  maxLoss: 'Most you can lose at the original premium',
+} as const
 export const PREMIUM_NOT_COUNTED = 'Premium not counted: you bought this option from a holder, and the price you paid is not recorded on the chain.'
 export const VIEWER_PAYOFF_NOTE = 'Premium included, from the side of the holder.'
 /** A wallet on neither side reads the holder's figure: the extremes are the holder's, not the viewer's. */
@@ -493,5 +517,5 @@ export const VIEWER_LABELS = { maxGain: 'Most the holder can gain', maxLoss: 'Mo
 export const READOUT = {
   at: (asset: string, price: string): string => `If ${asset} is at ${price} at the deadline, exercising pays`,
   nothing: (asset: string, price: string): string => `If ${asset} is at ${price} at the deadline, exercising pays nothing.`,
-  net: (premium: string, unit: string): string => `After the ${premium} ${unit} original premium:`,
+  net: (premium: string, unit: string): string => `After the ${premium}\u00a0${unit} original premium:`,
 } as const

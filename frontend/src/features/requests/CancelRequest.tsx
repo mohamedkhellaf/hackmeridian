@@ -5,8 +5,7 @@ import { TX_PHASE_HELP, describeTx, useUnsettledTx } from '../../data'
 import type { CoveredTx } from '../../data'
 import type { TxResult } from '../../core/options/types'
 import type { Bid } from '../../core/requests/types'
-import { Button, Callout, DateTime, Dialog, KeyValue, KeyValueItem, TxLink, TxStepper, UnsettledNotice } from '../../ui'
-import { money } from './board'
+import { Amount, Button, Callout, DateTime, Dialog, KeyValue, KeyValueItem, TxLink, TxStepper, UnsettledNotice } from '../../ui'
 import type { RequestRow } from './board'
 import {
   CANCELLED_TITLE,
@@ -22,10 +21,7 @@ import {
   TX_LABEL,
   cancelTitle,
   confirmedInLedger,
-  listTitle,
-  strikePerUnitOf,
-  takeBack,
-  takeBackTitle,
+  requestTitle,
 } from './copy'
 import styles from './CancelRequest.module.css'
 
@@ -42,9 +38,10 @@ export interface CancelRequestProps {
 
 /**
  * Cancels one of the wallet's requests as a staged transaction: what comes back, then check, sign, submit and
- * confirm with what each state means. An expired request is named for what cancelling it does: the premium is
- * taken back. The outcome stays on screen until the user closes it, and in Activity. The stage area keeps the
- * stepper's height from the start, so the dialog does not change size or move while the transaction runs.
+ * confirm with what each state means. The action has one name before and after the deadline (ruling F9); the note
+ * says what is different once the deadline has passed. The outcome stays on screen until the user closes it, and in
+ * Activity. The dialog takes the room its content needs at rest and after the outcome; only while the transaction
+ * runs does the stage keep the stepper's height, so it does not change size from one stage to the next.
  */
 export function CancelRequest({ row, tx, isMock, onClose, fallbackFocus }: CancelRequestProps) {
   const { state } = tx
@@ -62,7 +59,7 @@ export function CancelRequest({ row, tx, isMock, onClose, fallbackFocus }: Cance
         {expired ? CLOSE : KEEP_REQUEST}
       </Button>
       <Button variant="primary" onClick={() => void tx.run(row.bid)} disabled={unsettled !== null} disabledReason={unsettled?.reason}>
-        {expired ? takeBack(row.premium) : CANCEL_REQUEST}
+        {CANCEL_REQUEST}
       </Button>
     </>
   ) : confirmed ? (
@@ -98,13 +95,15 @@ export function CancelRequest({ row, tx, isMock, onClose, fallbackFocus }: Cance
   const body = row ? (
     <div className={styles.body}>
       <KeyValue>
-        <KeyValueItem label={CANCEL_TERMS.request}>{listTitle(row)}</KeyValueItem>
-        <KeyValueItem label={CANCEL_TERMS.strike}>{strikePerUnitOf(row)}</KeyValueItem>
+        <KeyValueItem label={CANCEL_TERMS.request}>{requestTitle(row)}</KeyValueItem>
+        <KeyValueItem label={CANCEL_TERMS.strike}>
+          <Amount value={row.strike.text} exact={row.strike.exact} unit={row.strike.code} />
+        </KeyValueItem>
         <KeyValueItem label={CANCEL_TERMS.deadline}>
           <DateTime value={row.deadlineSec * 1000} />
         </KeyValueItem>
         <KeyValueItem label={CANCEL_TERMS.refund} marked>
-          {money(row.premium)}
+          <Amount value={row.premium.text} exact={row.premium.exact} unit={row.premium.code} />
         </KeyValueItem>
       </KeyValue>
       <div className={styles.stage} data-phase={state.phase}>
@@ -144,7 +143,7 @@ export function CancelRequest({ row, tx, isMock, onClose, fallbackFocus }: Cance
     onOpenChange: (open: boolean) => {
       if (!open) onClose()
     },
-    title: confirmed ? CANCELLED_TITLE : row ? (expired ? takeBackTitle(row.serial) : cancelTitle(row.serial)) : CANCEL_REQUEST,
+    title: confirmed ? CANCELLED_TITLE : row ? cancelTitle(row.serial) : CANCEL_REQUEST,
     footer,
     finalFocus: confirmed ? fallbackFocus : undefined,
   }

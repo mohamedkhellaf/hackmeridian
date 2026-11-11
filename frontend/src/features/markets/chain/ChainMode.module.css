@@ -18,7 +18,7 @@
     line-height: var(--caption-line);
   }
 
-  /* The one instruction, while nothing is selected: a premium is a control, and this says so. */
+  /* The one line while nothing is selected: a premium is a control, or nothing is posted on this deadline yet. */
   .hint {
     color: var(--text-2);
     font-size: var(--ui-size);
@@ -56,7 +56,6 @@
 
   .skeletonTable {
     display: grid;
-    max-inline-size: 46rem;
   }
 
   .skeletonRow {
@@ -85,7 +84,7 @@
     align-items: center;
     justify-content: center;
     align-self: stretch;
-    background: color-mix(in srgb, var(--text) 7%, transparent);
+    background: var(--cell-tone);
   }
 
   @media (max-width: 767.98px) {

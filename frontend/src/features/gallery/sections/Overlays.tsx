@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
+import { definitionOf } from '../../../core/glossary'
 import {
+  Amount,
   Button,
   Callout,
   Dialog,
@@ -70,10 +72,12 @@ export function OverlaysSection() {
 
       <Specimen title="Term" note="A term of the trade explained where it is met: the word is the button, a press opens its one glossary sentence. In place of a caption that defines its label.">
         <KeyValue className={styles.narrow}>
-          <KeyValueItem label={<Term definition="The price per unit at which exercising pays back exactly what the premium cost.">Breakeven</Term>}>
-            98.32 USDx
+          <KeyValueItem label={<Term definition={definitionOf('breakeven')}>Breakeven</Term>}>
+            <Amount value="98.32" unit="USDx" figure="serif" />
           </KeyValueItem>
-          <KeyValueItem label={<Term definition="The price of the option, paid once to the maker.">Premium</Term>}>1.36 USDx</KeyValueItem>
+          <KeyValueItem label={<Term definition={definitionOf('premium')}>Premium</Term>}>
+            <Amount value="1.36" unit="USDx" figure="serif" />
+          </KeyValueItem>
         </KeyValue>
       </Specimen>
 
@@ -179,7 +183,7 @@ export function OverlaysSection() {
         onOpenChange={onOpenChange}
         size="sm"
         title="Exercise this put?"
-        description="You deliver 5 BOND and receive 50.00 USDx in one transaction."
+        description="You deliver 5.00 BOND and receive 50.00 USDx in one transaction."
         footer={
           <>
             <Button variant="quiet" onClick={close}>
@@ -251,7 +255,7 @@ export function OverlaysSection() {
         <Callout variant="info" title="The body scrolls; the title and the actions stay in view." />
         {Array.from({ length: 6 }, (_, i) => (
           <KeyValue key={i} figures="sans">
-            <KeyValueItem label="Contract">Covered options, version 1.5</KeyValueItem>
+            <KeyValueItem label="Contract">Covered, version 1.5</KeyValueItem>
             <KeyValueItem label="Admin key">None</KeyValueItem>
             <KeyValueItem label="Upgrade path">None</KeyValueItem>
             <KeyValueItem label="Listing an asset">Anyone, by code and issuer</KeyValueItem>
@@ -277,11 +281,17 @@ export function OverlaysSection() {
       >
         <KeyValue>
           <KeyValueItem label="Strike" marked>
-            10.00 USDx
+            <Amount value="10.00" unit="USDx" figure="serif" />
           </KeyValueItem>
-          <KeyValueItem label="Quantity">5 BOND</KeyValueItem>
-          <KeyValueItem label="You pay">1.80 USDx</KeyValueItem>
-          <KeyValueItem label="Breakeven">9.64</KeyValueItem>
+          <KeyValueItem label="Quantity">
+            <Amount value="5.00" unit="BOND" figure="serif" />
+          </KeyValueItem>
+          <KeyValueItem label="You pay">
+            <Amount value="1.80" unit="USDx" figure="serif" />
+          </KeyValueItem>
+          <KeyValueItem label="Breakeven">
+            <Amount value="9.64" unit="USDx" figure="serif" />
+          </KeyValueItem>
         </KeyValue>
       </Drawer>
 

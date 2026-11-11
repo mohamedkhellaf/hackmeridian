@@ -1,6 +1,7 @@
 // The listed deadlines as one radio group: a date, the number of orders on it as a plain muted numeral, and the
-// time left under it. A date with no order has its date in muted ink and carries no numeral. "Other dates" links to the
-// orders on dates that are not listed.
+// time left under it. A date with no order has its date in muted ink and carries no numeral. On a phone the numeral
+// leaves the tab (after a time left, "1 d, 12" read as hours): the line under the bar says it for the date shown
+// (ruling F3). "Other dates" links to the orders on dates that are not listed.
 import { formatUtc } from '../../../core/format'
 import type { ExpiryColumn } from '../../../data'
 import { Link, Segmented, VisuallyHidden } from '../../../ui'
@@ -16,7 +17,7 @@ export interface ExpiryBarProps {
   onChange: (day: string) => void
   /** Orders on dates that are not listed. Zero hides the link. */
   otherDates: number
-  /** A narrow column: the count goes on the second line, after the time left, so five dates still fit. */
+  /** A narrow column: no numeral in the tabs, so five dates still fit; screen readers still hear each count. */
   compact?: boolean
 }
 
@@ -42,16 +43,10 @@ export function ExpiryBar({ columns, value, onChange, otherDates, compact = fals
             detail: (
               <>
                 {leftLabel(c.secondsLeft)}
-                {orders > 0 && compact ? (
-                  <>
-                    <span aria-hidden="true">, {orders}</span>
-                    <VisuallyHidden>, {COPY.ordersOn(c.offers, c.bids)}</VisuallyHidden>
-                  </>
-                ) : null}
                 <VisuallyHidden>
                   {' '}
                   {COPY.left}, {formatUtc(c.expiry)}
-                  {orders === 0 ? `, ${COPY.ordersOn(0, 0)}` : null}
+                  {orders === 0 || compact ? `, ${COPY.ordersOn(c.offers, c.bids)}` : null}
                 </VisuallyHidden>
               </>
             ),

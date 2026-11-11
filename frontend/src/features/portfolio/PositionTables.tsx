@@ -1,22 +1,25 @@
 // The tables of the three portfolio tabs. Where the list has the room, each list is a ruled table: one row per
 // position, the whole row opens the position page, and the row carries its contract call (and, for a held
-// option, listing it for resale). Where it does not (a container query on the list's own width, not the
-// viewport), the same rows are a list of three-line items that open the position page, with no figure left out.
+// option, listing it for resale or changing and withdrawing its listing). Where it does not (a container query on
+// the list's own width, not the viewport), the same rows are a list of three-line items that open the position
+// page, with no figure left out. Every row action is the same outlined small button, right-aligned in the pinned
+// column; priority shows by order.
 import { useNavigate } from '@tanstack/react-router'
 import type { MouseEvent, ReactNode } from 'react'
-import { formatCountdown, formatExact, formatUnits, formatUtc } from '../../core/format'
+import { NBSP, formatCountdown, formatExact, formatUnits, formatUtc } from '../../core/format'
 import type { OptionOffer, TokenInfo } from '../../core/options/types'
 import { requiredCollateral } from '../../core/options/types'
 import type { Bid } from '../../core/requests/types'
-import { premiumUnits } from '../../core/units'
 import { optionSubject, bidSubject, useSubjectBusy, useTxBusy } from '../../data'
-import type { PositionView } from '../../data'
+import type { PositionView, UnsettledTx } from '../../data'
 import { Amount, Button, Countdown, DateTime, Glyph, IconChevronRight, Marker, RowHeader, TBody, THead, Table, TableWrap, Td, Th, Tr } from '../../ui'
-import { BID_STATUS, BUSY_REASON, SHORT_LINE, VIEW_POSITION, YOU_LOCK, phonePremium, statusLine, strikeAgainst } from './copy'
+import { BID_STATUS, LOCKS, SHORT_LINE, VIEW_POSITION, exerciseValueLine, phonePremium, statusLine, strikeAgainst } from './copy'
 import { isShort } from './hooks'
 import { PositionButtonLink, PositionLink, ReservesLink } from './links'
-import { ACTION_NAME, ACTION_OF_KIND, KIND_WORD, MONEYNESS_WORD, glyphOf, money, qtyOf, sellLabel, strikeExact, strikeText } from './model'
+import { ACTION_NAME, ACTION_OF_KIND, KIND_WORD, MONEYNESS_WORD, glyphOf, money, premiumPerUnitLine, qtyOf, sellLabel, strikeExact, strikeText } from './model'
 import type { PositionAction } from './model'
+import { UnsettledAction } from './Unsettled'
+import { unsettledOn, waitReason } from './waiting'
 import css from './PositionTables.module.css'
 
 const HOUR_MS = 3_600_000
@@ -32,6 +35,8 @@ export interface PositionTableProps {
   canSell?: (p: PositionView) => boolean
   /** One more line under where the row stands: an open offer's place in its series, a sale since the last visit. */
   noteOf?: (p: PositionView) => string | null
+  /** An earlier transaction of the wallet whose outcome is unknown: its row shows so, the other rows' actions wait. */
+  unsettled?: UnsettledTx | null
 }
 
 /** The token the contract pays this row out in: an exercise, a claim, a reclaim or a cancellation. */
@@ -64,16 +69,12 @@ const Figure = ({ units, decimals }: { units: bigint; decimals: number }) => <Am
 
 /** The premium as the total, with the premium per unit under it, as the Requests board prints it. */
 function PremiumCell({ o }: { o: Pick<OptionOffer, 'underlying' | 'quote' | 'underlyingQty' | 'totalPremium'> }) {
-  const unit = premiumUnits(o)
+  const perUnit = premiumPerUnitLine(o)
   return (
     <Td numeric>
       <span className={css.stackEnd}>
         <Figure units={o.totalPremium} decimals={o.quote.decimals} />
-        {unit !== null ? (
-          <span className={css.sub}>
-            {formatUnits(unit, o.quote.decimals)} per {o.underlying.code}
-          </span>
-        ) : null}
+        {perUnit !== null ? <span className={css.sub}>{perUnit}</span> : null}
       </span>
     </Td>
   )
@@ -86,7 +87,7 @@ function TermsCells({ o }: { o: Pick<OptionOffer, 'underlying' | 'quote' | 'unde
       <Td numeric>
         <Figure units={o.underlyingQty} decimals={o.underlying.decimals} />
       </Td>
-      <Td numeric>
+      <Td strike>
         <Amount value={strikeText(o)} exact={strikeExact(o)} />
       </Td>
       <PremiumCell o={o} />
@@ -120,7 +121,17 @@ function ShortNote({ token }: { token: TokenInfo }) {
   )
 }
 
-/** Where the position stands: moneyness in words with the price it was measured at while active, else what is pending. */
+/**
+ * The second line of a live row: what it is worth or what it locks. A holding in the money gives its exercise value
+ * at the labelled reference; any other holding says where the strike stands against it; a written option or an open
+ * offer says what it locks.
+ */
+function valueLine(p: PositionView): string {
+  if (p.role === 'writer') return LOCKS(money(p.collateral))
+  return exerciseValueLine(p) ?? strikeAgainst(p) ?? 'Set an assumed price on the position page'
+}
+
+/** Where the position stands: moneyness in words with its value or what it locks while active, else what is pending. */
 function StandingCell({ p, short, note }: { p: PositionView; short: readonly TokenInfo[]; note?: string | null }) {
   const o = p.option
   const payout = payoutOf(p)
@@ -131,7 +142,7 @@ function StandingCell({ p, short, note }: { p: PositionView; short: readonly Tok
       <Td muted>
         <span className={css.stack}>
           <span className={css.wrap}>{statusLine(p)}</span>
-          <span className={css.sub}>{YOU_LOCK(money(p.collateral))}</span>
+          <span className={css.sub}>{LOCKS(money(p.collateral))}</span>
           {note ? <span className={css.sub}>{note}</span> : null}
           {shortNote}
         </span>
@@ -143,7 +154,7 @@ function StandingCell({ p, short, note }: { p: PositionView; short: readonly Tok
       <Td>
         <span className={css.stack}>
           <span>{MONEYNESS_WORD[p.moneyness]}</span>
-          <span className={css.sub}>{strikeAgainst(p) ?? 'Set an assumed price on the position page'}</span>
+          <span className={css.sub}>{valueLine(p)}</span>
           {p.listing ? <span className={css.sub}>Listed for resale at {money({ token: o.quote, amount: p.listing.askTotal })}</span> : null}
           {note ? <span className={css.news}>{note}</span> : null}
           {shortNote}
@@ -161,17 +172,21 @@ function StandingCell({ p, short, note }: { p: PositionView; short: readonly Tok
   )
 }
 
-function RowAction({ p, action, onAction, variant = 'secondary' }: { p: PositionView; action: PositionAction; onAction: RowActionHandler; variant?: 'secondary' | 'quiet' }) {
+/** One row action: the same outlined small button for every action on every row. */
+function RowAction({ p, action, onAction, unsettled }: { p: PositionView; action: PositionAction; onAction: RowActionHandler; unsettled?: UnsettledTx | null }) {
   const working = useSubjectBusy(optionSubject(p.option.id))
   const busy = useTxBusy()
   const label = action === 'sell' ? sellLabel(p.listing) : ACTION_NAME[action]
+  // A contract call shows its own transaction in flight; listing goes through the ticket, which shows its own.
+  const call = action !== 'sell'
+  const wait = waitReason(busy, working, unsettled)
   return (
     <Button
       size="sm"
-      variant={variant}
-      loading={working && variant === 'secondary'}
-      disabled={busy && !working}
-      disabledReason={BUSY_REASON}
+      variant="secondary"
+      loading={working && call}
+      disabled={wait.disabled}
+      disabledReason={wait.reason}
       onClick={() => onAction(p, action)}
       aria-label={`${label}: ${KIND_WORD[p.option.kind].toLowerCase()} on ${money(qtyOf(p.option))}, number ${p.option.id}`}
     >
@@ -188,11 +203,19 @@ const NoAction = () => (
 )
 
 /**
- * The contract call the row allows, and listing for resale for a held option. An exercise that the reference
- * says is out of the money is left to the position page, where its warning and consent are: the row leads with
- * the listing instead.
+ * The contract call the row allows, and for a held option listing it for resale, or changing and withdrawing its
+ * listing: every action of the position page. An exercise that the reference says is out of the money is left to
+ * the position page, where its warning and consent are: the row leads with the listing instead.
  */
-function ActionCell({ p, onAction, canSell }: { p: PositionView; onAction: RowActionHandler; canSell?: (p: PositionView) => boolean }) {
+function ActionCell({ p, onAction, canSell, unsettled }: { p: PositionView; onAction: RowActionHandler; canSell?: (p: PositionView) => boolean; unsettled?: UnsettledTx | null }) {
+  const own = unsettledOn(unsettled, optionSubject(p.option.id))
+  if (own) {
+    return (
+      <Td pinned>
+        <UnsettledAction unsettled={own} />
+      </Td>
+    )
+  }
   // Past its deadline an option still reads active for a few seconds, until the next read: nothing to exercise.
   const lapsed = p.action === 'exercise' && p.secondsLeft !== null && p.secondsLeft <= 0
   const call = p.action && !lapsed ? ACTION_OF_KIND[p.action] : null
@@ -202,8 +225,9 @@ function ActionCell({ p, onAction, canSell }: { p: PositionView; onAction: RowAc
     <Td pinned>
       {showCall || sell ? (
         <span className={css.actions}>
-          {showCall && call ? <RowAction p={p} action={call} onAction={onAction} /> : null}
-          {sell ? <RowAction p={p} action="sell" onAction={onAction} variant={showCall ? 'quiet' : 'secondary'} /> : null}
+          {showCall && call ? <RowAction p={p} action={call} onAction={onAction} unsettled={unsettled} /> : null}
+          {sell ? <RowAction p={p} action="sell" onAction={onAction} unsettled={unsettled} /> : null}
+          {sell && p.listing ? <RowAction p={p} action="unlist" onAction={onAction} unsettled={unsettled} /> : null}
         </span>
       ) : (
         <NoAction />
@@ -214,23 +238,28 @@ function ActionCell({ p, onAction, canSell }: { p: PositionView; onAction: RowAc
 
 // ------------------------------------------------------------------------------------------- phone rows
 
-/** What the emphasised corner of a phone row says: what waits for the wallet, else the time left, else the date. */
-function phoneCorner(p: PositionView): string {
+/** What the emphasised corner of a phone row says: an unknown outcome, what waits for the wallet, else the time left. */
+function phoneCorner(p: PositionView, unsettled: UnsettledTx | null | undefined): string {
   const o = p.option
+  if (unsettledOn(unsettled, optionSubject(o.id))) return 'Outcome unknown'
   if (p.role === 'writer' && p.claim) return `Claim ${money(p.claim)}`
   if (p.role === 'writer' && o.state === 'expired') return `Reclaim ${money(p.collateral)}`
   if (p.secondsLeft !== null && p.secondsLeft > 0) return `${formatCountdown(p.secondsLeft)} left`
   return ''
 }
 
+/** `Put on 10.00 FUND at 10.60`, the strike kept on the line of its "at". */
+const phoneTitle = (o: Pick<OptionOffer, 'kind' | 'underlying' | 'quote' | 'underlyingQty' | 'totalStrike'>): string =>
+  `${KIND_WORD[o.kind]} on ${money(qtyOf(o))} at${NBSP}${strikeText(o)}`
+
 /** Three lines and a chevron; the whole row is the link to the position. */
-function PhoneRow({ p, short, note }: { p: PositionView; short: readonly TokenInfo[]; note?: string | null }) {
+function PhoneRow({ p, short, note, unsettled }: { p: PositionView; short: readonly TokenInfo[]; note?: string | null; unsettled?: UnsettledTx | null }) {
   const o = p.option
   const standing =
     o.state === 'active' && p.moneyness
-      ? [MONEYNESS_WORD[p.moneyness], strikeAgainst(p), note].filter(Boolean).join('. ')
+      ? [MONEYNESS_WORD[p.moneyness], valueLine(p), note].filter(Boolean).join('. ')
       : o.state === 'offered'
-        ? [statusLine(p), YOU_LOCK(money(p.collateral)), note].filter(Boolean).join('. ')
+        ? [statusLine(p), LOCKS(money(p.collateral)), note].filter(Boolean).join('. ')
         : [statusLine(p), note].filter(Boolean).join('. ')
   const listing = o.state === 'active' && p.listing ? `Listed for resale at ${money({ token: o.quote, amount: p.listing.askTotal })}` : null
   const payout = payoutOf(p)
@@ -240,14 +269,12 @@ function PhoneRow({ p, short, note }: { p: PositionView; short: readonly TokenIn
         <span className={css.phoneLine}>
           <span className={css.phoneTitle}>
             <Glyph name={glyphOf(o.kind, p.role)} size={12} />
-            <span>
-              {KIND_WORD[o.kind]} on {money(qtyOf(o))} at {strikeText(o)}
-            </span>
+            <span>{phoneTitle(o)}</span>
           </span>
-          <span className={css.phoneWhen}>{phoneCorner(p)}</span>
+          <span className={css.phoneWhen}>{phoneCorner(p, unsettled)}</span>
         </span>
         <span className={css.phoneWhere}>{listing ? `${standing}. ${listing}` : standing}</span>
-        <span className={css.phoneLine}>
+        <span className={css.phoneMetaLine}>
           <span className={css.phoneMeta}>{phonePremium(p)}</span>
           <span className={css.phoneMeta}>{formatUtc(o.expiry)}</span>
         </span>
@@ -293,7 +320,7 @@ function Head({ strike, premium, last = 'Where it stands', action = 'Actions' }:
         <Th>Option</Th>
         <Th>Asset</Th>
         <Th numeric>Quantity</Th>
-        <Th numeric>{strike}</Th>
+        <Th strike>{strike}</Th>
         <Th numeric>{premium}</Th>
         <Th>Deadline (UTC)</Th>
         <Th>{last}</Th>
@@ -326,11 +353,11 @@ function useRowOpen() {
   }
 }
 
-function PositionTable({ label, premium, rows, onAction, short = [], canSell, noteOf }: PositionTableProps & { label: string; premium: string }) {
+function PositionTable({ label, premium, rows, onAction, short = [], canSell, noteOf, unsettled }: PositionTableProps & { label: string; premium: string }) {
   const unit = unitOf(rows)
   const open = useRowOpen()
   return (
-    <Responsive label={label} phone={rows.map((p) => <PhoneRow key={p.option.id.toString()} p={p} short={short} note={noteOf?.(p)} />)}>
+    <Responsive label={label} phone={rows.map((p) => <PhoneRow key={p.option.id.toString()} p={p} short={short} note={noteOf?.(p)} unsettled={unsettled} />)}>
       <Table fixed className={css.table} caption={`${label}. Strike per unit and premium in ${unit}.`}>
         <Columns widths={COLUMNS} />
         <Head strike={`Strike (${unit})`} premium={<TwoLines first={premium} second={`(${unit})`} />} />
@@ -341,7 +368,7 @@ function PositionTable({ label, premium, rows, onAction, short = [], canSell, no
               <TermsCells o={p.option} />
               <DeadlineCell expiry={p.option.expiry} live={p.secondsLeft !== null && p.secondsLeft > 0} warnHours={warnHoursOf(p)} />
               <StandingCell p={p} short={short} note={noteOf?.(p)} />
-              <ActionCell p={p} onAction={onAction} canSell={canSell} />
+              <ActionCell p={p} onAction={onAction} canSell={canSell} unsettled={unsettled} />
             </Tr>
           ))}
         </TBody>
@@ -362,15 +389,16 @@ export const OffersTable = (props: PositionTableProps) => <PositionTable {...pro
 export interface ListingsTableProps {
   rows: readonly PositionView[]
   onAction: RowActionHandler
+  unsettled?: UnsettledTx | null
 }
 
 /** The wallet's live resale listings: its price under the highlighter, re-price and withdraw. */
-export function ListingsTable({ rows, onAction }: ListingsTableProps) {
+export function ListingsTable({ rows, onAction, unsettled }: ListingsTableProps) {
   const label = 'Your resale listings'
   const unit = unitOf(rows)
   const open = useRowOpen()
   return (
-    <Responsive label={label} phone={rows.map((p) => <PhoneRow key={p.option.id.toString()} p={p} short={[]} />)}>
+    <Responsive label={label} phone={rows.map((p) => <PhoneRow key={p.option.id.toString()} p={p} short={[]} unsettled={unsettled} />)}>
       <Table fixed className={css.table} caption={`${label}. Strike per unit and your price in ${unit}.`}>
         <Columns widths={LISTING_COLUMNS} />
         <THead>
@@ -378,7 +406,7 @@ export function ListingsTable({ rows, onAction }: ListingsTableProps) {
             <Th>Option</Th>
             <Th>Asset</Th>
             <Th numeric>Quantity</Th>
-            <Th numeric>Strike ({unit})</Th>
+            <Th strike>Strike ({unit})</Th>
             <Th numeric>Your price ({unit})</Th>
             <Th>Deadline (UTC)</Th>
             <Th pinned>
@@ -390,6 +418,7 @@ export function ListingsTable({ rows, onAction }: ListingsTableProps) {
           {rows.map((p) => {
             const o = p.option
             const ask = p.listing?.askTotal ?? 0n
+            const own = unsettledOn(unsettled, optionSubject(o.id))
             return (
               <Tr key={o.id.toString()} data-testid={`listing-${o.id}`} interactive className={css.row} onClick={open(o.id)}>
                 <OptionCell p={p} />
@@ -397,7 +426,7 @@ export function ListingsTable({ rows, onAction }: ListingsTableProps) {
                 <Td numeric>
                   <Figure units={o.underlyingQty} decimals={o.underlying.decimals} />
                 </Td>
-                <Td numeric>
+                <Td strike>
                   <Amount value={strikeText(o)} exact={strikeExact(o)} />
                 </Td>
                 <Td numeric>
@@ -407,10 +436,14 @@ export function ListingsTable({ rows, onAction }: ListingsTableProps) {
                 </Td>
                 <DeadlineCell expiry={o.expiry} live={p.secondsLeft !== null && p.secondsLeft > 0} warnHours={2} />
                 <Td pinned>
-                  <span className={css.actions}>
-                    <RowAction p={p} action="sell" onAction={onAction} />
-                    <RowAction p={p} action="unlist" onAction={onAction} variant="quiet" />
-                  </span>
+                  {own ? (
+                    <UnsettledAction unsettled={own} />
+                  ) : (
+                    <span className={css.actions}>
+                      <RowAction p={p} action="sell" onAction={onAction} unsettled={unsettled} />
+                      <RowAction p={p} action="unlist" onAction={onAction} unsettled={unsettled} />
+                    </span>
+                  )}
                 </Td>
               </Tr>
             )
@@ -428,19 +461,22 @@ export interface RequestsTableProps {
   nowSec: number
   onCancel: (bid: Bid) => void
   short?: readonly TokenInfo[]
+  unsettled?: UnsettledTx | null
 }
 
+/** Open (before or after its deadline) or expired, a request still holds its premium: the buyer can cancel it. */
 const cancellable = (b: Bid): boolean => b.state === 'open' || b.state === 'expired'
 
-function CancelRequestButton({ b, onCancel, wide = false }: { b: Bid; onCancel: (bid: Bid) => void; wide?: boolean }) {
+function CancelRequestButton({ b, onCancel, wide = false, unsettled }: { b: Bid; onCancel: (bid: Bid) => void; wide?: boolean; unsettled?: UnsettledTx | null }) {
   const working = useSubjectBusy(bidSubject(b.id))
   const busy = useTxBusy()
+  const wait = waitReason(busy, working, unsettled)
   return (
     <Button
       size={wide ? 'md' : 'sm'}
       loading={working}
-      disabled={busy && !working}
-      disabledReason={BUSY_REASON}
+      disabled={wait.disabled}
+      disabledReason={wait.reason}
       onClick={() => onCancel(b)}
       aria-label={`Cancel request: ${b.kind} on ${money({ token: b.underlying, amount: b.underlyingQty })}, number ${b.id}`}
     >
@@ -449,8 +485,10 @@ function CancelRequestButton({ b, onCancel, wide = false }: { b: Bid; onCancel: 
   )
 }
 
-function RequestAction({ b, onCancel, wide }: { b: Bid; onCancel: (bid: Bid) => void; wide?: boolean }) {
-  if (cancellable(b)) return <CancelRequestButton b={b} onCancel={onCancel} wide={wide} />
+function RequestAction({ b, onCancel, wide, unsettled }: { b: Bid; onCancel: (bid: Bid) => void; wide?: boolean; unsettled?: UnsettledTx | null }) {
+  const own = unsettledOn(unsettled, bidSubject(b.id))
+  if (own) return <UnsettledAction unsettled={own} size={wide ? 'md' : 'sm'} />
+  if (cancellable(b)) return <CancelRequestButton b={b} onCancel={onCancel} wide={wide} unsettled={unsettled} />
   if (b.state === 'filled' && b.optionId !== null) {
     return (
       <PositionButtonLink id={b.optionId} size={wide ? 'md' : 'sm'}>
@@ -462,7 +500,7 @@ function RequestAction({ b, onCancel, wide }: { b: Bid; onCancel: (bid: Bid) => 
 }
 
 /** The wallet's requests: premiums it escrowed, each cancellable for a refund while open or expired. */
-export function RequestsTable({ rows, nowSec, onCancel, short = [] }: RequestsTableProps) {
+export function RequestsTable({ rows, nowSec, onCancel, short = [], unsettled }: RequestsTableProps) {
   const label = 'Your requests'
   const unit = rows[0]?.quote.code ?? ''
   const status = (b: Bid): string => (b.state === 'open' && b.expiry <= nowSec ? BID_STATUS.expired : BID_STATUS[b.state])
@@ -492,7 +530,7 @@ export function RequestsTable({ rows, nowSec, onCancel, short = [] }: RequestsTa
                     </span>
                   </Td>
                   <Td pinned>
-                    <RequestAction b={b} onCancel={onCancel} />
+                    <RequestAction b={b} onCancel={onCancel} unsettled={unsettled} />
                   </Td>
                 </Tr>
               ))}
@@ -507,20 +545,18 @@ export function RequestsTable({ rows, nowSec, onCancel, short = [] }: RequestsTa
               <span className={css.phoneLine}>
                 <span className={css.phoneTitle}>
                   <Glyph name={glyphOf(b.kind, 'holder')} size={12} />
-                  <span>
-                    {KIND_WORD[b.kind]} on {money({ token: b.underlying, amount: b.underlyingQty })} at {strikeText(b)}
-                  </span>
+                  <span>{phoneTitle(b)}</span>
                 </span>
                 <span className={css.phoneWhen}>{b.state === 'open' && b.expiry > nowSec ? `${formatCountdown(b.expiry - nowSec)} left` : ''}</span>
               </span>
               <span className={css.phoneWhere}>{status(b)}</span>
-              <span className={css.phoneLine}>
+              <span className={css.phoneMetaLine}>
                 <span className={css.phoneMeta}>Escrowed {money({ token: b.quote, amount: b.totalPremium })}</span>
                 <span className={css.phoneMeta}>{formatUtc(b.expiry)}</span>
               </span>
               {cancellable(b) && isShort(b.quote, short) ? <ShortNote token={b.quote} /> : null}
               <span className={css.phoneAction}>
-                <RequestAction b={b} onCancel={onCancel} wide />
+                <RequestAction b={b} onCancel={onCancel} wide unsettled={unsettled} />
               </span>
             </div>
           </li>

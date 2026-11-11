@@ -200,14 +200,6 @@
     min-width: 0;
   }
 
-  .heroLabel {
-    margin-bottom: var(--s-16);
-    font-size: var(--body-size);
-    line-height: var(--body-line);
-    font-weight: 500;
-    color: var(--muted);
-  }
-
   /* The headline is text and the largest thing painted on the first screen. Beside the note it grows from 40 px
      at 1100 px (two lines in a 24rem column) to 52 px at 1280 px and 64 px at 1440 px. */
   .h1 {
@@ -270,28 +262,26 @@
     padding-inline: var(--landing-gutter);
   }
 
-  /* One column: the heading, one sentence, the button. */
+  /* One sentence and the button: one column on a phone, one line from 768 px. */
   .closingInner {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--s-12);
+    gap: var(--s-16);
     max-width: var(--landing-max);
     margin-inline: auto;
-    padding-block: var(--landing-section-gap);
+    padding-block: var(--s-40) var(--landing-section-gap);
     border-top: 1px solid var(--rule);
-  }
 
-  .closingHeading {
-    font-family: var(--font-serif);
-    font-size: var(--landing-h2-size);
-    line-height: var(--landing-h2-line);
-    font-weight: 560;
-    letter-spacing: var(--h1-track);
+    @media (min-width: 768px) {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--s-16) var(--s-32);
+    }
   }
 
   .closingBody {
-    margin-bottom: var(--s-12);
     font-size: var(--landing-lede-size);
     line-height: var(--landing-lede-line);
     color: var(--text-2);

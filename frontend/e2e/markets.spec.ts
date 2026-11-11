@@ -34,10 +34,15 @@ test.describe('markets index', () => {
     await expect(table.getByRole('row', { name: /EQTY/ })).toContainText('24.60')
     await expect(page.getByRole('main')).not.toContainText(/market price|oracle price|live price/i)
 
-    // Open offers, the nearest deadline and the cheapest premiums are read from the mock market; a cheapest
-    // premium names the strike and the day it is for.
+    // Open offers, the nearest deadline and the two premiums are read from the mock market. A premium is the best
+    // offer at the strike nearest the demo price (BOND 99.40: the 99.00 strike) and names the strike and the day.
+    await expect(table.getByRole('columnheader', { name: /^Put near demo price/ })).toContainText('USDx per unit')
+    await expect(table.getByRole('columnheader', { name: /^Call near demo price/ })).toContainText('USDx per unit')
+    await expect(table.getByRole('columnheader', { name: /Cheapest/ })).toHaveCount(0)
     await expect(bond.getByRole('cell').nth(1)).toHaveText(/^\d+$/)
-    await expect(bond.getByRole('cell').nth(3)).toContainText(/at [\d,.]+, \d+ [A-Z][a-z]{2}/)
+    await expect(bond.getByRole('cell').nth(3)).toContainText(/^[\d,.]+at 99\.00, \d+\s[A-Z][a-z]{2}$/)
+    await expect(bond.getByRole('cell').nth(4)).toContainText(/^(None|[\d,.]+at 99\.00, \d+\s[A-Z][a-z]{2})$/)
+    await expect(table.getByRole('row', { name: /FUND/ }).getByRole('cell').nth(3)).toContainText(/at 10\.20, /)
     await expect(bond.getByRole('link', { name: 'Trade BOND' })).toHaveAttribute('href', /\/markets\/bond$/)
 
     // Nothing is hidden, so there is no count line, no tier legend and no note about the list.
@@ -60,12 +65,16 @@ test.describe('markets index', () => {
   test('an intent asks for the asset in the Assets section, then opens it in guided mode with the intent', async ({ page }) => {
     await openApp(page, '/markets')
     const intents = page.getByRole('region', { name: 'What do you want to do?' })
-    // Four equal rows, each with who pays and when.
+    // Four equal rows, each saying in two words who pays the premium (when is said at the ticket).
     await expect(intents.getByRole('listitem')).toHaveCount(4)
-    await expect(intents.getByRole('link', { name: /^Set a floor/ })).toContainText('You pay for that right once, when you buy: the premium.')
-    await expect(intents.getByRole('link', { name: /^Earn on what you hold/ })).toContainText('A buyer pays you for that agreement, the premium, when one takes your terms.')
-    await expect(intents.getByRole('link', { name: /^Earn while waiting to buy/ })).toContainText('A buyer pays you')
-    await expect(intents.getByRole('link', { name: /^Lock a buy price/ })).toContainText('You pay for that right once')
+    await expect(intents.getByRole('link', { name: /^Set a floor/ })).toContainText(/You pay$/)
+    await expect(intents.getByRole('link', { name: /^Earn on what you hold/ })).toContainText(/You are paid$/)
+    await expect(intents.getByRole('link', { name: /^Earn while waiting to buy/ })).toContainText(/You are paid$/)
+    await expect(intents.getByRole('link', { name: /^Lock a buy price/ })).toContainText(/You pay$/)
+    await expect(intents).not.toContainText(/once, when you buy|when one takes your terms/)
+    // The sentences of the rows start at one edge, whatever the length of who pays.
+    const starts = await intents.getByRole('listitem').evaluateAll((items) => items.map((li) => Math.round(li.querySelector('a > span:nth-of-type(2)')?.getBoundingClientRect().x ?? -1)))
+    expect(new Set(starts).size).toBe(1)
 
     await intents.getByRole('link', { name: /^Set a floor/ }).click()
     await expect(page).toHaveURL(/\/markets\?intent=floor$/)
@@ -208,7 +217,7 @@ test.describe('asset page', () => {
     await expect(main.getByRole('heading', { name: 'The contract does not list this asset.' })).toBeVisible()
     // The segment of the URL is never printed back.
     await expect(main).not.toContainText('nosuchasset')
-    await expect(main.getByRole('link', { name: 'All markets' })).toHaveAttribute('href', /\/markets$/)
+    await expect(main.getByRole('link', { name: 'Go to Markets' })).toHaveAttribute('href', /\/markets$/)
     const listed = main.getByRole('navigation', { name: 'Assets you can open' })
     await expect(listed.getByRole('link')).toHaveText(['FUND', 'BOND', 'EQTY'])
     await listed.getByRole('link', { name: 'EQTY' }).click()
@@ -261,7 +270,8 @@ test.describe('requests tab', () => {
     await expect(tabs(page).getByRole('link', { name: /^Requests/ })).toContainText('2')
 
     const table = requestsTable(page)
-    await expect(table.getByRole('columnheader')).toHaveText(['Kind', 'Strike', 'Quantity', 'Deadline', 'Premium escrowed', 'Buyer', 'Action'])
+    // The columns of /requests (ruling F15): the premium per unit leads, its total is the hint.
+    await expect(table.getByRole('columnheader')).toHaveText(['Kind', 'Strike', 'Quantity', 'Deadline', 'Premium per unit', 'Buyer', 'Action'])
     const rows = table.locator('tbody tr')
     await expect(rows).toHaveCount(2)
     for (const row of await rows.all()) {
@@ -272,9 +282,10 @@ test.describe('requests tab', () => {
     }
     // Every column is on screen at 1440 px: the table does not scroll inside its frame.
     await expect(page.locator('.ui-table-wrap[data-scrolls]')).toHaveCount(0)
-    // Highest premium per unit first: the per-unit figure sits under the escrowed total.
+    // Highest premium per unit first: the per-unit figure leads its cell, the escrowed total is under it.
     const premiums = await rows.locator('td:nth-child(5)').allInnerTexts()
-    const figures = premiums.map((t) => Number(/([\d.]+) per unit/.exec(t)?.[1]))
+    await expect(rows.first().locator('td:nth-child(5)')).toContainText('in total')
+    const figures = premiums.map((t) => Number(/^([\d.]+)/.exec(t.trim())?.[1]))
     expect(figures.every((f) => Number.isFinite(f))).toBe(true)
     expect(figures[0]).toBeGreaterThanOrEqual(figures[1])
   })
@@ -298,10 +309,10 @@ test.describe('requests tab', () => {
     await expect(row).toHaveCount(1)
     await expect(row).toContainText('Yours')
     await expect(row.locator('mark')).toContainText('USDx') // the escrowed premium is the wallet's own figure
-    await row.getByRole('button', { name: /^Cancel your request/ }).click()
+    await row.getByRole('button', { name: /^Cancel request No\. \d+:/ }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
-    await dialog.getByRole('button', { name: 'Cancel request' }).click()
+    await dialog.getByRole('button', { name: 'Cancel request', exact: true }).click()
     await expect(dialog.getByRole('button', { name: /^(Done|Close)$/ }).first()).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('heading', { name: 'No open requests on BOND.' })).toBeVisible()
@@ -314,17 +325,18 @@ test.describe('about tab', () => {
     await openApp(page, '/markets/bond?tab=about')
     const main = page.getByRole('main')
     await expect(main.getByRole('heading', { name: 'Asset facts' })).toBeVisible()
-    // What a token of the app's list is: said once, here, in a sentence.
-    await expect(main.getByText("A test token issued by this project's issuer account on Stellar Testnet.")).toHaveCount(1)
+    // What a token of the app's list is: said once, here, in a sentence. On mock data it claims no network.
+    await expect(main.getByText('A demo token of the in-memory market. It represents no real instrument and has no monetary value.')).toHaveCount(1)
+    await expect(main).not.toContainText("issued by this project's issuer account")
     // The top bar says "Mock data"; no panel repeats it.
     await expect(main).not.toContainText(/Mock (asset|contract|ids)/)
 
     const powers = page.getByRole('table', { name: 'Issuer powers' })
-    // A mock asset answers with the flags of the regulated asset it plays, so each power reads On or Off and the
-    // table has its fourth row: whether the issuer can still change them.
-    await expect(powers.getByRole('rowheader')).toHaveText(['Authorization required', 'Authorization revocable', 'Clawback enabled', 'Change these settings'])
+    // A mock asset answers with the flags of the recorded Testnet issuer, in the words Reserves and Issuer use, so
+    // each power reads Yes or No and the table has its fourth row: whether the issuer can still change them.
+    await expect(powers.getByRole('rowheader')).toHaveText(['Approval required', 'Can freeze', 'Can claw back', 'Can change these'])
     await expect(powers).not.toContainText('Not read')
-    await expect(powers.getByRole('row', { name: /^Clawback enabled/ })).toContainText('On')
+    await expect(powers.getByRole('row', { name: /^Can claw back/ })).toContainText('Yes')
     await expect(powers).toContainText('The issuer can take tokens back, including from the Covered contract.')
     // The required sentence has its home here, verbatim and once.
     await expect(main.getByText(ISSUER_DISCLOSURE)).toHaveCount(1)
@@ -334,7 +346,7 @@ test.describe('about tab', () => {
     // The contract's own facts are on Reserves, not repeated on every asset.
     await expect(main.getByRole('heading', { name: 'Contract and roles' })).toHaveCount(0)
     await expect(main.getByRole('heading', { name: 'On the explorer' })).toHaveCount(0)
-    await expect(main.getByRole('link', { name: 'Reserves, contracts and roles' })).toHaveAttribute('href', /\/reserves$/)
+    await expect(main.getByRole('link', { name: 'Open Reserves' })).toHaveAttribute('href', /\/reserves$/)
 
     // A guest gets no access card; a connected wallet is told whether it can hold the asset.
     await expect(main.getByRole('heading', { name: 'Your access' })).toHaveCount(0)
@@ -416,6 +428,27 @@ test.describe('first run: a wallet that holds none of the tokens', () => {
     // The same page as a wallet with balances has no such strip, and a guest never sees it.
     await switchAccount(page, ADDR_A)
     await expect(page.getByRole('heading', { name: 'Get test funds' })).toHaveCount(0)
+  })
+
+  test('names the tokens as this page does, and ends with the way back to the order that sent the wallet here @both', async ({ page }) => {
+    const order = '/markets/bond?mode=guided&intent=floor&strike=99.00&expiry=2026-11-20'
+    await openApp(page, `/markets?funds=1&from=${encodeURIComponent(order)}`, { connect: DEMO_WALLETS.c })
+    const strip = page.getByRole('region', { name: 'Get test funds' })
+    // Mock data calls the fund token FUND; on Testnet its code is RWA.
+    await expect(strip).toContainText('FUND (RWA on Testnet), BOND or EQTY')
+    const back = strip.getByRole('link', { name: 'Back to your order' })
+    // The test wallet's `as=` may ride along; the order's own terms are all there.
+    await expect(back).toHaveAttribute('href', new RegExp(`^${order.replace(/[.?]/g, '\\$&')}(&as=\\w+)?$`))
+    await back.click()
+    expect(await currentPath(page)).toBe(order)
+    await expect(pageHeading(page)).toHaveText('BOND')
+
+    // A return path that leaves the app is dropped, and the strip has no way back.
+    for (const away of ['//example.org/x', 'https://example.org/']) {
+      await routeTo(page, `/markets?funds=1&from=${encodeURIComponent(away)}`)
+      await expect(page.getByRole('region', { name: 'Get test funds' })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Back to your order' })).toHaveCount(0)
+    }
   })
 
   test('the asset page shows the empty balances as they are, with the way to test tokens', async ({ page }) => {

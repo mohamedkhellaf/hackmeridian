@@ -43,10 +43,7 @@
 
   .no {
     color: var(--text-2);
-    font-family: var(--font-mono);
-    font-size: var(--mono-size);
-    line-height: var(--mono-line);
-    font-feature-settings: 'zero';
+    white-space: nowrap;
   }
 
   .reason {

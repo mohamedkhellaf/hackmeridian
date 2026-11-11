@@ -4,7 +4,7 @@ import { DIFFERENT, SECTION } from '../copy'
 import { Section } from './Section'
 import css from './Different.module.css'
 
-/** Three properties of the Covered contract. Their limits are told once, in the Limits table. */
+/** Three properties of the Covered contract. Their limits are told once, in the Limits list. */
 export function Different() {
   return (
     <Section id={SECTION.different} heading={DIFFERENT.heading}>

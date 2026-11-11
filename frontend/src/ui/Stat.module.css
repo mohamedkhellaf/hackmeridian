@@ -37,12 +37,14 @@
     letter-spacing: -0.005em;
   }
 
+  /* The unit as Amount sets it beside a serif figure: sans 500 at UI size, muted. */
   .unit {
     font-family: var(--font-sans);
-    font-size: var(--label-size);
-    line-height: var(--label-line);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
     font-weight: 500;
     color: var(--muted);
+    white-space: nowrap;
   }
 
   .hint {

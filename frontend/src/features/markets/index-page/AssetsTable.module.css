@@ -116,7 +116,8 @@
     align-items: flex-end;
   }
 
-  .unit {
+  /* The second line of a column head: what the bare figures under it are counted in. */
+  .headUnit {
     font-weight: 450;
   }
 

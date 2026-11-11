@@ -20,7 +20,8 @@
   .row {
     display: grid;
     flex: 1;
-    grid-template-columns: var(--s-20) minmax(10rem, 0.8fr) minmax(0, 1.3fr) minmax(0, 1fr) var(--s-16);
+    /* The same tracks in every row (no auto track), so the sentences start at one edge. */
+    grid-template-columns: var(--s-20) minmax(10rem, 0.8fr) minmax(0, 2fr) minmax(6rem, 0.4fr) var(--s-16);
     align-items: baseline;
     column-gap: var(--s-16);
     min-width: 0;
@@ -88,14 +89,11 @@
     font-weight: var(--body-weight);
   }
 
-  .premium {
+  /* Who pays the premium, in two words, in its own column at every width. */
+  .payer {
+    justify-self: end;
     color: var(--muted);
     font-weight: var(--body-weight);
-  }
-
-  .payer {
-    display: none;
-    color: var(--muted);
     white-space: nowrap;
   }
 
@@ -117,13 +115,11 @@
       margin-top: 0;
     }
 
-    .consequence,
-    .premium {
+    .consequence {
       display: none;
     }
 
     .payer {
-      display: block;
       font-size: var(--caption-size);
       line-height: var(--caption-line);
     }

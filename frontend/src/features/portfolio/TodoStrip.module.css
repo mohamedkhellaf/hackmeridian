@@ -14,9 +14,11 @@
     letter-spacing: var(--h2-track);
   }
 
+  /* Each card hugs its content: a one-line claim is not stretched to the height of an exercise. */
   .list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+    align-items: start;
     gap: var(--s-12);
     margin: 0;
     padding: 0;
@@ -26,6 +28,7 @@
     @media (max-width: 767.98px) {
       display: flex;
       flex-direction: column;
+      align-items: stretch;
       gap: 0;
       border-top: 1px solid var(--rule);
     }
@@ -79,18 +82,33 @@
 
   .value {
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--s-2) var(--s-12);
+    flex-direction: column;
+    gap: var(--s-2);
     padding-block: var(--s-6);
     border-block: 1px solid var(--hairline);
 
     @media (max-width: 767.98px) {
       padding-block: var(--s-2);
       border: 0;
+    }
+  }
+
+  .valueRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-12);
+
+    @media (max-width: 767.98px) {
       justify-content: flex-start;
     }
+  }
+
+  .valueHint {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
   }
 
   .valueLabel {
@@ -146,10 +164,8 @@
     color: var(--warn);
   }
 
-  /* The action sits on the card's foot, so a row of cards lines its buttons up. */
   .action {
     display: flex;
-    margin-top: auto;
     padding-top: var(--s-8);
 
     @media (max-width: 767.98px) {

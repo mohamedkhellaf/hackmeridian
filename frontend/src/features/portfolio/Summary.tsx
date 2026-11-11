@@ -28,14 +28,7 @@ function Sums({ sums, quote }: { sums: Money[]; quote: TokenInfo | null }) {
       {parts.map((part, i) => {
         if (part.type === 'literal') return <span key={i} className={css.and}>{part.value}</span>
         const m = shown[Number(part.value)]
-        return (
-          <span key={m.token.contractId} className={css.sum}>
-            <Amount value={formatUnits(m.amount, m.token.decimals)} exact={formatExact(m.amount, m.token.decimals)} srLabel={`${formatUnits(m.amount, m.token.decimals)} ${m.token.code}`} figure="serif" size="lg" />
-            <span className={css.unit} aria-hidden="true">
-              {m.token.code}
-            </span>
-          </span>
-        )
+        return <Amount key={m.token.contractId} value={formatUnits(m.amount, m.token.decimals)} exact={formatExact(m.amount, m.token.decimals)} unit={m.token.code} figure="serif" size="lg" />
       })}
     </span>
   )

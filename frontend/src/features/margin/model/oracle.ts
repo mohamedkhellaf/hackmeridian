@@ -43,12 +43,14 @@ export function snapshotAge(model: Pick<ProModel, 'now'>, s: SeriesView): number
 
 /**
  * A span of seconds in the product's time style: `45 s`, `2 min 1 s`, `1 h 5 min`, `3 d 4 h`. Seconds stay
- * visible under an hour because the early-exercise limit is counted in seconds.
+ * visible under an hour because the early-exercise limit is counted in seconds. Each figure is held to its unit
+ * by a non-breaking space, so "2 min" never breaks across lines.
  */
 export function spanText(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
-  if (s < 60) return `${s} s`
-  if (s < 3600) return s % 60 === 0 ? `${s / 60} min` : `${Math.floor(s / 60)} min ${s % 60} s`
-  if (s < 86400) return s % 3600 < 60 ? `${Math.floor(s / 3600)} h` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`
-  return `${Math.floor(s / 86400)} d ${Math.floor((s % 86400) / 3600)} h`
+  const u = (n: number, unit: string) => `${n}\u00a0${unit}`
+  if (s < 60) return u(s, 's')
+  if (s < 3600) return s % 60 === 0 ? u(s / 60, 'min') : `${u(Math.floor(s / 60), 'min')} ${u(s % 60, 's')}`
+  if (s < 86400) return s % 3600 < 60 ? u(Math.floor(s / 3600), 'h') : `${u(Math.floor(s / 3600), 'h')} ${u(Math.floor((s % 3600) / 60), 'min')}`
+  return `${u(Math.floor(s / 86400), 'd')} ${u(Math.floor((s % 86400) / 3600), 'h')}`
 }

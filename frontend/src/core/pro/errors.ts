@@ -32,7 +32,7 @@ const list: [number, string, string][] = [
   [223, 'OutOfTheMoney', 'Out of the money at the latest snapshot (the publisher price is not above the strike): exercising now would pay nothing.'],
   [224, 'LiquidateFirst', 'The writer is below its liquidation level (MM) and must be taken over first. Early exercise is refused until then.'],
   [225, 'SettlementPending', 'The writer has expired positions still waiting for a settlement price. Early exercise and LP deposits wait until it is published.'],
-  [226, 'NoEarlyExercise', 'This position is owned by the vault and settles at expiry.'],
+  [226, 'NoEarlyExercise', 'This position is owned by the vault and settles at the deadline.'],
 ]
 
 export const PRO_ERRORS: Record<number, ProErrorInfo> = Object.fromEntries(

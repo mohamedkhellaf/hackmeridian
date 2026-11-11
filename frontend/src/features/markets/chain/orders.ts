@@ -46,6 +46,8 @@ export interface OrdersProps {
   showReason?: boolean
   /** With `showSeries`: the series of a row is a control that selects it in the chain. */
   onSelect?: (row: BookRow) => void
+  /** Every row is the wallet's own ("Your orders"): the role alone, without the word "Yours" the title already says. */
+  allMine?: boolean
   /** The reason every row shares (an off-grid series): said once above the book, not on each row. */
   sharedReason?: NonStandardReason | null
   /** `row.key` of the order the open ticket is about. */
@@ -67,11 +69,8 @@ export function termsOf(row: BookRow): string {
   return `${row.kind} on ${formatUnits(row.underlyingQty, row.underlying.decimals)} ${row.underlying.code}`
 }
 
-/** The order's number as the ticket prints it: `000047`, the id of the offer, listing or request. */
-export function orderNumber(row: BookRow): string {
-  const id = row.bid?.id ?? row.offer?.id ?? null
-  return id === null ? '' : id.toString().padStart(6, '0')
-}
+/** The contract id of the order (the offer, listing or request), printed through core's `serialOf`. */
+export const idOf = (row: BookRow): bigint | null => row.bid?.id ?? row.offer?.id ?? null
 
 export interface RowNotes {
   /** What needs care before taking the row: terms that cannot pay back, a reserve shortfall. Drawn with the warning mark. */

@@ -11,6 +11,7 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { BANNED_TAGLINES, ISSUER_DISCLOSURE, PAYOFF_CAPTION, PREMIUM_DISCLOSURE, RESALE_PRICE_DISCLOSURE, bidEscrowDisclosure, findBannedWords } from '../src/core/disclosures'
+import { DEMO_WALLETS } from '../src/core/options/demoAccounts'
 import { COMMITMENT, RESALE_NOTE } from '../src/features/ticket/copy'
 import { currentPath, expectNoAxeViolations, expectNoHorizontalOverflow, openApp, quietDevOverlay, routeTo } from './helpers'
 
@@ -54,12 +55,15 @@ async function openOffer(page: Page, kind: 'put' | 'call' = 'put'): Promise<stri
   return id!
 }
 
-/** The closing figure of a form's terms ("You receive when bought 1.80 USDx"): the amount with its unit. */
+/** The closing figure of a form's terms ("You receive when bought 1.80 USDx"): the amount with its unit, as read. */
 async function totalOf(page: Page): Promise<string> {
-  const text = ((await page.getByTestId('ticket-total').locator('mark').first().innerText()) ?? '').replace(/\s+/g, ' ').trim()
+  const text = ((await page.getByTestId('ticket-total').locator('mark').first().innerText()) ?? '').split('\n')[0].replace(/\s+/g, ' ').trim()
   expect(text).toMatch(/^[\d,.]+ [A-Za-z]+$/)
   return text
 }
+
+/** The "Change terms" disclosure of a form, which holds the kind, deadline and strike pickers. */
+const changeTerms = (scope: Locator): Locator => scope.locator('details', { has: scope.page().locator('summary', { hasText: 'Change terms' }) })
 
 /** The figure of a review row, as read: "1.80 USDx". */
 async function figureOf(scope: Locator, label: string): Promise<string> {
@@ -87,10 +91,16 @@ test.describe('buy an offer', () => {
     const review = flow(page)
     await expect(ticket(page)).toHaveAttribute('data-container', 'rail')
     await expect(review).toHaveAttribute('data-step', 'review')
-    await expect(review.getByText(`Offer No. ${id.padStart(6, '0')}`)).toBeVisible()
+    // The contract's own number, unpadded.
+    await expect(review.getByText(`Offer No. ${id}`, { exact: true })).toBeVisible()
     for (const label of ['You pay', 'Collateral locked', 'Strike', 'Quantity', 'Deadline', 'Breakeven', 'Most you can lose', 'Maker']) {
       await expect(row(review, label)).toBeVisible()
     }
+    // The breakeven is decided on beside the money: it follows the money rows, before the issuer sentence; the
+    // terms follow the outcome sentences.
+    const top = async (l: Locator) => (await l.boundingBox())!.y
+    expect(await top(row(review, 'Breakeven'))).toBeLessThan(await top(review.getByText(ISSUER_DISCLOSURE)))
+    expect(await top(row(review, 'Strike'))).toBeGreaterThan(await top(review.getByTestId('outcome')))
     // No absence rows, no step trail, no consent.
     for (const gone of ['You lock', 'Counterparty', 'Offer', 'Your account', 'USDx balance']) await expect(row(review, gone)).toHaveCount(0)
     await expect(page.getByRole('list', { name: 'Steps of the ticket' })).toHaveCount(0)
@@ -98,14 +108,14 @@ test.describe('buy an offer', () => {
     await expect(button(page, 'Review')).toHaveCount(0)
     await expect(button(page, 'Back')).toHaveCount(0)
 
-    // The checks that passed are one sentence with the read time.
-    await expect(review.getByTestId('checks')).toHaveText(/^Read from the contract at \d\d:\d\d:\d\d UTC: the offer is open, the FUND issuer has authorized your account, and you hold [\d,.]+ USDx\.$/)
+    // The checks that passed are one sentence with the read time; on mock data it says mock data, not a contract.
+    await expect(review.getByTestId('checks')).toHaveText(/^Mock data, \d\d:\d\d:\d\d\sUTC: the offer is open, the FUND issuer has authorized your account, and you hold [\d,.]+\sUSDx\.$/)
     // The required sentences at their home, as plain paragraphs.
     await expect(row(review, 'You pay')).toContainText(PREMIUM_DISCLOSURE)
     await expect(review.getByText(ISSUER_DISCLOSURE)).toBeVisible()
     await expect(review.getByText('Issuer control', { exact: true })).toHaveCount(0)
     await expect(review.getByTestId('outcome')).toContainText(COMMITMENT.buy)
-    await expect(review.getByTestId('outcome')).toContainText(/If FUND is below [\d.]+ USDx, exercising pays: you deliver/)
+    await expect(review.getByTestId('outcome')).toContainText(/If FUND is below [\d.]+\sUSDx, exercising pays: you deliver/)
 
     // The payoff figure is closed until asked for; its caption is inside with it.
     await expect(review.getByTestId('payoff-chart')).toBeHidden()
@@ -123,7 +133,7 @@ test.describe('buy an offer', () => {
     await expect(receipt.getByRole('heading', { name: 'Long put, FUND' })).toBeVisible()
     await expect(receipt.getByText('Active', { exact: true })).toBeVisible()
     await expect(receipt.getByTestId('receipt-tx')).toContainText('confirmed')
-    await expect(receipt.getByText(/^Until .+ UTC you can sell [\d.]+ FUND for [\d,.]+ USDx\. Use it only if FUND is worth less than [\d.]+ USDx then: exercise from Portfolio before the deadline\.$/)).toBeVisible()
+    await expect(receipt.getByText(/^Until .+\sUTC you can sell [\d.]+\sFUND for [\d,.]+\sUSDx\. Use it only if FUND is worth less than [\d.]+\sUSDx then: exercise from Portfolio before the deadline\.$/)).toBeVisible()
     await expect(receipt.getByRole('link', { name: /Open in Google Calendar instead/ })).toHaveAttribute('href', /^https:\/\/calendar\.google\.com\//)
 
     const download = page.waitForEvent('download')
@@ -176,13 +186,13 @@ test.describe('buy an offer', () => {
     await openHarness(page)
     await connectAs(page, 'A')
     const id = await openOffer(page)
-    const strike = /put ([\d.]+) USDx/.exec((await offersList(page).getByRole('button', { name: new RegExp(`^Buy offer ${id}:`) }).textContent()) ?? '')?.[1]
+    const strike = /put ([\d.]+)\sUSDx/.exec((await offersList(page).getByRole('button', { name: new RegExp(`^Buy offer ${id}:`) }).textContent()) ?? '')?.[1]
     await page.getByRole('radio', { name: 'Write' }).click()
     await expect(heading(page, 'Write a put on FUND')).toBeVisible()
     await expect(page).toHaveURL(/side=write/)
     // Opened on a series: the series is three rows, and the pickers wait behind "Change terms".
     await expect(row(flow(page), 'Strike')).toContainText(`${strike} USDx`)
-    await expect(flow(page).locator('details', { hasText: 'Change terms' })).not.toHaveAttribute('open', '')
+    await expect(changeTerms(flow(page))).not.toHaveAttribute('open', '')
     await page.getByRole('radio', { name: 'Request' }).click()
     await expect(heading(page, 'Request a put on FUND')).toBeVisible()
     await page.getByRole('radio', { name: 'Buy', exact: true }).click()
@@ -207,7 +217,7 @@ test.describe('the transaction states', () => {
     await expect(heading(page, 'Not confirmed yet')).toBeVisible()
     const sign = flow(page)
     await expect(sign.getByText('Outcome unknown')).toBeVisible()
-    await expect(sign.getByText(/It can still go through until \d\d:\d\d:\d\d UTC\. Do not send another one before that: check again first\./)).toBeVisible()
+    await expect(sign.getByText(/It can still go through until \d\d:\d\d:\d\d\sUTC\. Do not send another one before that: check again first\./)).toBeVisible()
     await expect(sign.getByRole('button', { name: 'Copy transaction hash' })).toBeVisible()
     await expect(page.getByRole('button', { name: /sign again|try again|send again/i })).toHaveCount(0)
     await button(page, 'Check again').click()
@@ -223,7 +233,7 @@ test.describe('the transaction states', () => {
     await offersList(page).locator('button[data-kind="put"][data-maker]').nth(1).click()
     await expect(heading(page, 'Buy a put on FUND')).toBeVisible()
     await expect(pay(page)).toBeDisabled()
-    await expect(page.getByTestId('action-reason')).toHaveText(/^A transaction sent at \d\d:\d\d:\d\d UTC is not confirmed yet and can still go through until \d\d:\d\d:\d\d UTC\./)
+    await expect(page.getByTestId('action-reason')).toHaveText(/^A transaction sent at \d\d:\d\d:\d\d\sUTC is not confirmed yet and can still go through until \d\d:\d\d:\d\d\sUTC\./)
     // Looking it up releases the review once the ledger has it.
     await flow(page).getByRole('button', { name: 'Check again' }).click()
     await expect(pay(page)).toBeEnabled()
@@ -284,8 +294,12 @@ test.describe('write an offer', () => {
     await button(page, 'Write a put').click()
     await expect(heading(page, 'Write a put on FUND')).toBeVisible()
 
-    // Opened without a series: the pickers are open, a listed deadline and the strike nearest the reference chosen.
+    // Opened without a series: a listed deadline and the strike nearest the reference, shown as rows; the pickers
+    // wait behind "Change terms", so the quantity and the premium come first.
     const form = flow(page)
+    await expect(changeTerms(form)).not.toHaveAttribute('open', '')
+    await expect(row(form, 'Deadline')).toBeVisible()
+    await changeTerms(form).locator('summary').first().click()
     await expect(form.getByRole('radiogroup', { name: 'Deadline' }).getByRole('radio', { checked: true })).toHaveCount(1)
     const strike = await form.getByRole('radiogroup', { name: /^Strike/ }).getByRole('radio', { checked: true }).getAttribute('value')
     expect(Number(strike)).toBeGreaterThan(0)
@@ -340,26 +354,31 @@ test.describe('write an offer', () => {
     const qty = form.getByRole('textbox', { name: /^Quantity/ })
     const premium = form.getByRole('textbox', { name: 'Premium per FUND' })
 
-    // More than the wallet holds: the collateral check names both figures.
+    // More than the wallet holds: the field says so, and the reason under the action names both figures, once,
+    // with the way to test funds beside it (no notice repeats it).
     await qty.fill('500')
     await premium.fill('1')
     await premium.blur()
-    await expect(form.getByText(/You have 120\.00 FUND; this locks 500\.00 FUND\./)).toBeVisible()
+    await expect(form.getByText(/^This locks more than the 120\.00\sFUND you have\.$/)).toBeVisible()
+    await expect(page.getByTestId('action-reason')).toHaveText(/^You have 120\.00\sFUND; this locks 500\.00\sFUND\./)
+    await expect(form.getByText(/You have 120\.00\sFUND; this locks/)).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'How to get test funds' })).toHaveAttribute('href', /^\/markets\?funds=1&from=/)
     await expect(button(page, 'Review')).toBeDisabled()
 
     // Max takes the whole balance of the asset a covered call locks.
     await button(page, /^Max/).click()
     await expect(qty).toHaveValue('120')
 
-    // A premium at or above the total strike is allowed, with a warning.
+    // A premium at or above the total strike is allowed, with a warning that carries no category word.
     await qty.fill('1')
     await premium.fill('5000')
     await premium.blur()
-    await expect(form.getByText('Check terms', { exact: true }).first()).toBeVisible()
     await expect(form.getByText(/The premium is at least the total strike\./)).toBeVisible()
+    await expect(form.getByText('Check terms', { exact: true })).toHaveCount(0)
     await expect(button(page, 'Review')).toBeEnabled()
 
     // Custom terms: a strike off the ladder and a date beyond the two-year tenor.
+    await changeTerms(form).locator('summary').first().click()
     await form.locator('summary', { hasText: 'Custom terms' }).click()
     await form.getByRole('textbox', { name: /^Strike, USDx per FUND/ }).fill('10.33')
     await expect(form.getByRole('radiogroup', { name: /^Strike/ }).getByRole('radio', { checked: true })).toHaveCount(0)
@@ -380,7 +399,7 @@ test.describe('write an offer', () => {
     await form.getByRole('textbox', { name: 'Premium per FUND' }).fill('0.4')
     await button(page, 'Review').click()
     const review = flow(page)
-    await expect(row(review, 'You give up')).toContainText(/Every rise above [\d.]+ USDx per FUND/)
+    await expect(row(review, 'You give up')).toContainText(/Every rise above [\d.]+\sUSDx per FUND/)
     await expect(row(review, 'You give up')).toContainText('You cannot owe more than the 3.00 FUND you lock; it can still fall in price.')
     await expect(row(review, 'Most you can lose')).toHaveCount(0)
     await openFigure(page)
@@ -414,7 +433,7 @@ test.describe('requests', () => {
     const before = await page.getByTestId('harness-bids').getByRole('button').count()
     await button(page, 'Post request, escrow 2.00 USDx').click()
     await expect(heading(page, 'Request posted')).toBeVisible()
-    await expect(flow(page).getByText(/^Request No\. \d{6}/).first()).toBeVisible()
+    await expect(flow(page).getByText(/^Request No\. \d+/).first()).toBeVisible()
     await expect(page.getByTestId('harness-bids').getByRole('button')).toHaveCount(before + 1)
 
     const view = page.getByRole('link', { name: 'View my requests' })
@@ -428,7 +447,7 @@ test.describe('requests', () => {
     const open = page.getByTestId('harness-bids').locator('button:not([data-mine])', { hasText: 'FUND' }).first()
     const text = (await open.textContent()) ?? ''
     const kind = /: (put|call) on/.exec(text)![1]
-    const premium = /premium ([\d.,]+ USDx)/.exec(text)![1]
+    const premium = /premium ([\d.,]+\sUSDx)/.exec(text)![1].replace(/\s/g, ' ')
     await open.click()
     await expect(heading(page, `Fill a request for a ${kind} on FUND`)).toBeVisible()
 
@@ -463,7 +482,7 @@ test.describe('resale', () => {
     const listing = page.getByTestId('harness-asks').getByRole('button').first()
     const text = (await listing.textContent()) ?? ''
     const kind = /: (put|call) on/.exec(text)![1]
-    const price = / for ([\d.,]+ USDx)$/.exec(text)![1]
+    const price = / for ([\d.,]+\sUSDx)$/.exec(text)![1].replace(/\s/g, ' ')
     await listing.click()
     await expect(heading(page, new RegExp(`^Buy a ${kind} on [A-Z]+ from its holder$`))).toBeVisible()
 
@@ -492,34 +511,53 @@ test.describe('resale', () => {
     await expect(row(flow(page), 'Original premium')).toBeVisible()
     await expect(flow(page).getByText(/Premium you paid/)).toHaveCount(0)
     await expect(button(page, 'Review')).toBeDisabled()
-    const price = flow(page).getByRole('textbox', { name: /^Your price/ })
+    // The price is typed per unit, like the reference printed above it; the exact total is a row of its own.
+    const lowest = row(flow(page), 'Lowest open offer in this series')
+    if ((await lowest.count()) > 0) await expect(lowest.locator('dd')).toContainText(/USDx per [A-Z]+/)
+    const price = flow(page).getByRole('textbox', { name: /^Your price per [A-Z]+/ })
     await price.fill('0')
     await price.blur()
     await expect(flow(page).getByText('The price must be above zero.')).toBeVisible()
-    await price.fill('2.1')
-    await expect(flow(page).getByText(/USDx per [A-Z]+\.$/)).toBeVisible()
+    await price.fill('0.7')
+    const total = await totalOf(page)
+    const qty = Number((await figureOf(flow(page), 'Quantity')).split(' ')[0].replace(/,/g, ''))
+    expect(total).toBe(`${(qty * 0.7).toFixed(2)} USDx`)
 
     await button(page, 'Review').click()
     await expect(heading(page, 'Review your listing')).toBeVisible()
     const review = flow(page)
-    expect(await figureOf(review, 'You receive')).toBe('2.10 USDx')
+    expect(await figureOf(review, 'You receive')).toBe(total)
     await expect(review.getByTestId('checks')).toContainText('the option is active')
     // Selling is not keeping: no payoff figure, no breakeven, no loss drawn from someone else's premium.
     await expect(review.locator('summary', { hasText: 'Payoff at the deadline' })).toHaveCount(0)
     await expect(row(review, 'Breakeven')).toHaveCount(0)
     await expect(review.getByText(ISSUER_DISCLOSURE)).toHaveCount(0)
-    await button(page, 'List for 2.10 USDx').click()
+    await button(page, `List for ${total}`).click()
     await expect(heading(page, 'Listed for sale')).toBeVisible()
-    await expect(page.getByTestId('harness-asks').getByRole('button', { name: new RegExp(`^Buy listing ${id}:.* for 2\\.10 USDx$`) })).toBeVisible()
+    await expect(page.getByTestId('harness-asks').getByRole('button', { name: new RegExp(`^Buy listing ${id}:.* for ${total.replace('.', '\\.')}$`) })).toBeVisible()
     await button(page, 'Done').click()
 
-    // Opening it again is a change of price, starting from the current one; the same price cannot be signed.
+    // Opening it again is a change of price, starting from the current one per unit; the same price cannot be signed.
     await page.getByTestId('harness-held').getByRole('button', { name: new RegExp(`^Sell option ${id}:`) }).click()
     await expect(heading(page, /^Change the price of your (put|call) on [A-Z]+$/)).toBeVisible()
-    await expect(flow(page).getByRole('textbox', { name: /^Your price/ })).toHaveValue('2.1')
-    await expect(row(flow(page), 'Listed now')).toContainText('2.10 USDx')
+    await expect(flow(page).getByRole('textbox', { name: /^Your price per/ })).toHaveValue('0.7')
+    await expect(row(flow(page), 'Listed now')).toContainText(total)
     await expect(button(page, 'Review')).toBeDisabled()
     await expect(page.getByTestId('action-reason')).toHaveText('This is the current price.')
+
+    // The same ticket takes the listing off sale: its own review, a way back to the price, then the receipt.
+    await button(page, 'Cancel listing').click()
+    await expect(heading(page, /^Cancel the listing of your (put|call) on [A-Z]+$/)).toBeVisible()
+    const cancel = flow(page)
+    expect(await figureOf(cancel, 'Listed now')).toBe(total)
+    await expect(cancel.getByTestId('outcome')).toContainText('You keep the option and can still exercise it before the deadline.')
+    await button(page, 'Back').click()
+    await expect(heading(page, /^Change the price of your (put|call) on [A-Z]+$/)).toBeVisible()
+    await button(page, 'Cancel listing').click()
+    await button(page, 'Cancel listing').click()
+    await expect(heading(page, 'Listing cancelled')).toBeVisible()
+    await expect(flow(page).getByText('Active', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('harness-asks').getByRole('button', { name: new RegExp(`^Buy listing ${id}:`) })).toHaveCount(0)
   })
 })
 
@@ -598,6 +636,7 @@ test.describe('keyboard', () => {
     await openHarness(page)
     await connectAs(page, 'A')
     await button(page, 'Write a put').click()
+    await changeTerms(ticket(page)).locator('summary').first().click()
     const strikes = ticket(page).getByRole('radiogroup', { name: /^Strike/ })
     const checked = strikes.getByRole('radio', { checked: true })
     const first = await checked.getAttribute('value')
@@ -630,6 +669,19 @@ test.describe('drawer, 768 to 1199 px', () => {
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
     await expect(page).not.toHaveURL(/offer=/)
+  })
+
+  test('Escape leaves a transaction in flight on screen, as in the rail, and closes the receipt', async ({ page }) => {
+    await openHarness(page)
+    await connectAs(page, 'A')
+    await openOffer(page)
+    await pay(page).click()
+    await expect(page.getByRole('dialog').getByText(/^(Sign in your wallet|Sending|Waiting for the ledger)$/).first()).toBeVisible()
+    await page.keyboard.press('Escape')
+    const dialog = page.getByRole('dialog', { name: 'Put bought' })
+    await expect(dialog).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 })
 
@@ -715,6 +767,7 @@ test.describe('phone, 390 px @phone', () => {
     await expectNoHorizontalOverflow(page)
     const qty = dialog.getByRole('textbox', { name: /^Quantity/ })
     expect(await qty.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+    await changeTerms(dialog).locator('summary').first().click()
     const chip = dialog.getByRole('radiogroup', { name: /^Strike/ }).locator('label').first()
     expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     const dialogBox = (await dialog.boundingBox())!
@@ -746,8 +799,9 @@ test.describe('accessibility', () => {
     await button(page, 'Write a call').click()
     await flow(page).getByRole('textbox', { name: /^Quantity/ }).fill('500')
     await flow(page).getByRole('textbox', { name: 'Premium per FUND' }).fill('1')
+    await changeTerms(flow(page)).locator('summary').first().click()
     await flow(page).locator('summary', { hasText: 'Custom terms' }).click()
-    await expect(flow(page).getByText(/this locks 500\.00 FUND/)).toBeVisible()
+    await expect(flow(page).getByText(/^This locks more than the 120\.00\sFUND you have\.$/)).toBeVisible()
     await expectNoAxeViolations(page, { include: '[data-testid="ticket"]' })
 
     await button(page, 'Close ticket').click()
@@ -776,6 +830,13 @@ test.describe('through the asset route', () => {
     const rail = page.getByRole('complementary', { name: 'Order ticket' })
     await expect(rail.getByRole('heading', { name: 'Write a put on FUND', level: 2 })).toBeVisible()
     await expect(rail.getByRole('button', { name: 'Connect wallet' })).toBeVisible()
+    // The quantity and the premium are on the rail's first screen, above its action bar; the pickers wait behind
+    // "Change terms".
+    const bar = rail.getByRole('button', { name: 'Connect wallet' })
+    const premium = rail.getByRole('textbox', { name: 'Premium per FUND' })
+    await expect(premium).toBeInViewport({ ratio: 1 })
+    expect((await premium.boundingBox())!.y + (await premium.boundingBox())!.height).toBeLessThanOrEqual((await bar.boundingBox())!.y)
+    await changeTerms(rail).locator('summary').first().click()
     await rail.getByRole('radiogroup', { name: /^Strike/ }).getByRole('radio').first().check({ force: true })
     await expect(page).toHaveURL(/strike=[\d.]+/)
     await rail.getByRole('button', { name: 'Close ticket' }).click()
@@ -805,6 +866,26 @@ test.describe('through the asset route', () => {
     await expect(rail.getByRole('button', { name: /^Pay / })).toBeEnabled()
   })
 
+  test('a wallet that cannot pay reads the shortfall at its balance row and under the action, with the way to test funds and back', async ({ page }) => {
+    await openApp(page, '/markets/bond?mode=chain&offer=47', { connect: DEMO_WALLETS.c })
+    const rail = page.getByRole('complementary', { name: 'Order ticket' })
+    await expect(rail.getByRole('heading', { name: 'Buy a put on BOND', level: 2 })).toBeVisible()
+    const review = rail.getByTestId('ticket-flow')
+    await expect(row(review, 'USDx balance')).toContainText(/short$/)
+    // Stated once in the review, never as a notice headed by a category word.
+    await expect(page.getByTestId('action-reason')).toHaveText(/^You have 0\.00\sUSDx; this needs [\d.,]+\sUSDx\. Get test funds or pick a smaller offer\.$/)
+    await expect(review.getByText(/^You have 0\.00\sUSDx/)).toHaveCount(0)
+    for (const word of ['Blocked', 'Warning', 'Exercise', 'Check terms']) await expect(rail.getByText(word, { exact: true })).toHaveCount(0)
+    // The way to test funds sits beside the reason and carries the order, so the funds strip can lead back to it.
+    const funds = rail.getByRole('link', { name: 'How to get test funds' })
+    const href = (await funds.getAttribute('href')) ?? ''
+    const url = new URL(href, 'http://app.invalid')
+    expect(url.pathname).toBe('/markets')
+    expect(url.searchParams.get('funds')).toBe('1')
+    expect(url.searchParams.get('from')).toMatch(/^\/markets\/bond\?.*offer=47/)
+    await expect(pay(page)).toBeDisabled()
+  })
+
   test('new terms from the page after a written offer start a new form, and the receipt keeps what was signed', async ({ page }) => {
     await openApp(page, '/markets/fund?side=write&kind=put', { connect: true })
     const rail = page.getByRole('complementary', { name: 'Order ticket' })
@@ -817,7 +898,7 @@ test.describe('through the asset route', () => {
     const strike = await figureOf(form, 'Strike')
     await rail.getByRole('button', { name: /^Write put, lock / }).click()
     await expect(rail.getByRole('heading', { name: 'Offer written', level: 2 })).toBeVisible()
-    await expect(form).toContainText(new RegExp(`${strike.replace('.', '\\.')}.*per FUND`))
+    await expect(form).toContainText(strike)
 
     // Another strike chosen on the page: the ticket starts again at Terms with it.
     const path = await currentPath(page)

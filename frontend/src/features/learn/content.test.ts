@@ -78,10 +78,17 @@ describe('the structure of the Learn page', () => {
     for (const s of SECTIONS) expect(s.id).toMatch(/^[a-z][a-z-]*$/)
   })
 
-  it('says what this is in three sentences', () => {
-    expect(WHAT_THIS_IS).toHaveLength(3)
+  it('says what this is in two sentences, and leaves the rest to the rules table', () => {
+    expect(WHAT_THIS_IS).toHaveLength(2)
     // One sentence each: a single full stop, at the end.
     for (const sentence of WHAT_THIS_IS) expect(sentence.match(/[.?](\s|$)/g)).toHaveLength(1)
+    // The same words on a mock build and a contract build: the network is named where it is a state, not here.
+    expect(WHAT_THIS_IS.join(' ')).not.toContain('Testnet')
+  })
+
+  it('says once that a settlement is all or nothing: in the rules table', () => {
+    const atomic = ALL_COPY.filter((text) => /nothing moves/.test(text))
+    expect(atomic).toEqual([RULES.find((r) => r.rule === 'Settlement')!.text])
   })
 
   it('has copy for each of the four intents', () => {

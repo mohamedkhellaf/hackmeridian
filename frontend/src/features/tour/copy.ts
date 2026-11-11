@@ -3,16 +3,17 @@
 //
 // The title of a note is the label its control or its heading carries on screen, so the text stands without the
 // mark around the control. A note says what the control beside it does and nothing else: no risk statement, no
-// required disclosure, no claim about an instrument. Sentence case, no directional words.
+// required disclosure, no claim about an instrument. Sentence case, no directional words (the closing line names
+// where the settings menu sits on the screen, which does not depend on where the note is).
 
 export const INTENTS_NOTE = {
   title: 'What do you want to do?',
-  body: 'Each row is one thing you can do here, and says whether you pay or are paid. Pick one, then choose the asset in the Assets list.',
+  body: 'Pick what you want; the next step is choosing the asset.',
 } as const
 
 export const ASSETS_NOTE = {
   title: 'Assets',
-  body: "Each asset with its reference price, the number of open offers and the nearest deadline. Trade opens that asset's page.",
+  body: 'Trade opens the asset: its offers by strike and deadline.',
 } as const
 
 export const MODE_NOTE = {
@@ -43,9 +44,9 @@ export const WALLET_MENU_NOTE = {
   body: 'Your address, your balances, and Activity: the transactions made from this browser. Disconnect is here too.',
 } as const
 
-/** Small print on the last note of a tour: where the guide lives afterwards. */
-export const CLOSING_LINE = 'This guide stays in Settings.'
-export const CLOSING_LINE_PHONE = 'This guide stays under More.'
+/** Small print on the last note of a tour, and nowhere else: the control that starts the guide again. */
+export const CLOSING_LINE = 'Show me around is in the settings menu, top right.'
+export const CLOSING_LINE_PHONE = 'Show me around is under More.'
 
 export const NEXT = 'Next'
 export const BACK = 'Back'

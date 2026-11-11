@@ -1,0 +1,83 @@
+@layer ui {
+  .root {
+    min-width: 0;
+  }
+
+  .list {
+    display: none;
+  }
+
+  /* A table of sentences: rows grow with their text and read from the top. */
+  .table {
+    & td,
+    & th[scope='row'] {
+      height: auto;
+      padding-block: var(--s-12);
+      white-space: normal;
+      vertical-align: top;
+    }
+  }
+
+  .label {
+    width: 12rem;
+  }
+
+  .state {
+    width: 6rem;
+    color: var(--text-2);
+    font-weight: 500;
+
+    &[data-on] {
+      color: var(--text);
+      font-weight: 600;
+    }
+  }
+
+  .effect {
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  /* Under 768 px each fact is a ruled row: the name and its answer on one line, the sentence under them. */
+  @media (max-width: 767.98px) {
+    .table {
+      display: none;
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border-top: 1px solid var(--rule);
+
+      & > li {
+        display: flex;
+        flex-direction: column;
+        gap: var(--s-2);
+        padding-block: var(--s-12);
+        border-bottom: 1px solid var(--hairline);
+        font-size: var(--ui-size);
+        line-height: var(--ui-line);
+      }
+
+      & .label,
+      & .state {
+        width: auto;
+      }
+
+      & .label {
+        font-weight: 600;
+        color: var(--text);
+      }
+    }
+
+    .head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-12);
+    }
+  }
+}

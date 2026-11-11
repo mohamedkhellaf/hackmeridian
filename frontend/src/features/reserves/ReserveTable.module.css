@@ -93,11 +93,6 @@
     color: var(--muted);
   }
 
-  /* The figures of a token row: key values, in the serif figure style (sans on a phone, set in the markup). */
-  .figureCell {
-    font-weight: var(--figure-weight);
-  }
-
   /* Figure, then a fixed slot for its word: every figure of the column ends on the same edge, with or without a word. */
   .difference {
     display: inline-grid;
@@ -289,6 +284,51 @@
 
     .phoneItems :where(dd) {
       color: var(--text);
+    }
+  }
+
+  /*
+   * Under 400 px (phones; the container is the statement block of ReservesPage) the figure columns
+   * narrow to what a figure needs, with a small gap, and the role sits flush under the code: the token column
+   * keeps the rest, and Locked, Held and Difference all fit at 320 px.
+   */
+  @container (max-width: 24.99rem) {
+    .table {
+      min-width: 0;
+    }
+
+    .tokenHead {
+      padding-inline-start: var(--s-4);
+    }
+
+    .figureHead {
+      width: 4.25rem;
+    }
+
+    /* Wide enough for "under 0.01" in its heavier short weight. */
+    .differenceHead {
+      width: 4.75rem;
+    }
+
+    .figureHead,
+    .differenceHead,
+    .figureCell {
+      padding-inline: var(--s-4);
+    }
+
+    .toggle {
+      gap: 0 var(--s-4);
+      padding-inline-end: var(--s-4);
+    }
+
+    .role {
+      padding-inline-start: 0;
+      white-space: nowrap;
+    }
+
+    .bar {
+      min-width: 0;
+      margin-inline-start: var(--s-4);
     }
   }
 }

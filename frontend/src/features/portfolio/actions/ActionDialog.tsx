@@ -84,9 +84,10 @@ const LINE_WORD: Record<PreTradeLine['status'], string> = { pending: 'checking',
  * read; a line that is still running, could not be checked or failed stays a row, with a mark that repeats its word.
  */
 export function CheckLines({ lines, at = null }: { lines: ReadonlyArray<CheckLine | null>; at?: string | null }) {
+  const { isMock } = useOptionsClient()
   const shown = lines.filter((l): l is CheckLine => l !== null)
   if (shown.length === 0) return null
-  const sentence = checksSentence(at, shown)
+  const sentence = checksSentence(at, shown, isMock)
   const rows = shown.filter((l) => l.status !== 'ok')
   return (
     <section className={css.checks} aria-label={CHECKS_HEADING}>

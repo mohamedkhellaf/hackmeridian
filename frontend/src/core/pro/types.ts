@@ -184,15 +184,33 @@ export interface ProModel {
   history: HistoryEntry[]
 }
 
+/** Fixtures: the recorded step a call replayed, with its own arguments. A receipt is built from these, never from a form. */
+export interface ReplayedStep {
+  /** 1-based, as the replay counts steps. */
+  number: number
+  op: string
+  args: unknown[]
+}
+
 /** Outcome of a state-changing call. Errors carry the contract error code (201..226). */
 export type CallResult<T = null> =
-  | { ok: true; value: T; /** Simulation: which scripted step was replayed. Live: `Transaction <hash>`. */ note?: string; hash?: string }
+  | {
+      ok: true
+      value: T
+      /** Simulation: which scripted step was replayed. Live: `Transaction <hash>`. */
+      note?: string
+      hash?: string
+      /** Simulation: the step that was replayed. */
+      step?: ReplayedStep
+    }
   | {
       ok: false
       /** 201..226: a contract refusal. 0: no scripted step (fixtures). -1: not a refusal (wallet, network); the note says why. */
       code: number
       name: string
       note?: string
+      /** Simulation: the step that was replayed. */
+      step?: ReplayedStep
       /**
        * Where a live transaction stopped when it was not a contract refusal in simulation (core/tx/errors.ts):
        * declined, refused, failed, unknown or expired. With `unknown` the transaction may still be included:

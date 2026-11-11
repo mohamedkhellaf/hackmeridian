@@ -2,7 +2,7 @@
 // arrow key goes. The grid itself (ladder, cells, book, "other" orders) comes from the data layer's `useMarket`
 // and `useBook`; nothing here prices or ranks anything.
 import type { AssetSearch } from '../../../app/search'
-import { countOf, formatCountdown, formatExact, formatList, formatUnits, formatUtcDay, parseAmount } from '../../../core/format'
+import { NBSP, countOf, formatCountdown, formatExact, formatList, formatUnits, formatUtcDay, parseAmount } from '../../../core/format'
 import { bookRowAction, cellKey } from '../../../core/market/selection'
 import type { SeriesRef } from '../../../core/market/selection'
 import type { BookRow } from '../../../core/market/book'
@@ -11,7 +11,7 @@ import { priceOf } from '../../../core/reference'
 import type { ReferencePrice } from '../../../core/reference'
 import { expiryDayKey } from '../../../core/series'
 import type { ExpiryColumn, GridCell, MarketView } from '../../../data'
-import { COPY, KIND_WORD, MAKERS, OFFERS, REFERENCE_LABEL, REFERENCE_PHRASE, REFERENCE_TAG, REQUESTS } from './copy'
+import { COPY, MAKERS, OFFERS, REFERENCE_LABEL, REFERENCE_PHRASE, REFERENCE_TAG, REQUESTS } from './copy'
 import { isMine } from './orders'
 
 // ------------------------------------------------------------------------------------------- figures
@@ -28,9 +28,9 @@ export const premiumText = (units: bigint, decimals: number): string => formatUn
 /** `13 Nov` for an expiry (UTC day). */
 export const expiryLabel = (expiry: number): string => formatUtcDay(expiry)
 
-/** Time left for an expiry tab: the largest unit only (`2 d`, `5 h`, `12 min`). */
+/** Time left for an expiry tab: the largest unit only (`2 d`, `5 h`, `12 min`), never broken inside. */
 export function leftLabel(secondsLeft: number): string {
-  return formatCountdown(secondsLeft).split(' ').slice(0, 2).join(' ')
+  return formatCountdown(secondsLeft).split(/[ \u00a0]/).slice(0, 2).join(NBSP)
 }
 
 /** `BOND 100.00 put, 13 Nov`: the heading of a series, with the strike as the chain prints it. */
@@ -120,7 +120,7 @@ export function missingDeadlineLine(day: string, shown: ExpiryColumn, nowSec: nu
   const at = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 8) / 1000
   if (Number.isNaN(at)) return null
   const thisYear = new Date(nowSec * 1000).getUTCFullYear()
-  const label = Number(m[1]) === thisYear ? expiryLabel(at) : `${expiryLabel(at)} ${m[1]}`
+  const label = Number(m[1]) === thisYear ? expiryLabel(at) : `${expiryLabel(at)}${NBSP}${m[1]}`
   return at <= nowSec ? COPY.deadlinePassed(label, expiryLabel(shown.expiry)) : COPY.notADeadline(label, expiryLabel(shown.expiry))
 }
 
@@ -131,94 +131,130 @@ export function selectionSearch(ref: Pick<SeriesRef, 'kind' | 'strikePerUnit' | 
 
 // ------------------------------------------------------------------------------------------- cells
 
-/** A cell with an offer; one with only a buyer's request; one with neither, which asks for a price. */
-export type CellVariant = 'priced' | 'request-only' | 'empty'
+/** The two halves of a chain cell (ruling F3): the best offer next to the strike, the best request further out. */
+export type Half = 'offer' | 'request'
 
-export interface CellText {
-  variant: CellVariant
-  /** The best offer per unit (`0.21`), or null. */
-  offer: string | null
-  /** The size of that offer in the underlying (`1.00`), or null. */
+/**
+ * What pressing a half does: open the ticket on that order (`take`), open the request form or the write form on
+ * the series (`post`, `write`), or select the series so its book is listed under the chain (`select`).
+ */
+export type HalfAction = { kind: 'take'; row: BookRow } | { kind: 'post' } | { kind: 'write' } | { kind: 'select' }
+
+/** What a half's action depends on besides the cell. */
+export interface HalfContext {
+  /** The reference in words (`the demo price`), or null without one. */
+  phrase: string | null
+  /** The contract has buyer requests; without them a cell has no request half. */
+  bidsOn: boolean
+  /** The connected address: only its own orders are marked. */
+  me: string | null
+  /** The ticket is a column beside the chain (from 1200 px): a press on a price opens it on that order. */
+  wide: boolean
+  /** A write or request form is open and follows the selection. */
+  form: 'write' | 'bid' | null
+}
+
+export interface HalfText {
+  half: Half
+  /** The best premium per unit on this half (`0.55`), or null when the half is empty. */
+  figure: string | null
+  /** The size of that order in the underlying (`1.00`), or null. */
   size: string | null
-  /** The best request per unit, or null. */
-  request: string | null
-  /** The figure shown is the connected wallet's own order: it goes under the highlighter, with the word "yours". */
-  ownOffer: boolean
-  ownRequest: boolean
-  /** Either figure is the wallet's own. */
-  yours: boolean
-  inTheMoney: boolean
-  /** An empty cell offers "Ask for a price" (the contract has requests). */
-  ask: boolean
+  /** The figure is the connected wallet's own order: it goes under the highlighter. */
+  own: boolean
+  action: HalfAction
+  /** What an empty half shows on hover and focus, the action a press performs (`Post a request`); else null. */
+  hint: string | null
   /**
-   * The full accessible name: `Put at 10.00, best offer 0.36 for 1.00 FUND, 2 offers, 2 makers`. The button's
-   * visible text (the best offer, else the best request, else "Ask for a price") is a run of words of it, so
-   * what a voice user sees is what they can say; the size, the request beside an offer and "yours" are drawn
-   * over the cell and said here, in the order they are drawn.
+   * The full accessible name, a sentence: `Offer 0.55 at 98.00, put, 13 Nov, for 1.00 BOND, 2 offers, 2 makers.
+   * Buy.`, or for an empty half `No offer at 102.00, call, 13 Nov. Post a request.` (ruling F2). The visible
+   * figure comes first, so what a voice user sees is what they can say.
    */
   name: string
+}
+
+export interface CellText {
+  offer: HalfText
+  /** Null on a contract without requests. */
+  request: HalfText | null
+  /** Either figure is the wallet's own: the cell carries the word "yours". */
+  yours: boolean
+  inTheMoney: boolean
 }
 
 /** The row is the connected wallet's own order (its offer, listing or request). */
 const ownRow = (row: BookRow | null, me: string | null): boolean => row !== null && me !== null && isMine(bookRowAction(row, me))
 
-/**
- * How one cell reads, visibly and for a screen reader. `phrase` is the reference in words, or null without one.
- * `requests` is false on a contract without buyer requests: an empty cell then offers nothing. `me` is the
- * connected address: only a figure that is the wallet's own order is marked as its own (DESIGN.md: the
- * highlighter marks the user's own terms and nothing else).
- */
-export function describeCell(cell: GridCell, quoteDecimals: number, phrase: string | null, requests: boolean = true, me: string | null = null): CellText {
-  const strike = strikeText(cell.ref.strikePerUnit, quoteDecimals)
-  const head = `${KIND_WORD[cell.ref.kind]} at ${strike}`
-  const inTheMoney = cell.moneyness === 'in'
-  const best = cell.empty ? null : cell.best
-  const bestBid = cell.bids > 0 ? cell.bestBid : null
-  const offer = best && cell.bestPerUnit !== null ? premiumText(cell.bestPerUnit, quoteDecimals) : null
-  const size = best ? formatUnits(best.underlyingQty, best.underlying.decimals) : null
-  const request = bestBid && cell.bestBidPerUnit !== null ? premiumText(cell.bestBidPerUnit, quoteDecimals) : null
-  const ownOffer = offer !== null && ownRow(best, me)
-  const ownRequest = request !== null && ownRow(bestBid, me)
-  const yours = ownOffer || ownRequest
+/** The order a half shows: the best offer of the series, or its best request; null when that half is empty. */
+export function halfRow(cell: GridCell, half: Half): BookRow | null {
+  if (half === 'offer') return cell.empty || cell.bestPerUnit === null ? null : cell.best
+  return cell.bids > 0 && cell.bestBidPerUnit !== null ? cell.bestBid : null
+}
 
-  const parts: string[] = []
-  if (offer !== null && best) {
-    parts.push(`best offer ${offer} for ${size} ${best.underlying.code}${best.source === 'resale' ? ', a resale listing' : ''}`)
-    parts.push(cell.makers > 0 ? `${countOf(cell.offers, OFFERS)}, ${countOf(cell.makers, MAKERS)}` : countOf(cell.offers, OFFERS))
-  } else if (request !== null) parts.push('no offer')
-  if (request !== null) parts.push(`best request ${request}`, countOf(cell.bids, REQUESTS))
-  if (yours) parts.push(`${COPY.yours}: ${ownOffer && ownRequest ? 'the best offer and the best request' : ownOffer ? 'the best offer' : 'the best request'}`)
-  const ask = offer === null && request === null && requests
-  if (offer === null && request === null) parts.push(requests ? 'no offer or request' : 'no offer')
-  if (ask) parts.push(COPY.askPrice.toLowerCase())
+/** The action of one half: a form that is open follows the selection; an empty half opens a form; a price opens its ticket from 1200 px. */
+export function halfAction(row: BookRow | null, ctx: Pick<HalfContext, 'bidsOn' | 'me' | 'wide' | 'form'>): HalfAction {
+  if (ctx.form === 'write') return { kind: 'write' }
+  if (ctx.form === 'bid') return { kind: 'post' }
+  if (row === null) return ctx.bidsOn ? { kind: 'post' } : { kind: 'write' }
+  if (!ctx.wide) return { kind: 'select' }
+  const kind = bookRowAction(row, ctx.me).kind
+  return kind === 'buy' || kind === 'buy-resale' || kind === 'fill' ? { kind: 'take', row } : { kind: 'select' }
+}
 
-  const tail: string[] = []
-  if (phrase !== null && cell.moneyness === 'in') tail.push(`in the money at ${phrase}`)
-  if (phrase !== null && cell.moneyness === 'at') tail.push(`at the money at ${phrase}`)
-  const own: string[] = []
-  if (cell.holding) own.push('you hold an option')
-  if (cell.wrote) own.push('you wrote an option')
-  if (cell.mine && !yours) own.push('you have an order')
-  if (own.length) tail.push(`${formatList(own)} in this series`)
-
-  const variant: CellVariant = offer !== null ? 'priced' : request !== null ? 'request-only' : 'empty'
-  return { variant, offer, size, request, ownOffer, ownRequest, yours, inTheMoney, ask, name: [head, ...parts, ...tail].join(', ') }
+/** The words of an action at the end of a name, and on an empty half. */
+const ACTION_WORDS: Record<Exclude<HalfAction['kind'], 'select'>, (row: BookRow | null) => string> = {
+  take: (row) => (row?.source === 'bid' ? COPY.fillRequest : COPY.buy),
+  post: () => COPY.bidHere,
+  write: () => COPY.writeHere,
 }
 
 /**
- * What pressing a cell opens from 1200 px, where the ticket is a column beside the chain: the best order the
- * wallet can take there (the cheapest offer or listing, else the highest request to fill), or null when the
- * wallet can take neither (its own order is the best, or the cell is empty).
+ * How one cell reads, visibly and for a screen reader: its offer half and its request half, each with its own
+ * figure, size, name and action. Only a figure that is the wallet's own order is marked as its own (DESIGN.md:
+ * the highlighter marks the user's own terms and nothing else).
  */
-export function takeableOf(cell: GridCell, me: string | null): BookRow | null {
-  const takes = (row: BookRow | null): row is BookRow => {
-    if (!row) return false
-    const kind = bookRowAction(row, me).kind
-    return kind === 'buy' || kind === 'buy-resale' || kind === 'fill'
+export function describeCell(cell: GridCell, quoteDecimals: number, ctx: HalfContext): CellText {
+  const strike = strikeText(cell.ref.strikePerUnit, quoteDecimals)
+  const at = `at ${strike}, ${cell.ref.kind}, ${expiryLabel(cell.ref.expiry)}`
+  const inTheMoney = cell.moneyness === 'in'
+
+  // Said on both halves: where the strike stands, and what the wallet has in the series besides the figure shown.
+  const tail = (yours: boolean): string[] => {
+    const t: string[] = []
+    if (ctx.phrase !== null && cell.moneyness === 'in') t.push(`in the money at ${ctx.phrase}`)
+    if (ctx.phrase !== null && cell.moneyness === 'at') t.push(`at the money at ${ctx.phrase}`)
+    const own: string[] = []
+    if (cell.holding) own.push('you hold an option')
+    if (cell.wrote) own.push('you wrote an option')
+    if (cell.mine && !yours) own.push('you have an order')
+    if (own.length) t.push(`${formatList(own)} in this series`)
+    return t
   }
-  if (!cell.empty && takes(cell.best)) return cell.best
-  if (cell.bids > 0 && takes(cell.bestBid)) return cell.bestBid
-  return null
+
+  const best = halfRow(cell, 'offer')
+  const bestBid = halfRow(cell, 'request')
+  const ownOffer = ownRow(best, ctx.me)
+  const ownRequest = ownRow(bestBid, ctx.me)
+  const yours = ownOffer || ownRequest
+
+  const half = (side: Half, row: BookRow | null, perUnit: bigint | null, own: boolean, counts: string[]): HalfText => {
+    const action = halfAction(row, ctx)
+    const word = action.kind === 'select' ? null : ACTION_WORDS[action.kind](row)
+    const priced = row !== null && perUnit !== null ? row : null
+    const figure = priced && perUnit !== null ? premiumText(perUnit, quoteDecimals) : null
+    const size = priced ? formatUnits(priced.underlyingQty, priced.underlying.decimals) : null
+    const noun = side === 'offer' ? 'offer' : 'request'
+    const words = priced
+      ? [`${own ? `Your ${noun}` : side === 'offer' ? 'Offer' : 'Request'} ${figure} ${at}`, `for ${size} ${priced.underlying.code}${priced.source === 'resale' ? ', a resale listing' : ''}`, ...counts]
+      : [`No ${noun} ${at}`]
+    const name = `${[...words, ...tail(yours)].join(', ')}.${word ? ` ${word}.` : ''}`
+    return { half: side, figure, size, own, action, hint: priced ? null : word, name }
+  }
+
+  const offerCounts = best ? [cell.makers > 0 ? `${countOf(cell.offers, OFFERS)}, ${countOf(cell.makers, MAKERS)}` : countOf(cell.offers, OFFERS)] : []
+  const offer = half('offer', best, cell.bestPerUnit, ownOffer, offerCounts)
+  const request = ctx.bidsOn ? half('request', bestBid, cell.bestBidPerUnit, ownRequest, bestBid ? [countOf(cell.bids, REQUESTS)] : []) : null
+  return { offer, request, yours, inTheMoney }
 }
 
 // ------------------------------------------------------------------------------------------- keyboard
@@ -249,51 +285,59 @@ export function moveForKey(key: string, ctrl: boolean): Move | null {
   }
 }
 
+/** A column of buttons in the chain, left to right: the halves of the call side, then those of the put side. */
+export type ChainColumn = 'call-request' | 'call-offer' | 'put-offer' | 'put-request'
+
+export const columnOf = (kind: OptionKind, half: Half): ChainColumn => `${kind}-${half}`
+
+/** The columns on screen: four halves, or the two offer halves on a contract without requests. */
+export const chainColumns = (bidsOn: boolean): readonly ChainColumn[] => (bidsOn ? ['call-request', 'call-offer', 'put-offer', 'put-request'] : ['call-offer', 'put-offer'])
+
 export interface CellPosition {
   row: number
-  side: OptionKind
+  col: ChainColumn
 }
 
 /**
- * Where focus goes from `from`. `sides` are the halves on screen, left to right: both on a wide chain, one on a
- * phone. Movement stops at the edges (no wrapping), as in a spreadsheet.
+ * Where focus goes from `from`. `cols` are the halves on screen, left to right. Movement stops at the edges (no
+ * wrapping), as in a spreadsheet.
  */
-export function nextPosition(from: CellPosition, move: Move, rowCount: number, sides: readonly OptionKind[]): CellPosition {
-  if (rowCount <= 0 || sides.length === 0) return from
+export function nextPosition(from: CellPosition, move: Move, rowCount: number, cols: readonly ChainColumn[]): CellPosition {
+  if (rowCount <= 0 || cols.length === 0) return from
   const lastRow = rowCount - 1
   const clamp = (row: number) => Math.min(lastRow, Math.max(0, row))
-  const at = Math.max(0, sides.indexOf(from.side))
-  const side = (i: number) => sides[Math.min(sides.length - 1, Math.max(0, i))]
+  const at = Math.max(0, cols.indexOf(from.col))
+  const col = (i: number) => cols[Math.min(cols.length - 1, Math.max(0, i))]
   switch (move) {
     case 'up':
-      return { row: clamp(from.row - 1), side: side(at) }
+      return { row: clamp(from.row - 1), col: col(at) }
     case 'down':
-      return { row: clamp(from.row + 1), side: side(at) }
+      return { row: clamp(from.row + 1), col: col(at) }
     case 'left':
-      return { row: clamp(from.row), side: side(at - 1) }
+      return { row: clamp(from.row), col: col(at - 1) }
     case 'right':
-      return { row: clamp(from.row), side: side(at + 1) }
+      return { row: clamp(from.row), col: col(at + 1) }
     case 'row-start':
-      return { row: clamp(from.row), side: side(0) }
+      return { row: clamp(from.row), col: col(0) }
     case 'row-end':
-      return { row: clamp(from.row), side: side(sides.length - 1) }
+      return { row: clamp(from.row), col: col(cols.length - 1) }
     case 'top':
-      return { row: 0, side: side(at) }
+      return { row: 0, col: col(at) }
     case 'bottom':
-      return { row: lastRow, side: side(at) }
+      return { row: lastRow, col: col(at) }
     case 'first':
-      return { row: 0, side: side(0) }
+      return { row: 0, col: col(0) }
     case 'last':
-      return { row: lastRow, side: side(sides.length - 1) }
+      return { row: lastRow, col: col(cols.length - 1) }
   }
 }
 
 /**
- * The cell that takes the chain's single tab stop before the user has moved in it: the selected one, else the
- * first row at or above the reference price (the middle of the ladder), on the first half shown.
+ * The half that takes the chain's single tab stop before the user has moved in it: the selected one, else the
+ * call offer (next to the strike) on the first row at or above the reference price (the middle of the ladder).
  */
-export function homePosition(view: Pick<MarketView, 'referenceRule'>, rowCount: number, sides: readonly OptionKind[], selected: CellPosition | null): CellPosition {
-  if (selected && sides.includes(selected.side) && selected.row < rowCount) return selected
+export function homePosition(view: Pick<MarketView, 'referenceRule'>, rowCount: number, cols: readonly ChainColumn[], selected: CellPosition | null): CellPosition {
+  if (selected && cols.includes(selected.col) && selected.row < rowCount) return selected
   const row = view.referenceRule ? Math.min(Math.max(0, rowCount - 1), view.referenceRule.below) : 0
-  return { row, side: sides[0] ?? 'call' }
+  return { row, col: cols.includes('call-offer') ? 'call-offer' : (cols[0] ?? 'call-offer') }
 }

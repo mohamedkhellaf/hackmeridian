@@ -6,7 +6,7 @@ import { Amount, ContractNote, Logo, Mark } from '../../../ui'
 import styles from './brand.module.css'
 
 /**
- * The 1200 by 630 social card, on the light paper ground: the logo, the landing's label and headline (no marker),
+ * The 1200 by 630 social card, on the light paper ground: the logo, the landing's headline (no marker, no eyebrow),
  * and the hero note with the floor the reader would set. No network label, no date, no second tagline.
  */
 export function OgCard() {
@@ -17,7 +17,6 @@ export function OgCard() {
       </header>
       <div className={styles.cardBody}>
         <div className={styles.pitch}>
-          <p className={styles.label}>Options on tokenized assets, on Stellar</p>
           <p className={styles.headline}>Set the lowest price you would sell at.</p>
         </div>
         <ContractNote
@@ -26,7 +25,7 @@ export function OgCard() {
           glyph="long-put"
           kind="Long put, EQTY"
           terms={[
-            { label: 'I hold', value: <Amount value="5.00" unit="EQTY" figure="serif" /> },
+            { label: 'Quantity', value: <Amount value="5.00" unit="EQTY" figure="serif" /> },
             { label: 'Floor, per unit', value: <Amount value="10.00" unit="USDx" figure="serif" />, marked: true },
             { label: 'Collateral', value: '50.00 USDx in contract' },
           ]}

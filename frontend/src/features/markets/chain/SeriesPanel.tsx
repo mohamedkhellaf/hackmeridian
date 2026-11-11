@@ -3,7 +3,7 @@
 // first), funded requests below it (highest first).
 import { Link as RouterLink } from '@tanstack/react-router'
 import { useEffect, useId, useMemo, useRef } from 'react'
-import { formatUnits } from '../../../core/format'
+import { formatUnits, withUnit } from '../../../core/format'
 import type { BookRow } from '../../../core/market/book'
 import { cellKey, sameSeriesRef, seriesRefOf } from '../../../core/market/selection'
 import type { SeriesRef } from '../../../core/market/selection'
@@ -146,7 +146,7 @@ export function SeriesPanel({ view, series, bidsOn, narrow, ticketKey, reveal, p
           {bidsOn ? <Button onClick={onBid}>{COPY.bidHere}</Button> : null}
         </div>
         <p className={styles.terms}>
-          {RIGHT_OF[series.kind]} 1 {code} for {strikeText(series.strikePerUnit, decimals)} {view.quote.code}.{' '}
+          {RIGHT_OF[series.kind]} {withUnit('1', code)} for {withUnit(strikeText(series.strikePerUnit, decimals), view.quote.code)}.{' '}
           {reference && where !== 'unknown' ? MONEYNESS_SENTENCE[where](reference.phrase, reference.price) : null}
           {data && !data.onGrid ? ` ${COPY.offGridSeries}` : null}
         </p>

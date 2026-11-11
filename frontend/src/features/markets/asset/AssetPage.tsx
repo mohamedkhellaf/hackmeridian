@@ -15,7 +15,7 @@ import { Button, Callout, Skeleton, useIsWide } from '../../../ui'
 import { TicketHost, searchFromTicketIntent, ticketIntentFromSearch } from '../../ticket'
 import type { TicketIntent } from '../../ticket'
 import { ChainMode } from '../chain'
-import { GuidedClosing, GuidedMode } from '../guided'
+import { GuidedClosing, GuidedMode, shownSeriesOf } from '../guided'
 import { ASSET_ERROR, ASSET_LOADING, RAIL_LABEL, RETRY } from '../copy'
 import { assetRequests } from '../model'
 import { ShortfallNotice } from '../parts'
@@ -98,15 +98,18 @@ export function AssetPage() {
   const tab: AssetTab = search.tab ?? 'trade'
   const guidedTrade = mode === 'guided' && tab === 'trade'
 
+  const assetId = token?.contractId ?? null
+  // From guided to the chain the series on screen goes with the user, also when the guided page chose it by
+  // default: the chain opens on that deadline with the series selected (no ticket is opened for it).
   const setMode = useCallback(
     (next: AssetMode) => {
       setDefaultMode(next)
-      patch({ mode: next })
+      const series = next === 'chain' && mode === 'guided' && assetId !== null ? shownSeriesOf(assetId) : null
+      patch(series ? { mode: next, ...series } : { mode: next })
     },
-    [patch, setDefaultMode],
+    [patch, setDefaultMode, mode, assetId],
   )
 
-  const assetId = token?.contractId ?? null
   const intent = useMemo(() => (assetId ? ticketIntentFromSearch(search, assetId) : null), [search, assetId])
 
   // History. Opening a ticket adds an entry (Back then closes it, as a phone user expects); closing it returns to
@@ -208,9 +211,10 @@ export function AssetPage() {
           {hasRail ? (
             // A landmark only where it is a column with something in it: below 1200 px the ticket opens over the page
             // and this box is empty, and in chain mode it is empty until a price is picked. One element in every
-            // case, so the ticket keeps its state when the window crosses the width.
+            // case, so the ticket keeps its state when the window crosses the width. In guided mode the intent
+            // picker is the one side switch: the ticket has no Buy, Write and Request tabs there (F4).
             <div ref={rail} className={styles.rail} role={landmark ? 'complementary' : undefined} aria-label={landmark ? RAIL_LABEL : undefined}>
-              <TicketHost placement="rail" intent={intent} startAt={search.step} onClose={closeTicket} onIntentChange={changeIntent} idle={railIdle} />
+              <TicketHost placement="rail" intent={intent} startAt={search.step} onClose={closeTicket} onIntentChange={changeIntent} idle={railIdle} sides={!guidedTrade} />
             </div>
           ) : null}
         </div>

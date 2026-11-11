@@ -92,7 +92,9 @@ export function GuideHost() {
     const first = here[0]
     const target = first ? findAnchor(first.id) : null
     if (!first || !target) return
-    returnTo.current = document.activeElement
+    // The welcome's button that started it is gone once the tour runs: focus goes back to the place the page
+    // marks for that (`restoreFocus`), never to whatever held focus a moment after the press.
+    returnTo.current = next.origin === 'slip' ? null : document.activeElement
     setShow({ run: next, solo: false, id: first.id, ids: here.map((note) => note.id), target, dock: first.dock ? findAnchor('nav') : null, turn: 0 })
     setOpen(true)
   }
@@ -197,7 +199,7 @@ export function GuideHost() {
   }, [shownRun, shownId, shown])
   useEffect(() => {
     // The note that opened by itself never scrolls the page. A frame later, so the page has taken its new shape
-    // (the welcome on Markets becomes one line when the tour starts).
+    // (the welcome on Markets goes when the tour starts).
     if (!shownRun || !shownTarget || shownRun.id !== 'tour') return
     const frame = requestAnimationFrame(() => reveal(shownTarget))
     return () => cancelAnimationFrame(frame)

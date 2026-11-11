@@ -3,26 +3,20 @@
     min-width: 0;
   }
 
-  /* The figure and, beside it on a wide column, the two figures the ticket prints too. */
+  /* The figure across the column, then the two figures the ticket prints too, as one ruled row. */
   .detail {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--s-16) var(--s-24);
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
     min-width: 0;
-  }
-
-  @container (min-width: 44rem) {
-    .detail {
-      grid-template-columns: minmax(0, 1fr) 13rem;
-    }
+    container: outcome-detail / inline-size;
   }
 
   .chart {
     min-width: 0;
   }
 
-  /* The read-out itself (label, the two figures) is the chart kit's; these are the two lines guided adds to it. */
+  /* The read-out itself (label, the two figures) is the chart kit's; this is the line guided adds to it. */
   .difference {
     font-size: var(--ui-size);
     line-height: var(--ui-line);
@@ -38,25 +32,35 @@
     }
   }
 
-  .sentence {
-    max-width: var(--measure);
-    font-size: var(--body-size);
-    line-height: var(--body-line);
-    font-weight: var(--body-weight);
-    color: var(--text);
-    text-wrap: pretty;
-    /* Two lines are reserved so the plot does not jump while the price is dragged. */
-    min-height: calc(var(--body-line) * 2);
-  }
-
+  /* Two columns between a rule and a hairline; one under the other in a narrow column. */
   .facts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--hairline);
+
+    /* Both items take the row's height (the rule between them runs full height); their lines start at the top. */
+    & > div {
+      justify-content: flex-start;
+      padding-block: var(--s-12);
+    }
+
+    & > div + div {
+      border-top: 1px solid var(--hairline);
+    }
   }
 
-  @container (min-width: 44rem) {
+  @container outcome-detail (min-width: 28rem) {
     .facts {
-      border-top: 0;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--s-24);
+
+      & > div + div {
+        border-top: 0;
+        border-inline-start: 1px solid var(--hairline);
+        padding-inline-start: var(--s-24);
+      }
     }
   }
 }

@@ -26,7 +26,7 @@ export function FillFlow({ intent }: { intent: Extract<TicketIntent, { mode: 'fi
     if (query.isError) {
       // An id the contract does not have is not a failed read: there is nothing to try again.
       if (isNotFoundMessage(errorText(query.error))) return <FlowGone title={LOADING_TITLE.fill} sentence="This request does not exist." hint={`The contract has no request No. ${serialOf(intent.bidId)}. Pick a request on the board.`} />
-      return <FlowError title={LOADING_TITLE.fill} what={`Request ${serialOf(intent.bidId)}`} onRetry={() => void query.refetch()} />
+      return <FlowError title={LOADING_TITLE.fill} what={`Request No. ${serialOf(intent.bidId)}`} onRetry={() => void query.refetch()} />
     }
     return <FlowLoading title={LOADING_TITLE.fill} />
   }
@@ -61,7 +61,8 @@ function FillTicket({ bid, readAt, nowSec }: { bid: Bid; readAt: number; nowSec:
     gone: bid.state === 'filled' ? 'Another maker filled this request.' : bid.state !== 'open' || bid.expiry <= nowSec ? `Its deadline passed at ${formatUtc(bid.expiry)}.` : undefined,
     serial: `Request No. ${serialOf(bid.id)}`,
     money: [leadRow('You receive', premium, "Paid to you from the buyer's escrow when the transaction confirms."), moneyRow('You lock', collateral)],
-    details: [strikeRow(bid), quantityRow(bid), deadlineRow(bid.expiry), breakevenRow(bid), mostYouCanLoseRow(bid, 'short'), partyRow('Buyer', bid.buyer, me)],
+    figures: [breakevenRow(bid), mostYouCanLoseRow(bid, 'short')],
+    details: [strikeRow(bid), quantityRow(bid), deadlineRow(bid.expiry), partyRow('Buyer', bid.buyer, me)],
     readAt,
     outcome: outcomeFor(bid, 'short'),
     commitment: COMMITMENT.fill,

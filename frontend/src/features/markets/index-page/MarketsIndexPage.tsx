@@ -6,7 +6,7 @@ import { Link as RouterLink } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { TIER_MEANING } from '../../../core/assets'
 import type { AssetTier } from '../../../core/assets'
-import { guideAnchor } from '../../../core/guide'
+import { GUIDE_RETURN_ATTRIBUTE, guideAnchor } from '../../../core/guide'
 import { intentInfo } from '../../../core/payoff/strategies'
 import { shortTokens } from '../../../core/reserves/reserves'
 import { useAssets, useBalances, useBalancesById, useHealth, useMarketsIndex, useMe, useNowSec, useOptionsClient } from '../../../data'
@@ -32,6 +32,7 @@ export function MarketsIndexPage() {
   const health = useHealth()
   const nowSec = useNowSec(30)
   const question = useRef<HTMLHeadingElement | null>(null)
+  const intentsHeading = useRef<HTMLHeadingElement | null>(null)
 
   const intent = search.intent
   const showAll = search.all === '1'
@@ -66,11 +67,12 @@ export function MarketsIndexPage() {
     <div className={styles.page}>
       <PageHeader title={MARKETS_TITLE} />
 
-      {firstRun && balances.data ? <GetFunds address={me} balances={balances.data} quoteId={quote.contractId} mock={isMock} onCheck={() => void balances.refetch()} checking={balances.isFetching} /> : null}
-      <GuideSlip displaced={firstRun} pending={me !== null && (assets.isPending || balances.isPending)} />
+      {firstRun && balances.data ? <GetFunds address={me} balances={balances.data} quoteId={quote.contractId} mock={isMock} onCheck={() => void balances.refetch()} checking={balances.isFetching} from={search.from} /> : null}
+      <GuideSlip displaced={firstRun} pending={me !== null && (assets.isPending || balances.isPending)} after={intentsHeading} />
 
       <section className={styles.section} aria-labelledby="markets-intents" {...guideAnchor('intents')}>
-        <h2 id="markets-intents" className={styles.heading}>
+        {/* Takes focus after "Not now", and back from a tour started from the welcome, which is gone by then. */}
+        <h2 id="markets-intents" className={styles.heading} ref={intentsHeading} tabIndex={-1} {...{ [GUIDE_RETURN_ATTRIBUTE]: '' }}>
           {INTENTS_HEADING}
         </h2>
         <IntentList current={intent} showAll={showAll} rows={list?.rows ?? null} available={available || index.isLoading} balances={balancesById.data ?? null} quoteCode={quote?.code ?? 'USDx'} />

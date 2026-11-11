@@ -12,8 +12,10 @@ The Reserves page (`/reserves`, brief 4.7). The router lazy-loads the named expo
    rows right below carry the figures. It is the one `role="alert"` on the page. Without a shortfall the page has
    no alert role at all.
 3. **Held against locked.** One sentence (`summaryLine`), left out when a notice above already says it, then:
-   - `ReserveTable`: the statement, at most 60rem wide. Headers are exactly `Token, Locked, Held, Difference`; fixed
-     columns; the three figures of a token row in the serif figure style (sans on a phone). A token whose held
+   - `ReserveTable`: the statement. Headers are exactly `Token, Locked, Held, Difference`; fixed columns; the
+     token code in serif, the three figures in the table's sans face, as every money column. Under 400 px (a
+     container query on the statement block) the figure columns narrow to what a figure needs and the role sits
+     flush under the code, so all four columns fit at 320 px. A token whose held
      differs from locked carries a bar in its row (`Bullet` from src/viz: bar = held, tick = locked, hatched =
      shortfall), hidden from assistive technology since the figures beside it say the same. The word of a
      difference (short, over) sits in a slot of its own so every figure ends on the same edge; a difference under
@@ -29,10 +31,15 @@ The Reserves page (`/reserves`, brief 4.7). The router lazy-loads the named expo
 4. **Contracts and roles** (`ContractsAndRoles`): per contract one ruled list (`FactList variant="record"`) in one
    order: contract id in full, version, wasm hash, deploy transaction, deployer, then the facts (Admin,
    Upgrades, Oracle, Asset listing, Audit for Covered; Upgrades, Prices, Audit for Margin). Then the token
-   contracts with issuer and the three issuer flags in plain words, and, when the build has Margin
+   contracts with issuer and the three issuer flags, named and answered in the one vocabulary of
+   `core/assetfacts` that the asset About tab and the Issuer page use (`FLAG_LABELS`, `POWER_STATE`; the Stellar
+   flag names only in the footnote), and, when the build has Margin
    (`PRO_ENABLED`), the Margin contract in a fenced block: its list, the admin and the publisher with their
    addresses and what each does, and once for both what neither can do. Copy buttons belong to ids printed in
    full and to wasm hashes; a shortened id carries its explorer link only.
+
+The page has two measures: prose at `--measure`, and every table and list (the statement, the notes, the
+contracts, the tokens, the Margin block) at the page's one width (60rem), so the blocks end on one edge.
 
 ## Where the facts come from
 

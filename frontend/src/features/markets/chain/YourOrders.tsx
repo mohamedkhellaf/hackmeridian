@@ -1,10 +1,12 @@
 // The wallet's own open orders on this asset, across every deadline: its offers, resale listings and requests in
 // one table, so a maker can see and cancel them without opening each series (audit finding "No list of the
-// wallet's own orders on the asset"). Shown only when there is one. Each series selects itself in the chain.
+// wallet's own orders on the asset"). Shown only when there is one. Each series selects itself in the chain. The
+// orders of the series selected above are left out: its book already lists them, with their one Cancel.
 import { useMemo } from 'react'
 import { bookRows } from '../../../core/market/book'
 import type { BookRow } from '../../../core/market/book'
-import { bookRowAction } from '../../../core/market/selection'
+import { bookRowAction, sameSeriesRef, seriesRefOf } from '../../../core/market/selection'
+import type { SeriesRef } from '../../../core/market/selection'
 import { premiumUnits } from '../../../core/units'
 import type { MarketView, PositionsView } from '../../../data'
 import { useHealth, useMe, useNowSec, useOptionsClient, useTxBusy } from '../../../data'
@@ -19,12 +21,14 @@ export interface YourOrdersProps {
   narrow: boolean
   /** The connected wallet's positions and orders, or null for a guest. */
   positions: PositionsView | null
+  /** The series selected in the chain, whose book lists its orders: they are not listed twice. */
+  selected: SeriesRef | null
   ticketKey: string | null
   onSelect: (row: BookRow) => void
   onCancel: (row: BookRow) => void
 }
 
-export function YourOrders({ view, narrow, positions, ticketKey, onSelect, onCancel }: YourOrdersProps) {
+export function YourOrders({ view, narrow, positions, selected, ticketKey, onSelect, onCancel }: YourOrdersProps) {
   const me = useMe()
   const nowSec = useNowSec(30)
   const health = useHealth()
@@ -39,10 +43,15 @@ export function YourOrders({ view, narrow, positions, ticketKey, onSelect, onCan
     const offers = data.orders.offers.map((p) => p.option).filter((o) => o.state === 'offered' && o.expiry > nowSec && here(o.underlying.contractId))
     const listings = data.orders.listings.filter((l) => here(l.position.option.underlying.contractId)).map((l) => ({ option: l.position.option, ask: l.ask }))
     const requests = data.orders.requests.filter((b) => here(b.underlying.contractId))
+    const shownAbove = (row: BookRow) => {
+      const ref = selected ? seriesRefOf(row) : null
+      return ref !== null && selected !== null && sameSeriesRef(ref, selected)
+    }
     return bookRows(offers, listings, requests, nowSec)
+      .filter((row) => !shownAbove(row))
       .sort((a, b) => a.expiry - b.expiry || Number(a.source === 'bid') - Number(b.source === 'bid') || (a.key < b.key ? -1 : 1))
       .map((row) => ({ row, perUnit: premiumUnits(row), action: bookRowAction(row, me), reason: null }))
-  }, [positions, me, nowSec, assetId])
+  }, [positions, me, nowSec, assetId, selected])
 
   if (lines.length === 0) return null
   const title = COPY.yourOrders(view.asset.code)
@@ -57,6 +66,7 @@ export function YourOrders({ view, narrow, positions, ticketKey, onSelect, onCan
         sections={[{ key: 'mine', lines }]}
         showSeries
         showReason={false}
+        allMine
         onSelect={onSelect}
         ticketKey={ticketKey}
         health={health.data}

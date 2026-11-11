@@ -9,7 +9,7 @@ import { plural } from '../../core/format'
 import type { TokenInfo } from '../../core/options/types'
 import type { Bid } from '../../core/requests/types'
 import { canList } from '../../core/resale/resale'
-import { useAsks, useAssets, useBalancesById, useMe, useNowSec, useOptions, usePortfolioKpis, usePositions, useTodo } from '../../data'
+import { useAsks, useAssets, useBalancesById, useMe, useNowSec, useOptions, usePortfolioKpis, usePositions, useTodo, useUnsettledTx } from '../../data'
 import type { PositionView, PositionsView } from '../../data'
 import { Button, Callout, EmptyNote, PageHeader, Skeleton, Switch, Tab, TabList, TabPanel, Tabs } from '../../ui'
 import { useWallet } from '../../wallet'
@@ -84,6 +84,7 @@ export function PortfolioPage() {
   const soldSince = useSoldSinceLastVisit(me, allOptions.data ?? null)
   const health = useReserveHealth()
   const nowSec = useNowSec(10)
+  const unsettled = useUnsettledTx()
   const flow = useActionFlow()
   const [request, setRequest] = useState<{ bid: Bid; seq: number } | null>(null)
   const [requestOpen, setRequestOpen] = useState(false)
@@ -195,7 +196,17 @@ export function PortfolioPage() {
         </Callout>
       ) : null}
 
-      {todo.data ? <TodoStrip items={todo.data} expiredRequests={expiredRequests} short={short} balances={balances.data} onAction={(option, action) => flow.start(option, action)} onCancelRequest={cancelRequest} /> : null}
+      {todo.data ? (
+        <TodoStrip
+          items={todo.data}
+          expiredRequests={expiredRequests}
+          short={short}
+          balances={balances.data}
+          onAction={(option, action) => flow.start(option, action)}
+          onCancelRequest={cancelRequest}
+          unsettled={unsettled}
+        />
+      ) : null}
 
       {kpis.data && totals ? <Summary summary={kpis.data} totals={totals} quote={assets.data?.quote ?? null} /> : null}
 
@@ -204,7 +215,7 @@ export function PortfolioPage() {
         {lapsed.map((t) => (
           <p key={t.key} className={css.lapsed} data-testid={`lapsed-${t.option.id}`}>
             {expiredLine(t.option)}{' '}
-            <PositionLink id={t.option.id} className={css.lapsedLink} aria-label={`${VIEW_POSITION}: ${expiredLine(t.option)}`}>
+            <PositionLink id={t.option.id} aria-label={`${VIEW_POSITION}: ${expiredLine(t.option)}`}>
               {VIEW_POSITION}
             </PositionLink>
           </p>
@@ -233,7 +244,7 @@ export function PortfolioPage() {
 
           <TabPanel value="holding" className={css.panel}>
             {holding.length > 0 ? (
-              <HoldingTable rows={holding} onAction={onRow} short={short} canSell={canSell} />
+              <HoldingTable rows={holding} onAction={onRow} short={short} canSell={canSell} unsettled={unsettled} />
             ) : (
               <EmptyNote className={css.empty} title={EMPTY.holding.title} hint={hidden ? EMPTY.holding.closedHint : undefined} action={markets} />
             )}
@@ -241,7 +252,7 @@ export function PortfolioPage() {
 
           <TabPanel value="written" className={css.panel}>
             {written.length > 0 ? (
-              <WrittenTable rows={writtenRows} onAction={onRow} short={short} noteOf={soldNote} />
+              <WrittenTable rows={writtenRows} onAction={onRow} short={short} noteOf={soldNote} unsettled={unsettled} />
             ) : (
               <EmptyNote className={css.empty} title={EMPTY.written.title} hint={hidden ? EMPTY.written.closedHint : undefined} action={markets} />
             )}
@@ -249,7 +260,7 @@ export function PortfolioPage() {
 
           <TabPanel value="orders" className={css.panel}>
             <OrdersSection heading={ORDERS.offers} empty={EMPTY.offers} count={orders.offers.length}>
-              <OffersTable rows={orders.offers} onAction={onRow} short={short} noteOf={rankOf} />
+              <OffersTable rows={orders.offers} onAction={onRow} short={short} noteOf={rankOf} unsettled={unsettled} />
             </OrdersSection>
             <OrdersSection
               heading={ORDERS.requests}
@@ -260,7 +271,7 @@ export function PortfolioPage() {
               }
               count={orders.requests.length}
             >
-              <RequestsTable rows={orders.requests} nowSec={nowSec} onCancel={cancelRequest} short={short} />
+              <RequestsTable rows={orders.requests} nowSec={nowSec} onCancel={cancelRequest} short={short} unsettled={unsettled} />
             </OrdersSection>
             <OrdersSection
               heading={ORDERS.listings}
@@ -272,7 +283,7 @@ export function PortfolioPage() {
               }
               count={listingRows.length}
             >
-              <ListingsTable rows={listingRows} onAction={onRow} />
+              <ListingsTable rows={listingRows} onAction={onRow} unsettled={unsettled} />
             </OrdersSection>
           </TabPanel>
         </Tabs>

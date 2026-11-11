@@ -32,9 +32,10 @@ function everySentence(): string[] {
   for (const phase of PHASES) out.push(copy.signHelp(phase, '08:01:30 UTC'), copy.signHelp(phase, null))
   for (const phase of OUTCOMES) for (const effect of EFFECTS) out.push(copy.outcomeTitle(phase, effect, false), copy.outcomeTitle(phase, effect, true))
   out.push(copy.listingNote('USDx', false), copy.listingNote('USDx', true))
-  out.push(copy.checksSentence('13:45:12 UTC', ['the offer is open', 'the BOND issuer has authorized your account', 'you hold 2,500.00 USDx']), copy.checksSentence(null, ['you hold 2,500.00 USDx']))
-  out.push(copy.pendingTxNotice('14:38:02 UTC', '14:43:41 UTC'), copy.betterRequest('0.65 USDx', '5.00 BOND', '000001'), copy.cheaperOffer('0.16 USDx', 'BOND', '5.00 BOND', '000032'))
+  out.push(copy.checksSentence('13:45:12 UTC', ['the offer is open', 'the BOND issuer has authorized your account', 'you hold 2,500.00 USDx']), copy.checksSentence(null, ['you hold 2,500.00 USDx']), copy.checksSentence('13:45:12 UTC', ['the offer is open'], true))
+  out.push(copy.pendingTxNotice('14:38:02 UTC', '14:43:41 UTC'), copy.betterRequest('0.65 USDx', '5.00 BOND', '1'), copy.cheaperOffer('0.16 USDx', 'BOND', '5.00 BOND', '32'))
   out.push(copy.giveUpValue('25.00 USDx', 'EQTY'), copy.giveUpHint('4.00 EQTY'), copy.capOffers(50, 50), copy.capRequests(50, 50))
+  for (const kind of KINDS) out.push(copy.cancelListingTitle(kind, 'BOND'), copy.cancelListingSummary(kind, '2.00 BOND', '1.25 USDx'), copy.cancelListingCommitment(kind, '2.00 BOND', '1.25 USDx'))
   return out
 }
 
@@ -128,6 +129,11 @@ describe('ticket copy', () => {
     )
     expect(copy.checksSentence(null, ['the BOND issuer has authorized your account', 'you hold 2,500.00 USDx'])).toBe('Read from the contract: the BOND issuer has authorized your account and you hold 2,500.00 USDx.')
   })
+
+  it('on mock data says mock data, not a contract read, as Reserves does', () => {
+    expect(copy.checksSentence('20:44:42 UTC', ['the request is open', 'you hold 120.00 USDx'], true)).toBe('Mock data, 20:44:42 UTC: the request is open and you hold 120.00 USDx.')
+    expect(copy.checksSentence(null, ['the request is open'], true)).toBe('Mock data: the request is open.')
+  })
 })
 
 describe('calendar entry', () => {
@@ -136,7 +142,7 @@ describe('calendar entry', () => {
   const event = calendarFor({ kind: 'put', underlying: BOND, quote: USDX, underlyingQty: 50_000_000n, totalStrike: 4_950_000_000n, totalPremium: 18_000_000n, expiry: 1_800_000_000 }, 12n, 'https://app.invalid')
 
   it('says what the holder needs to exercise, and no tagline', () => {
-    expect(event.description).toContain('To exercise you need 5.00 BOND in your wallet.')
+    expect(event.description).toContain('To exercise you need 5.00\u00A0BOND in your wallet.')
     expect(findBannedWords(event.description, BANNED_TAGLINES)).toEqual([])
     expect(event.description).not.toMatch(/fictional|testnet/i)
     expect(event.url).toBe('https://app.invalid/portfolio/12?do=exercise')

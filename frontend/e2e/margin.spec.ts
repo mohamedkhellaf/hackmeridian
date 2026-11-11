@@ -92,17 +92,22 @@ test.describe('Margin on fixtures', () => {
     }
   })
 
-  test('the publisher prices give the price, the snapshot, its age in words and the early-exercise window', async ({ page }) => {
+  test('one ruled row: the scenario, then the price, the snapshot and its age; early exercise only on Positions', async ({ page }) => {
     await openApp(page, '/margin')
     await startAt(page, EARLY, 22)
     const o = prices(page)
-    await expect(o.getByText('EQTY, publisher price')).toBeVisible()
+    // Labelled as the Margin publisher's price, so it is not read as the Covered token's demo price (ruling F11).
+    await expect(o.getByText('EQTY, Margin publisher price')).toBeVisible()
     await expect(o).toContainText('140.00')
     await expect(o).toContainText('No. 4')
     await expect(o).toContainText('0 s, fresh')
+    await expect(o).not.toContainText('Early exercise')
+    await expect(page.getByText(/^Early exercise, step 22 of 31, as Maker A\./)).toBeVisible()
+
+    await goToScreen(page, 'Positions')
     await expect(o).toContainText('Open, snapshot within 2 min')
 
-    // At step 26 the clock is at expiry: the snapshot is stale, exercise is paused, a settlement price is pending.
+    // At step 26 the clock is at the deadline: the snapshot is stale, exercise is paused, a settlement price is pending.
     await stepTo(page, 26)
     await expect(o).toContainText('stale (limit 1 h)')
     await expect(o).toContainText('Paused, snapshot older than 2 min')
@@ -120,23 +125,42 @@ test.describe('Margin on fixtures', () => {
     for (const label of ['Account value (NLV)', 'Liquidation level (MM)', 'Opening requirement (IM)']) await expect(main.getByText(label, { exact: true }).first()).toBeVisible()
     await expect(main.getByText("In Maker A's wallet")).toBeVisible()
 
-    // The scenario records no later deposit by Maker A: the button says so instead of answering after a press.
-    await main.getByRole('textbox', { name: /^Amount/ }).fill('1')
+    // The scenario records no later deposit by Maker A: no field, the reason, and the button says so before a press.
+    await expect(main.getByText('The scenario records no deposit or withdrawal by Maker A after step 22.')).toBeVisible()
+    await expect(main.getByRole('textbox', { name: /^Amount/ })).toHaveCount(0)
     await expect(main.getByRole('button', { name: 'Deposit', exact: true })).toBeDisabled()
     // Typed amounts are not used by the replay, so there is no "Fill in" on fixtures.
     await expect(main.getByRole('button', { name: /^Fill in/ })).toHaveCount(0)
   })
 
-  test('a deposit the scenario records runs, and the result takes focus', async ({ page }) => {
+  test('a recorded deposit shows its own amount, locked, runs it, and the receipt states that amount', async ({ page }) => {
     await openApp(page, '/margin')
     await startAt(page, UNCOVERED, 3)
     const main = page.getByRole('main')
     await expect(main.getByText('Maker A has no margin posted yet.')).toBeVisible()
-    await main.getByRole('textbox', { name: /^Amount/ }).fill('26499.938194')
-    await main.getByRole('button', { name: 'Deposit', exact: true }).click()
+    // Fixtures: the field holds the recorded amount and cannot be typed in; the button carries the amount (ruling F11).
+    const amount = main.getByRole('textbox', { name: /^Amount/ })
+    await expect(amount).toHaveValue('26499.938194')
+    await expect(amount).not.toBeEditable()
+    await expect(main.getByText('Recorded amount for step 4.')).toBeVisible()
+    // The withdrawal comes later in the scenario: it waits, and says why.
+    await expect(main.getByRole('button', { name: 'Withdraw', exact: true })).toBeDisabled()
+    await main.getByRole('button', { name: /^Deposit 26,499\.93\sUSDx$/ }).click()
     await expect(result(page)).toContainText('Deposited')
+    await expect(result(page)).toContainText('26,499.93')
+    await expect(result(page)).toContainText('Step 4 of the scenario.')
     await expect(result(page)).toBeFocused()
     await expect(main.getByText('Maker A has no margin posted yet.')).toHaveCount(0)
+
+    // The scenario has no requirement at this step: one sentence says where it is recorded, and no empty meter.
+    await expect(main.getByText("The scenario records Maker A's margin requirement at step 7.")).toBeVisible()
+    await expect(main.getByText('Account value (NLV)', { exact: true })).toHaveCount(0)
+    await expect(main.getByText('Cash in the contract')).toBeVisible()
+
+    // The next recorded withdrawal is step 8: before the press, the page says that steps 5 to 7 run first.
+    await expect(amount).toHaveValue('2000.0000001')
+    await expect(main.getByText('Steps 5 to 7 run first: write a call (Maker A), buy a call (Alice), read the margin requirement (Maker A).')).toBeVisible()
+    await expect(main.getByRole('button', { name: /^Withdraw 2,000\.00\sUSDx$/ })).toBeEnabled()
   })
 
   test('withdrawals are blocked while an expired position is unsettled, and the reason is on screen', async ({ page }) => {
@@ -146,8 +170,7 @@ test.describe('Margin on fixtures', () => {
     await expect(main.getByText('Withdrawals are blocked: an expired position is not settled yet.')).toBeVisible()
     await expect(main.getByText(/SeriesExpired, 205/)).toBeVisible()
     await expect(main.getByText(/Waiting for the publisher's settlement price for series 0/)).toBeVisible()
-    await main.getByRole('textbox', { name: /^Amount/ }).fill('1')
-    await expect(main.getByRole('button', { name: 'Withdraw', exact: true })).toBeDisabled()
+    await expect(main.getByRole('button', { name: /^Withdraw/ })).toBeDisabled()
   })
 
   test('early exercise is refused with LiquidateFirst (224); after a takeover to the vault, with the vault-owned reason', async ({ page }) => {
@@ -160,7 +183,9 @@ test.describe('Margin on fixtures', () => {
     await exercise.click()
     let dialog = page.getByRole('dialog', { name: 'Exercise early' })
     await expect(dialog).toContainText('140.00 USDx')
-    await expect(dialog).toContainText('You receive')
+    // Acting as Maker A for Bob's position: the payout row names who receives it (flow-8).
+    await expect(dialog).toContainText('Bob receives')
+    await expect(dialog).not.toContainText('You receive')
     await expect(dialog).toContainText('30,000.00 USDx')
     await expect(dialog).toContainText('LiquidateFirst (224)')
     await dialog.getByRole('button', { name: 'Try anyway' }).click()
@@ -170,10 +195,14 @@ test.describe('Margin on fixtures', () => {
     await expect(result(page)).toBeFocused()
 
     await goToScreen(page, 'Liquidations')
+    // The result belongs to the screen where the call ran.
+    await expect(result(page)).toHaveAttribute('data-empty', 'true')
     const accounts = page.getByRole('table', { name: 'Margin accounts and their distance to liquidation' })
     await expect(accounts.getByRole('row', { name: /Maker A/ })).toContainText('Liquidatable')
-    // Your own account: the way out is a deposit; a private takeover of yourself is not offered.
-    await expect(accounts.getByRole('link', { name: 'Deposit 20,437.8473 USDx' })).toBeVisible()
+    // Your own account: the way out is a deposit, at two decimals like the figures beside it, exact in its name.
+    const deposit = accounts.getByRole('link', { name: /^Deposit 20,437\.84\sUSDx, at least 20,437\.8473\sUSDx, on Account$/ })
+    await expect(deposit).toBeVisible()
+    await expect(deposit).toHaveText(/^Deposit 20,437\.84\sUSDx/)
     await expect(page.getByRole('button', { name: 'Private takeover: Maker A' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Take over to the vault: Maker A' }).click()
     const confirm = page.getByRole('alertdialog', { name: 'Take over to the vault' })
@@ -189,7 +218,7 @@ test.describe('Margin on fixtures', () => {
     // The book now belongs to the vault: the position is no longer Maker A's, so it is listed under All.
     await goToScreen(page, 'Positions')
     await page.getByRole('radio', { name: /^All/ }).click()
-    await expect(positions(page).getByRole('row', { name: /Position 1/ })).toContainText('Settles at expiry')
+    await expect(positions(page).getByRole('row', { name: /Position 1/ })).toContainText('Settles at the deadline')
     await exercise.click()
     dialog = page.getByRole('dialog', { name: 'Exercise early' })
     await expect(dialog).toContainText('NoEarlyExercise (226)')
@@ -259,6 +288,9 @@ test.describe('Margin on fixtures', () => {
     const dialog = page.getByRole('dialog', { name: 'Buy EQTY call' })
     await expect(dialog).toContainText('619.17')
     await expect(dialog).toContainText('10 % goes to the vault as a reserve fee, the rest to the writer.')
+    // The premium is the writer's figure: no highlighter on it (flow-17).
+    await expect(dialog.locator('mark')).toHaveCount(0)
+    await expect(dialog).toContainText('Deadline')
     await expect(dialog).toContainText('Breakeven')
     await expect(dialog).toContainText('110.6191')
     await expect(dialog).toContainText('Most you can lose')
@@ -278,7 +310,7 @@ test.describe('Margin on fixtures', () => {
     // No consent box: the sentence of what is agreed to is printed with the action, and the action is ready.
     await expect(dialog.getByRole('checkbox')).toHaveCount(0)
     await expect(dialog).toContainText(BUY_PAYOUT_LINE)
-    const confirm = dialog.getByRole('button', { name: /^Buy for 619\.17 USDx$/ })
+    const confirm = dialog.getByRole('button', { name: /^Buy for 619\.17\sUSDx$/ })
     await expect(confirm).toBeEnabled()
     await confirm.click()
     await expect(dialog).toHaveCount(0)
@@ -293,34 +325,53 @@ test.describe('Margin on fixtures', () => {
     await expect(positions(page).getByRole('row', { name: /Position 0/ })).toContainText('Alice (you)')
   })
 
-  test('writing a call states the reserve fee, previews the requirement and warns under the mark floor', async ({ page }) => {
+  test('writing a call shows the recorded order per lot with its exact total, the reserve fee and the requirement after the fill', async ({ page }) => {
     await openApp(page, '/margin/trade')
     await startAt(page, UNCOVERED, 4)
+    // The series line says what the price is and that no token moves; the series column is the deadline.
+    await expect(page.getByText("Calls settled in USDx on the publisher's EQTY price. No EQTY token changes hands.")).toBeVisible()
+    await expect(page.getByRole('table', { name: 'EQTY call series' }).getByRole('columnheader', { name: 'Deadline' })).toBeVisible()
+    await expect(page.getByText('1 series listed')).toHaveCount(0)
     const form = page.locator('#write')
     await expect(form.getByRole('heading', { name: 'Write an uncovered call' })).toBeVisible()
-    await expect(form).toContainText('At the latest mark a buy needs at least 562.8819 USDx.')
+    // Fixtures: the recorded step's quantity and premium per lot, locked; the contract gets the exact total.
+    await expect(form.getByRole('textbox', { name: /^Quantity/ })).toHaveValue('1,000')
+    const each = form.getByRole('textbox', { name: /^Premium per lot/ })
+    await expect(each).toHaveValue('0.61917009')
+    await expect(each).not.toBeEditable()
+    await expect(form).toContainText('Recorded amounts for step 5.')
+    await expect(form).toContainText('A buy needs at least 0.5629 USDx per lot at the latest mark.')
+    await expect(form).toContainText('Premium, total')
+    await expect(form).toContainText('619.17')
     await expect(form).toContainText('You receive 90 % of the premium when the offer is bought; 10 % goes to the vault as a reserve fee.')
-    // Before a full order the panel shows the account as it stands.
-    await expect(form.getByRole('region', { name: 'Your margin now' })).toBeVisible()
-
-    const premium = form.getByRole('textbox', { name: /^Premium, total/ })
-    await premium.fill('100')
-    await expect(form).toContainText('PremiumBelowMark (222)')
-    await premium.fill('619.17009')
-    await expect(form).not.toContainText('PremiumBelowMark (222)')
     const preview = form.getByRole('region', { name: 'Margin after the fill' })
     await expect(preview).toContainText('24,494.30')
     await expect(preview).toContainText('26,494.30')
+    // One unfunded-quote sentence, the form's.
+    expect(await countVisible(page, 'unfunded quote')).toBe(1)
 
-    await form.getByRole('button', { name: 'Write call' }).click()
+    await form.getByRole('button', { name: /^Write call for 619\.17\sUSDx$/ }).click()
     await expect(result(page)).toContainText('Offer written')
+    await expect(result(page)).toContainText('No. 0')
+    await expect(result(page)).toContainText('619.17')
     await expect(page.getByRole('table', { name: 'Open offers' }).getByRole('row', { name: /Offer 0/ })).toContainText('Maker A (you)')
   })
 
-  test('after expiry: one block settles the books, then the series; each holder claims; the row keeps what was paid', async ({ page }) => {
+  test('a recorded order under the mark floor is shown with the refusal it will meet', async ({ page }) => {
+    await openApp(page, '/margin/trade')
+    await startAt(page, /^Review cases/, 10)
+    const form = page.locator('#write')
+    await expect(form.getByRole('textbox', { name: /^Quantity/ })).toHaveValue('100')
+    await expect(form.getByRole('textbox', { name: /^Premium per lot/ })).toHaveValue('0.000000001')
+    await expect(form).toContainText('PremiumBelowMark (222)')
+  })
+
+  test('after the deadline: one block settles the books, then the series; each holder claims; the row keeps what was paid', async ({ page }) => {
     await openApp(page, '/margin/positions')
     await startAt(page, /^Settlement with a deficit/, 10)
-    const block = page.getByRole('region', { name: 'After expiry' })
+    // One heading per word: the page is Positions, the table under it has no second "Positions" heading.
+    await expect(page.getByRole('heading', { name: 'Positions', exact: true })).toHaveCount(1)
+    const block = page.getByRole('region', { name: 'After the deadline' })
     await expect(block).toContainText("Waiting for the publisher's settlement price.")
     await expect(block).toContainText('Anyone can make the first two calls.')
     await expect(positions(page).getByRole('row', { name: /Position 0/ })).toContainText('Waiting for settlement price')
@@ -356,19 +407,22 @@ test.describe('Margin on fixtures', () => {
     await actAs(page, 'LP 2')
     const main = page.getByRole('main')
     await expect(main.getByText('LP capital cannot be withdrawn in this version. A deposit stays in the vault.')).toBeVisible()
-    await expect(main.getByText('Vault value')).toBeVisible()
+    await expect(main.getByText('Vault value', { exact: true })).toBeVisible()
+    // No vault value recorded at this step: where the scenario records it, not a bare dash.
+    await expect(main.getByText('The scenario records no vault value after step 16.')).toBeVisible()
     await expect(main.getByText('Reserved for takeovers')).toBeVisible()
     await expect(main.getByText('Includes the 10 % reserve fee taken from every premium.')).toBeVisible()
     const shares = page.getByRole('table', { name: 'LP shares of the vault' })
     await expect(shares.getByRole('row', { name: /LP 1/ })).toContainText('100.00 %')
     await expect(shares.getByRole('row', { name: /All shares/ })).toContainText('250,000.00')
 
-    const deposit = main.getByRole('button', { name: 'Deposit to the vault' })
-    await expect(deposit).toBeDisabled()
-    await main.getByRole('textbox', { name: /^Amount/ }).fill('500')
+    // Fixtures: the recorded amount of LP 2's deposit, locked, and carried by the button.
+    await expect(main.getByRole('textbox', { name: /^Amount/ })).toHaveValue('50000')
+    await expect(main.getByText('Recorded amount for step 17.')).toBeVisible()
+    const deposit = main.getByRole('button', { name: /^Deposit 50,000\.00\sUSDx to the vault$/ })
     await deposit.click()
     const dialog = page.getByRole('dialog', { name: 'Deposit to the vault' })
-    await expect(dialog).toContainText('500.00')
+    await expect(dialog).toContainText('50,000.00')
     await expect(dialog).toContainText('it can be lost')
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(deposit).toBeFocused()
@@ -514,6 +568,19 @@ test.describe('Margin on a phone @phone', () => {
     const box = await sheet.boundingBox()
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(PHONE.width - 1)
     await expectNoHorizontalOverflow(page)
+  })
+
+  test('the publisher figures are one sentence under the scenario, and the screen starts in the first view', async ({ page }) => {
+    await openApp(page, '/margin')
+    const o = prices(page)
+    await expect(o).toHaveText(/^EQTY, Margin publisher price 100\.00\sUSDx, snapshot No\.\s1, 0\ss old\.$/)
+    const box = await o.boundingBox()
+    // At most two short lines, broken between facts, and no early-exercise state off Positions.
+    expect(box?.height ?? 99).toBeLessThan(48)
+    await expect(o).not.toContainText('early exercise')
+    const first = page.getByRole('main').getByRole('heading', { level: 2 }).first()
+    const top = (await first.boundingBox())?.y ?? 9999
+    expect(top).toBeLessThan(PHONE.height - 120)
   })
 
   test('the replay opens on demand and the flows work with it', async ({ page }) => {

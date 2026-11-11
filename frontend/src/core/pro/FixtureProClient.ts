@@ -1,11 +1,12 @@
 // Simulated StellSec Pro client: replays packages/risk/fixtures/pro_v0.json. Not on chain.
 // Calls do not compute anything. Each one finds the next scripted step with the same operation and arguments
-// (who, position, book, series...), moves the cursor there and returns that step's recorded result or error.
-// Amounts typed in a form are therefore not used: the script decides. When the script has no such step the
-// call returns a "not scripted" refusal (code 0).
+// (who, position, book, series...), moves the cursor there and returns that step's recorded result or error,
+// with the step itself (`step`: its number and arguments). Amounts passed in are not used: the Margin forms show
+// the recorded amounts, locked, and say which steps run first. When the script has no such step the call
+// returns a "not scripted" refusal (code 0).
 import raw from '../../../../packages/risk/fixtures/pro_v0.json?raw'
 import { proErrorName } from './errors'
-import { currentRequirement, deriveModel, findScripted, requirementAfterFill } from './replay'
+import { currentRequirement, deriveModel, findScripted, requirementAfterFill, stepActor } from './replay'
 import type { RawFixtureFile, RawScenario, RawStep, StepMatcher } from './replay'
 import type { TxOptions } from '../tx/types'
 import type { CallResult, ClaimResult, OfferParams, Party, ProClient, ProModel, Requirement } from './types'
@@ -61,7 +62,10 @@ export class FixtureProClient implements ProClient {
   /** Parties that appear in the scenario (wallet owners plus the roles), for the "acting as" selector. */
   get parties(): Party[] {
     const names = new Set<string>(Object.keys(this.scenario.initial_wallets))
-    for (const s of this.scenario.steps) if (typeof s.args[0] === 'string' && /^[A-Z][A-Z0-9_]*$/.test(s.args[0])) names.add(s.args[0])
+    for (const s of this.scenario.steps) {
+      const actor = stepActor(s)
+      if (actor) names.add(actor)
+    }
     names.delete(VAULT)
     return [...names]
   }
@@ -101,11 +105,13 @@ export class FixtureProClient implements ProClient {
       return { ok: false, code: NOT_SCRIPTED, name: 'NotScripted', note: 'Simulation: the fixture has no later step for this exact action. Use the step control to pick another moment or scenario.' }
     }
     const s: RawStep = this.scenario.steps[i]
-    const skipped = i - this.cursor
-    const note = `Step ${i + 1} of the scenario${skipped > 0 ? `, ${skipped} skipped before it` : ''}, with the amounts recorded for it.`
+    const from = this.cursor + 1
+    // The screens say before the press which steps run first (useReplayable); the note repeats it after.
+    const note = `Step ${i + 1} of the scenario${i + 1 > from ? (i === from ? `, after step ${from}` : `, after steps ${from} to ${i}`) : ''}.`
+    const step = { number: i + 1, op: s.op, args: s.args }
     this.moveTo(i + 1)
-    if (s.expect !== 'ok') return { ok: false, code: s.expect.code, name: proErrorName(s.expect.code), note }
-    return { ok: true, value: read(s.result), note }
+    if (s.expect !== 'ok') return { ok: false, code: s.expect.code, name: proErrorName(s.expect.code), note, step }
+    return { ok: true, value: read(s.result), note, step }
   }
 
   deposit(who: Party, amount: bigint, opts?: TxOptions) {

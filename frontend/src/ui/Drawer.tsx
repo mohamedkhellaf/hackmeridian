@@ -9,12 +9,20 @@ import styles from './Drawer.module.css'
 
 const PARTS = { Title: BaseDrawer.Title, Description: BaseDrawer.Description, Close: BaseDrawer.Close }
 
+/** The dismissals `holdDismissal` holds back: the close button is never one of them. */
+const HELD: ReadonlySet<string> = new Set(['escape-key', 'close-watcher', 'outside-press'])
+
 export interface DrawerProps extends OverlayProps {
   /**
    * `page`: on phones the drawer is a full page (no scrim edge, no shadow) and its footer is the 64 px action
    * bar, outside the scroller, so nothing in the body can sit under it. From 768 px it is the usual panel.
    */
   presentation?: 'panel' | 'page'
+  /**
+   * While true, Escape, the system Back and a press outside do not close the panel; its close button still does.
+   * For a step that cannot be called back (a transaction between signature and ledger), so it stays on screen.
+   */
+  holdDismissal?: boolean
 }
 
 /**
@@ -22,8 +30,8 @@ export interface DrawerProps extends OverlayProps {
  * Modal: focus is trapped, Escape closes it, focus returns to the opener. It can be swiped away to the right;
  * the close button is the alternative to the gesture.
  */
-export function Drawer({ presentation = 'panel', ...props }: DrawerProps) {
-  return <SlidingPanel {...props} placement="right" page={presentation === 'page'} />
+export function Drawer({ presentation = 'panel', holdDismissal = false, ...props }: DrawerProps) {
+  return <SlidingPanel {...props} placement="right" page={presentation === 'page'} holdDismissal={holdDismissal} />
 }
 
 /**
@@ -62,13 +70,20 @@ function SlidingPanel({
   className,
   placement,
   page = false,
-}: OverlayProps & { placement: 'right' | 'bottom'; page?: boolean }) {
+  holdDismissal = false,
+}: OverlayProps & { placement: 'right' | 'bottom'; page?: boolean; holdDismissal?: boolean }) {
   const titleId = useId()
   const bodyId = useId()
   return (
     <BaseDrawer.Root
       open={open}
-      onOpenChange={(next) => onOpenChange(next)}
+      onOpenChange={(next, details) => {
+        if (!next && holdDismissal && HELD.has(details.reason)) {
+          details.cancel()
+          return
+        }
+        onOpenChange(next)
+      }}
       swipeDirection={placement === 'right' ? 'right' : 'down'}
       disablePointerDismissal={!dismissible}
     >

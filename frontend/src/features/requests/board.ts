@@ -79,7 +79,7 @@ export function boardTotals(bids: readonly Bid[]): BoardTotals {
   return { count: bids.length, escrowed: bids.reduce((sum, b) => sum + b.totalPremium, 0n), quote: bids[0].quote }
 }
 
-/** The contract's bid id as printed on a note: six digits. */
+/** The contract's bid id as printed on a row: unpadded, `No. 3` (ruling F1). */
 import { serialOf } from '../../core/format/option'
 export { serialOf }
 

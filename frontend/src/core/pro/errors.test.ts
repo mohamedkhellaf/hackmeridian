@@ -20,7 +20,7 @@ describe('Pro error map', () => {
   })
 
   it('maps the early-exercise refusals to their reasons', () => {
-    expect(proErrorMessage(226)).toBe('This position is owned by the vault and settles at expiry.')
+    expect(proErrorMessage(226)).toBe('This position is owned by the vault and settles at the deadline.')
     expect(proErrorMessage(207)).toMatch(/too old/)
     expect(proErrorMessage(223)).toMatch(/Out of the money/)
     expect(proErrorMessage(225)).toMatch(/settlement price/)

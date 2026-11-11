@@ -128,7 +128,7 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 
 | Module | Exports |
 |---|---|
-| `assetfacts/assetFacts.ts` | Parsers `parseSacName`, `parseAssetsResponse`, `parseIssuerAccount`, `parseHolderStatus`, `describeFlags`; cached reads `fetchAssetFacts(contractId, code)` (rejects for mock tokens), `fetchHolderStatus(code, issuer, address)`; types `AssetFacts`, `AssetFlags`, `IssuerFacts`, `HolderStatus`, `FlagFact`. No static SDK import. Explorer links moved to `explorer.ts`. |
+| `assetfacts/assetFacts.ts` | Parsers `parseSacName`, `parseAssetsResponse`, `parseIssuerAccount`, `parseHolderStatus`, `describeFlags`, `describeFlagChange`; the one vocabulary of the issuer powers for About, Issuer and Reserves, `FLAG_LABELS` (Approval required, Can freeze, Can claw back, Can change these) and `POWER_STATE` (Yes, No); cached reads `fetchAssetFacts(contractId, code)` (rejects for mock tokens), `fetchHolderStatus(code, issuer, address)`; types `AssetFacts`, `AssetFlags`, `IssuerFacts`, `HolderStatus`, `FlagFact`. No static SDK import. Explorer links moved to `explorer.ts`. |
 | `issuer/issuerView.ts` | `actionsFor`, `AuthState`. |
 | `issuer/issuerTx.ts` (SDK) | Builders: `buildSetAuthorizedTx`, `buildClawbackTx`, `sacSetAuthorizedOp`, `sacClawbackOp`, `buildSacTx`, `buildSacAuthorizedQuery`, `sacContractId`, `trustStatus`, `missingFlags`, `isAccountId`, `isContractId`, `STROOPS_DECIMALS`. |
 | `issuer/issuerNet.ts` (SDK) | `submitClassic`, `submitSoroban`, `readSacAuthorized`, `horizonError`, `Signer`. The issuer route is lazy: import these two only from it. |
@@ -201,7 +201,7 @@ Used when the build has no `VITE_OPTIONS_CONTRACT_ID`. All of it is computed fro
 | `maker/lowestOffer.ts` | `lowestOpenInSeriesOf(offers, series, quote)`: the cheapest offer of a series named by its terms. |
 | `series` | `LADDER_ROWS`: the strike rows of the app's grid, one number for every view. |
 | `format` | `noBreak(text)`: keeps a deadline or a figure with its unit on one line. |
-| `assetfacts` | `mockAssetFacts(code)`: fixture flags for mock assets (`mock: true`, no counts). |
+| `assetfacts` | `mockAssetFacts(code)`: the mock issuer's flags, the same for FUND, BOND and EQTY and equal to the recorded Testnet issuer's (`TEAM_ISSUER_FLAGS`: approval not required, can freeze, can claw back); `mock: true`, no counts. |
 | `options/mockClient.ts` | `failNextRead(method?, times)`, `clawBack(tokenId, units)`; `DEMO_WALLETS.c` is an empty wallet. `createOptionsClient` no longer keeps a failed load of the mock chunk. |
 | `disclosures.ts` | `MARGIN_PAYOUT_RISK`, `MARGIN_PUBLISHER_LINE` (the on-chain banner is the two together). |
 

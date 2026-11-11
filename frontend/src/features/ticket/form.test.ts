@@ -183,8 +183,10 @@ describe('takeOver', () => {
 
 describe('chipCountdown', () => {
   it('counts whole days from one day up, and hours and minutes below', () => {
-    expect(chipCountdown(9 * 86_400 + 3600)).toBe('9 d')
-    expect(chipCountdown(86_400)).toBe('1 d')
-    expect(chipCountdown(3 * 3600 + 12 * 60)).toBe('3 h 12 min')
+    // A duration never breaks inside: its spaces are no-break spaces.
+    const nb = (text: string) => text.replaceAll(' ', '\u00A0')
+    expect(chipCountdown(9 * 86_400 + 3600)).toBe(nb('9 d'))
+    expect(chipCountdown(86_400)).toBe(nb('1 d'))
+    expect(chipCountdown(3 * 3600 + 12 * 60)).toBe(nb('3 h 12 min'))
   })
 })

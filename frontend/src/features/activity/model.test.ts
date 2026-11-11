@@ -180,7 +180,8 @@ describe('groupRows', () => {
       ON,
     )
     const groups = groupRows(rows)
-    expect(groups.map((g) => g.title)).toEqual(['Waiting for an outcome', '11 Nov 2026', '10 Nov 2026'])
+    // A short date never breaks inside: no-break spaces from core/format.
+    expect(groups.map((g) => g.title)).toEqual(['Waiting for an outcome', '11\u00a0Nov\u00a02026', '10\u00a0Nov\u00a02026'])
     expect(groups.map((g) => g.rows.map((r) => r.id))).toEqual([['u', 'p'], ['a', 'b'], ['c']])
   })
 

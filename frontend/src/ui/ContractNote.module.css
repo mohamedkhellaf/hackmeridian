@@ -157,20 +157,34 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--s-8);
-    padding-block: var(--s-24) var(--s-16);
+    gap: var(--s-6);
+    padding-block: var(--s-16);
   }
 
   .slip .emptyBody {
+    gap: var(--s-8);
     padding-block: var(--s-32) var(--s-20);
   }
 
+  /*
+   * The plain sentence sits a rank under the heading above it: figure size, book weight, secondary ink, so it
+   * never reads as one more section title.
+   */
   .emptyTitle {
     font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 420;
+    color: var(--text-2);
+  }
+
+  /* The blank contract note keeps the large sentence: it stands in for the note itself. */
+  .slip .emptyTitle {
     font-size: var(--h2-size);
     line-height: var(--h2-line);
     font-weight: var(--display-weight);
     letter-spacing: var(--h2-track);
+    color: var(--text);
   }
 
   .emptyHint {
@@ -200,14 +214,14 @@
       padding-block: var(--s-12);
     }
 
-    & .emptyTitle {
-      font-size: var(--figure-size);
-      line-height: var(--figure-line);
-      letter-spacing: 0;
-    }
-
     & .emptyAction {
       margin-top: var(--s-4);
     }
+  }
+
+  .slip[data-size='sm'] .emptyTitle {
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    letter-spacing: 0;
   }
 }

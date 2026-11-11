@@ -1,9 +1,10 @@
 import { Link as RouterLink, useLocation } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
 import { explorerTx } from '../../../core/explorer'
 import { txEffectText, usePro } from '../../../data'
 import { Button, Callout, KeyValue, KeyValueItem, Link, TxLink, TxStepper } from '../../../ui'
 import { Waterfall } from '../../../viz'
-import { QUOTE, toChartNumber, usdx } from '../model/money'
+import { toChartNumber, usdx, withUnit } from '../model/money'
 import { Usdx } from './figures'
 import { useMarginUi } from './marginUi'
 import type { ResultSplit, ResultView } from './marginUi'
@@ -26,9 +27,9 @@ function SplitFigure({ split }: { split: ResultSplit }) {
   return (
     <Waterfall
       className={css.split}
-      heading={`Owed ${usdx(split.due)} ${QUOTE}`}
+      heading={`Owed ${withUnit(usdx(split.due))}`}
       paidLabel={unpaid > 0n ? `Paid ${usdx(split.due - unpaid)} of ${usdx(split.due)}` : undefined}
-      label={`Owed ${usdx(split.due)} ${QUOTE}: ${read}.`}
+      label={`Owed ${withUnit(usdx(split.due))}: ${read}.`}
       segments={split.parts.map((p) => ({ id: p.id, label: p.label, value: toChartNumber(p.value), valueLabel: usdx(p.value), kind: p.kind }))}
     />
   )
@@ -66,6 +67,13 @@ export function OutcomeRegion() {
   const { outcome, clearOutcome, tx, simulated, canCheckAgain, checkAgain } = usePro()
   const { result, resultRef } = useMarginUi()
   const { pathname } = useLocation()
+  // A result belongs to the screen where the call ran: moving to another Margin screen clears it.
+  const shownOn = useRef(pathname)
+  useEffect(() => {
+    if (pathname === shownOn.current) return
+    shownOn.current = pathname
+    clearOutcome()
+  }, [pathname, clearOutcome])
   const working = !simulated && WORKING.has(tx.phase)
   const hash = !simulated && tx.hash ? <TxLink hash={tx.hash} explorerUrl={explorerTx(tx.hash)} copy /> : null
 

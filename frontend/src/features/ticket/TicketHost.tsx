@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { JSX, ReactNode, RefObject } from 'react'
 import { announce, Button, Drawer, IconButton, IconClose, Segmented, useIsPhone, useIsWide } from '../../ui'
 import { BuyFlow } from './BuyFlow'
-import { LOADING_TITLE, NO_OFFER, ticketTitle } from './copy'
+import { LOADING_TITLE, NO_OFFER, SIGN_TITLE, ticketTitle } from './copy'
 import type { StepName } from './copy'
 import { FillFlow } from './FillFlow'
 import { FrameContext } from './frame'
@@ -59,6 +59,12 @@ function fallbackFocus(): HTMLElement | null {
   return heading
 }
 
+/** A press in the rail's idle content that opens a ticket within this long counts as the user opening it. */
+const IDLE_PRESS_MS = 3000
+
+/** The first control of the rail's idle content, where focus returns when a ticket it opened closes. */
+const IDLE_CONTROL = 'a[href], button:not([disabled])'
+
 export function TicketHost(props: {
   intent: TicketIntent | null
   onClose: () => void
@@ -66,6 +72,11 @@ export function TicketHost(props: {
   placement: 'rail' | 'overlay'
   startAt?: 'terms' | 'review'
   idle?: ReactNode
+  /**
+   * The Buy, Write and Request tabs at the top of the ticket (default on). Off where the page around the ticket
+   * already chooses the side, as the asset page's guided mode does with its intents: one side switch per page.
+   */
+  sides?: boolean
 }): JSX.Element {
   const { intent, placement, idle } = props
   const wide = useIsWide()
@@ -76,17 +87,67 @@ export function TicketHost(props: {
   const [last, setLast] = useState<TicketIntent | null>(intent)
   if (intent !== null && intent !== last) setLast(intent)
 
+  // The rail's idle content can hold the control that opens a ticket (the guided closing block). That control is
+  // replaced by the ticket it opens, so focus would fall to the page: a press in it is remembered, the ticket
+  // then takes focus and is announced as one the user opened, and on close focus goes back to the idle content.
+  const idleBox = useRef<HTMLDivElement | null>(null)
+  const idlePress = useRef<number | null>(null)
+  const backToIdle = useRef(false)
+  const notePress = useCallback(() => {
+    idlePress.current = performance.now()
+  }, [])
+  const takeIdleOpen = useCallback(() => {
+    const at = idlePress.current
+    idlePress.current = null
+    const yes = at !== null && performance.now() - at < IDLE_PRESS_MS
+    if (yes) backToIdle.current = true
+    return yes
+  }, [])
+  useEffect(() => {
+    if (intent !== null || !backToIdle.current) return
+    backToIdle.current = false
+    const frame = requestAnimationFrame(() => {
+      if (document.activeElement !== null && document.activeElement !== document.body) return
+      idleBox.current?.querySelector<HTMLElement>(IDLE_CONTROL)?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [intent])
+
   if (container === 'rail') {
-    if (intent === null) return <>{idle ?? null}</>
-    return <Ticket {...props} intent={intent} container="rail" open />
+    if (intent === null)
+      return idle ? (
+        <div
+          ref={idleBox}
+          className={styles.idle}
+          onClickCapture={notePress}
+          onKeyDownCapture={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') notePress()
+          }}
+        >
+          {idle}
+        </div>
+      ) : (
+        <></>
+      )
+    return <Ticket {...props} intent={intent} container="rail" open takeIdleOpen={takeIdleOpen} />
   }
   const shown = intent ?? last
   if (shown === null) return <></>
   return <Ticket {...props} intent={shown} container={container} open={intent !== null} />
 }
 
-function Ticket(props: { intent: TicketIntent; container: Container; open: boolean; onClose: () => void; onIntentChange?: (next: TicketIntent) => void; startAt?: 'terms' | 'review' }) {
-  const { intent, container, open, onClose, onIntentChange, startAt } = props
+function Ticket(props: {
+  intent: TicketIntent
+  container: Container
+  open: boolean
+  onClose: () => void
+  onIntentChange?: (next: TicketIntent) => void
+  startAt?: 'terms' | 'review'
+  sides?: boolean
+  /** True once, for a ticket opened by a press in the rail's idle content (see TicketHost). */
+  takeIdleOpen?: () => boolean
+}) {
+  const { intent, container, open, onClose, onIntentChange, startAt, sides = true, takeIdleOpen } = props
   const key = intentKey(intent)
   const titleId = useId()
   const titleRef = useRef<HTMLElement | null>(null)
@@ -149,10 +210,13 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
   const fromTabs = useRef(false)
   const openedKey = useRef<string | null>(null)
   const opener = useRef<HTMLElement | null>(null)
+  // Opened from the rail's idle content, which the ticket replaced: on close TicketHost gives focus back there.
+  const fromIdle = useRef(false)
   useEffect(() => {
     if (openedKey.current === key) return
     const first = openedKey.current === null
     openedKey.current = key
+    if (first && takeIdleOpen?.()) fromIdle.current = true
     const active = document.activeElement
     if (first && active instanceof HTMLElement && active !== document.body && !sectionRef.current?.contains(active)) opener.current = active
     if (container !== 'rail') return
@@ -161,18 +225,21 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
       return
     }
     // The first ticket of a page load is part of the page (a link opened it): no focus is taken from the page.
-    if (first && active === document.body) return
-    if (active instanceof HTMLElement && !sectionRef.current?.contains(active)) opener.current = active
+    // A ticket opened from the idle content is the user's own press, though the control that took it is gone.
+    if (first && active === document.body && !fromIdle.current) return
+    if (active instanceof HTMLElement && active !== document.body && !sectionRef.current?.contains(active)) opener.current = active
     focusTitle()
     announce(`Order ticket: ${LOADING_TITLE[intent.mode]}`)
-  }, [container, key, focusTitle, intent.mode])
+  }, [container, key, focusTitle, intent.mode, takeIdleOpen])
 
   // Closing the ticket removes whatever had focus inside it: hand focus back to what opened it, if it is still
-  // there (a row of an offer just bought is not), else to the heading of the series or of the page.
+  // there (a row of an offer just bought is not), else to the heading of the series or of the page. A ticket
+  // opened from the rail's idle content returns there once it is back (TicketHost).
   const closeRail = useCallback(() => {
     const back = opener.current
     closedFor.current = key
     onClose()
+    if (fromIdle.current && !back) return
     requestAnimationFrame(() => {
       if (document.activeElement !== null && document.activeElement !== document.body) return
       const target = back?.isConnected ? back : fallbackFocus()
@@ -201,7 +268,7 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
   const series = current?.series ?? null
   // Buy opens on its review (there is nothing to set), so the tabs stay there too.
   const tabStep = step === 'terms' || (step === 'review' && tab === 'buy')
-  const showTabs = onIntentChange !== undefined && tab !== null && tabStep && (series !== null || emptyBuy)
+  const showTabs = sides && onIntentChange !== undefined && tab !== null && tabStep && (series !== null || emptyBuy)
   const selectTab = (next: Tab) => {
     if (!onIntentChange || !series) return
     const shownTab = emptyBuy ? 'buy' : tab
@@ -231,10 +298,16 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
         </div>
       ) : null}
       <div hidden={emptyBuy} className={styles.flowSlot}>
-        <FlowFor key={key} intent={intent} startAt={startAt} onIntentChange={onIntentChange} />
+        <FlowFor key={key} intent={intent} startAt={startAt} onIntentChange={onIntentChange} customTerms={sides} />
       </div>
     </FrameContext.Provider>
   )
+
+  // From the wallet's signature until the network has answered, the attempt cannot be called back: Escape leaves
+  // the stepper on screen (as the dialogs do) in the rail and in the drawer, and the close button says the
+  // transaction goes on without it.
+  const inFlight = step === 'sign' && (title === SIGN_TITLE.signing || title === SIGN_TITLE.submitting || title === SIGN_TITLE.pending)
+  const closeLabel = inFlight ? 'Close ticket. The transaction goes on.' : 'Close ticket'
 
   if (container === 'rail') {
     return (
@@ -246,9 +319,9 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
         data-container="rail"
         data-step={step}
         onKeyDown={(e) => {
-          // Escape clears the ticket, unless a popover inside it is open. Closing is allowed at every step: before
-          // the wallet is asked it cancels the attempt; after, the transaction goes on and Activity records it.
-          if (e.key !== 'Escape' || e.defaultPrevented) return
+          // Escape clears the ticket, unless a popover inside it is open or a transaction is in flight. Before the
+          // wallet is asked it cancels the attempt; on an outcome and on the receipt it closes the ticket again.
+          if (e.key !== 'Escape' || e.defaultPrevented || inFlight) return
           if (sectionRef.current?.querySelector('[data-popup-open]')) return
           close()
         }}
@@ -264,7 +337,7 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
           >
             {title}
           </h2>
-          <IconButton label="Close ticket" icon={<IconClose />} size="sm" onClick={close} className={styles.railClose} />
+          <IconButton label={closeLabel} icon={<IconClose />} size="sm" onClick={close} className={styles.railClose} />
         </header>
         <div className={styles.railBody}>{body}</div>
         <div className={styles.actions} ref={setActionsEl} data-emptybuy={emptyBuy || undefined} />
@@ -290,7 +363,8 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
           {title}
         </span>
       }
-      closeLabel="Close ticket"
+      closeLabel={closeLabel}
+      holdDismissal={inFlight}
       presentation="page"
       footer={<div className={styles.actions} ref={setActionsEl} data-container={container} data-emptybuy={emptyBuy || undefined} />}
     >
@@ -302,7 +376,7 @@ function Ticket(props: { intent: TicketIntent; container: Container; open: boole
   )
 }
 
-function FlowFor({ intent, startAt, onIntentChange }: { intent: TicketIntent; startAt?: 'terms' | 'review'; onIntentChange?: (next: TicketIntent) => void }) {
+function FlowFor({ intent, startAt, onIntentChange, customTerms }: { intent: TicketIntent; startAt?: 'terms' | 'review'; onIntentChange?: (next: TicketIntent) => void; customTerms?: boolean }) {
   switch (intent.mode) {
     case 'buy':
       return <BuyFlow intent={intent} onIntentChange={onIntentChange} />
@@ -314,6 +388,6 @@ function FlowFor({ intent, startAt, onIntentChange }: { intent: TicketIntent; st
       return <ListFlow intent={intent} startAt={startAt} />
     case 'write':
     case 'bid':
-      return <OrderFlow intent={intent} startAt={startAt} onIntentChange={onIntentChange} />
+      return <OrderFlow intent={intent} startAt={startAt} onIntentChange={onIntentChange} customTerms={customTerms} />
   }
 }

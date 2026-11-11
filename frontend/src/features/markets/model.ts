@@ -5,9 +5,12 @@ import type { BookRow } from '../../core/market/book'
 import { GUIDED_INTENTS } from '../../core/payoff/strategies'
 import type { Bid } from '../../core/requests/types'
 import type { HolderStatus } from '../../core/assetfacts/assetFacts'
+import type { OptionKind } from '../../core/options/types'
+import { priceOf } from '../../core/reference'
+import { nearestStrike } from '../../core/series'
 import type { TokenBalance } from '../../core/stellar/tokens'
 import { byPremiumPerUnit } from '../../core/units'
-import type { MarketIndexRow } from '../../data'
+import type { MarketIndexRow, MarketView } from '../../data'
 
 export interface IndexList {
   /** The rows on screen: reference assets, or every listed asset with `all`. */
@@ -30,6 +33,33 @@ export const guidedSearch = (intent: Intent): AssetSearch => ({ mode: 'guided', 
 
 /** Search of the Markets index while an intent waits for its asset. */
 export const choosingSearch = (intent: Intent, showAll: boolean): MarketsSearch => (showAll ? { intent, all: '1' } : { intent })
+
+/** The best offer of one kind near the reference price: its premium per unit and the terms it is for. */
+export interface NearOffer {
+  perUnit: bigint
+  strikePerUnit: bigint
+  /** Unix seconds. */
+  expiry: number
+}
+
+/**
+ * What the Markets index shows per kind (ruling F10, metric to be confirmed by the product owner): on the nearest
+ * listed deadline that has a standard offer or listing, the strike of the ladder nearest the reference price
+ * (the lower one on a tie), and the best offer per unit there, as the chain cell shows it. Null for a kind with
+ * no offer at that strike, and for both kinds without a reference price or without any offer.
+ */
+export function nearReference(view: Pick<MarketView, 'reference' | 'ladder' | 'columns'>): Record<OptionKind, NearOffer | null> {
+  const none = { put: null, call: null }
+  const strike = nearestStrike(priceOf(view.reference), view.ladder)
+  const column = view.columns.find((c) => c.offers > 0)
+  const row = strike === null || !column ? undefined : column.rows.find((r) => r.strikePerUnit === strike)
+  if (!column || !row) return none
+  const offer = (kind: OptionKind): NearOffer | null => {
+    const cell = row[kind]
+    return cell.bestPerUnit === null ? null : { perUnit: cell.bestPerUnit, strikePerUnit: row.strikePerUnit, expiry: column.expiry }
+  }
+  return { put: offer('put'), call: offer('call') }
+}
 
 const positive = (b: TokenBalance | undefined): boolean => b !== undefined && b.balance !== null && b.balance > 0n
 

@@ -40,21 +40,14 @@
     min-width: 0;
   }
 
-  /* An option that lapsed in the last week: one plain line above the tabs. */
+  /* An option that lapsed in the last week: one plain line above the tabs. Its link stays at text height: a link
+     inside a sentence keeps the sentence's line box. */
   .lapsed {
     max-width: var(--measure);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
     text-wrap: pretty;
-  }
-
-  .lapsedLink {
-    @media (pointer: coarse) {
-      display: inline-flex;
-      align-items: center;
-      min-height: var(--touch);
-    }
   }
 
   /* Tabs on the left, the one view setting on the right, on one rule that runs under both. */

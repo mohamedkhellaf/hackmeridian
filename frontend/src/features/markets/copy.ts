@@ -1,6 +1,9 @@
 // Interface copy of the markets feature (brief D18: whole sentences in feature constants, never glued from
 // fragments). Required disclosure sentences are not here: they come from core/disclosures.
 import type { Intent } from '../../app/search'
+import { IS_MOCK } from '../../core/config'
+import type { OptionKind } from '../../core/options/types'
+import type { ReferenceKind } from '../../core/reference'
 import type { PayoffGlyph } from '../../ui'
 
 export const MARKETS_TITLE = 'Markets'
@@ -13,26 +16,19 @@ export interface IntentCopy {
   glyph: PayoffGlyph
   /** One line: what the user gets or agrees to. `quote` is the quote token code. */
   consequence: (quote: string) => string
-  /** Who pays, in two words: the short form of `premium`, for a phone row. */
+  /** Who pays the premium, in two words. When it is paid is said at the ticket, beside the premium. */
   payer: 'You pay' | 'You are paid'
-  /** Who pays the premium, when, and that the premium is the price of the agreement. */
-  premium: string
   /** The question the Assets section asks once the intent is chosen. */
   question: string
   /** The accessible name of an asset's action once the intent is chosen: "Set a floor on BOND". */
   choose: (code: string) => string
 }
 
-const PAY_ONCE = 'You pay for that right once, when you buy: the premium.'
-// True whether a request is filled or an offer posted: nothing is paid until a buyer takes the terms.
-const PAID_WHEN_TAKEN = 'A buyer pays you for that agreement, the premium, when one takes your terms.'
-
 export const INTENT_COPY: Record<Intent, IntentCopy> = {
   floor: {
     glyph: 'long-put',
     consequence: () => 'Keep the right to sell at a price you choose, until a date you choose.',
     payer: 'You pay',
-    premium: PAY_ONCE,
     question: 'Set a floor on which asset?',
     choose: (code) => `Set a floor on ${code}`,
   },
@@ -40,7 +36,6 @@ export const INTENT_COPY: Record<Intent, IntentCopy> = {
     glyph: 'short-call',
     consequence: () => 'Lock what you hold and agree to sell it at a higher price if a buyer asks before the deadline.',
     payer: 'You are paid',
-    premium: PAID_WHEN_TAKEN,
     question: 'Earn on which asset?',
     choose: (code) => `Earn on ${code}`,
   },
@@ -48,7 +43,6 @@ export const INTENT_COPY: Record<Intent, IntentCopy> = {
     glyph: 'short-put',
     consequence: (quote) => `Lock ${quote} and agree to buy at a lower price if a holder asks before the deadline.`,
     payer: 'You are paid',
-    premium: PAID_WHEN_TAKEN,
     question: 'Which asset would you buy at a lower price?',
     choose: (code) => `Earn while waiting to buy ${code}`,
   },
@@ -56,7 +50,6 @@ export const INTENT_COPY: Record<Intent, IntentCopy> = {
     glyph: 'long-call',
     consequence: () => 'Keep the right to buy at a price you choose, until a date you choose.',
     payer: 'You pay',
-    premium: PAY_ONCE,
     question: 'Lock a buy price on which asset?',
     choose: (code) => `Lock a buy price on ${code}`,
   },
@@ -76,15 +69,19 @@ export const COL = {
   reference: 'Reference price',
   offers: 'Open offers',
   expiry: 'Nearest deadline',
-  put: 'Cheapest put',
-  call: 'Cheapest call',
   hold: 'You hold',
   action: 'Action',
 } as const
 /** The unit line of a premium column: the figures below it are bare. */
 export const perUnitOf = (quote: string): string => `${quote} per unit`
-/** Under a cheapest premium: the terms it is for, "at 97.00, 13 Nov". */
-export const cheapestTerms = (strike: string, day: string): string => `at ${strike}, ${day}`
+/**
+ * The head of a premium column: the best offer at the strike nearest the reference price, named by that price's
+ * source ("Put near demo price"). Rows whose prices come from different sources share "reference price".
+ */
+const NEAR_SOURCE: Record<ReferenceKind, string> = { demo: 'demo price', fixed: 'faucet price', desk: 'desk price', none: 'reference price' }
+export const nearPriceHead = (kind: OptionKind, source: ReferenceKind | null): string => `${kind === 'put' ? 'Put' : 'Call'} near ${NEAR_SOURCE[source ?? 'none']}`
+/** Under that premium: the terms it is for, "at 99.00, 13 Nov". */
+export const nearTerms = (strike: string, day: string): string => `at ${strike}, ${day}`
 
 export const NONE = 'None'
 export const TRADE = 'Trade'
@@ -97,7 +94,10 @@ export const tradeLabel = (code: string): string => `Trade ${code}`
 export const typeLine = (typeLabel: string | null): string => typeLabel ?? 'Listed asset'
 
 /** About tab, under the facts heading: what a token of the app's list is. Said once, here. */
-export const TEST_TOKEN_NOTE = "A test token issued by this project's issuer account on Stellar Testnet. It represents no real instrument and has no monetary value."
+export const TEST_TOKEN_NOTE_TESTNET = "A test token issued by this project's issuer account on Stellar Testnet. It represents no real instrument and has no monetary value."
+/** The same on mock data, where no token is issued on any network. */
+export const TEST_TOKEN_NOTE_MOCK = 'A demo token of the in-memory market. It represents no real instrument and has no monetary value.'
+export const TEST_TOKEN_NOTE = IS_MOCK ? TEST_TOKEN_NOTE_MOCK : TEST_TOKEN_NOTE_TESTNET
 
 export const noOffersOn = (code: string): string => `No open offers on ${code}.`
 export const POST_REQUEST = 'Post a request'
@@ -129,6 +129,8 @@ export const FUNDS_LEAD = {
   asked: 'Three steps, all in your wallet.',
 } as const
 export const FUNDS_MOCK_NOTE = 'This build runs on mock data, so these steps will not change the balances shown here. They are the steps on Testnet.'
+/** On mock data, a Testnet asset whose code differs from the one shown here: "FUND (RWA on Testnet)". */
+export const shownAs = (shown: string, testnet: string): string => `${shown} (${testnet} on Testnet)`
 export const FUNDS_STEPS = {
   fund: {
     title: 'Fund the account',
@@ -146,6 +148,8 @@ export const FUNDS_STEPS = {
 } as const
 export const STEP_DONE = 'Done'
 export const FUNDS_CHECK = 'Check again'
+/** Ends the strip when an order sent the visitor here (`?from=`): back to that order, its terms still in the link. */
+export const FUNDS_BACK = 'Back to your order'
 /** Beside the balances of an asset page when the wallet cannot pay: leads to the strip above. */
 export const FUNDS_LINK = 'Get test funds'
 
@@ -181,7 +185,7 @@ export const NOT_FOUND = {
   unknown: 'The contract does not list this asset.',
 } as const
 export const NOT_FOUND_LISTED = 'Assets you can open'
-export const ALL_MARKETS = 'All markets'
+export const ALL_MARKETS = 'Go to Markets'
 export const ASSET_ERROR = 'The asset could not be read.'
 export const ASSET_HEADING = 'Asset'
 export const ASSET_LOADING = 'Loading the asset'
@@ -193,28 +197,10 @@ export const RAIL_LABEL = 'Order ticket'
 export const REQUESTS_HEADING = 'Requests'
 export const requestsLead = (code: string): string =>
   `A request is a buyer's premium already escrowed in the contract, waiting for a maker. Fill one and you write the option on ${code}: you lock the collateral and receive the premium.`
-export const REQ_COL = {
-  kind: 'Kind',
-  strike: 'Strike',
-  qty: 'Quantity',
-  expiry: 'Deadline',
-  premium: 'Premium escrowed',
-  buyer: 'Buyer',
-  action: 'Action',
-} as const
-/** Under an escrowed premium: the same amount for one unit of the asset. The unit is the one of the figure above. */
-export const perUnitLine = (figure: string): string => `${figure} per unit`
-/** In the deadline cell of the wallet's own request that lapsed and still holds its premium. */
-export const LAPSED = 'Expired'
-export const SELL_TO_BID = 'Fill request'
-export const CANCEL_REQUEST = 'Cancel'
-export const CANCEL_REFUND = 'Cancelling refunds your escrowed premium.'
-export const YOURS = 'Yours'
 export const requestsEmpty = (code: string): string => `No open requests on ${code}.`
 export const REQUESTS_ERROR = 'The requests could not be read.'
 export const REQUESTS_UNSUPPORTED = 'This contract version has no requests.'
 export const requestsCaption = (code: string): string => `Open requests on ${code}`
-export { KIND_WORD } from '../../core/format/option'
 
 // ---------------------------------------------------------------------------------------------- about tab
 
@@ -228,7 +214,6 @@ export const FACT_ROW = {
   issuer: 'Issuer',
   contract: 'Asset contract',
   domain: 'Home domain',
-  tier: 'Tier',
   trustlines: 'Trustlines',
   contracts: 'Contracts holding it',
   signers: 'Issuer keys',
@@ -249,7 +234,7 @@ export const FACTS_ERROR = 'Could not read this asset from Testnet.'
 export const FACTS_PARTIAL = 'Some facts could not be read from Horizon.'
 export const UNKNOWN_POWERS_NOTE = 'The flags could not be read. The effects below are what each flag does when it is on.'
 export const NATIVE_FACTS = 'Native XLM. No issuer and no flags.'
-export const CONTRACTS_LINK = 'Reserves, contracts and roles'
+export const CONTRACTS_LINK = 'Open Reserves'
 
 /** The "Risks" block: the limits in our own words (the required sentence itself comes from core/disclosures). */
 export const MEANS = (code: string): readonly string[] => [

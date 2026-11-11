@@ -38,10 +38,9 @@
     text-wrap: pretty;
   }
 
-  /* The serial line of the order being taken: mono, like the line of a contract note. */
+  /* The number of the order being taken. Mono belongs to the serial line of a contract note only. */
   .serial {
     margin: 0;
-    font-family: var(--font-mono);
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     color: var(--muted);

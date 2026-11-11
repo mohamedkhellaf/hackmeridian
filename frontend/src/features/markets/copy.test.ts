@@ -16,6 +16,28 @@ function strings(value: unknown, out: string[] = []): string[] {
 const ALL = strings(copy)
 
 describe('markets copy', () => {
+  it('names the premium columns by the source of the price they sit near', () => {
+    expect(copy.nearPriceHead('put', 'demo')).toBe('Put near demo price')
+    expect(copy.nearPriceHead('call', 'demo')).toBe('Call near demo price')
+    expect(copy.nearPriceHead('put', 'fixed')).toBe('Put near faucet price')
+    expect(copy.nearPriceHead('call', null)).toBe('Call near reference price')
+    expect(copy.nearTerms('99.00', '13 Nov')).toBe('at 99.00, 13 Nov')
+  })
+
+  it('says who pays in two words, in every intent row', () => {
+    expect(Object.values(copy.INTENT_COPY).map((c) => c.payer)).toEqual(['You pay', 'You are paid', 'You are paid', 'You pay'])
+  })
+
+  it('names a mock token by the code the page shows, with its Testnet code', () => {
+    expect(copy.shownAs('FUND', 'RWA')).toBe('FUND (RWA on Testnet)')
+  })
+
+  it('describes a demo token without claiming a network on mock data', () => {
+    // The unit tests run without a contract id: a mock build.
+    expect(copy.TEST_TOKEN_NOTE).toBe(copy.TEST_TOKEN_NOTE_MOCK)
+    expect(copy.TEST_TOKEN_NOTE_MOCK).not.toMatch(/Testnet|issuer account/)
+  })
+
   it('collects the copy', () => {
     expect(ALL.length).toBeGreaterThan(100)
     expect(ALL).toContain('What do you want to do?')

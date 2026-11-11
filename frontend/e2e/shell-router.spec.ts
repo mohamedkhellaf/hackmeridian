@@ -87,9 +87,10 @@ test.describe('routes', () => {
 
 test.describe('search params', () => {
   test('a valid link reaches the page as strings, exactly as written', async ({ page }) => {
-    const link = '/markets/bond?mode=chain&expiry=2026-11-27&kind=put&strike=10.00&offer=12&step=review'
+    // Offer 12 of the mock market is a FUND offer: under another asset the page would move to FUND (AssetPage).
+    const link = '/markets/fund?mode=chain&expiry=2026-11-27&kind=put&strike=10.00&offer=12&step=review'
     await page.goto(link)
-    await expect(page).toHaveTitle('BOND · Markets · StellSec')
+    await expect(page).toHaveTitle('FUND · Markets · StellSec')
     expect(await routerSearch(page)).toEqual({ mode: 'chain', kind: 'put', strike: '10.00', expiry: '2026-11-27', offer: '12', step: 'review' })
     expect(await currentPath(page)).toBe(link)
   })
@@ -217,7 +218,7 @@ test.describe('a page that fails', () => {
     const retry = page.getByRole('button', { name: 'Try again' })
     await expect(retry).toBeVisible()
     await retry.click()
-    await expect(page.getByText(/^Tried again at \d{2}:\d{2} UTC\. The same error came back\.$/)).toBeVisible()
+    await expect(page.getByText(/^Tried again at \d{2}:\d{2}\sUTC\. The same error came back\.$/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Try again' })).toBeFocused()
     await expectAnnounced(page, 'The same error came back.')
     // The way out is not marked as the page you are on.

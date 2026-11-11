@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { RefObject } from 'react'
 import type { ProCall } from '../../../data'
-import type { CallResult } from '../../../core/pro/types'
+import type { CallResult, ReplayedStep } from '../../../core/pro/types'
 
 /** One line of what a call returned: the takeover price, what a claim paid, the deficit. */
 export interface ResultFact {
@@ -10,7 +10,7 @@ export interface ResultFact {
   value: bigint | string
   /** A shortfall, debt or deficit above zero. */
   loss?: boolean
-  /** A second figure of the same thing (the time left under an expiry). */
+  /** A second figure of the same thing (the time left under a deadline). */
   hint?: string
 }
 
@@ -33,9 +33,11 @@ export interface ResultView {
 export interface MarginUi {
   /**
    * Runs a Margin call through the shared transaction layer, keeps what it returned for the result region and
-   * moves focus there. `describe` turns the call's value into the receipt shown under the confirmation.
+   * moves focus there. `describe` turns the call's value into the receipt shown under the confirmation. On
+   * fixtures it also gets the replayed step: a receipt takes its amounts from the step's arguments, never from
+   * what a form held.
    */
-  act: <T>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T) => ResultView) => Promise<CallResult<T>>
+  act: <T>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T, step: ReplayedStep | null) => ResultView) => Promise<CallResult<T>>
   /** What the last call returned, when it has more to say than "done". */
   result: ResultView | null
   /** The result region: focus is sent here when a call starts and when it ends. */

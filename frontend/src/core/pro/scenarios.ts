@@ -30,7 +30,7 @@ export const SCENARIO_COPY: Record<string, ScenarioCopy> = {
   },
   settlement_pro_rata_deficit: {
     title: 'Settlement with a deficit',
-    summary: 'Nobody takes the account over before expiry. Margin and vault are not enough: holders are paid pro rata and the deficit is shown.',
+    summary: 'Nobody takes the account over before the deadline. Margin and vault are not enough: holders are paid pro rata and the deficit is shown.',
   },
   limits_and_staleness: {
     title: 'Caps and stale snapshots',
@@ -38,15 +38,15 @@ export const SCENARIO_COPY: Record<string, ScenarioCopy> = {
   },
   american_exercise: {
     title: 'Early exercise',
-    summary: 'A holder exercises before expiry at the price of a recent snapshot. A liquidatable writer is taken over first, and a book owned by the vault waits for expiry.',
+    summary: 'A holder exercises before the deadline at the price of a recent snapshot. A liquidatable writer is taken over first, and a book owned by the vault waits for the deadline.',
   },
   review_regressions: {
     title: 'Review cases',
-    summary: 'Roles kept out of the market, the premium floor, withdrawals frozen after expiry, takeover of a live series, the vault shared pro rata between writers.',
+    summary: 'Roles kept out of the market, the premium floor, withdrawals frozen after the deadline, takeover of a live series, the vault shared pro rata between writers.',
   },
   writer_cash_pro_rata: {
     title: 'One writer short on two series',
-    summary: 'An insolvent writer on two series with the same expiry: the cash is shared pro rata, whatever the order of settlement.',
+    summary: 'An insolvent writer on two series with the same deadline: the cash is shared pro rata, whatever the order of settlement.',
   },
   negative_paths: {
     title: 'Refusals',

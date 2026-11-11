@@ -6,25 +6,32 @@ import { usePro } from '../../../data'
 import { AmountField, Button, Callout, Card, EmptyNote, KeyValue, KeyValueItem, Link, Select, Tag, useIsPhone } from '../../../ui'
 import type { TagAppearance } from '../../../ui'
 import { AMOUNT_ERROR, LOTS_ERROR } from '../copy'
-import { QUOTE, bpsPercent, lots, perLot, usdx, usdxExact } from '../model/money'
-import { UNDERLYING, contractTitle, partyName } from '../model/names'
+import { QUOTE, bpsPercent, lots, perLot, perLotAtLeast, usdx, usdxExact, withUnit } from '../model/money'
+import { UNDERLYING, contractTitle, numbered, partyName, runsFirstText } from '../model/names'
 import { snapshotAge, spanText } from '../model/oracle'
-import { parseLots, parseUsdx, premiumPerLot, writeDraft } from '../model/write'
+import { exactPerLot, parseLots, parseUsdx, premiumFloor, premiumPerLot, writeDraft } from '../model/write'
+import type { WriteDraft } from '../model/write'
 import { DeskTable } from '../parts/DeskTable'
 import type { DeskColumn } from '../parts/DeskTable'
 import { NoValue, Sub, Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
+import { RecordedField } from '../parts/RecordedField'
+import { RunsFirst } from '../parts/RunsFirst'
 import { Section } from '../parts/Section'
 import { useReplayable } from '../parts/useReplayable'
+import type { RecordedStep } from '../parts/useReplayable'
 import { BuyDialog } from './BuyDialog'
 import css from './TradeScreen.module.css'
 
 const SERIES_LOOK: Record<string, TagAppearance> = { Live: 'live', Expired: 'ended', Settling: 'open', Closed: 'done' }
 
+/** Under the series table, once: the price is the publisher's and nothing of the token moves (ruling F11). */
+export const SERIES_LINE = `Calls settled in ${QUOTE} on the publisher's ${UNDERLYING} price. No ${UNDERLYING} token changes hands.`
+
 /** Series, open offers with the Buy dialog, and the form to write an uncovered call (in a rail from 1200 px). */
 export function TradeScreen() {
-  const { client, model, me, busy } = usePro()
-  const { act, canAct, connect } = useMarginUi()
+  const { model, me } = usePro()
+  const { canAct, connect } = useMarginUi()
   const [buying, setBuying] = useState<OfferView | null>(null)
   const [showLapsed, setShowLapsed] = useState(false)
   const phone = useIsPhone()
@@ -63,7 +70,7 @@ export function TradeScreen() {
           return <Tag state={label} appearance={SERIES_LOOK[label]} />
         },
       },
-      { id: 'expiry', header: 'Expiry', cell: (s) => formatUtc(s.expiry) },
+      { id: 'deadline', header: 'Deadline', cell: (s) => formatUtc(s.expiry) },
       {
         id: 'left',
         header: 'Time left',
@@ -78,7 +85,7 @@ export function TradeScreen() {
         header: 'Snapshot',
         cell: (s) => {
           const age = snapshotAge(model, s)
-          return s.snapshot && age !== null ? <span className={css.wrap}>{`No. ${s.snapshot.seq}, ${spanText(age)} old`}</span> : <NoValue label="No snapshot" />
+          return s.snapshot && age !== null ? <span className={css.wrap}>{`${numbered(s.snapshot.seq)}, ${spanText(age)} old`}</span> : <NoValue label="No snapshot" />
         },
       },
       {
@@ -117,14 +124,7 @@ export function TradeScreen() {
       phone: 'actions',
       cell: (o) =>
         o.writer === me && canAct ? (
-          <Button
-            {...rowButton}
-            disabled={busy}
-            aria-label={`Cancel offer ${o.id}, ${contractTitle(seriesOf(o.seriesId))}`}
-            onClick={() => void act({ label: 'Cancel offer', done: 'Offer cancelled' }, (opts) => client.cancelOffer(me, o.id, opts))}
-          >
-            Cancel offer
-          </Button>
+          <CancelOffer offer={o} />
         ) : lapsed(o) ? (
           <span className={css.muted}>Quote expired</span>
         ) : !canAct ? (
@@ -132,7 +132,7 @@ export function TradeScreen() {
             Connect wallet
           </Button>
         ) : (
-          <Button {...rowButton} aria-label={`Buy offer ${o.id}: ${lots(o.qty)} lots of ${contractTitle(seriesOf(o.seriesId))} for ${usdx(o.premium)} ${QUOTE}`} onClick={() => setBuying(o)}>
+          <Button {...rowButton} aria-label={`Buy offer ${o.id}: ${lots(o.qty)} lots of ${contractTitle(seriesOf(o.seriesId))} for ${withUnit(usdx(o.premium))}`} onClick={() => setBuying(o)}>
             Buy
           </Button>
         ),
@@ -151,16 +151,13 @@ export function TradeScreen() {
         <Section
           title="Series"
           aside={
-            <>
-              <span>{countOf(model.series.length, { one: 'series listed', other: 'series listed' })}</span>
-              {live.length > 0 ? (
-                <Link href="#write" className={css.toWrite}>
-                  Write a call
-                </Link>
-              ) : null}
-            </>
+            live.length > 0 ? (
+              <Link href="#write" className={css.toWrite}>
+                Write a call
+              </Link>
+            ) : undefined
           }
-          note={`${UNDERLYING} calls, cash-settled. 1 lot is 1 ${UNDERLYING}. Prices and marks are in ${QUOTE}.`}
+          note={SERIES_LINE}
         >
           <DeskTable caption={`${UNDERLYING} call series`} columns={seriesColumns} rows={model.series} rowKey={(s) => s.id} empty={null} />
         </Section>
@@ -168,11 +165,7 @@ export function TradeScreen() {
 
       <div className={live.length > 0 ? css.desk : undefined}>
         <div className={css.main}>
-          <Section
-            title="Open offers"
-            aside={open.length > 0 ? countOf(open.length, { one: 'offer', other: 'offers' }) : undefined}
-            note={`An offer here is an unfunded quote: the writer margin is checked when someone buys it. Premiums are in ${QUOTE}.`}
-          >
+          <Section title="Open offers" aside={open.length > 0 ? countOf(open.length, { one: 'offer', other: 'offers' }) : undefined}>
             <DeskTable caption="Open offers" columns={offerColumns} rows={open} rowKey={(o) => o.id} empty={<EmptyNote size="sm" title="No open offers." />} />
             {expired.length > 0 ? (
               <div className={css.lapsed}>
@@ -193,25 +186,90 @@ export function TradeScreen() {
   )
 }
 
+/** The writer's own offer: Cancel, and on fixtures the recorded steps a press runs first, if any. */
+function CancelOffer({ offer }: { offer: OfferView }) {
+  const { client, model, me, busy } = usePro()
+  const { act } = useMarginUi()
+  const replay = useReplayable()
+  const phone = useIsPhone()
+  const step = replay.next('cancel_offer', (args) => args[0] === me && args[1] === offer.id)
+  const button = (
+    <Button
+      size={phone ? 'md' : 'sm'}
+      fullWidth={phone}
+      disabled={busy}
+      aria-label={`Cancel offer ${offer.id}, ${contractTitle(model.series.find((s) => s.id === offer.seriesId))}`}
+      onClick={() => void act({ label: 'Cancel offer', done: 'Offer cancelled' }, (opts) => client.cancelOffer(me, offer.id, opts))}
+    >
+      Cancel offer
+    </Button>
+  )
+  if (!step || step.before.length === 0) return button
+  return (
+    <span className={css.act}>
+      {button}
+      <RunsFirst step={step} />
+    </span>
+  )
+}
+
+/** A replayed offer's terms, read from its recorded step: the replay sends these, whatever a field held. */
+function recordedDraft(step: RecordedStep, writer: string, series: SeriesView | undefined): WriteDraft {
+  const qty = BigInt(step.args[2] as number)
+  const premium = BigInt(step.args[3] as number)
+  const floor = premiumFloor(qty, series)
+  return {
+    params: { writer, seriesId: step.args[1] as number, qty, premium, quoteExpiry: step.args[4] as number },
+    qty,
+    each: premiumPerLot(premium, qty),
+    premium,
+    floor,
+    belowFloor: floor !== null && premium < floor,
+  }
+}
+
 /**
- * "Write an uncovered call": series, quantity and total premium, then the margin figures: after the fill when
- * the client has a preview (get_requirement, never computed here), the account as it stands otherwise.
+ * "Write an uncovered call": series, quantity and the premium per lot, with the exact total the contract gets,
+ * then the margin figures: after the fill when the client has a preview (get_requirement, never computed here),
+ * the account as it stands otherwise. On fixtures the quantity and premium are those of the recorded step the
+ * press replays, locked.
  */
 function WriteCall({ live }: { live: SeriesView[] }) {
-  const { client, model, me, busy } = usePro()
+  const { client, model, me, busy, simulated } = usePro()
   const { act, canAct, connect } = useMarginUi()
   const replay = useReplayable()
   const [seriesId, setSeriesId] = useState<string | null>(null)
-  const [qty, setQty] = useState('1000')
-  const [premium, setPremium] = useState('')
+  const [qty, setQty] = useState('1,000')
+  const [each, setEach] = useState('')
 
   const chosen = live.find((s) => String(s.id) === seriesId) ?? live[0]
-  const draft = writeDraft({ writer: me, series: chosen, qty, premium })
+  const recorded = simulated ? replay.next('create_offer', (args) => args[0] === me && args[1] === chosen?.id) : null
+  const draft = recorded ? recordedDraft(recorded, me, chosen) : writeDraft({ writer: me, series: chosen, qty, perLot: each })
   const preview = draft.params ? client.requirementAfterFill(draft.params) : null
   const now = model.accounts.find((a) => a.id === me)?.requirement ?? null
   const shown = preview ?? now
   const fee = model.config.reserveFeeBps
-  const scripted = replay.can('create_offer', (args) => args[0] === me && args[1] === chosen?.id)
+  const mark = chosen?.snapshot?.mark ?? null
+  const atLeast = mark !== null ? `A buy needs at least ${withUnit(perLotAtLeast(mark))} per lot at the latest mark.` : null
+  const recordedAt = replay.requirementAt(me)
+  const noRequirement = recordedAt !== null ? `The scenario records ${partyName(me)}'s margin requirement at step ${recordedAt}.` : `The scenario records no margin requirement for ${partyName(me)} after step ${replay.position}.`
+
+  const write = () => {
+    const params = draft.params
+    if (!params) return
+    void act({ label: 'Write call', done: 'Offer written' }, (opts) => client.createOffer(params, opts), (id, step) => {
+      // The receipt states the replayed step's own terms; on the contract, what was signed.
+      const terms = step ? { seriesId: step.args[1] as number, qty: BigInt(step.args[2] as number), premium: BigInt(step.args[3] as number) } : params
+      return {
+        facts: [
+          ...(id === null ? [] : [{ label: 'Offer', value: numbered(id) }]),
+          { label: 'Contract', value: contractTitle(model.series.find((x) => x.id === terms.seriesId)) },
+          { label: 'Quantity', value: `${lots(terms.qty)} lots` },
+          { label: 'Premium, total', value: terms.premium },
+        ],
+      }
+    })
+  }
 
   return (
     <Card title="Write an uncovered call" headingLevel={2} id="write" className={css.write}>
@@ -223,31 +281,56 @@ function WriteCall({ live }: { live: SeriesView[] }) {
             onValueChange={setSeriesId}
             options={live.map((s) => ({ value: String(s.id), label: contractTitle(s), detail: `Series ${s.id}` }))}
           />
-          <AmountField
-            label="Quantity"
-            unit="lots"
-            decimals={0}
-            placeholder="0"
-            value={qty}
-            onValueChange={setQty}
-            validate={(v) => (v.trim() === '' || parseLots(v) !== null ? undefined : LOTS_ERROR)}
-          />
-          <AmountField
-            label="Premium, total"
-            unit={QUOTE}
-            decimals={7}
-            value={premium}
-            onValueChange={setPremium}
-            validate={(v) => (v.trim() === '' || (parseUsdx(v) ?? 0n) > 0n ? undefined : AMOUNT_ERROR)}
-            hint={draft.floor !== null ? `At the latest mark a buy needs at least ${usdxExact(draft.floor)} ${QUOTE}.` : undefined}
-          />
+          {simulated ? (
+            <>
+              <RecordedField label="Quantity" unit="lots" value={recorded ? lots(draft.qty) : ''} hint={undefined} />
+              <RecordedField
+                label="Premium per lot"
+                unit={QUOTE}
+                value={recorded && draft.premium !== null && draft.qty !== null ? (exactPerLot(draft.premium, draft.qty) ?? perLot(draft.each)) : ''}
+                hint={
+                  recorded
+                    ? [`Recorded amounts for step ${recorded.number}.`, runsFirstText(recorded.before), atLeast].filter(Boolean).join(' ')
+                    : replay.reason(`offer by ${partyName(me)} on this series`)
+                }
+              />
+            </>
+          ) : (
+            <>
+              <AmountField
+                label="Quantity"
+                unit="lots"
+                decimals={0}
+                placeholder="0"
+                value={qty}
+                onValueChange={setQty}
+                validate={(v) => (v.trim() === '' || parseLots(v) !== null ? undefined : LOTS_ERROR)}
+              />
+              <AmountField
+                label="Premium per lot"
+                unit={QUOTE}
+                decimals={7}
+                value={each}
+                onValueChange={setEach}
+                validate={(v) => (v.trim() === '' || (parseUsdx(v) ?? 0n) > 0n ? undefined : AMOUNT_ERROR)}
+                hint={atLeast ?? undefined}
+              />
+            </>
+          )}
+          {simulated && !recorded ? null : (
+            <KeyValue>
+              <KeyValueItem label="Premium, total">
+                <Usdx v={draft.premium} unit figure="serif" none="Enter a quantity and a premium per lot" />
+              </KeyValueItem>
+            </KeyValue>
+          )}
           <p className={css.muted}>
             You receive {bpsPercent(10_000 - fee)} of the premium when the offer is bought; {bpsPercent(fee)} goes to the vault as a reserve fee.
           </p>
           {draft.belowFloor && draft.floor !== null ? (
             <Callout variant="warning" title="A buy of this offer would be refused: PremiumBelowMark (222).">
               <p>
-                The contract refuses a buy whose premium is below quantity times the latest mark: {lots(draft.qty)} lots at {perLot(chosen?.snapshot?.mark)} is {usdxExact(draft.floor)} {QUOTE}. Raise the
+                The contract refuses a buy whose premium is below quantity times the latest mark: {lots(draft.qty)} lots at {perLot(mark)} is {withUnit(usdxExact(draft.floor))}. Raise the
                 premium, or wait for a lower mark.
               </p>
             </Callout>
@@ -255,21 +338,11 @@ function WriteCall({ live }: { live: SeriesView[] }) {
           {canAct ? (
             <Button
               variant="primary"
-              disabled={!draft.params || !scripted || busy}
-              disabledReason={!draft.params ? 'Enter a quantity and a premium first.' : !scripted ? replay.reason(`offer by ${partyName(me)} on this series`) : undefined}
-              onClick={() =>
-                draft.params &&
-                void act({ label: 'Write call', done: 'Offer written' }, (opts) => client.createOffer(draft.params!, opts), (id) => ({
-                  facts: [
-                    ...(id === null ? [] : [{ label: 'Offer', value: `No. ${id}` }]),
-                    { label: 'Contract', value: contractTitle(chosen) },
-                    { label: 'Quantity', value: `${lots(draft.params!.qty)} lots` },
-                    { label: 'Premium, total', value: draft.params!.premium },
-                  ],
-                }))
-              }
+              disabled={!draft.params || busy}
+              disabledReason={!draft.params ? (simulated ? replay.reason(`offer by ${partyName(me)} on this series`) : 'Enter a quantity and a premium first.') : undefined}
+              onClick={write}
             >
-              Write call
+              {recorded && draft.premium !== null ? `Write call for ${withUnit(usdx(draft.premium))}` : 'Write call'}
             </Button>
           ) : (
             <Button variant="primary" onClick={connect}>
@@ -282,15 +355,20 @@ function WriteCall({ live }: { live: SeriesView[] }) {
           <h3 className={css.previewTitle}>{preview ? 'Margin after the fill' : 'Your margin now'}</h3>
           <KeyValue>
             <KeyValueItem label="Mark per lot">
-              <Usdx v={chosen?.snapshot?.mark} perLot unit figure="serif" none="No snapshot" />
+              <Usdx v={mark} perLot unit figure="serif" none="No snapshot" />
             </KeyValueItem>
-            <KeyValueItem label="Opening requirement (IM)" hint={preview && now ? `Now ${usdx(now.im)} ${QUOTE}` : undefined}>
-              <Usdx v={shown?.im} unit figure="serif" none="No requirement for this account" />
-            </KeyValueItem>
-            <KeyValueItem label="Account value (NLV)" hint={preview && now ? `Now ${usdx(now.nlv)} ${QUOTE}` : undefined}>
-              <Usdx v={shown?.nlv} unit figure="serif" none="No requirement for this account" />
-            </KeyValueItem>
+            {shown || !simulated ? (
+              <>
+                <KeyValueItem label="Opening requirement (IM)" hint={preview && now ? `Now ${withUnit(usdx(now.im))}` : undefined}>
+                  <Usdx v={shown?.im} unit figure="serif" none="No requirement for this account" />
+                </KeyValueItem>
+                <KeyValueItem label="Account value (NLV)" hint={preview && now ? `Now ${withUnit(usdx(now.nlv))}` : undefined}>
+                  <Usdx v={shown?.nlv} unit figure="serif" none="No requirement for this account" />
+                </KeyValueItem>
+              </>
+            ) : null}
           </KeyValue>
+          {!shown && simulated ? <p className={css.muted}>{noRequirement}</p> : null}
           <p className={css.muted}>
             Writing posts an unfunded quote. When someone buys it, the contract checks that your account value is at or above the opening requirement, and refuses the buy otherwise.
           </p>

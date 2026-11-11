@@ -4,7 +4,7 @@
 import { useMemo, useState } from 'react'
 import { IS_MOCK } from '../../../core/config'
 import { explorerAddress, isMockId } from '../../../core/explorer'
-import { formatExact, formatUnits } from '../../../core/format'
+import { formatExact, formatUnits, withUnit } from '../../../core/format'
 import type { PreTradeAction } from '../../../core/options/preTrade'
 import { requiredCollateral } from '../../../core/options/types'
 import type { OptionOffer } from '../../../core/options/types'
@@ -106,7 +106,7 @@ export function ExerciseDialog({ open, onClose, option: o, receiptAction, finalF
           <DateTime value={o.expiry * 1000} local="below" />
         </KeyValueItem>
         {hasReference ? (
-          <KeyValueItem label={NOTE_TERMS.moneyness} hint={`${reference.label} ${figure} ${o.quote.code}`}>
+          <KeyValueItem label={NOTE_TERMS.moneyness} hint={`${reference.label} ${withUnit(figure, o.quote.code)}`}>
             {MONEYNESS_WORD[moneyness]}
           </KeyValueItem>
         ) : null}

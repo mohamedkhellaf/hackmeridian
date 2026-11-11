@@ -6,7 +6,7 @@ import * as copy from './copy'
 const words: copy.Words = { a: 'BOND', q: 'USDx', qty: '2.00', strike: '99.00', strikeTotal: '198.00', premium: '1.36' }
 const bare: copy.Words = { ...words, premium: null }
 const facts: copy.FactWords = { ...words, premiumPerUnit: '0.68' }
-const sample = { ...facts, collateral: '198.00 USDx', deadline: '20 Nov 2026, 08:00 UTC', value: '190.00' }
+const sample = { ...facts, collateral: '198.00\u00a0USDx', deadline: '20 Nov 2026, 08:00 UTC', value: '190.00' }
 const outcome: copy.OutcomeWords = { ...words, premium: '1.36', value: '190.00' }
 
 /**
@@ -33,7 +33,6 @@ function everything(): string[] {
     out.push(copy.INTENT_COPY[id].lead('BOND', 'USDx'), copy.INTENT_COPY[id].level('99.00'), copy.INTENT_COPY[id].heading('BOND'))
     for (const used of [true, false]) out.push(copy.outcomeSentence(id, used, outcome))
     for (const w of [words, bare]) for (const route of ['take', 'own'] as const) for (const step of Object.values(copy.timelineSteps(id, route, w))) out.push(step.title, step.body)
-    out.push(copy.BREAKEVEN_HINT[id](facts))
     if (id !== 'earn-hold') out.push(copy.MAX_LOSS_HINT[id](facts))
   }
   out.push(copy.GIVE_UP.value(words), copy.GIVE_UP.hint(words))
@@ -50,7 +49,10 @@ function everything(): string[] {
   out.push(copy.NO_GRID_OTHERS(1), copy.NO_GRID_OTHERS(3))
   out.push(copy.OWN.holding(sample), copy.OWN.written(sample), copy.OWN.offer('000004', '2.00', 'BOND', '1.20', 'USDx'), copy.OWN.request('000004', '2.00', 'BOND', '0.50', 'USDx'))
   for (const side of ['buy', 'write'] as const) out.push(copy.LOTS[side]('2.00 and 5.00', 'BOND'), copy.OWN_SUMMARY[side](sample))
-  for (const side of ['buy', 'write'] as const) out.push(copy.FALLBACK[side].body('2.00 BOND'))
+  out.push(copy.LOCK_SUMMARY(sample))
+  for (const kind of ['holding', 'written', 'offer', 'request'] as const) out.push(copy.OWN_SHORT[kind]('58'))
+  for (const lead of Object.values(copy.ANOTHER)) out.push(copy.another(lead, copy.INTENT_COPY.floor.summary(sample)))
+  for (const side of ['buy', 'write'] as const) out.push(copy.FALLBACK[side].body('2.00\u00a0BOND'))
   return [...new Set(out)]
 }
 
@@ -121,12 +123,12 @@ describe('guided copy', () => {
   })
 
   it('says what is escrowed before posting, not that it already waits', () => {
-    expect(copy.OWN_SUMMARY.buy(sample)).toMatch(/^You escrow 1\.36 USDx now\. It waits in the contract/)
+    expect(copy.OWN_SUMMARY.buy(sample)).toMatch(/^You escrow 1\.36\u00a0USDx now\. It waits in the contract/)
   })
 
   it('never prints a loss figure for a written covered call', () => {
     expect(Object.keys(copy.MAX_LOSS_HINT)).not.toContain('earn-hold')
-    expect(copy.GIVE_UP.value(words)).toBe('Every rise above 99.00 USDx per BOND')
+    expect(copy.GIVE_UP.value(words)).toBe('Every rise above 99.00\u00a0USDx per BOND')
     expect(`${copy.GIVE_UP.value(words)} ${copy.GIVE_UP.hint(words)}`).not.toMatch(/no cap|unlimited/i)
   })
 
@@ -136,7 +138,32 @@ describe('guided copy', () => {
     for (const text of all) expect(text, text).not.toMatch(/Arrow keys|Next: the ticket|In contract words/)
   })
 
+  it('labels the quantity as the rest of the app does, never in the first person', () => {
+    for (const { id } of GUIDED_INTENTS) expect(copy.INTENT_COPY[id].qtyLabel).toBe(id === 'earn-hold' || id === 'earn-buy' ? 'Quantity to lock' : 'Quantity')
+  })
+
+  it('ends no step on a line that defines a word or comforts the reader', () => {
+    for (const { id } of GUIDED_INTENTS)
+      for (const route of ['take', 'own'] as const)
+        for (const w of [words, bare])
+          for (const step of Object.values(copy.timelineSteps(id, route, w))) expect(step.body, step.body).not.toMatch(/This is called exercising|You decide if and when/)
+    // The word itself stays in the step that uses the right, where the page makes it a glossary term.
+    for (const { id } of GUIDED_INTENTS) expect(copy.timelineSteps(id, 'take', words).until.body).toMatch(/\bexercise\b/)
+    expect(copy.timelineSteps('floor', 'take', words).after.body).toBe('If you did not exercise, you still hold your BOND.')
+    expect(copy.timelineSteps('earn-hold', 'take', words).after.body).toContain('The premium is yours either way.')
+  })
+
+  it("says a seller's deal before a premium is typed, and that a second order is another one", () => {
+    expect(copy.LOCK_SUMMARY(sample)).toBe('You lock 198.00\u00a0USDx. You are paid the premium you ask only if a buyer takes the offer before 20 Nov 2026, 08:00 UTC.')
+    expect(copy.another(copy.ANOTHER.offer, 'You pay 1.40 USDx now.')).toBe('Another offer on these terms: you pay 1.40 USDx now.')
+    expect(copy.OWN_SHORT.holding('58')).toBe('You hold option No. 58.')
+  })
+
   it('counts in words in a sentence', () => {
-    expect(copy.COVER(2, '4.00', '5.00', 'BOND')).toBe('Two smaller offers at these terms cover 4.00 of your 5.00 BOND, in two purchases. Each is sold whole and signed on its own.')
+    expect(copy.COVER(2, '4.00', '5.00', 'BOND')).toBe('Two smaller offers at these terms cover 4.00 of your 5.00\u00a0BOND, in two purchases. Each is sold whole and signed on its own.')
+  })
+
+  it('never lets a line break part a figure from its unit', () => {
+    for (const text of all) expect(text, text).not.toMatch(/\d (USDx|BOND)\b/)
   })
 })

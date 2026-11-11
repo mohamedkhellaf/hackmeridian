@@ -104,6 +104,11 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--s-8);
+
+    /* A replayed step: each button carries its amount, so they stack. */
+    &[data-recorded] {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   @media (max-width: 1199.98px) {

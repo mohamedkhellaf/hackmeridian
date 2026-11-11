@@ -12,6 +12,7 @@ import {
   inSeries,
   inputAmount,
   intentOf,
+  ticketSide,
   lotsOf,
   offGrid,
   maxQuantity,
@@ -62,6 +63,28 @@ describe('intentOf', () => {
     expect(intentOf({ kind: 'put', side: 'write' })).toBe('earn-buy')
     expect(intentOf({ kind: 'put', side: 'bid' })).toBe('floor')
     expect(intentOf({})).toBe('floor')
+  })
+
+  it("follows an open ticket's side and kind over the intent the link names, so the page and the ticket agree", () => {
+    expect(intentOf({ intent: 'floor', side: 'write', kind: 'put' })).toBe('earn-buy')
+    expect(intentOf({ intent: 'floor', side: 'write', kind: 'call' })).toBe('earn-hold')
+    expect(intentOf({ intent: 'earn-buy', side: 'bid', kind: 'put' })).toBe('floor')
+    expect(intentOf({ intent: 'earn-hold', side: 'buy', offer: '5', kind: 'call' })).toBe('lock-buy')
+    // Filling a request is the seller's side.
+    expect(intentOf({ intent: 'floor', bid: '3', kind: 'put' })).toBe('earn-buy')
+    // Without a kind the ticket cannot say: the link's intent stays.
+    expect(intentOf({ intent: 'earn-hold', bid: '3' })).toBe('earn-hold')
+  })
+})
+
+describe('ticketSide', () => {
+  it('reads the side of the ticket the URL opens', () => {
+    expect(ticketSide({ side: 'write' })).toBe('write')
+    expect(ticketSide({ side: 'bid' })).toBe('buy')
+    expect(ticketSide({ side: 'buy', offer: '1' })).toBe('buy')
+    expect(ticketSide({ ask: '1' })).toBe('buy')
+    expect(ticketSide({ bid: '1' })).toBe('write')
+    expect(ticketSide({})).toBeNull()
   })
 })
 

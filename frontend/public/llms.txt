@@ -23,17 +23,17 @@ Links to the earlier hash routes (`#` followed by `/markets`, `/portfolio`, `/re
 - Covered (default): the maker locks the total strike (put) or the total underlying (call) before the sale, and the contract holds it until exercise, the deadline or cancellation. Collateral does not cover issuer action.
 - Eligibility is the asset's own trustline authorization, read from its Stellar Asset Contract (SAC). The issuer keeps freeze and clawback; the contract checks those rules, it does not override them.
 - Anyone can list a classic asset by code and issuer; the contract derives the canonical SAC. Listing is not eligibility.
-- A buyer can post a request: the premium is escrowed in the contract until a maker fills it, the buyer cancels it, or it expires.
+- A buyer can post a request: the premium is escrowed in the contract until a maker fills the request or the buyer cancels it, before or after its deadline. After the deadline anyone can also clear it, which returns the premium to the buyer.
 - A holder can list an active option for resale at a price they set. Strike, deadline, quantity and collateral do not change.
 - Nothing settles by itself: the holder must exercise before the deadline, and the maker claims the delivery or reclaims the collateral afterwards.
-- No admin, no oracle, no margin and no upgrade path in the options contract.
+- No admin, no oracle, no margin and no upgrade path in the Covered contract.
 - Premium is paid to the maker at purchase and is never refunded.
 
 ## Contracts (Stellar Testnet)
 
-- [Options contract v1.5](https://stellar.expert/explorer/testnet/contract/CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6): `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`
+- [Covered contract v1.5](https://stellar.expert/explorer/testnet/contract/CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6): `CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6`
 - [RWA SAC](https://stellar.expert/explorer/testnet/contract/CCVYWYG56YL7VA7A3EKVJKAKZC4O2B6YXV6UJMERG2NYC7HJHELJLR7U), [BOND SAC](https://stellar.expert/explorer/testnet/contract/CADCBCQ7TU5XCGPYDD32HANAVEWWDARGKIKXWF5YK7NTFOLAWGQYQGHP), [EQTY SAC](https://stellar.expert/explorer/testnet/contract/CDBHRGVHB2NVKJCM5ZKBTUQ3RQHZUZJSSEZLATIUROWXNIEFZ7T7NIFU) (listed at runtime), [USDx SAC](https://stellar.expert/explorer/testnet/contract/CAKXMQVKSW2AEKF5DSMDPHJAYGNVOQANHXLI64QJS2H3GOCXRW2GCICU) (quote token). RWA, BOND and EQTY are issued by one account, so its flags apply to all three: revocable, with clawback enabled. Its authorization-required flag was cleared on 2026-10-26, so new trustlines are authorized automatically (read from the issuer account on 2026-11-11).
-- [StellSec Margin (contract crate pro) v0.3.2](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) (a separate contract): uncovered calls on partial margin, cash-settled in USDx, with a liquidity-provider vault. Prices are published by the team. Payouts can be reduced and any deficit is shown. Shares no storage or balance with the options contract.
+- [StellSec Margin (contract crate pro) v0.3.2](https://stellar.expert/explorer/testnet/contract/CBZNS63L23N3Y3GHU6H57AU6OVZ3FOAPM7Z54ATDRC472Q5DWV6UVKCN) (a separate contract): uncovered calls on partial margin, cash-settled in USDx, with a liquidity-provider vault. Prices are published by the team. Payouts can be reduced and any deficit is shown. Shares no storage or balance with the Covered contract.
 
 ## Evidence (Testnet transactions)
 

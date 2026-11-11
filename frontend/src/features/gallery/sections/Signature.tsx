@@ -18,7 +18,7 @@ export function SignatureSection() {
         layout="split"
       >
         <ContractNote
-          serial="000184"
+          serial="184"
           ledger="58,331,204"
           glyph="long-put"
           kind="Long put, BOND"
@@ -26,14 +26,14 @@ export function SignatureSection() {
           aside={<Countdown to={SAMPLE_DEADLINE} now={SAMPLE_NOW} />}
           terms={[
             { label: 'Strike', value: <Amount value="10.00" unit="USDx" figure="serif" /> },
-            { label: 'Quantity', value: <Amount value="5" unit="BOND" figure="serif" /> },
+            { label: 'Quantity', value: <Amount value="5.00" unit="BOND" figure="serif" /> },
             { label: 'Premium paid', value: <Amount value="1.80" exact="1.8000000" unit="USDx" figure="serif" /> },
-            { label: 'Breakeven', value: '9.64', marked: true },
+            { label: 'Breakeven', value: <Amount value="9.64" unit="USDx" figure="serif" />, marked: true },
             {
               label: 'Deadline',
               value: <DateTime value={SAMPLE_DEADLINE} local="below" />,
             },
-            { label: 'Collateral', value: '50.00 USDx in contract' },
+            { label: 'Collateral', value: <Amount value="50.00" unit="USDx" figure="serif" />, hint: 'In the contract' },
           ]}
           footer={
             <>
@@ -45,7 +45,7 @@ export function SignatureSection() {
           }
         />
         <ContractNote
-          serial="000207"
+          serial="207"
           ledger="58,331,204"
           serialLabel="Offer No."
           glyph="short-call"
@@ -53,10 +53,10 @@ export function SignatureSection() {
           state="Offered"
           terms={[
             { label: 'Strike', value: <Amount value="11.00" unit="USDx" figure="serif" /> },
-            { label: 'Quantity', value: <Amount value="20" unit="FUND" figure="serif" /> },
+            { label: 'Quantity', value: <Amount value="20.00" unit="FUND" figure="serif" /> },
             { label: 'Premium asked', value: <Amount value="3.80" unit="USDx" figure="serif" />, marked: true },
             { label: 'Deadline', value: <DateTime value={SAMPLE_DEADLINE} /> },
-            { label: 'Collateral', value: '20 FUND in contract' },
+            { label: 'Collateral', value: <Amount value="20.00" unit="FUND" figure="serif" />, hint: 'In the contract' },
           ]}
           footer={
             <Button size="sm" variant="secondary">
@@ -74,14 +74,14 @@ export function SignatureSection() {
         <ContractNote
           key={printKey}
           printing={printKey > 0}
-          serial="000311"
+          serial="311"
           ledger="58,331,260"
           glyph="long-put"
           kind="Long put, BOND"
           state="Active"
           terms={[
             { label: 'Floor', value: <Amount value="10.00" unit="USDx" figure="serif" />, marked: true },
-            { label: 'You paid', value: <Amount value="1.80" unit="USDx" figure="serif" />, hint: '0.36 per BOND' },
+            { label: 'You paid', value: <Amount value="1.80" unit="USDx" figure="serif" />, hint: '0.36 USDx per BOND' },
             { label: 'Deadline', value: <DateTime value={SAMPLE_DEADLINE} /> },
           ]}
           footer={<TxLink hash={SAMPLE_HASH} explorerUrl="https://stellar.expert/explorer/testnet" />}
@@ -102,7 +102,7 @@ export function SignatureSection() {
           kind="A floor on BOND"
           terms={[
             { label: 'Floor', value: <Amount value="99.00" unit="USDx" figure="serif" />, marked: true },
-            { label: 'Quantity', value: <Amount value="2" unit="BOND" figure="serif" /> },
+            { label: 'Quantity', value: <Amount value="2.00" unit="BOND" figure="serif" /> },
             { label: 'Deadline', value: <DateTime value={SAMPLE_DEADLINE} /> },
           ]}
         />
@@ -118,7 +118,7 @@ export function SignatureSection() {
           slip
           title="No positions."
           hint="Terms appear here once you hold or write an option."
-          action={<ButtonLink href="#signature">Open Markets</ButtonLink>}
+          action={<ButtonLink href="#signature">Go to Markets</ButtonLink>}
         />
       </Specimen>
 
@@ -131,11 +131,9 @@ export function SignatureSection() {
           If BOND is at 8.00 at the deadline you still sell at <Marker>10.00</Marker>, the floor you chose.
         </p>
         <Example label="A changed figure flashes the marker for 1.2 s, then it is plain again">
-          <span className="ui-figure-lg">
-            <Marker key={printKey} flash>
-              48.20 USDx
-            </Marker>
-          </span>
+          <Marker key={printKey} flash>
+            <Amount value="48.20" unit="USDx" figure="serif" size="lg" />
+          </Marker>
         </Example>
       </Specimen>
     </Section>

@@ -1,9 +1,9 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import type { Intent } from '../../../app/search'
 import { PAYOFF_CAPTION } from '../../../core/disclosures'
-import { formatMoney } from '../../../core/format'
+import { formatMoney, formatUnits } from '../../../core/format'
 import { strikeUnits } from '../../../core/units'
-import { Glyph, Link } from '../../../ui'
+import { Amount, Glyph, Link } from '../../../ui'
 import type { PayoffGlyph } from '../../../ui'
 import { WithWithoutChart } from '../../../viz'
 import { INTENTS, SECTION } from '../copy'
@@ -21,8 +21,8 @@ interface Plate {
   withLabel: string
   level: string
   figureCaption: string
-  /** What the recorded example paid or was paid, for the one row under the figure. */
-  flow: string
+  /** The premium the recorded example paid or was paid, for the one row under the figure. */
+  premium: string
 }
 
 const put = RECORDED_PUT
@@ -45,7 +45,7 @@ const PLATES: Record<(typeof INTENTS.items)[number]['id'], Plate> = {
     withLabel: INTENTS.floorWith,
     level: INTENTS.floorLevel(floor.strikeText),
     figureCaption: INTENTS.floorFigure(money(put.underlyingQty, put.underlying), perUnit(put)),
-    flow: INTENTS.paid(money(put.totalPremium, put.quote)),
+    premium: formatUnits(put.totalPremium, put.quote.decimals),
   },
   'earn-hold': {
     intent: 'earn-hold',
@@ -56,7 +56,7 @@ const PLATES: Record<(typeof INTENTS.items)[number]['id'], Plate> = {
     withLabel: INTENTS.earnHoldWith,
     level: INTENTS.capLevel(earnHold.strikeText),
     figureCaption: INTENTS.earnHoldFigure(money(call.underlyingQty, call.underlying), perUnit(call)),
-    flow: INTENTS.received(money(call.totalPremium, call.quote)),
+    premium: formatUnits(call.totalPremium, call.quote.decimals),
   },
   'earn-buy': {
     intent: 'earn-buy',
@@ -67,13 +67,13 @@ const PLATES: Record<(typeof INTENTS.items)[number]['id'], Plate> = {
     withLabel: INTENTS.earnBuyWith,
     level: INTENTS.buyLevel(earnBuy.strikeText),
     figureCaption: INTENTS.earnBuyFigure(money(put.totalStrike, put.quote), perUnit(put)),
-    flow: INTENTS.received(money(put.totalPremium, put.quote)),
+    premium: formatUnits(put.totalPremium, put.quote.decimals),
   },
 }
 
 /**
- * Three uses, each one recorded option seen from one side. The payoff caption is said once under the row; each
- * figure still carries it for a screen reader.
+ * Three uses, each one recorded option seen from one side. Each name is the link into Markets on that intent. The
+ * payoff caption is said once under the row; each figure still carries it for a screen reader.
  */
 export function Intents() {
   return (
@@ -85,7 +85,14 @@ export function Intents() {
             <li key={item.id} className={css.item}>
               <h3 className={css.name}>
                 <Glyph name={plate.glyph} size={16} className={css.glyph} />
-                {item.name}
+                <Link
+                  tone="ink"
+                  className={css.nameLink}
+                  aria-label={`${item.name}${INTENTS.linkContext}`}
+                  render={<RouterLink to="/markets" search={{ intent: plate.intent }} />}
+                >
+                  {item.name}
+                </Link>
               </h3>
               <p className={css.statement}>{item.statement}</p>
               <WithWithoutChart
@@ -111,13 +118,11 @@ export function Intents() {
               <dl className={css.facts}>
                 <div className={css.fact}>
                   <dt>{item.flowLabel}</dt>
-                  <dd>{plate.flow}</dd>
+                  <dd>
+                    <Amount value={plate.premium} unit={plate.quote} />
+                  </dd>
                 </div>
               </dl>
-              <Link className={css.action} render={<RouterLink to="/markets" search={{ intent: plate.intent }} />}>
-                {item.action}
-                <span className="ui-vh">{item.actionContext}</span>
-              </Link>
             </li>
           )
         })}

@@ -16,7 +16,8 @@ describe('notesFor', () => {
 
   it('places each note beside its control from 768 px', () => {
     expect(desktop.map((note) => [note.side, note.align, note.dock])).toEqual([
-      ['bottom', 'start', false],
+      // Under the end of the list, clear of the Assets heading under its start.
+      ['bottom', 'end', false],
       ['top', 'start', false],
       ['top', 'end', false],
       ['bottom', 'start', false],

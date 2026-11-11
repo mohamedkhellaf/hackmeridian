@@ -30,14 +30,14 @@ import {
 describe('required sentences, verbatim (brief section 6.2)', () => {
   it('keeps the exact wording of each fixed sentence', () => {
     expect(LEGAL_NOTICE).toBe(
-      'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.',
+      'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is investment advice or a solicitation to buy or sell any security.',
     )
     expect(COPYRIGHT_NOTICE).toBe('\u00A9 2026 The StellSec authors.')
     expect(TRADEMARK_NOTICE).toBe(
       '\u201CStellar\u201D is a trademark of the Stellar Development Foundation. All rights reserved. This is independent software, not affiliated with, sponsored or endorsed by the Stellar Development Foundation.',
     )
     expect(LEGAL_NOTICE_MOCK).toBe(
-      'This software is provided as is, without warranty of any kind. This build runs on an in-memory demo market: nothing is read from Stellar or sent to it, and the tokens shown have no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.',
+      'This software is provided as is, without warranty of any kind. This build runs on an in-memory demo market: nothing is read from Stellar or sent to it, and the tokens shown have no monetary value. Nothing here is investment advice or a solicitation to buy or sell any security.',
     )
     expect(findBannedWords(LEGAL_NOTICE, BANNED_TAGLINES)).toEqual([])
     expect(findBannedWords(LEGAL_NOTICE_MOCK, BANNED_TAGLINES)).toEqual([])
@@ -69,8 +69,14 @@ describe('required sentences, verbatim (brief section 6.2)', () => {
   })
 
   it('builds the bid escrow sentence around a formatted amount', () => {
-    expect(bidEscrowDisclosure('2.00 USDx')).toBe('You escrow 2.00 USDx now; refunded if you cancel or it expires.')
-    expect(bidEscrowDisclosure('1,080.00 USDx')).toBe('You escrow 1,080.00 USDx now; refunded if you cancel or it expires.')
+    expect(bidEscrowDisclosure('2.00 USDx')).toBe(
+      'You escrow 2.00 USDx now. Until a maker fills the request you can cancel it and take the premium back, also after the deadline.',
+    )
+    expect(bidEscrowDisclosure('1,080.00 USDx')).toBe(
+      'You escrow 1,080.00 USDx now. Until a maker fills the request you can cancel it and take the premium back, also after the deadline.',
+    )
+    // The contract never refunds a request by itself (ruling F9): no sentence may say it does.
+    expect(bidEscrowDisclosure('2.00 USDx')).not.toMatch(/refunded if|expires/)
   })
 
   it('keeps both Margin banner variants and picks by build', () => {

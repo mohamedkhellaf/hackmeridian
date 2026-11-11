@@ -41,7 +41,6 @@ export function IntentList({ current, showAll, rows, available, balances, quoteC
               {target ? <span className={styles.target}>{onAsset(target.asset.code)}</span> : null}
             </span>
             <span className={styles.consequence}>{copy.consequence(quoteCode)}</span>
-            <span className={styles.premium}>{copy.premium}</span>
             <span className={styles.payer}>{copy.payer}</span>
             {available ? <IconChevronRight size={16} className={styles.go} /> : null}
           </>

@@ -23,13 +23,6 @@
     gap: var(--s-20);
   }
 
-  .lead {
-    max-width: var(--measure);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    color: var(--text-2);
-  }
-
   .controls {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);

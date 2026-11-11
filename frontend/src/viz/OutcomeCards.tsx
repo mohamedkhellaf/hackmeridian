@@ -59,7 +59,7 @@ export function OutcomeCards({ outcomes, onSelect, label = 'Outcomes', className
               )}
               <p className={css.figure}>
                 {o.figure}
-                {o.unit && <span className={css.unit}> {o.unit}</span>}
+                {o.unit && <span className={css.unit}>{'\u00a0'}{o.unit}</span>}
               </p>
               {o.delta && (
                 <p className={css.delta} data-direction={side}>

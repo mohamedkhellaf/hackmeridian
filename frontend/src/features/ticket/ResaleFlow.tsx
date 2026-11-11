@@ -40,7 +40,7 @@ export function ResaleFlow({ intent }: { intent: Extract<TicketIntent, { mode: '
       return (
         <FlowError
           title={title}
-          what={`Listing ${serialOf(intent.optionId)}`}
+          what={`Listing No. ${serialOf(intent.optionId)}`}
           onRetry={() => {
             void option.refetch()
             void ask.refetch()
@@ -95,7 +95,8 @@ function ResaleTicket(props: { option: OptionOffer; seen: Ask; liveAsk: bigint |
     gone,
     fix: repriced ? { label: `Show the price of ${moneyText({ token: q, amount: liveAsk })}`, onClick: () => props.onAcceptPrice(liveAsk) } : undefined,
     money: [leadRow('You pay', price, RESALE_PRICE_DISCLOSURE), moneyRow('Collateral locked', collateral, RESALE_NOTE)],
-    details: [strikeRow(o), quantityRow(o), deadlineRow(o.expiry), breakevenRow(leg), mostYouCanLoseRow(leg, 'long'), partyRow('Seller', seen.holder, me), partyRow('Maker', o.writer, me)],
+    figures: [breakevenRow(leg)],
+    details: [strikeRow(o), quantityRow(o), deadlineRow(o.expiry), mostYouCanLoseRow(leg, 'long'), partyRow('Seller', seen.holder, me), partyRow('Maker', o.writer, me)],
     readAt: props.readAt,
     outcome: outcomeFor(leg, 'long'),
     commitment: COMMITMENT['buy-resale'],

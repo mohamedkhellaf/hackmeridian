@@ -38,7 +38,7 @@ own; the route's pending and error screens belong to the router.
 - **The figure the guided page draws.** Every example uses the with-and-without figure with the guided page's line
   labels ("With the floor", "Just holding", "Keeping the cash"), so what a reader learns here is what Markets shows.
   An outcome's difference keeps its sign and neutral words ("−1.80 USDx compared with no floor").
-- **A written call has no loss figure**: its note prints what is given up and that the writer cannot owe more than
+- **A written call has no loss figure**: its note prints what is given up and that the maker cannot owe more than
   the asset locked (ruling E14; the exact wording is Dev 1's).
 - **The lifecycle is nobody's position**: no step is marked done, current or ahead. The first step of each ending
   names it ("The holder exercises", "The deadline passes").
@@ -46,7 +46,11 @@ own; the route's pending and error screens belong to the router.
   figures. Limits are restated in the page's own words (brief D16), and the Margin block uses only the wording
   `AGENTS.md` allows. `content.test.ts` checks the copy against the banned words, price terms, taglines and hedge
   words ("experimental", "fictional").
-- **A figure never parts from its unit, and a deadline stays on one line**: no-break spaces in `examples.ts`.
+- **A figure never parts from its unit, and a deadline stays on one line**: no-break spaces in the sentences of
+  `examples.ts`; on the note every figure with a unit is an `Amount` (`qtyFigure`, `premiumFigure`,
+  `collateralFigure` keep figure and unit apart for it), which owns the unit's style.
+- **Each fact has one home on the page.** "What this is" is two sentences; the rules table under it carries the
+  style, the settlement and the premium. That a settlement is all or nothing is said once, in the Settlement row.
 
 ## Tests
 

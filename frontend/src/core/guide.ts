@@ -51,8 +51,6 @@ export const GUIDE_COPY = {
   start: 'Show me around',
   decline: 'Not now',
   group: 'Guide',
-  stays: 'The guide stays in Settings.',
-  staysPhone: 'The guide stays under More.',
 } as const
 
 /** The welcome may be offered: nothing is stored for the tour, and storage works. The page adds its own conditions. */

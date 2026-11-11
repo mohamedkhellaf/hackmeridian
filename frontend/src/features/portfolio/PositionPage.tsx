@@ -10,14 +10,13 @@ import type { OptionOffer } from '../../core/options/types'
 import { askOf } from '../../core/resale/resale'
 import { OPTIONS_ERRORS } from '../../core/stellar/errors'
 import { plainAmount, strikeUnits } from '../../core/units'
-import { optionReference, optionSubject, useAsks, useBalancesById, useLedger, useMe, useNowSec, usePosition, useSubjectBusy, useTxBusy } from '../../data'
-import type { PositionView } from '../../data'
+import { optionReference, optionSubject, useAsks, useBalancesById, useLedger, useMe, useNowSec, usePosition, useSubjectBusy, useTxBusy, useUnsettledTx } from '../../data'
+import type { PositionView, UnsettledTx } from '../../data'
 import { Button, Callout, Countdown, DateTime, EmptyNote, PageHeader, Skeleton } from '../../ui'
 import { useWallet } from '../../wallet'
 import { ActionFlow } from './actions/ActionFlow'
 import { useActionFlow } from './actions/useActionFlow'
 import {
-  BUSY_REASON,
   CONNECT,
   GUEST_ACTIONS,
   LAST_MINUTES_NOTE,
@@ -35,7 +34,7 @@ import {
   readError,
   staleLink,
 } from './copy'
-import { shortOf, useFromRequest, useReserveHealth, useResold } from './hooks'
+import { shortOf, useFilledRequest, usePaidOriginal, useReserveHealth, useResold } from './hooks'
 import { Lifecycle } from './Lifecycle'
 import { BackToPortfolio, MarketsLink, ReservesLink } from './links'
 import { ACTION_NAME, actionsFor, allows, exerciseShortOf, optionTitle, sellLabel, strikeText } from './model'
@@ -44,6 +43,8 @@ import { PositionNote } from './PositionNote'
 import { PositionPayoff } from './PositionPayoff'
 import { drawsPayoff } from './payoff'
 import { parseOptionId, positionRoute } from './route'
+import { UnsettledAction } from './Unsettled'
+import { unsettledOn, waitReason } from './waiting'
 import css from './PositionPage.module.css'
 
 interface FrameProps {
@@ -70,28 +71,35 @@ interface HeaderActionsProps {
   position: PositionView | null
   actions: readonly PositionAction[]
   onOpen: (action: PositionAction) => void
+  /** An earlier transaction of the wallet whose outcome is unknown. */
+  unsettled: UnsettledTx | null
 }
 
 /**
  * The buttons that apply now. A contract call that is waiting (an in-the-money exercise, a claim, a reclaim) is
  * the page's one ink button; an exercise the reference calls out of the money, a cancellation and a listing are
- * choices, so they are outlined.
+ * choices, so they are outlined. While a transaction on this option has an unknown outcome, "Outcome unknown" and
+ * "Check again" stand in their place; one on anything else makes them wait, with its sentence as the reason.
  */
-function HeaderActions({ option, position, actions, onOpen }: HeaderActionsProps) {
+function HeaderActions({ option, position, actions, onOpen, unsettled }: HeaderActionsProps) {
   const working = useSubjectBusy(optionSubject(option.id))
   const busy = useTxBusy()
+  const own = unsettledOn(unsettled, optionSubject(option.id))
+  if (own) return <UnsettledAction unsettled={own} size="md" />
   if (actions.length === 0) return null
   const [first, ...rest] = actions
   const label = (a: PositionAction) => (a === 'sell' ? sellLabel(position?.listing ?? null) : ACTION_NAME[a])
   const isCall = first !== 'sell' && first !== 'unlist'
   const lead = isCall && first !== 'cancel' && !(first === 'exercise' && (position?.moneyness === 'out' || position?.moneyness === 'at'))
+  const wait = waitReason(busy, working, unsettled)
+  const others = waitReason(busy, false, unsettled)
   return (
     <>
-      <Button variant={lead ? 'primary' : 'secondary'} loading={working && isCall} disabled={busy && !working} disabledReason={BUSY_REASON} onClick={() => onOpen(first)}>
+      <Button variant={lead ? 'primary' : 'secondary'} loading={working && isCall} disabled={wait.disabled} disabledReason={wait.reason} onClick={() => onOpen(first)}>
         {label(first)}
       </Button>
       {rest.map((a) => (
-        <Button key={a} disabled={busy} disabledReason={BUSY_REASON} onClick={() => onOpen(a)}>
+        <Button key={a} disabled={others.disabled} disabledReason={others.reason} onClick={() => onOpen(a)}>
           {label(a)}
         </Button>
       ))}
@@ -130,7 +138,9 @@ export function PositionPage() {
   const option = detail.data?.option ?? null
   const position = detail.data?.position ?? null
   const resold = useResold(option)
-  const fromRequest = useFromRequest(option)
+  const request = useFilledRequest(option)
+  const paid = usePaidOriginal(option, me, request)
+  const unsettled = useUnsettledTx()
   // Withdrawing a listing has no link form: it is opened by its button only.
   const [local, setLocal] = useState<PositionAction | null>(null)
 
@@ -199,12 +209,14 @@ export function PositionPage() {
   const lastMinutes = role === 'holder' && option.state === 'active' && position?.urgency === 'within15min'
   const stale = wanted !== null && target === null && !flow.open
   const short = shortOf(option, health)
-  const holderActions = me ? <HeaderActions option={option} position={position} actions={actions} onOpen={open} /> : null
-  const bar = !!me && actions.length > 0 && live
+  const holderActions = me ? <HeaderActions option={option} position={position} actions={actions} onOpen={open} unsettled={unsettled} /> : null
+  const bar = !!me && (actions.length > 0 || unsettledOn(unsettled, optionSubject(option.id)) !== null) && live
   // A live option has its payoff figure on the right and the lifecycle under the note; an ended one has no
   // figure, and its lifecycle takes the right column.
   const figure = drawsPayoff(option)
-  const lifecycle = <Lifecycle option={option} role={role} resold={role === 'holder' && resold} fromRequest={fromRequest} />
+  const holderResold = role === 'holder' && resold
+  const holderPaid = role === 'holder' && paid
+  const lifecycle = <Lifecycle option={option} role={role} resold={holderResold} paid={holderPaid} fromRequest={request !== null} />
 
   // A holder who cannot cover the exercise yet is told before opening it, with where the asset is.
   const uncovered = role === 'holder' && option.state === 'active' && live ? exerciseShortOf(option, balances.data) : null
@@ -292,13 +304,14 @@ export function PositionPage() {
             me={me}
             ledger={ledger.data?.sequence ?? null}
             nowSec={nowSec}
-            resold={role === 'holder' && resold}
+            resold={holderResold}
+            paid={holderPaid}
             listedAt={viewerAsk?.askTotal ?? null}
             short={short}
           />
           {figure ? lifecycle : null}
         </div>
-        {figure ? <PositionPayoff className={css.side} option={option} role={role} reference={reference} resold={role === 'holder' && resold} /> : lifecycle}
+        {figure ? <PositionPayoff className={css.side} option={option} role={role} reference={reference} resold={holderResold} paid={holderPaid} /> : lifecycle}
       </div>
 
       {bar ? <div className={css.actionBar}>{holderActions}</div> : null}

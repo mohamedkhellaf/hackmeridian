@@ -311,7 +311,7 @@ describe('an unknown outcome blocks the next write of the same account, across c
     expect(second).not.toHaveBeenCalled()
     expect(checkTx).toHaveBeenCalledTimes(1)
     expect(run.state).toMatchObject({ phase: 'failed', effect: 'nothing-sent' })
-    expect(run.state.error).toMatch(/^A transaction sent at \d\d:\d\d:\d\d UTC is not confirmed yet and can still go through until 00:08:20 UTC\. Check it in Activity before you send another\.$/)
+    expect(run.state.error).toMatch(/^A transaction sent at \d\d:\d\d:\d\d\u00A0UTC is not confirmed yet and can still go through until 00:08:20\u00A0UTC\. Check it in Activity before you send another\.$/)
     expect(run.entryId).toBeNull()
   })
 
