@@ -3,12 +3,13 @@ import { backingFor, formatFixed, formatTenths, lineTotal, ratioTenths, shortfal
 import type { CollateralHealth, CollateralLine, TokenInfo } from '../options/types'
 
 const token: TokenInfo = { contractId: 'C1', code: 'FUND', decimals: 7 }
-const line = (o: bigint, a: bigint, p: bigint, u: bigint): CollateralLine => ({ token, offered: o, active: a, pendingReclaim: p, unclaimed: u })
+const line = (o: bigint, a: bigint, p: bigint, u: bigint): CollateralLine => ({ token, offered: o, active: a, pendingReclaim: p, unclaimed: u, escrowed: 0n })
 const health = (reserved: bigint, held: bigint): CollateralHealth => ({ token, reserved, held })
 
 describe('reserves helpers', () => {
-  it('sums the breakdown', () => {
+  it('sums the breakdown, escrowed request premiums included', () => {
     expect(lineTotal(line(1n, 2n, 3n, 4n))).toBe(10n)
+    expect(lineTotal({ ...line(1n, 2n, 3n, 4n), escrowed: 5n })).toBe(15n)
   })
   it('computes shortfall only when held < reserved', () => {
     expect(shortfall(5n, 8n)).toBe(3n)

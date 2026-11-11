@@ -1,0 +1,109 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .waterfall {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .heading {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    color: var(--text);
+  }
+
+  /* Paid segments, in payment order: ink, then two lighter inks. Identity is also in the labels under the bar. */
+  .first {
+    fill: var(--text);
+  }
+
+  .second {
+    fill: var(--control);
+  }
+
+  .third {
+    fill: var(--muted);
+  }
+
+  .deficit {
+    fill: none;
+    stroke: var(--loss);
+    stroke-width: 1;
+  }
+
+  .empty {
+    fill: none;
+    stroke: var(--control);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+  }
+
+  .paidRule {
+    stroke: var(--text);
+    stroke-width: 1.5;
+  }
+
+  .key {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .key li {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+    margin: 0;
+  }
+
+  .key svg {
+    flex: none;
+    display: block;
+  }
+
+  .keyLabel {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .keyValue {
+    margin-left: auto;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .paidText {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  @media (forced-colors: active) {
+    .first,
+    .second,
+    .third {
+      fill: CanvasText;
+    }
+
+    .deficit,
+    .paidRule,
+    .empty {
+      stroke: CanvasText;
+    }
+  }
+}

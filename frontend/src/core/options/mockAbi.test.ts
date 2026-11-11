@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockOptionsClient } from './mockClient'
+import { bareSeed } from './mockSeed'
 import type { NewOffer } from './types'
 
 const UNIT = 10_000_000n
@@ -26,7 +27,7 @@ async function run<T>(p: Promise<T>): Promise<T> {
 const advanceDays = (d: number) => vi.advanceTimersByTimeAsync(d * 86400 * 1000)
 
 async function setup() {
-  const c = new MockOptionsClient()
+  const c = new MockOptionsClient(bareSeed())
   const fund = (await c.supportedAssets()).underlyings[0]
   const offer = (over: Partial<NewOffer> = {}): NewOffer => ({
     kind: 'put', underlying: fund, underlyingQty: 2n * UNIT, totalStrike: 20n * UNIT,

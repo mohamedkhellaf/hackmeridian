@@ -1,8 +1,7 @@
-import type { Notice } from '../ui'
+import { errorMessage as messageOf } from './errors'
+import type { Notice, TxOutcome } from './types'
 
-export type TxOutcome = { ok: true; hash: string; mock: boolean } | { ok: false; error: string }
-
-const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e))
+export type { Notice, TxOutcome } from './types'
 
 /**
  * Runs one transaction, then refreshes app state. The outcome is decided by the transaction alone: a failed

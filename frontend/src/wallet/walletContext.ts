@@ -1,8 +1,7 @@
 import { createContext } from 'react'
 import type { WalletInfo } from './helpers'
 
-// What useFreighter()/useWallet() return. The first seven fields are the original Freighter-only
-// shape that App.tsx and src/stellar/signer.ts depend on; walletName/networkMessage are additive.
+/** What useWallet() returns. `address`, `sign` and `signAuthEntry` are the WalletSigner the clients capture. */
 export interface WalletState {
   address: string | null
   /** Display name of the connected wallet ("Freighter", "xBull", ...), null when disconnected. */
@@ -11,13 +10,14 @@ export interface WalletState {
   /** Ready-made banner text for wrongNetwork, naming the connected wallet. */
   networkMessage: string | null
   error: string | null
-  /** Opens StellSec's connect dialog (or connects instantly under the e2e mock). */
+  /** Opens the wallet picker (or connects instantly under the test wallet). */
   connect: () => Promise<void>
   disconnect: () => void
   sign: (xdr: string) => Promise<string>
   signAuthEntry: (entryXdr: string) => Promise<string>
 }
 
+/** State of the wallet picker, rendered by the shell's connect dialog. */
 export interface DialogState {
   open: boolean
   loading: boolean
@@ -28,4 +28,16 @@ export interface DialogState {
   close: () => void
 }
 
+/** The picker when there is nothing to pick (test wallet, or outside a provider). */
+export const CLOSED_DIALOG: DialogState = {
+  open: false,
+  loading: false,
+  wallets: [],
+  busyId: null,
+  error: null,
+  pick: () => {},
+  close: () => {},
+}
+
 export const WalletContext = createContext<WalletState | null>(null)
+export const WalletDialogContext = createContext<DialogState>(CLOSED_DIALOG)

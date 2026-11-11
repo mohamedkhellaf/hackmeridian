@@ -1,0 +1,85 @@
+@layer ui {
+  .root {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    min-width: 0;
+    vertical-align: middle;
+  }
+
+  .name {
+    margin-inline-end: var(--s-4);
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .id {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+
+  /* The whole string in groups of four, wrapping, where it is checked character by character. */
+  .full {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-6);
+    white-space: normal;
+    color: var(--text);
+  }
+
+  .you {
+    margin-inline-start: var(--s-2);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .out {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    border-radius: var(--r-control);
+    color: var(--text-2);
+    transition: background-color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--hover);
+        color: var(--text);
+      }
+    }
+  }
+
+  .txLink {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 0.2em;
+    border-radius: var(--r-tag);
+
+    @media (hover: hover) {
+      &:hover {
+        text-decoration-color: currentColor;
+      }
+    }
+  }
+
+  .txIcon {
+    flex: none;
+  }
+}

@@ -3,6 +3,9 @@
 // Amounts are exact integer units (bigint, USDx has 7 decimals); quantities are whole lots.
 // Margin figures (nlv, mm, im...) always come from the client (get_requirement); the UI never computes them.
 
+import type { TxErrorKind } from '../tx/errors'
+import type { TxOptions } from '../tx/types'
+
 export const USDX_DECIMALS = 7
 
 /** A party: a fixture name (MAKER_A, VAULT...) while simulated, a G... address on chain. */
@@ -177,8 +180,21 @@ export interface ProModel {
 
 /** Outcome of a state-changing call. Errors carry the contract error code (201..226). */
 export type CallResult<T = null> =
-  | { ok: true; value: T; /** Simulation only: which scripted step was replayed. */ note?: string }
-  | { ok: false; code: number; name: string; note?: string }
+  | { ok: true; value: T; /** Simulation: which scripted step was replayed. Live: `Transaction <hash>`. */ note?: string; hash?: string }
+  | {
+      ok: false
+      /** 201..226: a contract refusal. 0: no scripted step (fixtures). -1: not a refusal (wallet, network); the note says why. */
+      code: number
+      name: string
+      note?: string
+      /**
+       * Where a live transaction stopped when it was not a contract refusal in simulation (core/tx/errors.ts):
+       * declined, refused, failed, unknown or expired. With `unknown` the transaction may still be included:
+       * do not offer to send it again.
+       */
+      kind?: TxErrorKind
+      hash?: string
+    }
 
 export interface OfferParams {
   writer: Party
@@ -199,20 +215,23 @@ export interface ProClient {
   subscribe(listener: () => void): () => void
   getModel(): ProModel
 
-  deposit(who: Party, amount: bigint): Promise<CallResult>
-  withdraw(who: Party, amount: bigint): Promise<CallResult>
-  createOffer(p: OfferParams): Promise<CallResult<number | null>>
-  cancelOffer(writer: Party, offerId: number): Promise<CallResult>
+  // Every write takes an optional last argument `{ onStage }` and reports checking, signing, submitting and
+  // pending (with the hash) while it runs, like the Covered client (core/tx/types.ts). It still resolves with a
+  // CallResult: a refusal is a value here, never a rejection.
+  deposit(who: Party, amount: bigint, opts?: TxOptions): Promise<CallResult>
+  withdraw(who: Party, amount: bigint, opts?: TxOptions): Promise<CallResult>
+  createOffer(p: OfferParams, opts?: TxOptions): Promise<CallResult<number | null>>
+  cancelOffer(writer: Party, offerId: number, opts?: TxOptions): Promise<CallResult>
   /** The margin check happens here, not at create_offer. */
-  buy(buyer: Party, offerId: number): Promise<CallResult<number | null>>
-  exercise(holder: Party, positionId: number): Promise<CallResult<{ due: bigint; spot: bigint }>>
+  buy(buyer: Party, offerId: number, opts?: TxOptions): Promise<CallResult<number | null>>
+  exercise(holder: Party, positionId: number, opts?: TxOptions): Promise<CallResult<{ due: bigint; spot: bigint }>>
   /** taker = null: take over to the vault (anyone can call it); otherwise a private takeover. */
-  liquidate(caller: Party, writer: Party, taker: Party | null): Promise<CallResult<{ x: bigint; paid: bigint; deficit: bigint }>>
-  settle(bookId: number): Promise<CallResult<{ due: bigint; fromOwner: bigint; shortfall: bigint }>>
-  settleVault(seriesId: number): Promise<CallResult<{ shortfall: bigint; vaultPaid: bigint; deficit: bigint }>>
-  claim(holder: Party, positionId: number): Promise<CallResult<ClaimResult>>
+  liquidate(caller: Party, writer: Party, taker: Party | null, opts?: TxOptions): Promise<CallResult<{ x: bigint; paid: bigint; deficit: bigint }>>
+  settle(bookId: number, opts?: TxOptions): Promise<CallResult<{ due: bigint; fromOwner: bigint; shortfall: bigint }>>
+  settleVault(seriesId: number, opts?: TxOptions): Promise<CallResult<{ shortfall: bigint; vaultPaid: bigint; deficit: bigint }>>
+  claim(holder: Party, positionId: number, opts?: TxOptions): Promise<CallResult<ClaimResult>>
   /** No LP withdrawal in v0. */
-  lpDeposit(lp: Party, amount: bigint): Promise<CallResult<bigint>>
+  lpDeposit(lp: Party, amount: bigint, opts?: TxOptions): Promise<CallResult<bigint>>
 
   /** get_requirement(who) for the current state, or null when none is available. */
   getRequirement(who: Party): Requirement | null

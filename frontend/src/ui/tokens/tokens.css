@@ -145,6 +145,39 @@
     --z-dialog: 50;
     --z-popover: 60;
     --z-toast: 70;
+
+    /* Interaction tones, mixed from ink so they follow the theme */
+    --hover: color-mix(in srgb, var(--text) 6%, transparent);
+    --pressed: color-mix(in srgb, var(--text) 11%, transparent);
+    --skeleton: color-mix(in srgb, var(--text) 9%, transparent);
+    --disabled-fg: #8f897d;
+
+    /* Icons: Regular at 16, Light at 20 */
+    --icon: 1rem;
+    --icon-lg: 1.25rem;
+
+    /* Contract note perforation (dots on the left edge) */
+    --perf-pitch: 0.5625rem;
+    --perf-dot: 0.1rem;
+    --perf-gutter: 1.375rem;
+
+    /* Overlay widths and reading measure */
+    --dialog-sm: 25rem;
+    --dialog-md: 32.5rem;
+    --dialog-lg: 45rem;
+    --popover-max: 20rem;
+    --popup-min: 10rem;
+    --popup-max: 24rem;
+    --popup-max-h: 22.5rem;
+    --toast-w: 22.5rem;
+    --sheet-max-h: 40rem;
+    --measure: 68ch;
+
+    /* The count inside a badge */
+    --badge-size: 0.6875rem;
+
+    /* A changed figure flashes the marker for this long */
+    --dur-flash: 1200ms;
   }
 
   /* Carbon (dark). Applied by the system preference unless the user chose light, or by data-theme="dark". */
@@ -177,6 +210,7 @@
       --loss-hatch: rgb(240 136 79 / 0.6);
       --warn-tint: #2c2412;
       --danger-tint: #33190f;
+      --disabled-fg: #6b675f;
       --scrim: rgb(0 0 0 / 0.6);
       --shadow-popover: 0 0 0 1px var(--hairline), 0 8px 24px -6px rgb(0 0 0 / 0.55);
       --shadow-dialog: 0 0 0 1px var(--hairline), 0 24px 64px -16px rgb(0 0 0 / 0.55);
@@ -211,6 +245,7 @@
     --loss-hatch: rgb(240 136 79 / 0.6);
     --warn-tint: #2c2412;
     --danger-tint: #33190f;
+    --disabled-fg: #6b675f;
     --scrim: rgb(0 0 0 / 0.6);
     --shadow-popover: 0 0 0 1px var(--hairline), 0 8px 24px -6px rgb(0 0 0 / 0.55);
     --shadow-dialog: 0 0 0 1px var(--hairline), 0 24px 64px -16px rgb(0 0 0 / 0.55);
@@ -224,11 +259,27 @@
 
   /* Gain / loss schemes (user setting). The default teal / orange is already robust for colour-blind viewers. */
   :root[data-pnl='classic'] {
-    --gain: #1a7f37;
-    --loss: #c0392b;
-    --gain-fill: rgb(26 127 55 / 0.12);
-    --loss-fill: rgb(192 57 43 / 0.08);
-    --loss-hatch: rgb(192 57 43 / 0.55);
+    --gain: #177832;
+    --loss: #bb3526;
+    --gain-fill: rgb(23 120 50 / 0.12);
+    --loss-fill: rgb(187 53 38 / 0.08);
+    --loss-hatch: rgb(187 53 38 / 0.55);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root[data-pnl='classic']:not([data-theme='light']) {
+      --gain: #4ac26b;
+      --loss: #ff7b72;
+      --gain-fill: rgb(74 194 107 / 0.14);
+      --loss-fill: rgb(255 123 114 / 0.1);
+      --loss-hatch: rgb(255 123 114 / 0.6);
+    }
+  }
+  :root[data-pnl='classic'][data-theme='dark'] {
+    --gain: #4ac26b;
+    --loss: #ff7b72;
+    --gain-fill: rgb(74 194 107 / 0.14);
+    --loss-fill: rgb(255 123 114 / 0.1);
+    --loss-hatch: rgb(255 123 114 / 0.6);
   }
   :root[data-pnl='mono'] {
     --gain: var(--text);
@@ -247,6 +298,17 @@
       --h1-line: 1.875rem;
       --row-h: var(--touch);
       --gutter: 1rem;
+    }
+    :root[data-density='compact'],
+    [data-density='compact'] {
+      --row-h: var(--touch);
+    }
+  }
+
+  /* More contrast requested: row rules take the stronger rule colour. */
+  @media (prefers-contrast: more) {
+    :root:root {
+      --hairline: var(--rule);
     }
   }
 }

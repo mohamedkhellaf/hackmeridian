@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockOptionsClient } from './mockClient'
+import { bareSeed } from './mockSeed'
 import type { NewOffer } from './types'
 
 const UNIT = 10_000_000n
@@ -28,7 +29,7 @@ async function run<T>(p: Promise<T>): Promise<T> {
 const advanceDays = (d: number) => vi.advanceTimersByTimeAsync(d * 86400 * 1000)
 
 async function setup() {
-  const c = new MockOptionsClient()
+  const c = new MockOptionsClient(bareSeed())
   const assets = await c.supportedAssets()
   const fund = assets.underlyings[0]
   const offer = (over: Partial<NewOffer> = {}): NewOffer => ({
@@ -157,7 +158,7 @@ describe('MockOptionsClient lifecycle', () => {
 })
 
 describe('openCollateral accounting', () => {
-  // Seed offers are in 'offered' state; measure deltas against that baseline.
+  // The contract starts empty (bareSeed); deltas are measured against a baseline anyway.
   type Lines = Awaited<ReturnType<MockOptionsClient['openCollateral']>>
   const line = (lines: Lines, id: string) =>
     lines.find((l) => l.token.contractId === id) ?? { offered: 0n, active: 0n, pendingReclaim: 0n, unclaimed: 0n }
@@ -190,7 +191,7 @@ describe('openCollateral accounting', () => {
     await run(c.buy(id, B))
     expect(delta(await c.openCollateral(), base, q)).toEqual([0n, amt, 0n])
 
-    await advanceDays(1) // seeds expire in >= 3 days, so only our option moves
+    await advanceDays(1) // only our option exists, and it expires within the hour
     expect(delta(await c.openCollateral(), base, q)).toEqual([0n, 0n, amt])
 
     await run(c.reclaim(id, W))
@@ -221,11 +222,11 @@ describe('openCollateral accounting', () => {
   it('sums multiple options per token into a single line', async () => {
     const { c, assets, offer } = await setup()
     const q = assets.quote.contractId
-    const lines = await c.openCollateral()
-    expect(lines.filter((l) => l.token.contractId === q)).toHaveLength(1)
-    const base = line(lines, q)
+    const base = line(await c.openCollateral(), q)
     await run(c.createOffer(offer(), W))
     await run(c.createOffer(offer({ totalStrike: 5n * UNIT }), W))
-    expect(delta(await c.openCollateral(), base, q)).toEqual([25n * UNIT, 0n, 0n])
+    const lines = await c.openCollateral()
+    expect(lines.filter((l) => l.token.contractId === q)).toHaveLength(1)
+    expect(delta(lines, base, q)).toEqual([25n * UNIT, 0n, 0n])
   })
 })

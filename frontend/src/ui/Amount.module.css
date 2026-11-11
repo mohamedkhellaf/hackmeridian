@@ -1,0 +1,125 @@
+@layer ui {
+  .root {
+    display: inline-flex;
+    align-items: baseline;
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+    color: inherit;
+
+    &[data-figure='serif'] {
+      font-family: var(--font-serif);
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+      font-weight: var(--figure-weight);
+    }
+
+    &[data-figure='serif'][data-size='lg'] {
+      font-size: var(--figure-lg-size);
+      line-height: var(--figure-lg-line);
+    }
+
+    &[data-direction='gain'] {
+      color: var(--gain);
+    }
+
+    &[data-direction='loss'] {
+      color: var(--loss);
+    }
+  }
+
+  .visible {
+    display: inline-flex;
+    align-items: baseline;
+  }
+
+  /* The unit follows the figure after a thin fixed space. Marker raises its ink: muted does not hold on the wash. */
+  .unit {
+    margin-inline-start: 0.3em;
+    font-family: var(--font-sans);
+    font-size: 0.82em;
+    font-weight: 500;
+    color: var(--amount-unit, var(--muted));
+  }
+
+  .root[data-direction] .unit {
+    color: inherit;
+  }
+
+  .triangle {
+    margin-inline-start: var(--s-4);
+    font-family: var(--font-sans);
+    font-size: 0.62em;
+    transform: translateY(-0.12em);
+  }
+
+  /* With an exact value behind it the figure is a button. It looks like the figure until hovered or focused. */
+  .trigger {
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-tag);
+    background: none;
+    font: inherit;
+    font-variant-numeric: tabular-nums lining-nums;
+    cursor: help;
+    text-decoration: underline dotted transparent;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.24em;
+    transition: text-decoration-color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover {
+        text-decoration-color: var(--control);
+      }
+    }
+
+    &[data-popup-open],
+    &:focus-visible {
+      text-decoration-color: var(--control);
+    }
+  }
+
+  .positioner {
+    z-index: var(--z-popover);
+  }
+
+  .popup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-2);
+    padding: var(--s-8) var(--s-12);
+    border-radius: var(--r-card);
+    background: var(--raised);
+    box-shadow: var(--shadow-popover);
+    outline: none;
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity var(--dur-popover) var(--ease-enter),
+      transform var(--dur-popover) var(--ease-enter);
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      opacity: 0;
+      transform: translateY(var(--s-2)) scale(0.98);
+    }
+  }
+
+  .popupLabel {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .popupValue {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    user-select: all;
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { longCall, longPut } from '../../../packages/payoff/src/index.ts'
+import { longCall, longPut } from '../../../../packages/payoff/src/index.ts'
 import type { OptionOffer } from '../options/types'
 import { buyerPnl, chartModel, legOf, riskLines } from './buyerPayoff'
 

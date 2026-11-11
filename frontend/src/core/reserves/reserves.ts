@@ -16,8 +16,9 @@ export interface Backing {
   fill: number
 }
 
-export function lineTotal(l: Pick<CollateralLine, 'offered' | 'active' | 'pendingReclaim' | 'unclaimed'>): bigint {
-  return l.offered + l.active + l.pendingReclaim + l.unclaimed
+/** Everything one line accounts for. `escrowed` is optional so a plain four-column split still adds up. */
+export function lineTotal(l: Pick<CollateralLine, 'offered' | 'active' | 'pendingReclaim' | 'unclaimed'> & { escrowed?: bigint }): bigint {
+  return l.offered + l.active + l.pendingReclaim + l.unclaimed + (l.escrowed ?? 0n)
 }
 
 export function shortfall(held: bigint, reserved: bigint): bigint {
@@ -54,10 +55,6 @@ export function backingFor(line: CollateralLine, health?: CollateralHealth): Bac
 // Fixed 2 decimals for reserves rows (1,080.00).
 export function formatFixed(units: bigint, decimals: number): string {
   return formatAmount(units, decimals, 2, 2)
-}
-
-export function stellarExpertContract(id: string): string {
-  return `https://stellar.expert/explorer/testnet/contract/${id}`
 }
 
 /** Tokens whose pooled balance is below what the contract owes (issuer clawback). Empty when health is unknown. */

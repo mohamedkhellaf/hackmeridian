@@ -1,12 +1,12 @@
 import { formatDisplay } from '../options/format'
 import type { Ask, OptionOffer } from '../options/types'
+import { byId as byOptionId, perUnit } from '../units'
 
 // Pure resale helpers (contract v1.4). Prices are set by the holder: never a market quote.
 
 /** Ask in quote units per one whole unit of underlying, floored. Display only; settlement uses `askTotal`. */
 export function askPerUnit(o: Pick<OptionOffer, 'underlying' | 'underlyingQty'>, askTotal: bigint): bigint | null {
-  if (o.underlyingQty <= 0n) return null
-  return (askTotal * 10n ** BigInt(o.underlying.decimals)) / o.underlyingQty
+  return perUnit(askTotal, o)
 }
 
 export function formatAskPerUnit(o: Pick<OptionOffer, 'underlying' | 'quote' | 'underlyingQty'>, askTotal: bigint): string {
@@ -36,7 +36,7 @@ export function resaleRows(options: OptionOffer[], asks: Ask[] | null, nowSec: n
     const option = byId.get(ask.id)
     if (option && isLive(option, nowSec) && option.holder === ask.holder) rows.push({ option, ask })
   }
-  return rows.sort((a, b) => (a.option.id < b.option.id ? -1 : a.option.id > b.option.id ? 1 : 0))
+  return rows.sort((a, b) => byOptionId(a.option, b.option))
 }
 
 export type ResaleCheck = 'ok' | 'fail' | 'changed'

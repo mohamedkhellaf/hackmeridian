@@ -1,8 +1,11 @@
 import { config } from '../config'
+import { getJson } from '../stellar/horizon'
 import { isMockToken } from '../stellar/tokens'
-import { server } from '../stellar/rpc'
 
-/** Pure parsers (tested with fixtures) + cached Horizon / RPC reads for the Asset facts panel. */
+/**
+ * Pure parsers (tested with fixtures) + cached Horizon / RPC reads for the asset "About" facts.
+ * No static Stellar SDK import: the one RPC read (`name()` of the SAC) loads core/stellar/rpc on demand.
+ */
 
 export type SacAsset = { kind: 'native' } | { kind: 'issued'; code: string; issuer: string }
 
@@ -139,14 +142,8 @@ export interface AssetFacts {
   partial: boolean
 }
 
-async function getJson(url: string): Promise<unknown | null> {
-  const res = await fetch(url)
-  if (res.status === 404) return null
-  if (!res.ok) throw new Error(`Horizon ${res.status}`)
-  return res.json()
-}
-
 async function loadFacts(contractId: string, fallbackCode: string): Promise<AssetFacts> {
+  const { server } = await import('../stellar/rpc')
   const { result } = await server.queryContract<string>(contractId, 'name', {})
   const sac = parseSacName(result)
   if (!sac) throw new Error('Not a Stellar Asset Contract')
@@ -188,8 +185,3 @@ export async function fetchHolderStatus(code: string, issuer: string, address: s
   if (json === null) return address === issuer ? 'issuer' : 'unfunded'
   return parseHolderStatus(json, code, issuer, address)
 }
-
-export const expertAsset = (code: string, issuer: string) =>
-  `https://stellar.expert/explorer/testnet/asset/${code}-${issuer}`
-export const expertAccount = (g: string) => `https://stellar.expert/explorer/testnet/account/${g}`
-export const expertContract = (c: string) => `https://stellar.expert/explorer/testnet/contract/${c}`

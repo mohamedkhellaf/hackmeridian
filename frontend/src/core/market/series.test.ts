@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OptionOffer } from '../options/types'
-import { filterOffers, formatCountdown, sameSeries, sortOffers } from './series'
+import { compactCountdown } from '../time'
+import { filterOffers, sameSeries, sortOffers } from './series'
 
 const NOW = 1_000_000 * 1000
 const tok = (code: string) => ({ contractId: code, code, decimals: 7 })
@@ -18,11 +19,11 @@ const offer = (code: string, kind: 'put' | 'call'): OptionOffer => ({
   state: 'offered',
 })
 
-describe('formatCountdown', () => {
-  it('formats days and hours', () => expect(formatCountdown(1_000_000 + 3 * 86400, NOW)).toBe('3d 0h'))
-  it('formats hours and minutes', () => expect(formatCountdown(1_000_000 + 5 * 3600 + 12 * 60, NOW)).toBe('5h 12m'))
-  it('never shows 0m while open', () => expect(formatCountdown(1_000_000 + 20, NOW)).toBe('1m'))
-  it('reports expired', () => expect(formatCountdown(1_000_000 - 1, NOW)).toBe('expired'))
+describe('compactCountdown', () => {
+  it('formats days and hours', () => expect(compactCountdown(1_000_000 + 3 * 86400, NOW)).toBe('3d 0h'))
+  it('formats hours and minutes', () => expect(compactCountdown(1_000_000 + 5 * 3600 + 12 * 60, NOW)).toBe('5h 12m'))
+  it('never shows 0m while open', () => expect(compactCountdown(1_000_000 + 20, NOW)).toBe('1m'))
+  it('reports expired', () => expect(compactCountdown(1_000_000 - 1, NOW)).toBe('expired'))
 })
 
 describe('filterOffers', () => {

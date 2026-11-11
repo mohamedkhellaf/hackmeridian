@@ -1,0 +1,83 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .wrap {
+    container-type: inline-size;
+    min-width: 0;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    gap: var(--s-4) var(--s-16);
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .name {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+  }
+
+  .bar {
+    min-width: 0;
+  }
+
+  .text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-12);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+  }
+
+  .amounts {
+    white-space: nowrap;
+  }
+
+  .sep {
+    color: var(--muted);
+  }
+
+  .vhComma {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .difference {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-4);
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .row[data-state='short'] .difference {
+    color: var(--loss);
+  }
+
+  /* Wide: name, bar and figures on one line. Proportional columns, so the bars of several rows line up. */
+  @container (min-width: 34rem) {
+    .row {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    }
+
+    .row[data-named='true'] {
+      grid-template-columns: 4.5rem minmax(0, 5fr) minmax(0, 6fr);
+    }
+  }
+}

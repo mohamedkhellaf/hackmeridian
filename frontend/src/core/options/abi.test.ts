@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertI128, collateralLines, expiryToU64, idToU32, kindFromAbi, kindToAbi, optionFromAbi, stateFromAbi } from './abi'
+import { assertI128, collateralLines, deliveryAmount, expiryToU64, idToU32, kindFromAbi, kindToAbi, optionFromAbi, reservedOf, stateFromAbi } from './abi'
 import type { AbiOptionData } from './abi'
 import type { OptionOffer, TokenInfo } from './types'
 import { unwrap } from './sorobanClient'
@@ -102,5 +102,38 @@ describe('collateralLines', () => {
     ])
     expect(get(lines, 'CRWA')).toMatchObject({ unclaimed: 2n * UNIT, offered: 0n })
     expect(get(lines, 'CUSDX')).toMatchObject({ unclaimed: 20n * UNIT })
+  })
+})
+
+describe('collateralLines with buyer requests', () => {
+  const o = (over: Partial<OptionOffer>): OptionOffer => ({
+    id: 1n, kind: 'put', underlying: RWA, quote: USDX, underlyingQty: 2n * UNIT, totalStrike: 20n * UNIT, totalPremium: UNIT,
+    expiry: 2000, writer: 'GW', holder: null, state: 'offered', ...over,
+  })
+  const bid = (state: 'open' | 'expired' | 'filled' | 'cancelled' | 'pruned', premium: bigint) => ({
+    id: 0n, buyer: 'GB', kind: 'put' as const, underlying: RWA, quote: USDX, underlyingQty: 2n * UNIT, totalStrike: 20n * UNIT,
+    totalPremium: premium, expiry: 2000, state, optionId: null,
+  })
+
+  it('counts the premium of open and expired-unrefunded requests as escrowed, in the quote token', () => {
+    const lines = collateralLines([o({})], [bid('open', 3n * UNIT), bid('expired', UNIT), bid('filled', 7n * UNIT), bid('cancelled', 7n * UNIT), bid('pruned', 7n * UNIT)])
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toMatchObject({ offered: 20n * UNIT, escrowed: 4n * UNIT })
+    expect(reservedOf(lines[0])).toBe(24n * UNIT)
+  })
+
+  it('creates the quote line for requests alone, and leaves escrowed at zero without them', () => {
+    expect(collateralLines([], [bid('open', UNIT)])).toEqual([{ token: USDX, offered: 0n, active: 0n, pendingReclaim: 0n, unclaimed: 0n, escrowed: UNIT }])
+    expect(collateralLines([o({})])[0].escrowed).toBe(0n)
+    expect(collateralLines([o({})], null)[0].escrowed).toBe(0n)
+  })
+
+  it('counts the proceeds of an exercised option as unclaimed for both kinds', () => {
+    const lines = collateralLines([o({ state: 'exercised' }), o({ kind: 'call', state: 'exercised' })])
+    const by = (id: string) => lines.find((l) => l.token.contractId === id)!
+    expect(by('CRWA').unclaimed).toBe(2n * UNIT) // put: the underlying the holder delivered
+    expect(by('CUSDX').unclaimed).toBe(20n * UNIT) // call: the strike the holder paid
+    expect(deliveryAmount(o({ kind: 'call' }))).toEqual({ token: USDX, amount: 20n * UNIT })
+    expect(deliveryAmount(o({ kind: 'put' }))).toEqual({ token: RWA, amount: 2n * UNIT })
   })
 })

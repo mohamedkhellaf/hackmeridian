@@ -1,8 +1,10 @@
 import type { OptionOffer } from '../options/types'
 import { formatDisplay, strikePerUnit } from '../options/format'
-import { byPremiumPerUnit } from './series'
+import { expiryDay } from '../time'
+import { byId, byPremiumPerUnit, byStrikePerUnit, perUnitText } from '../units'
 
 // Pure helpers behind the option chain. Everything is derived from open offers; nothing is priced here.
+// The expiry day is the UTC day (core/time `expiryDay`), the same key `lowestOpenInSeries` uses.
 
 export interface ChainSide {
   /** Cheapest premium per unit first, so offers[0] is the best quote. */
@@ -19,21 +21,6 @@ export interface ChainRow {
   put?: ChainSide
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-/** Local calendar day of an expiry ("2026-10-29"). Expiries on one day share a column of the chain. */
-export function expiryDay(expiryUnix: number): string {
-  const d = new Date(expiryUnix * 1000)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
-/** "29 Oct" for a day key. */
-export function dayLabel(day: string): string {
-  const [, m, d] = day.split('-').map(Number)
-  return `${d} ${MONTHS[m - 1]}`
-}
-
 /** Underlying codes that have open offers, sorted. */
 export function assetCodes(offers: OptionOffer[]): string[] {
   return [...new Set(offers.map((o) => o.underlying.code))].sort()
@@ -45,12 +32,12 @@ export function defaultAsset(offers: OptionOffer[]): string {
   return [...assetCodes(offers)].sort((a, b) => count(b) - count(a))[0] ?? ''
 }
 
-/** Expiry days with open offers for an asset, soonest first. */
+/** Expiry days (UTC) with open offers for an asset, soonest first. */
 export function expiryDays(offers: OptionOffer[], asset: string): string[] {
   return [...new Set(offers.filter((o) => o.underlying.code === asset).map((o) => expiryDay(o.expiry)))].sort()
 }
 
-/** Offers of one asset and expiry day. */
+/** Offers of one asset and expiry day (UTC). */
 export function inColumn(offers: OptionOffer[], asset: string, day: string): OptionOffer[] {
   return offers.filter((o) => o.underlying.code === asset && expiryDay(o.expiry) === day)
 }
@@ -62,7 +49,7 @@ export function seriesKey(o: OptionOffer): string {
 
 /** Best quote first. Returns a new array. */
 export function rankOffers(offers: OptionOffer[]): OptionOffer[] {
-  return [...offers].sort((a, b) => byPremiumPerUnit(a, b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  return [...offers].sort((a, b) => byPremiumPerUnit(a, b) || byId(a, b))
 }
 
 function side(offers: OptionOffer[]): ChainSide {
@@ -70,7 +57,7 @@ function side(offers: OptionOffer[]): ChainSide {
   return { offers: ranked, best: ranked[0], makers: new Set(ranked.map((o) => o.writer)).size }
 }
 
-/** Rows of the chain for the offers already narrowed to one asset and expiry day. Highest strike first. */
+/** Rows of the chain for the offers already narrowed to one asset and expiry day. Highest strike first (exact order). */
 export function buildChain(column: OptionOffer[]): ChainRow[] {
   const groups = new Map<string, { sample: OptionOffer; call: OptionOffer[]; put: OptionOffer[] }>()
   for (const o of column) {
@@ -79,9 +66,8 @@ export function buildChain(column: OptionOffer[]): ChainRow[] {
     g[o.kind].push(o)
     groups.set(k, g)
   }
-  const strikeNum = (g: { sample: OptionOffer }) => Number(g.sample.totalStrike) / Number(g.sample.underlyingQty)
   return [...groups.entries()]
-    .sort(([, a], [, b]) => strikeNum(b) - strikeNum(a))
+    .sort(([, a], [, b]) => byStrikePerUnit(b.sample, a.sample))
     .map(([strike, g]) => ({
       strike,
       call: g.call.length ? side(g.call) : undefined,
@@ -114,6 +100,5 @@ export function settlementLine(o: OptionOffer): string {
 
 /** Premium per one unit of underlying, display only. */
 export function premiumUnit(o: OptionOffer): string {
-  if (o.underlyingQty === 0n) return '–'
-  return formatDisplay((o.totalPremium * 10n ** BigInt(o.underlying.decimals)) / o.underlyingQty, o.quote.decimals)
+  return perUnitText(o.totalPremium, o, o.quote.decimals)
 }

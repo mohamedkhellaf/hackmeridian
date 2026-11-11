@@ -14,9 +14,15 @@ export type OptionKind = 'put' | 'call'
 export type OptionState = 'offered' | 'active' | 'exercised' | 'settled' | 'expired' | 'reclaimed' | 'cancelled'
 
 export interface TokenInfo {
-  contractId: string // SAC contract ID
+  contractId: string // SAC contract ID: the key for a token everywhere (state, URLs, maps)
   code: string
   decimals: number
+  /**
+   * Classic issuer (`G…`) when the SAC wraps an issued asset; absent for the native asset or when the SAC's
+   * `name()` could not be read. Two assets can share a code: the issuer (or the contract id) tells them apart.
+   * It also lets balance reads detect a missing or unauthorized trustline.
+   */
+  issuer?: string
 }
 
 export interface OptionOffer {
@@ -41,8 +47,11 @@ export interface Ask {
   askTotal: bigint
 }
 
+/** What a confirmed write resolves with. */
 export interface TxResult {
   hash: string
+  /** Ledger that included the transaction, when the client knows it. */
+  ledger?: number | null
 }
 
 // Assets the deployed contract allowlists (immutable constructor in the MVP).
@@ -66,7 +75,16 @@ export interface CollateralLine {
   offered: bigint // backing open offers
   active: bigint // backing sold options
   pendingReclaim: bigint // backing expired options the writer hasn't reclaimed
-  unclaimed: bigint // exercised options' proceeds the writer hasn't claimed yet (claim_delivery)
+  /**
+   * Proceeds of exercised options that the writer has not claimed yet. BOTH kinds leave something to claim:
+   * a put writer claims the delivered underlying, a call writer claims the strike paid in the quote token.
+   */
+  unclaimed: bigint
+  /**
+   * Premiums escrowed by open buyer requests (bids), in the quote token: the contract counts them in
+   * `open_collateral(quote)`. Zero when the bids were not passed to `collateralLines`.
+   */
+  escrowed: bigint
 }
 
 // Reserved (open_collateral) vs actually held (SAC balance of the contract) for one token.
@@ -82,7 +100,13 @@ export interface CollateralHealth {
 export const MAX_TENOR_SECONDS = 63_072_000 // 2 years
 export const MAX_OPEN_PER_WRITER = 50
 
+/** An exact amount of one token. */
+export interface Money {
+  token: TokenInfo
+  amount: bigint
+}
+
 // Puts lock the total strike in the quote token; covered calls lock the underlying.
-export function requiredCollateral(o: Pick<OptionOffer, 'kind' | 'underlying' | 'quote' | 'underlyingQty' | 'totalStrike'>) {
+export function requiredCollateral(o: Pick<OptionOffer, 'kind' | 'underlying' | 'quote' | 'underlyingQty' | 'totalStrike'>): Money {
   return o.kind === 'put' ? { token: o.quote, amount: o.totalStrike } : { token: o.underlying, amount: o.underlyingQty }
 }

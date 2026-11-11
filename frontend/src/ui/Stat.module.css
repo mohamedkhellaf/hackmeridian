@@ -1,0 +1,55 @@
+@layer ui {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  .label {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .value {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    min-width: 0;
+  }
+
+  .figure {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .root[data-size='lg'] .figure {
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    letter-spacing: -0.005em;
+  }
+
+  .unit {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .hint {
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+}

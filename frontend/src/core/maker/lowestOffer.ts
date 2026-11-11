@@ -1,32 +1,29 @@
-import { formatDisplay, strikePerUnit } from '../options/format'
+import { strikePerUnit } from '../options/format'
 import type { NewOffer, OptionOffer, TokenInfo } from '../options/types'
-
-const utcDay = (unix: number) => new Date(unix * 1000).toISOString().slice(0, 10)
-
-type Sized = { totalPremium: bigint; underlyingQty: bigint; underlying: TokenInfo }
-
-function perUnit(o: Sized): bigint {
-  return (o.totalPremium * 10n ** BigInt(o.underlying.decimals)) / o.underlyingQty
-}
+import { expiryDay } from '../time'
+import { byPremiumPerUnit, perUnitText } from '../units'
+import type { Sized } from '../units'
 
 /**
  * Cheapest open offer (premium per unit of underlying) in the same series as the draft: same underlying, kind,
- * strike per unit and expiry day (the grouping Markets uses). Null when there is none.
+ * strike per unit and expiry day. The day is the UTC day from core/time `expiryDay`, the same key the chain
+ * groups by, so the form and the chain always agree on what "this series" is. Null when there is none.
  */
 export function lowestOpenInSeries(offers: OptionOffer[], draft: NewOffer, quote: TokenInfo): OptionOffer | null {
   const draftStrike = strikePerUnit({ ...draft, quote } as OptionOffer)
+  const day = expiryDay(draft.expiry)
   let best: OptionOffer | null = null
   for (const o of offers) {
     if (o.state !== 'offered') continue
     if (o.underlying.contractId !== draft.underlying.contractId || o.quote.contractId !== quote.contractId) continue
     if (o.kind !== draft.kind || strikePerUnit(o) !== draftStrike) continue
-    if (utcDay(o.expiry) !== utcDay(draft.expiry)) continue
-    if (!best || perUnit(o) < perUnit(best)) best = o
+    if (expiryDay(o.expiry) !== day) continue
+    if (!best || byPremiumPerUnit(o, best) < 0) best = o
   }
   return best
 }
 
 /** Premium per unit of underlying as display text, e.g. "0.40". */
-export function premiumPerUnitText(o: Sized, quoteDecimals: number): string {
-  return formatDisplay(perUnit(o), quoteDecimals)
+export function premiumPerUnitText(o: Sized & { totalPremium: bigint }, quoteDecimals: number): string {
+  return perUnitText(o.totalPremium, o, quoteDecimals)
 }

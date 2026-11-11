@@ -247,7 +247,7 @@ describe('SorobanProClient against a fake RPC', () => {
     const c = new SorobanProClient(CONTRACT, { server: f.server, now: () => NOW, balanceOf: async () => 0n })
     c.setWallet(wallet(W, sign))
     const r = await c.deposit(W, 25n * E7)
-    expect(r).toEqual({ ok: true, value: null, note: `Transaction ${'ab'.repeat(32)}` })
+    expect(r).toEqual({ ok: true, value: null, note: `Transaction ${'ab'.repeat(32)}`, hash: 'ab'.repeat(32) })
     expect(sign).toHaveBeenCalledTimes(1)
     expect(f.sent).toHaveLength(1)
     const inv = (TransactionBuilder.fromXDR(f.sent[0], config.networkPassphrase).operations[0] as Any).func.invokeContract

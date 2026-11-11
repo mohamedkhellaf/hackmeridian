@@ -1,4 +1,5 @@
-import type { Ask, CollateralLine, OptionKind, OptionOffer, OptionState, TokenInfo } from './types'
+import type { Bid } from '../requests/types'
+import type { Ask, CollateralLine, Money, OptionKind, OptionOffer, OptionState, TokenInfo } from './types'
 import { requiredCollateral } from './types'
 
 // Pure mapping/conversion helpers between the on-chain ABI (docs/contract-abi.md) and the
@@ -102,18 +103,26 @@ export function optionFromAbi(raw: AbiOptionData, tokens: Map<string, TokenInfo>
   }
 }
 
-// What the writer receives from claim_delivery (ABI section 2): PUT -> underlying qty, CALL -> quote strike.
-export function deliveryAmount(o: Pick<OptionOffer, 'kind' | 'underlying' | 'quote' | 'underlyingQty' | 'totalStrike'>) {
+/**
+ * What the writer receives from claim_delivery (ABI section 2). An exercise never pays the writer directly: the
+ * proceeds wait in the contract until the writer claims them, for BOTH kinds.
+ *   PUT  exercised: the holder delivered the underlying -> the writer claims `underlyingQty` of the underlying.
+ *   CALL exercised: the holder paid the strike          -> the writer claims `totalStrike` of the quote token.
+ */
+export function deliveryAmount(o: Pick<OptionOffer, 'kind' | 'underlying' | 'quote' | 'underlyingQty' | 'totalStrike'>): Money {
   return o.kind === 'put' ? { token: o.underlying, amount: o.underlyingQty } : { token: o.quote, amount: o.totalStrike }
 }
 
-// Per-token split of what the contract must hold, derived from the option list.
-// The four columns sum to the contract's open_collateral(token).
-export function collateralLines(options: OptionOffer[]): CollateralLine[] {
+/**
+ * Per-token split of what the contract must hold, derived from the option list and, when given, the buyer
+ * requests. With the bids included, the five columns sum to the contract's open_collateral(token); without them
+ * the quote token's line is short by the escrowed premiums.
+ */
+export function collateralLines(options: OptionOffer[], bids: Bid[] | null = null): CollateralLine[] {
   const lines = new Map<string, CollateralLine>()
   const line = (token: TokenInfo) => {
     let l = lines.get(token.contractId)
-    if (!l) lines.set(token.contractId, (l = { token, offered: 0n, active: 0n, pendingReclaim: 0n, unclaimed: 0n }))
+    if (!l) lines.set(token.contractId, (l = { token, offered: 0n, active: 0n, pendingReclaim: 0n, unclaimed: 0n, escrowed: 0n }))
     return l
   }
   for (const o of options) {
@@ -128,7 +137,9 @@ export function collateralLines(options: OptionOffer[]): CollateralLine[] {
       line(token).unclaimed += amount
     }
   }
+  // An open request holds its premium until it is filled or cancelled; an expired one until it is pruned or cancelled.
+  for (const b of bids ?? []) if (b.state === 'open' || b.state === 'expired') line(b.quote).escrowed += b.totalPremium
   return [...lines.values()]
 }
 
-export const reservedOf = (l: CollateralLine) => l.offered + l.active + l.pendingReclaim + l.unclaimed
+export const reservedOf = (l: CollateralLine) => l.offered + l.active + l.pendingReclaim + l.unclaimed + l.escrowed

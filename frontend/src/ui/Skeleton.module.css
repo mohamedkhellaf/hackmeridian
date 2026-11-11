@@ -1,0 +1,58 @@
+@layer ui {
+  .bone {
+    display: block;
+    height: var(--s-12);
+    border-radius: var(--r-tag);
+    background: var(--skeleton);
+    animation: skeleton-breathe 1400ms ease-in-out infinite;
+  }
+
+  @keyframes skeleton-breathe {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .block {
+    width: 100%;
+    height: var(--s-72);
+    border-radius: var(--r-card);
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .line {
+    display: flex;
+    align-items: center;
+    height: var(--body-line);
+
+    & .bone {
+      width: 100%;
+    }
+
+    & .bone[data-last] {
+      width: 62%;
+    }
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-24);
+    height: var(--row-h);
+    border-bottom: 1px solid var(--hairline);
+
+    & .bone {
+      width: 38%;
+    }
+
+    & .rowEnd {
+      width: 14%;
+    }
+  }
+}

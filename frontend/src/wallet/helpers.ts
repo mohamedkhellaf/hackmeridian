@@ -1,7 +1,9 @@
-import { describeError } from '../stellar/errors'
+import { describeError } from '../core/stellar/errors'
 
 // Pure helpers for the multi-wallet flow (no kit import, so they are unit-testable in node).
 
+// The key predates the StellSec name. It is kept on purpose: renaming it would silently disconnect every
+// returning user, whose last wallet is restored from it at startup.
 export const WALLET_STORAGE_KEY = 'strata.wallet'
 
 // Wallets we never list: hardware wallets need extra setup. WalletConnect is added by kit.ts only

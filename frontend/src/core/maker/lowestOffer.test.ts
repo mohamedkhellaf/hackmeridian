@@ -36,3 +36,18 @@ describe('premiumPerUnitText', () => {
     expect(premiumPerUnitText({ totalPremium: (18n * U) / 10n, underlyingQty: 5n * U, underlying: FUND }, 7)).toBe('0.36')
   })
 })
+
+describe('lowestOpenInSeries groups by the UTC expiry day', () => {
+  it('matches an offer on the same UTC day and ignores one on the next UTC day', () => {
+    const day = Date.UTC(2026, 10, 13, 8) / 1000
+    const d: NewOffer = { ...draft, expiry: day }
+    const sameDay = offer({ id: 5n, expiry: Date.UTC(2026, 10, 13, 23, 59) / 1000 })
+    const nextDay = offer({ id: 6n, expiry: Date.UTC(2026, 10, 14, 0, 1) / 1000, totalPremium: U })
+    expect(lowestOpenInSeries([sameDay, nextDay], d, USDX)?.id).toBe(5n)
+  })
+  it('compares premiums per unit exactly across different lot sizes', () => {
+    const a = offer({ id: 1n, underlyingQty: 3n * U, totalStrike: 30n * U, totalPremium: U }) // 0.3333... per unit
+    const b = offer({ id: 2n, underlyingQty: 6n * U, totalStrike: 60n * U, totalPremium: 2n * U - 1n }) // a hair cheaper per unit
+    expect(lowestOpenInSeries([a, b], { ...draft, expiry: T }, USDX)?.id).toBe(2n)
+  })
+})

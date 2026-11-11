@@ -1,0 +1,169 @@
+@layer ui {
+  .root {
+    --note-pad: var(--s-20);
+
+    position: relative;
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: var(--s-16) var(--note-pad) var(--note-pad) calc(var(--note-pad) + var(--perf-gutter));
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    color: var(--text);
+
+    /* The perforation: a column of dots where the slip was torn from its stub. */
+    &::before {
+      content: '';
+      position: absolute;
+      inset-block: var(--s-12);
+      inset-inline-start: 0;
+      width: var(--perf-gutter);
+      background-image: radial-gradient(
+        circle at center,
+        var(--rule) 0,
+        var(--rule) var(--perf-dot),
+        transparent calc(var(--perf-dot) + 0.5px)
+      );
+      background-size: var(--perf-gutter) var(--perf-pitch);
+      background-position: center top;
+      background-repeat: repeat-y;
+      pointer-events: none;
+    }
+
+    /* A confirmed trade prints its note: it rises 6 px and settles; the serial line comes in after. */
+    &[data-printing] {
+      animation: note-print var(--dur-print) var(--ease-enter) both;
+
+      & .serial {
+        animation: note-serial var(--dur-print) var(--ease-enter) var(--dur-popover) both;
+      }
+    }
+
+    @media (max-width: 767.98px) {
+      --note-pad: var(--s-16);
+    }
+  }
+
+  @keyframes note-print {
+    from {
+      opacity: 0;
+      transform: translateY(var(--s-6)) scale(1.02);
+    }
+  }
+
+  @keyframes note-serial {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .running {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12);
+    min-height: var(--s-24);
+    padding-bottom: var(--s-8);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .serial {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+    flex-wrap: wrap;
+    padding-block: var(--s-16) var(--s-8);
+  }
+
+  .kind {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  .glyph {
+    align-self: center;
+    color: var(--text);
+  }
+
+  .aside {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .terms {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+    margin-top: var(--s-8);
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--rule);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  /* Blank slip: dashed outline, no fill, one sentence. */
+  .empty {
+    border-style: dashed;
+    border-color: var(--rule);
+    background: transparent;
+
+    & .running {
+      border-bottom-style: dashed;
+    }
+  }
+
+  .emptyBody {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-8);
+    padding-block: var(--s-32) var(--s-20);
+  }
+
+  .emptyTitle {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--display-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  .emptyHint {
+    max-width: 46ch;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .emptyAction {
+    margin-top: var(--s-8);
+  }
+}

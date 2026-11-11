@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { config } from '../config'
+import { config } from '../core/config'
 import {
   describeWalletError,
   isWrongNetwork,
@@ -16,7 +16,7 @@ import type { DialogState, WalletState } from './walletContext'
 type Kit = Awaited<ReturnType<typeof loadKit>>
 
 // Multi-wallet state on top of Stellar Wallets Kit. The kit is loaded lazily; the picker UI is
-// StellSec's own (ConnectWalletDialog), driven by `dialog`.
+// StellSec's own (the shell's connect dialog), driven by `dialog` through useWalletDialog().
 export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
   const [address, setAddress] = useState<string | null>(null)
   const [walletName, setWalletName] = useState<string | null>(null)

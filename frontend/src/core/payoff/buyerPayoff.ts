@@ -1,8 +1,8 @@
 // Adapter between on-chain offers (exact bigint units) and the pure payoff maths in packages/payoff.
 // All numbers here are display-only and hypothetical (no oracle, no market price). No pricing logic lives in the UI:
 // the P&L itself always comes from the package's longCall / longPut.
-import { longCall, longPut, toNumber } from '../../../packages/payoff/src/index.ts'
-import type { OptionLeg } from '../../../packages/payoff/src/index.ts'
+import { longCall, longPut, toNumber } from '../../../../packages/payoff/src/index.ts'
+import type { OptionLeg } from '../../../../packages/payoff/src/index.ts'
 import type { OptionOffer } from '../options/types'
 
 export interface RiskLines {

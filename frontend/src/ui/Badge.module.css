@@ -1,0 +1,24 @@
+@layer ui {
+  .root {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--s-16);
+    height: var(--s-16);
+    padding-inline: var(--s-4);
+    border-radius: var(--r-tag);
+    background: var(--text);
+    color: var(--bg);
+    font-family: var(--font-sans);
+    font-size: var(--badge-size);
+    line-height: 1;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums lining-nums;
+
+    &[data-tone='quiet'] {
+      background: var(--sunken);
+      color: var(--text-2);
+      box-shadow: inset 0 0 0 1px var(--hairline);
+    }
+  }
+}

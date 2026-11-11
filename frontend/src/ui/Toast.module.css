@@ -1,0 +1,134 @@
+@layer ui {
+  .region {
+    position: fixed;
+    z-index: var(--z-toast);
+    inset-inline-end: var(--s-24);
+    bottom: calc(var(--toast-bottom, var(--s-24)) + env(safe-area-inset-bottom, 0px));
+    width: min(var(--toast-w), calc(100vw - var(--s-32)));
+    pointer-events: none;
+
+    &[data-empty] {
+      display: none;
+    }
+
+    @media (max-width: 767.98px) {
+      inset-inline: var(--s-16);
+      width: auto;
+    }
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-12);
+    padding: var(--s-12) var(--s-12) var(--s-12) var(--s-16);
+    border-radius: var(--r-card);
+    background: var(--raised);
+    color: var(--text);
+    box-shadow: var(--shadow-popover);
+    animation: toast-in var(--dur-popover) var(--ease-enter);
+
+    /* A left rule only where it says something: warning and failure. */
+    &[data-tone='warning'] {
+      box-shadow:
+        inset 2px 0 0 var(--warn),
+        var(--shadow-popover);
+    }
+
+    &[data-tone='danger'] {
+      box-shadow:
+        inset 2px 0 0 var(--danger),
+        var(--shadow-popover);
+    }
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      translate: 0 var(--s-8);
+    }
+  }
+
+  .icon {
+    display: inline-flex;
+    flex: none;
+    color: var(--text-2);
+  }
+
+  .toast[data-tone='warning'] .icon {
+    color: var(--warn);
+  }
+
+  .toast[data-tone='danger'] .icon {
+    color: var(--danger);
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .title {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+  }
+
+  .description {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text-2);
+  }
+
+  .action {
+    margin-top: var(--s-4);
+    color: var(--accent);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 550;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    border-radius: var(--r-tag);
+  }
+
+  .close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--s-24);
+    height: var(--s-24);
+    margin: calc(var(--s-2) * -1) 0 0;
+    border-radius: var(--r-control);
+    color: var(--muted);
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--hover);
+        color: var(--text);
+      }
+    }
+
+    @media (pointer: coarse) {
+      width: var(--touch);
+      height: var(--touch);
+      margin: calc(var(--s-12) * -1) calc(var(--s-8) * -1) calc(var(--s-12) * -1) 0;
+    }
+  }
+}

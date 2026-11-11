@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockOptionsClient } from '../options/mockClient'
+import { bareSeed } from '../options/mockSeed'
 import { SorobanOptionsClient } from '../options/sorobanClient'
 import { OPTIONS_ERRORS } from '../stellar/errors'
 import type { AbiBid } from './abi'
@@ -26,7 +27,7 @@ describe('MockOptionsClient bids (v1.5 rules)', () => {
   }
 
   async function setup() {
-    const c = new MockOptionsClient()
+    const c = new MockOptionsClient(bareSeed())
     const fund = (await c.supportedAssets()).underlyings[0]
     const bid = (over: Partial<NewBid> = {}): NewBid => ({
       kind: 'put', underlying: fund, underlyingQty: 5n * UNIT, totalStrike: 50n * UNIT,

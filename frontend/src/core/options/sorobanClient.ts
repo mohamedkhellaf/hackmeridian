@@ -1,9 +1,14 @@
 import { contract, rpc } from '@stellar/stellar-sdk'
+import { parseSacName } from '../assetfacts/assetFacts'
 import { describeError } from '../stellar/errors'
 import { server } from '../stellar/rpc'
-import { baseClientOptions, clientSigning, signAndSend } from '../stellar/signer'
+import { baseClientOptions, checkTransaction, clientSigning, signAndSend } from '../stellar/signer'
 import type { WalletSigner } from '../stellar/signer'
-import { readBalance } from '../stellar/tokens'
+import { readBalance, readBalances } from '../stellar/tokens'
+import type { TokenBalance } from '../stellar/tokens'
+import { nowSec } from '../time'
+import { TxError } from '../tx/errors'
+import type { TxCheck, TxOptions } from '../tx/types'
 import { askFromAbi, askTotalFromAbi, collateralLines, expiryToU64, idToU32, assertI128, kindToAbi, optionFromAbi } from './abi'
 import type { AbiAsk, AbiConfig, AbiOptionData, AbiOptionType } from './abi'
 import type { OptionsClient } from './client'
@@ -130,13 +135,17 @@ function throwSimulationError(tx: contract.AssembledTransaction<unknown>): void 
 
 const PAGE = 50 // contract MAX_PAGE
 
-const nowSec = () => Math.floor(Date.now() / 1000)
+/** The asset registry can grow at runtime (list_asset), but rarely: re-read it at most this often. */
+const ASSETS_TTL_MS = 30_000
 
 export class SorobanOptionsClient implements OptionsClient {
   readonly isMock = false
   private bound: { key: string; p: Promise<Bound> } | null = null
   private tokenCache = new Map<string, Promise<TokenInfo>>()
   private cfg: Promise<AbiConfig> | null = null
+  private assetIds: { at: number; p: Promise<string[]> } | null = null
+  /** Reads in flight, so the queries of one refresh round share one RPC pass instead of repeating it. */
+  private inflight = new Map<string, Promise<unknown>>()
 
   private readonly contractId: string
   private readonly wallet: WalletSigner
@@ -167,8 +176,20 @@ export class SorobanOptionsClient implements OptionsClient {
     try {
       return await fn()
     } catch (e) {
+      if (e instanceof TxError) throw e // already described, and its kind matters to the caller
       throw new Error(describeError(e), { cause: e })
     }
+  }
+
+  /** One call per key at a time: concurrent callers get the same promise. */
+  private share<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const running = this.inflight.get(key) as Promise<T> | undefined
+    if (running) return running
+    const p = fn().finally(() => {
+      if (this.inflight.get(key) === p) this.inflight.delete(key)
+    })
+    this.inflight.set(key, p)
+    return p
   }
 
   private async read<T>(call: (c: Bound) => Tx<T>): Promise<T> {
@@ -178,9 +199,23 @@ export class SorobanOptionsClient implements OptionsClient {
     return tx.result
   }
 
-  private async write<T>(call: (c: Bound) => Tx<T>): Promise<{ hash: string; result: T }> {
-    const c = await this.client()
-    return signAndSend(await call(c))
+  /**
+   * simulate -> sign in the wallet -> send -> wait, reporting each stage. Anything that goes wrong before the
+   * wallet signs (no account, a refused simulation) is a `refused` TxError: nothing was sent.
+   */
+  private async write<T>(call: (c: Bound) => Tx<T>, opts?: TxOptions): Promise<{ hash: string; result: T; ledger: number | null }> {
+    if (!this.wallet.address) throw new TxError('refused', 'Connect a wallet first.')
+    opts?.onStage?.({ stage: 'checking' })
+    let tx: contract.AssembledTransaction<T>
+    try {
+      const c = await this.client()
+      tx = await call(c)
+      throwSimulationError(tx)
+    } catch (e) {
+      if (e instanceof TxError) throw e
+      throw new TxError('refused', describeError(e), { cause: e })
+    }
+    return signAndSend(tx, { onStage: opts?.onStage })
   }
 
   private config(): Promise<AbiConfig> {
@@ -191,14 +226,23 @@ export class SorobanOptionsClient implements OptionsClient {
     return this.cfg
   }
 
-  // SAC symbol()/decimals() are immutable, so cache them per token for the session.
+  // SAC symbol()/decimals()/name() are immutable, so cache them per token for the session. name() is
+  // "CODE:ISSUER" for a classic asset: the issuer tells same-code assets apart and enables trustline checks.
   private tokenInfo(contractId: string): Promise<TokenInfo> {
     let p = this.tokenCache.get(contractId)
     if (!p) {
       p = Promise.all([
         server.queryContract<string>(contractId, 'symbol'),
         server.queryContract<number>(contractId, 'decimals'),
-      ]).then(([code, decimals]) => ({ contractId, code: String(code.result), decimals: Number(decimals.result) }))
+        server.queryContract<string>(contractId, 'name').then(
+          (r) => parseSacName(r.result),
+          () => null, // the issuer is optional: a failed read must not hide the token
+        ),
+      ]).then(([code, decimals, sac]): TokenInfo => {
+        const info: TokenInfo = { contractId, code: String(code.result), decimals: Number(decimals.result) }
+        if (sac?.kind === 'issued') info.issuer = sac.issuer
+        return info
+      })
       const mine = p
       mine.catch(() => {
         if (this.tokenCache.get(contractId) === mine) this.tokenCache.delete(contractId)
@@ -208,9 +252,20 @@ export class SorobanOptionsClient implements OptionsClient {
     return p
   }
 
-  // Underlying token ids. v1.3+: the live registry from list_assets (assets can be listed at runtime, so this is
-  // not cached). v1.2: the constructor-time list from config().
-  private async underlyingIds(): Promise<string[]> {
+  // Underlying token ids. v1.3+: the live registry from list_assets. Assets can be listed at runtime, so the
+  // list is cached for 30 s only (it was re-read four times per refresh round). v1.2: the constructor-time list.
+  private underlyingIds(): Promise<string[]> {
+    const hit = this.assetIds
+    if (hit && Date.now() - hit.at < ASSETS_TTL_MS) return hit.p
+    const p = this.readUnderlyingIds()
+    this.assetIds = { at: Date.now(), p }
+    p.catch(() => {
+      if (this.assetIds?.p === p) this.assetIds = null
+    })
+    return p
+  }
+
+  private async readUnderlyingIds(): Promise<string[]> {
     const c = await this.client()
     if (!has(c, 'asset_count') || !has(c, 'list_assets')) return (await this.config()).underlyings
     const count = await this.read((x) => x.asset_count!())
@@ -259,21 +314,45 @@ export class SorobanOptionsClient implements OptionsClient {
   // All options ever created (positions need non-open ones too). v1.2 get_options pages 50 at a time
   // (MAX_PAGE), so this is ceil(n/50) simulations instead of 1+n.
   listOptions(): Promise<OptionOffer[]> {
+    return this.share('options', () =>
+      this.guard(async () => {
+        const [count, tokens] = await Promise.all([this.read((c) => c.option_count()), this.tokenMap()])
+        const now = nowSec()
+        const raws: AbiOptionData[] = []
+        while (raws.length < count) {
+          const page = await this.read((c) => c.get_options({ from: raws.length, limit: PAGE }))
+          if (page.length === 0) break
+          raws.push(...page)
+        }
+        return raws.map((r) => optionFromAbi(r, tokens, now))
+      }),
+    )
+  }
+
+  // Shares the option and request reads of the same refresh round. A failed bids read only drops the escrow column.
+  openCollateral() {
     return this.guard(async () => {
-      const [count, tokens] = await Promise.all([this.read((c) => c.option_count()), this.tokenMap()])
-      const now = nowSec()
-      const raws: AbiOptionData[] = []
-      while (raws.length < count) {
-        const page = await this.read((c) => c.get_options({ from: raws.length, limit: PAGE }))
-        if (page.length === 0) break
-        raws.push(...page)
-      }
-      return raws.map((r) => optionFromAbi(r, tokens, now))
+      const [options, bids] = await Promise.all([this.listOptions(), this.listBids().catch(() => null)])
+      return collateralLines(options, bids)
     })
   }
 
-  openCollateral() {
-    return this.guard(async () => collateralLines(await this.listOptions()))
+  balances(who: string, tokens?: TokenInfo[]): Promise<TokenBalance[]> {
+    return this.guard(async () => {
+      let list = tokens
+      if (!list) {
+        const assets = await this.supportedAssets()
+        list = [assets.quote, ...assets.underlyings]
+      }
+      return readBalances(list, who)
+    })
+  }
+
+  async checkTx(hash: string, maxTime: number | null): Promise<TxCheck> {
+    const r = await checkTransaction(server, hash, maxTime)
+    if (r.status === 'confirmed') return { status: 'confirmed', ledger: r.ledger }
+    if (r.status === 'failed') return { status: 'failed', message: r.message }
+    return { status: r.status }
   }
 
   collateralHealth(): Promise<CollateralHealth[]> {
@@ -295,45 +374,48 @@ export class SorobanOptionsClient implements OptionsClient {
     return this.guard(() => this.read((c) => c.is_eligible({ token, who })))
   }
 
-  createOffer(offer: NewOffer, writer: string): Promise<TxResult & { id: bigint }> {
+  createOffer(offer: NewOffer, writer: string, opts?: TxOptions): Promise<TxResult & { id: bigint }> {
     return this.guard(async () => {
-      const { hash, result } = await this.write((c) =>
-        c.create_offer({
-          writer,
-          underlying: offer.underlying.contractId,
-          option_type: kindToAbi(offer.kind),
-          qty: assertI128(offer.underlyingQty),
-          strike_total: assertI128(offer.totalStrike),
-          premium_total: assertI128(offer.totalPremium),
-          expiry: expiryToU64(offer.expiry),
-        }),
+      const { hash, ledger, result } = await this.write(
+        (c) =>
+          c.create_offer({
+            writer,
+            underlying: offer.underlying.contractId,
+            option_type: kindToAbi(offer.kind),
+            qty: assertI128(offer.underlyingQty),
+            strike_total: assertI128(offer.totalStrike),
+            premium_total: assertI128(offer.totalPremium),
+            expiry: expiryToU64(offer.expiry),
+          }),
+        opts,
       )
-      return { hash, id: BigInt(unwrap(result)) }
+      return { hash, ledger, id: BigInt(unwrap(result)) }
     })
   }
 
-  private simple(call: (c: Bound, id: number) => Tx<MaybeResult<null>>, id: bigint): Promise<TxResult> {
+  private simple(call: (c: Bound, id: number) => Tx<MaybeResult<null>>, id: bigint, opts?: TxOptions): Promise<TxResult> {
     return this.guard(async () => {
-      const { hash, result } = await this.write((c) => call(c, idToU32(id)))
+      const { hash, ledger, result } = await this.write((c) => call(c, idToU32(id)), opts)
       unwrap(result)
-      return { hash }
+      return { hash, ledger }
     })
   }
 
-  buy(id: bigint, buyer: string) {
-    return this.simple((c, n) => c.buy({ buyer, id: n }), id)
+  buy(id: bigint, buyer: string, opts?: TxOptions) {
+    return this.simple((c, n) => c.buy({ buyer, id: n }), id, opts)
   }
-  exercise(id: bigint, holder: string) {
-    return this.simple((c, n) => c.exercise({ holder, id: n }), id)
+  exercise(id: bigint, holder: string, opts?: TxOptions) {
+    return this.simple((c, n) => c.exercise({ holder, id: n }), id, opts)
   }
-  reclaim(id: bigint, writer: string) {
-    return this.simple((c, n) => c.reclaim({ writer, id: n }), id)
+  reclaim(id: bigint, writer: string, opts?: TxOptions) {
+    return this.simple((c, n) => c.reclaim({ writer, id: n }), id, opts)
   }
-  cancelOffer(id: bigint, writer: string) {
-    return this.simple((c, n) => c.cancel_offer({ writer, id: n }), id)
+  cancelOffer(id: bigint, writer: string, opts?: TxOptions) {
+    return this.simple((c, n) => c.cancel_offer({ writer, id: n }), id, opts)
   }
-  claimDelivery(id: bigint, writer: string) {
-    return this.simple((c, n) => c.claim_delivery({ writer, id: n }), id)
+  // Both kinds: a put writer claims the delivered underlying, a call writer the strike paid in the quote token.
+  claimDelivery(id: bigint, writer: string, opts?: TxOptions) {
+    return this.simple((c, n) => c.claim_delivery({ writer, id: n }), id, opts)
   }
 
   // v1.4 resale. Feature-detected: on an older contract listAsks is null and the UI hides resale.
@@ -359,20 +441,24 @@ export class SorobanOptionsClient implements OptionsClient {
     })
   }
   // The SDK only binds functions in the deployed spec; a pre-v1.4 contract has no resale functions.
-  private resaleWrite(call: (c: Bound, id: number) => Tx<MaybeResult<null>>, id: bigint): Promise<TxResult> {
-    return this.simple((c, n) => {
-      if (!has(c, 'list_for_sale')) throw new Error('This contract version has no resale (needs v1.4).')
-      return call(c, n)
-    }, id)
+  private resaleWrite(call: (c: Bound, id: number) => Tx<MaybeResult<null>>, id: bigint, opts?: TxOptions): Promise<TxResult> {
+    return this.simple(
+      (c, n) => {
+        if (!has(c, 'list_for_sale')) throw new Error('This contract version has no resale (needs v1.4).')
+        return call(c, n)
+      },
+      id,
+      opts,
+    )
   }
-  listForSale(id: bigint, holder: string, askTotal: bigint) {
-    return this.resaleWrite((c, n) => c.list_for_sale!({ holder, id: n, ask_total: assertI128(askTotal) }), id)
+  listForSale(id: bigint, holder: string, askTotal: bigint, opts?: TxOptions) {
+    return this.resaleWrite((c, n) => c.list_for_sale!({ holder, id: n, ask_total: assertI128(askTotal) }), id, opts)
   }
-  cancelSale(id: bigint, holder: string) {
-    return this.resaleWrite((c, n) => c.cancel_sale!({ holder, id: n }), id)
+  cancelSale(id: bigint, holder: string, opts?: TxOptions) {
+    return this.resaleWrite((c, n) => c.cancel_sale!({ holder, id: n }), id, opts)
   }
-  buyResale(id: bigint, buyer: string, maxTotal: bigint) {
-    return this.resaleWrite((c, n) => c.buy_resale!({ buyer, id: n, max_total: assertI128(maxTotal) }), id)
+  buyResale(id: bigint, buyer: string, maxTotal: bigint, opts?: TxOptions) {
+    return this.resaleWrite((c, n) => c.buy_resale!({ buyer, id: n, max_total: assertI128(maxTotal) }), id, opts)
   }
 
   // v1.2 capabilities, client only (no UI yet). transfer moves no tokens: payment is settled off-chain.
@@ -418,19 +504,21 @@ export class SorobanOptionsClient implements OptionsClient {
   }
   // v1.5 buyer requests (bids). Feature-detected on `bid_count`: null on an older contract, and the UI hides requests.
   listBids(): Promise<Bid[] | null> {
-    return this.guard(async () => {
-      const c = await this.client()
-      if (!has(c, 'bid_count')) return null
-      const [count, tokens] = await Promise.all([this.read((x) => x.bid_count!()), this.tokenMap()])
-      const now = nowSec()
-      const raws: AbiBid[] = []
-      // get_bids returns at most min(limit, 50) bids from `from`; step by the page size until bid_count.
-      for (let from = 0; from < count; from += PAGE) {
-        const page = await this.read((x) => x.get_bids!({ from, limit: PAGE }))
-        raws.push(...page)
-      }
-      return raws.map((r) => bidFromAbi(r, tokens, now))
-    })
+    return this.share('bids', () =>
+      this.guard(async () => {
+        const c = await this.client()
+        if (!has(c, 'bid_count')) return null
+        const [count, tokens] = await Promise.all([this.read((x) => x.bid_count!()), this.tokenMap()])
+        const now = nowSec()
+        const raws: AbiBid[] = []
+        // get_bids returns at most min(limit, 50) bids from `from`; step by the page size until bid_count.
+        for (let from = 0; from < count; from += PAGE) {
+          const page = await this.read((x) => x.get_bids!({ from, limit: PAGE }))
+          raws.push(...page)
+        }
+        return raws.map((r) => bidFromAbi(r, tokens, now))
+      }),
+    )
   }
   private async bidClient(): Promise<Bound> {
     const c = await this.client()
@@ -451,38 +539,40 @@ export class SorobanOptionsClient implements OptionsClient {
       return this.read((x) => x.buyer_open_count!({ buyer }))
     })
   }
-  createBid(bid: NewBid, buyer: string): Promise<TxResult & { id: bigint }> {
+  createBid(bid: NewBid, buyer: string, opts?: TxOptions): Promise<TxResult & { id: bigint }> {
     return this.guard(async () => {
       await this.bidClient()
       const cfg = await this.config()
-      const { hash, result } = await this.write((c) =>
-        c.create_bid!({
-          buyer,
-          kind: kindToAbi(bid.kind),
-          underlying: bid.underlying.contractId,
-          quote: cfg.quote,
-          qty: assertI128(bid.underlyingQty),
-          strike_total: assertI128(bid.totalStrike),
-          premium_total: assertI128(bid.totalPremium),
-          expiry: expiryToU64(bid.expiry),
-        }),
+      const { hash, ledger, result } = await this.write(
+        (c) =>
+          c.create_bid!({
+            buyer,
+            kind: kindToAbi(bid.kind),
+            underlying: bid.underlying.contractId,
+            quote: cfg.quote,
+            qty: assertI128(bid.underlyingQty),
+            strike_total: assertI128(bid.totalStrike),
+            premium_total: assertI128(bid.totalPremium),
+            expiry: expiryToU64(bid.expiry),
+          }),
+        opts,
       )
-      return { hash, id: BigInt(unwrap(result)) }
+      return { hash, ledger, id: BigInt(unwrap(result)) }
     })
   }
-  cancelBid(id: bigint, buyer: string): Promise<TxResult> {
+  cancelBid(id: bigint, buyer: string, opts?: TxOptions): Promise<TxResult> {
     return this.guard(async () => {
       await this.bidClient()
-      const { hash, result } = await this.write((c) => c.cancel_bid!({ buyer, id: idToU32(id) }))
+      const { hash, ledger, result } = await this.write((c) => c.cancel_bid!({ buyer, id: idToU32(id) }), opts)
       unwrap(result)
-      return { hash }
+      return { hash, ledger }
     })
   }
-  fillBid(id: bigint, writer: string): Promise<TxResult & { optionId: bigint }> {
+  fillBid(id: bigint, writer: string, opts?: TxOptions): Promise<TxResult & { optionId: bigint }> {
     return this.guard(async () => {
       await this.bidClient()
-      const { hash, result } = await this.write((c) => c.fill_bid!({ writer, id: idToU32(id) }))
-      return { hash, optionId: BigInt(unwrap(result)) }
+      const { hash, ledger, result } = await this.write((c) => c.fill_bid!({ writer, id: idToU32(id) }), opts)
+      return { hash, ledger, optionId: BigInt(unwrap(result)) }
     })
   }
   // Client only (no UI yet): anyone may prune expired Open requests, which refunds the escrowed premium.

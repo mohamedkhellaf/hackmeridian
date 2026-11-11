@@ -17,5 +17,5 @@ export function setMarginAck(): void {
   }
 }
 
-/** Where Continue lands: the margin section's Trade screen. */
-export const MARGIN_TRADE_HREF = '#/pro/trade'
+/** Where Continue lands: the Margin section's Trade screen. */
+export const MARGIN_TRADE_HREF = '/margin/trade'

@@ -1,0 +1,30 @@
+@layer ui {
+  .group {
+    padding-inline-end: var(--s-4);
+    gap: var(--s-2);
+  }
+
+  .action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--s-24);
+    height: var(--s-24);
+    border-radius: var(--r-tag);
+    color: var(--muted);
+
+    @media (hover: hover) {
+      &:hover {
+        color: var(--text);
+        background: var(--hover);
+      }
+    }
+  }
+
+  /* The popup matches the input's width. */
+  .popup {
+    width: var(--anchor-width);
+    max-width: none;
+  }
+}

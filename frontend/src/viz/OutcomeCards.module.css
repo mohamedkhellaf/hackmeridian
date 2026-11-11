@@ -1,0 +1,198 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .wrap {
+    container-type: inline-size;
+    min-width: 0;
+    font-family: var(--font-sans);
+    color: var(--text);
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+
+  .card {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+    margin: 0;
+    padding: var(--s-12) 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  /* The scenario under the price handle: an ink rule over the card, not a colour. */
+  .card[data-current='true']::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -1px;
+    height: 2px;
+    background: var(--text);
+  }
+
+  .label,
+  .select {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .select {
+    cursor: pointer;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  /* The whole card is the target; the ring is drawn around the card. */
+  .select::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .card:has(.select:focus-visible) {
+    box-shadow: var(--focus-ring);
+    border-radius: var(--r-tag);
+  }
+
+  .card[data-selectable='true']:hover {
+    background: var(--sunken);
+  }
+
+  .figure {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  .unit {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    font-weight: var(--ui-weight);
+    color: var(--text-2);
+  }
+
+  .delta {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text-2);
+  }
+
+  .delta[data-direction='gain'] {
+    color: var(--gain);
+  }
+
+  .delta[data-direction='loss'] {
+    color: var(--loss);
+  }
+
+  .delta svg {
+    flex: none;
+    align-self: center;
+    width: 0.5em;
+    height: 0.5em;
+    fill: currentColor;
+  }
+
+  .sentence {
+    margin: var(--s-2) 0 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .bar {
+    margin-top: auto;
+    padding-top: var(--s-8);
+  }
+
+  .key {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-6);
+    margin: var(--s-8) 0 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .keyBar {
+    display: inline-block;
+    width: var(--s-16);
+    height: var(--s-6);
+    background: var(--text);
+  }
+
+  .keyTick {
+    display: inline-block;
+    width: 2px;
+    height: var(--s-12);
+    margin-left: var(--s-12);
+    background: var(--text);
+  }
+
+  @container (min-width: 30rem) {
+    .cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .cards[data-count='2'] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cards[data-count='1'] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .card {
+      padding: var(--s-12) var(--s-16);
+      border-bottom: 0;
+    }
+
+    .card + .card {
+      border-left: 1px solid var(--hairline);
+    }
+
+    .card:first-child {
+      padding-left: 0;
+    }
+
+    .card:last-child {
+      padding-right: 0;
+    }
+  }
+}

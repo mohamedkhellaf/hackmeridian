@@ -1,0 +1,35 @@
+@layer ui {
+  .mark {
+    display: inline-block;
+    flex: none;
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  .accent {
+    fill: var(--accent);
+  }
+
+  .wordmark {
+    font-family: var(--font-serif);
+    font-weight: 620;
+    letter-spacing: -0.012em;
+    line-height: 1;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  /* The wordmark's cap height sits level with the mark. Its size follows the lockup's font size. */
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42em;
+    color: var(--text);
+    text-decoration: none;
+
+    & .wordmark {
+      font-size: 1.02em;
+      translate: 0 -0.02em;
+    }
+  }
+}

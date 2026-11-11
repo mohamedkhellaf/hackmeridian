@@ -1,5 +1,6 @@
 import type { Ask, OptionKind, OptionOffer, TokenInfo } from '../options/types'
 import type { Bid } from '../requests/types'
+import { byPremiumPerUnit } from '../units'
 
 // Two-sided book of one series. Bids are funded buyer requests; offers are funded maker offers and holders' resale
 // asks. Every price here is a limit price a user set: nothing is a market quote. Ordering is exact (bigint).
@@ -22,13 +23,6 @@ export interface BookRow {
   offer?: OptionOffer
   ask?: Ask
   bid?: Bid
-}
-
-/** Premium per unit, compared exactly by cross-multiplying. */
-export function byPremiumPerUnit(a: BookRow, b: BookRow): number {
-  const l = a.totalPremium * b.underlyingQty
-  const r = b.totalPremium * a.underlyingQty
-  return l < r ? -1 : l > r ? 1 : 0
 }
 
 const tie = (a: BookRow, b: BookRow) => a.expiry - b.expiry || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)

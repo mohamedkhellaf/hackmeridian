@@ -1,0 +1,141 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .gallery {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-56);
+    min-width: 0;
+    font-family: var(--font-sans);
+    color: var(--text);
+  }
+
+  .group {
+    min-width: 0;
+  }
+
+  .groupTitle {
+    margin: 0;
+    padding-bottom: var(--s-8);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+    color: var(--text);
+  }
+
+  .lede {
+    max-width: 44rem;
+    margin: var(--s-8) 0 var(--s-20);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+    align-items: start;
+    gap: var(--s-24);
+  }
+
+  .specimen {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+    padding: var(--s-20);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--surface);
+  }
+
+  @media (min-width: 60rem) {
+    .specimen[data-wide='true'] {
+      grid-column: span 2;
+    }
+  }
+
+  .specimenHead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .specimenTitle {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+
+  .note {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .sparkRow {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: var(--s-8) var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .table th,
+  .table td {
+    padding: var(--s-6) var(--s-8) var(--s-6) 0;
+    border-bottom: 1px solid var(--hairline);
+    font-weight: var(--body-weight);
+    text-align: left;
+  }
+
+  .table thead th {
+    border-bottom-color: var(--rule);
+    font-size: var(--label-size);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .table tbody th {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    white-space: nowrap;
+  }
+}

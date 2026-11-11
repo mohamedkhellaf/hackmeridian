@@ -76,11 +76,18 @@ export function describeError(e: unknown): string {
     return 'Your wallet is on the wrong network. Switch your wallet to Testnet.'
   if (/account not found|tx_no_source_account|txnosourceaccount/.test(lower))
     return 'Account not funded on Testnet. Fund it with friendbot first.'
-  if (/tx_insufficient_balance/.test(lower)) return 'Not enough XLM to pay fees and reserves.'
-  if (/tx_insufficient_fee|insufficient_fee/.test(lower))
-    return 'Fee too low for current network load. Retry the transaction.'
-  if (/tx_too_late|txtoolate|expired|timeout|timed out|still pending/.test(lower))
-    return 'The transaction expired or timed out. Please try again.'
+  if (/tx_insufficient_balance|txinsufficientbalance/.test(lower)) return 'Not enough XLM to pay fees and reserves.'
+  if (/tx_insufficient_fee|insufficient_fee|txinsufficientfee/.test(lower))
+    return 'Fee too low for current network load. Nothing was charged; send it again.'
+  if (/tx_bad_seq|txbadseq/.test(lower))
+    return 'Another transaction from this account went first, so this one was not accepted. Nothing was charged; sign it again.'
+  // Rejected for its time bound before any ledger: nothing was sent on, so signing again is harmless.
+  if (/tx_too_late|txtoolate|tx_too_early|txtooearly/.test(lower))
+    return 'The time limit of this transaction passed before the network accepted it. Nothing was charged; sign it again.'
+  // A timeout says nothing about the outcome: the transaction may still be included. Never suggest sending again here.
+  if (/timeout|timed out|still pending|not confirmed yet/.test(lower))
+    return 'Not confirmed yet. The transaction may still be included; check again before sending another.'
+  if (/expired/.test(lower)) return 'The transaction expired without being included. Nothing was charged.'
 
   return raw.length > 200 ? raw.slice(0, 200) + '…' : raw || 'Unknown error.'
 }

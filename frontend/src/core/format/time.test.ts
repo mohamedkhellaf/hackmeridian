@@ -1,0 +1,148 @@
+import { describe, expect, it } from 'vitest'
+import {
+  deadlineUrgency,
+  formatCountdown,
+  formatLocal,
+  formatUtc,
+  formatUtcDate,
+  formatUtcDay,
+  formatUtcTime,
+  isoUtc,
+  secondsUntil,
+} from './index'
+
+const FRI_13_NOV_0800 = Date.UTC(2026, 10, 13, 8, 0, 0) / 1000
+const MIN = 60
+const HOUR = 3_600
+const DAY = 86_400
+
+describe('UTC forms', () => {
+  it('gives the canonical deadline form', () => {
+    expect(formatUtc(FRI_13_NOV_0800)).toBe('13 Nov 2026, 08:00 UTC')
+    expect(formatUtc(Date.UTC(2027, 0, 1, 0, 5) / 1000)).toBe('1 Jan 2027, 00:05 UTC')
+    expect(formatUtc(Date.UTC(2026, 8, 30, 23, 59, 59) / 1000)).toBe('30 Sep 2026, 23:59 UTC')
+    expect(formatUtc(0)).toBe('1 Jan 1970, 00:00 UTC')
+  })
+
+  it('gives the date, day and time parts', () => {
+    expect(formatUtcDate(FRI_13_NOV_0800)).toBe('13 Nov 2026')
+    expect(formatUtcDay(FRI_13_NOV_0800)).toBe('13 Nov')
+    expect(formatUtcTime(FRI_13_NOV_0800)).toBe('08:00 UTC')
+    expect(isoUtc(FRI_13_NOV_0800)).toBe('2026-11-13T08:00:00Z')
+  })
+
+  it('does not depend on the zone the process runs in', () => {
+    const before = process.env.TZ
+    try {
+      for (const tz of ['Pacific/Kiritimati', 'America/Los_Angeles', 'UTC']) {
+        process.env.TZ = tz
+        expect(formatUtc(FRI_13_NOV_0800)).toBe('13 Nov 2026, 08:00 UTC')
+        expect(formatUtcDay(Date.UTC(2026, 10, 13, 0, 0) / 1000)).toBe('13 Nov')
+      }
+    } finally {
+      if (before === undefined) delete process.env.TZ
+      else process.env.TZ = before
+    }
+  })
+
+  it('shows a dash for something that is not an instant', () => {
+    expect(formatUtc(NaN)).toBe('–')
+    expect(formatUtcDate(Infinity)).toBe('–')
+    expect(formatUtcDay(1e20)).toBe('–')
+    expect(formatUtcTime(NaN)).toBe('–')
+    expect(isoUtc(NaN)).toBe('')
+  })
+})
+
+describe('formatLocal', () => {
+  it('uses the same shape with the zone name', () => {
+    expect(formatLocal(FRI_13_NOV_0800, 'UTC')).toBe('13 Nov 2026, 08:00 UTC')
+    expect(formatLocal(FRI_13_NOV_0800, 'Europe/Lisbon')).toMatch(/^13 Nov 2026, 08:00 \S+$/)
+    expect(formatLocal(FRI_13_NOV_0800, 'Europe/Paris')).toMatch(/^13 Nov 2026, 09:00 \S+$/)
+    expect(formatLocal(FRI_13_NOV_0800, 'America/New_York')).toMatch(/^13 Nov 2026, 03:00 \S+$/)
+  })
+
+  it('moves the calendar day when the zone does', () => {
+    expect(formatLocal(FRI_13_NOV_0800, 'Pacific/Auckland')).toMatch(/^13 Nov 2026, 21:00 \S+$/)
+    expect(formatLocal(Date.UTC(2026, 10, 13, 20, 0) / 1000, 'Asia/Tokyo')).toMatch(/^14 Nov 2026, 05:00 \S+$/)
+    expect(formatLocal(Date.UTC(2026, 8, 1, 2, 0) / 1000, 'America/New_York')).toMatch(/^31 Aug 2026, 22:00 \S+$/)
+  })
+
+  it('writes September as Sep and midnight as 00', () => {
+    expect(formatLocal(Date.UTC(2026, 8, 10, 0, 0) / 1000, 'UTC')).toBe('10 Sep 2026, 00:00 UTC')
+  })
+
+  it('falls back to the canonical UTC form on an unknown zone, and a dash on a bad instant', () => {
+    expect(formatLocal(FRI_13_NOV_0800, 'Not/AZone')).toBe('13 Nov 2026, 08:00 UTC')
+    expect(formatLocal(NaN, 'UTC')).toBe('–')
+  })
+
+  it('works without a zone argument', () => {
+    expect(formatLocal(FRI_13_NOV_0800)).toMatch(/^1[34] Nov 2026, \d{2}:\d{2}( \S+)?$/)
+  })
+})
+
+describe('formatCountdown', () => {
+  it('matches the forms of the brief', () => {
+    expect(formatCountdown(2 * DAY + 4 * HOUR)).toBe('2 d 4 h')
+    expect(formatCountdown(3 * HOUR + 12 * MIN)).toBe('3 h 12 min')
+    expect(formatCountdown(8 * MIN)).toBe('8 min')
+  })
+
+  it('floors every unit', () => {
+    expect(formatCountdown(2 * DAY + 4 * HOUR + 59 * MIN + 59)).toBe('2 d 4 h')
+    expect(formatCountdown(3 * HOUR + 12 * MIN + 59)).toBe('3 h 12 min')
+    expect(formatCountdown(8 * MIN + 59)).toBe('8 min')
+    expect(formatCountdown(DAY - 1)).toBe('23 h 59 min')
+    expect(formatCountdown(HOUR - 1)).toBe('59 min')
+  })
+
+  it('drops a zero second unit, and hours from ten days up', () => {
+    expect(formatCountdown(2 * DAY)).toBe('2 d')
+    expect(formatCountdown(2 * DAY + 30 * MIN)).toBe('2 d')
+    expect(formatCountdown(3 * HOUR)).toBe('3 h')
+    expect(formatCountdown(9 * DAY + 23 * HOUR)).toBe('9 d 23 h')
+    expect(formatCountdown(10 * DAY + 5 * HOUR)).toBe('10 d')
+    expect(formatCountdown(45 * DAY + 7 * HOUR)).toBe('45 d')
+  })
+
+  it('never shows zero minutes while time is left', () => {
+    expect(formatCountdown(59)).toBe('<1 min')
+    expect(formatCountdown(1)).toBe('<1 min')
+    expect(formatCountdown(0.4)).toBe('<1 min')
+    expect(formatCountdown(60)).toBe('1 min')
+  })
+
+  it('says expired at zero and below', () => {
+    expect(formatCountdown(0)).toBe('expired')
+    expect(formatCountdown(-5)).toBe('expired')
+    expect(formatCountdown(NaN)).toBe('expired')
+  })
+})
+
+describe('deadlineUrgency', () => {
+  it('bands the time left with inclusive thresholds', () => {
+    expect(deadlineUrgency(48 * HOUR + 1)).toBe('far')
+    expect(deadlineUrgency(30 * DAY)).toBe('far')
+    expect(deadlineUrgency(48 * HOUR)).toBe('within48h')
+    expect(deadlineUrgency(2 * HOUR + 1)).toBe('within48h')
+    expect(deadlineUrgency(2 * HOUR)).toBe('within2h')
+    expect(deadlineUrgency(15 * MIN + 1)).toBe('within2h')
+    expect(deadlineUrgency(15 * MIN)).toBe('within15min')
+    expect(deadlineUrgency(1)).toBe('within15min')
+  })
+
+  it('is past at zero, below zero and for a bad value', () => {
+    expect(deadlineUrgency(0)).toBe('past')
+    expect(deadlineUrgency(-1)).toBe('past')
+    expect(deadlineUrgency(NaN)).toBe('past')
+  })
+})
+
+describe('secondsUntil', () => {
+  it('is signed and whole', () => {
+    expect(secondsUntil(FRI_13_NOV_0800, FRI_13_NOV_0800 - 90)).toBe(90)
+    expect(secondsUntil(FRI_13_NOV_0800, FRI_13_NOV_0800 + 90)).toBe(-90)
+    expect(secondsUntil(FRI_13_NOV_0800, FRI_13_NOV_0800 - 90.6)).toBe(90)
+  })
+})

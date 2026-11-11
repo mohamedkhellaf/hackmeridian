@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockOptionsClient } from '../options/mockClient'
-import type { Notice } from '../ui'
+import { bareSeed } from '../options/mockSeed'
 import { runTx } from './runTx'
+import type { Notice } from './types'
 
 const UNIT = 10_000_000n
 
@@ -33,8 +34,10 @@ class FlakyAfterResale extends MockOptionsClient {
 
 describe('runTx', () => {
   it('keeps a confirmed buy_resale ok when the post-tx refresh rejects, and reports the refresh failure', async () => {
-    const c = new FlakyAfterResale()
-    const [o] = await settle(c.listOptions())
+    const c = new FlakyAfterResale(bareSeed())
+    const fund = (await c.supportedAssets()).underlyings[0]
+    const expiry = Math.floor(Date.now() / 1000) + 3600
+    const o = await settle(c.createOffer({ kind: 'put', underlying: fund, underlyingQty: 2n * UNIT, totalStrike: 20n * UNIT, totalPremium: UNIT, expiry }, 'GWRITER'))
     await settle(c.buy(o.id, 'GHOLDER'))
     await settle(c.listForSale(o.id, 'GHOLDER', 2n * UNIT))
 

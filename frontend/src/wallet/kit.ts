@@ -1,5 +1,5 @@
 import type { ModuleInterface } from '@jsr/creit-tech__stellar-wallets-kit/types'
-import { config } from '../config'
+import { config } from '../core/config'
 
 // Lazy loader for Stellar Wallets Kit v2 (JSR: @creit-tech/stellar-wallets-kit, installed from the
 // JSR npm mirror as @jsr/creit-tech__stellar-wallets-kit). Imported dynamically so the e2e mock path

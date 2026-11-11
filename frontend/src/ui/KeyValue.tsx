@@ -1,0 +1,47 @@
+import type { ReactNode } from 'react'
+import { cx } from './internal/cx'
+import { Marker } from './Marker'
+import styles from './KeyValue.module.css'
+
+export interface KeyValueProps {
+  children: ReactNode
+  /** `ruled` draws a hairline between rows (term sheets, review summaries). `plain` has none (compact facts). */
+  variant?: 'ruled' | 'plain'
+  /** Values in the serif (terms, impact summaries) or in the UI face (dense facts, ids). */
+  figures?: 'serif' | 'sans'
+  /** `stacked` puts the value under its label, for narrow columns. */
+  layout?: 'row' | 'stacked'
+  className?: string
+}
+
+/** A definition list: `dl > div > dt + dd`. The structure is a contract; tests and styles rely on it. */
+export function KeyValue({ children, variant = 'ruled', figures = 'serif', layout = 'row', className }: KeyValueProps) {
+  return (
+    <dl className={cx(styles.root, className)} data-variant={variant} data-figures={figures} data-layout={layout}>
+      {children}
+    </dl>
+  )
+}
+
+export interface KeyValueItemProps {
+  label: ReactNode
+  /** The value. */
+  children: ReactNode
+  /** The user's own term: the value goes under the highlighter. */
+  marked?: boolean
+  /** A caption under the value: a required disclosure next to its figure, or the local time under a deadline. */
+  hint?: ReactNode
+  className?: string
+}
+
+export function KeyValueItem({ label, children, marked = false, hint, className }: KeyValueItemProps) {
+  return (
+    <div className={cx(styles.item, className)}>
+      <dt className={styles.label}>{label}</dt>
+      <dd className={styles.value}>
+        <span className={styles.figure}>{marked ? <Marker>{children}</Marker> : children}</span>
+        {hint ? <span className={styles.hint}>{hint}</span> : null}
+      </dd>
+    </div>
+  )
+}

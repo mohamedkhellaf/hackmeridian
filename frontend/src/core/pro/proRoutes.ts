@@ -1,16 +1,22 @@
+// The five Margin screens and their paths. The section is mounted under /margin only when PRO_ENABLED.
+
 export type ProRoute = 'margin' | 'trade' | 'positions' | 'liquidations' | 'vault'
 
-export const PRO_NAV: { route: ProRoute; label: string }[] = [
-  { route: 'margin', label: 'Margin' },
-  { route: 'trade', label: 'Trade' },
-  { route: 'positions', label: 'Positions' },
-  { route: 'liquidations', label: 'Liquidations' },
-  { route: 'vault', label: 'Vault' },
+export const PRO_NAV: { route: ProRoute; label: string; path: string }[] = [
+  { route: 'margin', label: 'Account', path: '/margin' },
+  { route: 'trade', label: 'Trade', path: '/margin/trade' },
+  { route: 'positions', label: 'Positions', path: '/margin/positions' },
+  { route: 'liquidations', label: 'Liquidations', path: '/margin/liquidations' },
+  { route: 'vault', label: 'Vault', path: '/margin/vault' },
 ]
 
-export const proHref = (r: ProRoute) => `#/pro/${r}`
+/** Path of a Margin screen: `/margin`, `/margin/trade`... */
+export const proHref = (r: ProRoute): string => (r === 'margin' ? '/margin' : `/margin/${r}`)
 
-/** `#/pro/trade` -> trade. `#/pro` and unknown sub-routes fall back to margin. */
+/**
+ * Screen named by an old hash link. `#/pro/trade` -> trade; `#/pro` and unknown sub-routes fall back to the
+ * account screen. Used by the redirect of old `#/pro/*` links: `proHref(parseProRoute(location.hash))`.
+ */
 export function parseProRoute(hash: string): ProRoute {
   const parts = hash.replace(/^#\/?/, '').split(/[/?]/)
   const sub = parts[0] === 'pro' ? parts[1] : undefined

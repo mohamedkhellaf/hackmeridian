@@ -1,17 +1,15 @@
-import { formatAmount, formatDisplay } from '../options/format'
+import { formatAmount } from '../options/format'
 import { requiredCollateral } from '../options/types'
-import type { TokenInfo } from '../options/types'
+import { perUnit as perUnitUnits } from '../units'
 import type { Bid, BidState } from './types'
 
 // Pure helpers for the Requests UI (contract v1.5 bids). Display only: settlement uses exact units.
-
-export const amt = (units: bigint, t: Pick<TokenInfo, 'decimals' | 'code'>) => `${formatDisplay(units, t.decimals)} ${t.code}`
+// `amt(units, token)` lives in core/units.
 
 /** A quote-token total per one unit of underlying, 2 decimals, truncated. */
 export function perUnit(total: bigint, b: Pick<Bid, 'underlyingQty' | 'underlying' | 'quote'>): string {
-  if (b.underlyingQty === 0n) return '–'
-  const scaled = (total * 10n ** BigInt(b.underlying.decimals)) / b.underlyingQty
-  return formatAmount(scaled, b.quote.decimals, 2, Math.min(2, b.quote.decimals))
+  const scaled = perUnitUnits(total, b)
+  return scaled === null ? '–' : formatAmount(scaled, b.quote.decimals, 2, Math.min(2, b.quote.decimals))
 }
 
 /** What a maker locks to fill: PUT -> total strike in the quote token; CALL -> the underlying quantity. */

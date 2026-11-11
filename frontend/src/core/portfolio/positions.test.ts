@@ -1,18 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import type { OptionOffer, TokenInfo } from '../options/types'
 import {
+  ACTION_LABEL,
   actionKindOf,
   actionLabel,
+  actionsWaiting,
+  claimAmount,
   computeKpis,
   counterpartyLine,
   countdown,
   filterPositions,
   money,
+  portfolioSummary,
   premiumOf,
   roleOf,
   statusOf,
+  todoItems,
   waitingActions,
 } from './positions'
+import type { RowAction } from './positions'
 
 const U = 10_000_000n
 const USDX: TokenInfo = { contractId: 'Q', code: 'USDx', decimals: 7 }
@@ -139,5 +145,131 @@ describe('filterPositions / waitingActions', () => {
   it('lists exercise, claim and reclaim but not cancel', () => {
     expect(waitingActions(rows, ME, 0)).toEqual(['exercise your put on 5.00 FUND', 'claim 5.00 FUND from an exercised put'])
     expect(waitingActions([opt({ state: 'expired' })], ME, 0)).toEqual(['reclaim 50.00 USDx from an expired offer'])
+  })
+})
+
+describe('claim delivery applies to puts and calls alike', () => {
+  const exercisedPut = opt({ id: 10n, kind: 'put', state: 'exercised', holder: OTHER })
+  const exercisedCall = opt({ id: 11n, kind: 'call', state: 'exercised', holder: OTHER })
+
+  it('both writers have a claim action', () => {
+    expect(actionKindOf(exercisedPut, 'writer')).toBe('claim')
+    expect(actionKindOf(exercisedCall, 'writer')).toBe('claim')
+    expect(statusOf(exercisedCall, 'writer').label).toBe('Awaiting your claim')
+    expect(ACTION_LABEL.claim).toBe('Claim delivery')
+  })
+
+  it('a put writer claims the delivered underlying, a call writer the strike paid', () => {
+    expect(claimAmount(exercisedPut)).toEqual({ token: FUND, amount: 5n * U })
+    expect(claimAmount(exercisedCall)).toEqual({ token: USDX, amount: 50n * U })
+    expect(actionLabel(exercisedPut, 'claim')).toBe('Claim 5.00 FUND')
+    expect(actionLabel(exercisedCall, 'claim')).toBe('Claim 50.00 USDx')
+  })
+
+  it('both show up as waiting actions and as unclaimed proceeds', () => {
+    expect(waitingActions([exercisedPut, exercisedCall], ME, 0)).toEqual(['claim 5.00 FUND from an exercised put', 'claim 50.00 USDx from an exercised call'])
+    const s = portfolioSummary([exercisedPut, exercisedCall], ME)
+    expect(s.unclaimed).toEqual([
+      { token: FUND, amount: 5n * U },
+      { token: USDX, amount: 50n * U },
+    ])
+  })
+
+  it('a row action carries its kind', () => {
+    const a: RowAction = { kind: 'claim', label: ACTION_LABEL.claim, onClick: () => {} }
+    expect(a.kind).toBe('claim')
+  })
+})
+
+describe('todoItems', () => {
+  const NOW = 1_900_000_000
+  const DAY = 86_400
+  // Strike per unit is 10.00 for every option below.
+  const heldPut = (id: bigint, expiry: number) => opt({ id, writer: OTHER, holder: ME, state: 'active', expiry })
+  const priceBelow = () => 9n * U // a put struck at 10 is in the money
+  const priceAbove = () => 11n * U // out of the money
+
+  it('an in-the-money exercise is an action; an out-of-the-money one is only a reminder of the deadline', () => {
+    const itm = todoItems([heldPut(1n, NOW + DAY)], ME, NOW, priceBelow)
+    expect(itm).toHaveLength(1)
+    expect(itm[0]).toMatchObject({ kind: 'exercise', actionable: true, moneyness: 'in', deadline: NOW + DAY, secondsLeft: DAY })
+    expect(itm[0].amount).toEqual({ token: USDX, amount: 50n * U })
+    const otm = todoItems([heldPut(1n, NOW + DAY)], ME, NOW, priceAbove)
+    expect(otm[0]).toMatchObject({ kind: 'exercise', actionable: false, moneyness: 'out' })
+    expect(actionsWaiting(itm)).toBe(1)
+    expect(actionsWaiting(otm)).toBe(0)
+  })
+
+  it('without a reference price an exercise is listed but never pushed', () => {
+    const items = todoItems([heldPut(1n, NOW + DAY)], ME, NOW)
+    expect(items[0]).toMatchObject({ kind: 'exercise', actionable: false, moneyness: 'unknown' })
+  })
+
+  it('claims and reclaims are always actions, for puts and calls', () => {
+    const items = todoItems(
+      [opt({ id: 1n, state: 'exercised', holder: OTHER, kind: 'call' }), opt({ id: 2n, state: 'exercised', holder: OTHER }), opt({ id: 3n, state: 'expired', holder: OTHER }), opt({ id: 4n, state: 'expired' })],
+      ME,
+      NOW,
+    )
+    expect(items.map((t) => [t.kind, t.actionable])).toEqual([['claim', true], ['claim', true], ['reclaim', true], ['reclaim', true]])
+    expect(items[0].amount).toEqual({ token: USDX, amount: 50n * U }) // the call writer claims the strike
+    expect(items[1].amount).toEqual({ token: FUND, amount: 5n * U }) // the put writer claims the underlying
+    expect(items[2].amount).toEqual({ token: USDX, amount: 50n * U }) // collateral of a put
+    expect(actionsWaiting(items)).toBe(4)
+  })
+
+  it('orders by urgency: in-the-money exercises by deadline, claims, reclaims, reminders, then expired', () => {
+    const options = [
+      opt({ id: 1n, writer: OTHER, holder: ME, state: 'expired', expiry: NOW - DAY }),
+      heldPut(2n, NOW + 5 * DAY),
+      opt({ id: 3n, state: 'expired' }),
+      opt({ id: 4n, state: 'exercised', holder: OTHER }),
+      heldPut(5n, NOW + 2 * DAY),
+      opt({ id: 6n, kind: 'call', writer: OTHER, holder: ME, state: 'active', expiry: NOW + DAY }),
+    ]
+    // At 9.00 the puts are in the money and the call (strike 10) is out of the money.
+    const items = todoItems(options, ME, NOW, priceBelow)
+    expect(items.map((t) => [t.option.id, t.kind])).toEqual([
+      [5n, 'exercise'],
+      [2n, 'exercise'],
+      [4n, 'claim'],
+      [3n, 'reclaim'],
+      [6n, 'exercise'],
+      [1n, 'expired-unexercised'],
+    ])
+    expect(actionsWaiting(items)).toBe(4)
+  })
+
+  it('leaves out cancellable offers, options of other accounts, and old expiries', () => {
+    const items = todoItems(
+      [opt({ id: 1n }), opt({ id: 2n, writer: OTHER, holder: 'GX', state: 'active' }), opt({ id: 3n, writer: OTHER, holder: ME, state: 'expired', expiry: NOW - 30 * DAY }), heldPut(4n, NOW - 1)],
+      ME,
+      NOW,
+    )
+    expect(items).toEqual([])
+    expect(todoItems([opt({ id: 5n, state: 'exercised', holder: OTHER })], null, NOW)).toEqual([])
+  })
+})
+
+describe('portfolioSummary', () => {
+  it('sums exact figures per token and leaves resale purchases out of premium paid', () => {
+    const options = [
+      opt({ id: 1n, writer: OTHER, holder: ME, state: 'active' }), // paid 2
+      opt({ id: 2n, writer: OTHER, holder: ME, state: 'active', totalPremium: 3n * U }), // bought on resale
+      opt({ id: 3n, holder: OTHER, state: 'active' }), // earned 2, locks 50 USDx
+      opt({ id: 4n, kind: 'call', state: 'offered' }), // locks 5 FUND, nothing earned yet
+      opt({ id: 5n, state: 'settled', holder: OTHER }), // earned 2, closed
+      opt({ id: 6n, writer: OTHER, holder: 'GX' }), // not mine
+    ]
+    const s = portfolioSummary(options, ME, new Set([2n]))
+    expect(s.open).toBe(4)
+    expect(s.premiumPaid).toEqual([{ token: USDX, amount: 2n * U }])
+    expect(s.premiumEarned).toEqual([{ token: USDX, amount: 4n * U }])
+    expect(s.locked).toEqual([
+      { token: USDX, amount: 50n * U },
+      { token: FUND, amount: 5n * U },
+    ])
+    expect(s.unclaimed).toEqual([])
+    expect(portfolioSummary(options, null).open).toBe(0)
   })
 })

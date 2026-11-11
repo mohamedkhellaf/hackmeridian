@@ -1,14 +1,16 @@
 // On-chain StellSec Pro client: contracts/pro on Testnet, read through simulated view calls and written through the
-// connected wallet (simulate -> sign -> send), like the Covered options client (src/options/sorobanClient.ts).
+// connected wallet (simulate -> sign -> send), like the Covered options client (core/options/sorobanClient.ts).
 // Encoding goes through the contract spec (proSpec.ts) with explicit i128/u32/u64 argument types; amounts stay
 // bigint integer units end to end. Margin figures come from the contract's views (get_requirement, vault_value);
 // the few values without a view are derived exactly as the fixture client does and are marked where they are made.
 import { contract, rpc } from '@stellar/stellar-sdk'
 import { config } from '../config'
 import { describeError } from '../stellar/errors'
-import { clientSigning } from '../stellar/signer'
+import { clientSigning, signAndSend } from '../stellar/signer'
 import type { WalletSigner } from '../stellar/signer'
 import { readBalance } from '../stellar/tokens'
+import { TxError } from '../tx/errors'
+import type { TxOptions } from '../tx/types'
 import { proErrorName } from './errors'
 import {
   bookFromAbi,
@@ -105,8 +107,16 @@ function throwIfSimFailed(tx: contract.AssembledTransaction<unknown>): void {
 }
 
 /** Maps any failure to the CallResult the UI shows: Pro codes by number, anything else as a plain note (code -1). */
-export function failureOf(e: unknown): { ok: false; code: number; name: string; note?: string } {
+export function failureOf(e: unknown): Extract<CallResult<never>, { ok: false }> {
   const text = e instanceof Error ? e.message : String(e)
+  // A transaction that stopped after the simulation: keep where it stopped, so the UI never offers a resend
+  // while the outcome is unknown. A refusal found in an included transaction still maps to its Pro code.
+  if (e instanceof TxError) {
+    const where = { kind: e.kind, ...(e.hash ? { hash: e.hash } : {}) }
+    const included = proCodeOf(text) ?? proCodeOf(text.replace(/Contract error #(\d+)\./, 'Error(Contract, #$1)'))
+    if (included != null) return { ok: false, code: included, name: proErrorName(included), ...where }
+    return { ok: false, code: -1, name: 'TransactionFailed', note: text, ...where }
+  }
   const code = e instanceof ProCallError && e.code != null ? e.code : proCodeOf(text)
   if (code != null) return { ok: false, code, name: proErrorName(code) }
   return { ok: false, code: -1, name: 'TransactionFailed', note: describeError(e) }
@@ -431,15 +441,16 @@ export class SorobanProClient implements ProClient {
    * simulate -> sign in the wallet -> send -> wait. A refused simulation never reaches the wallet. After a
    * confirmed transaction the state is re-read; a failed re-read is reported in the status, never as a failed call.
    */
-  private async send<T, R>(op: string, args: (string | number)[], call: (c: Bound) => Tx<Res<T>>, shape: (v: T) => R): Promise<CallResult<R>> {
+  private async send<T, R>(op: string, args: (string | number)[], call: (c: Bound) => Tx<Res<T>>, shape: (v: T) => R, opts?: TxOptions): Promise<CallResult<R>> {
     let out: CallResult<R>
     try {
+      opts?.onStage?.({ stage: 'checking' })
       const tx = await call(this.signer())
       throwIfSimFailed(tx)
-      const sent = await tx.signAndSend()
-      const hash = sent.sendTransactionResponse?.hash ?? ''
+      // Reports signing, submitting and pending (with the hash); rejects with a TxError that says where it stopped.
+      const sent = await signAndSend(tx, { onStage: opts?.onStage, server: this.server })
       const value = shape(unwrap(sent.result))
-      out = { ok: true, value, note: hash ? `Transaction ${hash}` : undefined }
+      out = { ok: true, value, note: sent.hash ? `Transaction ${sent.hash}` : undefined, hash: sent.hash || undefined }
     } catch (e) {
       out = failureOf(e)
     }
@@ -451,48 +462,50 @@ export class SorobanProClient implements ProClient {
     return out
   }
 
-  deposit(who: Party, amount: bigint) {
-    return this.send('deposit', [who], (c) => c.deposit({ who, amount: i128(amount) }), () => null)
+  deposit(who: Party, amount: bigint, opts?: TxOptions) {
+    return this.send('deposit', [who], (c) => c.deposit({ who, amount: i128(amount) }), () => null, opts)
   }
-  withdraw(who: Party, amount: bigint) {
-    return this.send('withdraw', [who], (c) => c.withdraw({ who, amount: i128(amount) }), () => null)
+  withdraw(who: Party, amount: bigint, opts?: TxOptions) {
+    return this.send('withdraw', [who], (c) => c.withdraw({ who, amount: i128(amount) }), () => null, opts)
   }
-  createOffer(p: OfferParams) {
+  createOffer(p: OfferParams, opts?: TxOptions) {
     return this.send(
       'create_offer',
       [p.writer, p.seriesId],
       (c) => c.create_offer({ writer: p.writer, series_id: u32(p.seriesId), qty: i128(p.qty), premium: i128(p.premium), quote_expiry: u64(p.quoteExpiry) }),
       (id): number | null => Number(id),
+      opts,
     )
   }
-  cancelOffer(writer: Party, offerId: number) {
-    return this.send('cancel_offer', [writer, offerId], (c) => c.cancel_offer({ writer, offer_id: u32(offerId) }), () => null)
+  cancelOffer(writer: Party, offerId: number, opts?: TxOptions) {
+    return this.send('cancel_offer', [writer, offerId], (c) => c.cancel_offer({ writer, offer_id: u32(offerId) }), () => null, opts)
   }
-  buy(buyer: Party, offerId: number) {
-    return this.send('buy', [buyer, offerId], (c) => c.buy({ buyer, offer_id: u32(offerId) }), (id): number | null => Number(id))
+  buy(buyer: Party, offerId: number, opts?: TxOptions) {
+    return this.send('buy', [buyer, offerId], (c) => c.buy({ buyer, offer_id: u32(offerId) }), (id): number | null => Number(id), opts)
   }
-  exercise(holder: Party, positionId: number) {
-    return this.send('exercise', [holder, positionId], (c) => c.exercise({ holder, pos_id: u32(positionId) }), (r) => ({ due: r.due, spot: r.spot }))
+  exercise(holder: Party, positionId: number, opts?: TxOptions) {
+    return this.send('exercise', [holder, positionId], (c) => c.exercise({ holder, pos_id: u32(positionId) }), (r) => ({ due: r.due, spot: r.spot }), opts)
   }
-  liquidate(caller: Party, writer: Party, taker: Party | null) {
+  liquidate(caller: Party, writer: Party, taker: Party | null, opts?: TxOptions) {
     return this.send(
       'liquidate',
       [caller, writer, taker ?? VAULT],
       (c) => c.liquidate({ caller, writer, taker: taker ?? undefined }),
       (r) => ({ x: r.x, paid: r.paid, deficit: r.deficit }),
+      opts,
     )
   }
-  settle(bookId: number) {
-    return this.send('settle', [bookId], (c) => c.settle({ book_id: u32(bookId) }), (r) => ({ due: r.due, fromOwner: r.from_owner, shortfall: r.shortfall }))
+  settle(bookId: number, opts?: TxOptions) {
+    return this.send('settle', [bookId], (c) => c.settle({ book_id: u32(bookId) }), (r) => ({ due: r.due, fromOwner: r.from_owner, shortfall: r.shortfall }), opts)
   }
-  settleVault(seriesId: number) {
-    return this.send('settle_vault', [seriesId], (c) => c.settle_vault({ series_id: u32(seriesId) }), (r) => ({ shortfall: r.shortfall, vaultPaid: r.vault_paid, deficit: r.deficit }))
+  settleVault(seriesId: number, opts?: TxOptions) {
+    return this.send('settle_vault', [seriesId], (c) => c.settle_vault({ series_id: u32(seriesId) }), (r) => ({ shortfall: r.shortfall, vaultPaid: r.vault_paid, deficit: r.deficit }), opts)
   }
-  claim(holder: Party, positionId: number) {
-    return this.send('claim', [holder, positionId], (c) => c.claim({ holder, pos_id: u32(positionId) }), (r): ClaimResult => ({ due: r.due, paid: r.paid, deficit: r.deficit }))
+  claim(holder: Party, positionId: number, opts?: TxOptions) {
+    return this.send('claim', [holder, positionId], (c) => c.claim({ holder, pos_id: u32(positionId) }), (r): ClaimResult => ({ due: r.due, paid: r.paid, deficit: r.deficit }), opts)
   }
-  lpDeposit(lp: Party, amount: bigint) {
-    return this.send('lp_deposit', [lp], (c) => c.lp_deposit({ lp, amount: i128(amount) }), (shares) => BigInt(shares))
+  lpDeposit(lp: Party, amount: bigint, opts?: TxOptions) {
+    return this.send('lp_deposit', [lp], (c) => c.lp_deposit({ lp, amount: i128(amount) }), (shares) => BigInt(shares), opts)
   }
 }
 
