@@ -48,6 +48,7 @@ No storage in `ui/`: the data layer persists the choices and calls the three `ap
 | `NavTabs`, `NavTab` | links; `current` sets `aria-current="page"`; `render` for router links; `count` |
 | `Tooltip` | `content`, one focusable child. Never essential information |
 | `Popover` | `trigger`, `title`, children, `side`, `align`, `open`, `onOpenChange`, `openOnHover` |
+| `Coachmark` | a note beside a control it did not create (the welcome guide): `open`, `target` (gets the ruled mark and the note as its description), `anchor?` (where the note sits, default `target`), `title`, children, `counter?`, `foot?`, `actions`, `side`, `align`, `closeLabel`, `onClose('escape' \| 'close' \| 'outside')`, `initialFocus` (ref or `false`), `finalFocus`, `stepKey`. Not modal: no scrim, no scroll lock; a press outside closes it and still lands |
 | `Menu`, `MenuItem`, `MenuLinkItem`, `MenuSeparator`, `MenuGroup`, `MenuRadioGroup`, `MenuRadioItem` | `trigger` on `Menu`; `onSelect`, `icon`, `detail`, `tone="danger"` on items; `MenuLinkItem href` or `render` |
 | `Dialog` | `open`, `onOpenChange`, `title`, `description`, `footer`, `size: 'sm' \| 'md' \| 'lg'`, `role: 'dialog' \| 'alertdialog'`, `initialFocus: 'title' (default) \| 'first-control' \| ref`, `finalFocus`, `dismissible` |
 | `Drawer` | same as `Dialog`, slides from the right (420 px), swipe to dismiss |

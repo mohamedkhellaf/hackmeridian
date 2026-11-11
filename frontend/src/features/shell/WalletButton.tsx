@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { guideAnchor } from '../../core/guide'
 import { Button, announce, shortenAddress } from '../../ui'
 import { useWallet } from '../../wallet'
 import type { Tier } from './useTier'
@@ -52,6 +53,7 @@ export function WalletButton({ tier }: { tier: Tier }) {
         variant="primary"
         size={phone ? 'sm' : 'md'}
         className={styles.button}
+        {...guideAnchor('wallet')}
         onClick={() => {
           askedHere.current = true
           void wallet.connect()

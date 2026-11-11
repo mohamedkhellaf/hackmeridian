@@ -61,6 +61,7 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | `time.ts` | `nowSec`, `nowMs`, `MONTHS`, `SECONDS_PER_DAY`, `expiryDay(unix)` (UTC `YYYY-MM-DD`), `dayLabel(day)`, `compactCountdown(expiry, atMs?)` (`3d 0h`), `formatDuration(seconds)`, `formatExpiryShort` (local), `formatUtcShort`, `toLocalInput`, `fromLocalInput`. Compact forms for the Margin tables; new screens format time with `format/` (`formatUtc`, `formatCountdown(secondsLeft)`, `deadlineUrgency`). |
 | `units.ts` | `amt(units, token)` (`5.00 FUND`), `plainAmount` (input prefill), `perUnit(total, sized)` (bigint, floored), `strikeUnits`, `premiumUnits`, `perUnitText`, `compareRatio`, `byPremiumPerUnit`, `byStrikePerUnit`, `byId`, `shortBy`, types `UnitToken`, `Sized`. |
 | `disclosures.ts` **(core-new)** | Every required sentence, the Margin banners, warning bullets and collateral cards, banned-word lists. |
+| `guide.ts` | The welcome guide below the features: `GUIDE_ANCHORS` and `guideAnchor(name, { ring? })` (the `data-tour` attribute a component spreads on the control a note explains), `GuideId`, `GuideSeen`, `GUIDE_VERSION`, `TOUR_NOTES_ON_MARKETS`, `GUIDE_COPY` (the words shared by the welcome and the replay entry), and the two rules `canOfferTour`, `canOpenModeNote`. |
 
 ### `tx/` transaction stages
 

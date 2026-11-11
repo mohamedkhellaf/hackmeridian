@@ -1,6 +1,8 @@
 // The sub-tabs of an asset page as real links, and beside them the mode switch of the Trade tab.
 import { Link as RouterLink } from '@tanstack/react-router'
 import type { AssetSearch } from '../../../app/search'
+import { guideAnchor } from '../../../core/guide'
+import { useModeNoteOffer } from '../../../data'
 import { NavTab, NavTabs, Segmented } from '../../../ui'
 import { MODE_LABEL, MODE_NAMES, TABS_LABEL, TAB_NAMES } from '../copy'
 import { ASSET_ROUTE, EXACT, compactSearch } from '../routing'
@@ -24,6 +26,7 @@ export interface AssetTabsProps {
 }
 
 export function AssetTabs({ param, tab, mode, urlMode, onModeChange, requests }: AssetTabsProps) {
+  useModeNoteOffer(tab === 'trade', param)
   return (
     <div className={styles.root}>
       <NavTabs label={TABS_LABEL}>
@@ -46,7 +49,7 @@ export function AssetTabs({ param, tab, mode, urlMode, onModeChange, requests }:
         })}
       </NavTabs>
       {tab === 'trade' ? (
-        <div className={styles.mode}>
+        <div className={styles.mode} {...guideAnchor('mode')}>
           <Segmented<AssetMode> label={MODE_LABEL} size="sm" fullWidth value={mode} onValueChange={onModeChange} options={MODES.map((m) => ({ value: m, label: MODE_NAMES[m] }))} />
         </div>
       ) : null}

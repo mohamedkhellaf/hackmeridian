@@ -27,6 +27,7 @@ import {
   toast,
 } from '../../../ui'
 import { Example, Section, Specimen } from '../Specimen'
+import { CoachmarkSpecimen } from './CoachmarkSpecimen'
 import { EXPLORER } from './sample'
 
 type Open = null | 'title' | 'form' | 'confirm' | 'large' | 'drawer' | 'sheet'
@@ -65,6 +66,8 @@ export function OverlaysSection() {
           Popovers flip and shift to stay in view.
         </Popover>
       </Specimen>
+
+      <CoachmarkSpecimen />
 
       <Specimen title="Menu" note="Actions on one object, or settings. Arrow keys move, typing jumps to an item, Escape closes and returns focus.">
         <Menu trigger={<Button variant="secondary">GAJ2…VC7G</Button>} align="start">

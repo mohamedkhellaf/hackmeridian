@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react'
 import { PRO_ENABLED } from '../../core/config'
 import { IconChevronRight, Sheet } from '../../ui'
 import { SETTINGS_TITLE } from './copy'
+import { GuideSheetRow } from './GuideEntry'
 import { moreNav, nextMenuIndex } from './nav'
 import { RouteLink } from './RouteLink'
 import { SECTION_ICON } from './sectionIcons'
@@ -45,6 +46,7 @@ export function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
           )
         })}
       </ul>
+      <GuideSheetRow className={styles.link} onClose={() => onOpenChange(false)} />
       <section className={styles.section} aria-labelledby={settingsId}>
         <h3 id={settingsId} className={styles.heading}>
           {SETTINGS_TITLE}

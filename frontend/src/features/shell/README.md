@@ -67,6 +67,7 @@ own rail to the top of the viewport.
 | `TopBar.tsx`, `TabBar.tsx`, `MoreSheet.tsx`, `Footer.tsx` | The bars, the phone sheet, the footer |
 | `NetworkChip.tsx` | The chip and the facts behind it (`NetworkChipView` and `NetworkSummary` take plain props) |
 | `Settings.tsx` | `SettingsMenu` (bar) and `SettingsControls` (More sheet), both on `useSettings()` |
+| `GuideEntry.tsx` | "Show me around", the one way to start the welcome guide again: `GuideMenuGroup` (last group of the Settings menu) and `GuideSheetRow` (last row of the pages in the More sheet). They call `useGuide().start('tour', 'replay')`; the tour is `features/tour`, mounted by `src/app`. The bars and the wallet control carry its anchors: `guideAnchor('nav')` on the `nav` of `TopBar` and of `TabBar`, `guideAnchor('wallet')` on the button of `WalletButton` and the trigger of `WalletMenu` |
 | `WalletButton.tsx`, `WalletMenu.tsx`, `ConnectDialog.tsx`, `WalletBanners.tsx` | The wallet: button, menu, picker, banners |
 | `RouteLink.tsx` | The router's link for the shell's destinations; also what `Link`, `ButtonLink` and `MenuLinkItem` take in `render` |
 | `nav.ts`, `wallet.ts`, `useTier.ts`, `copy.ts` | Pure model, helpers, the three-tier breakpoint hook, the shell's words. Tested in `*.test.ts` |

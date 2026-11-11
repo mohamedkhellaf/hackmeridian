@@ -80,6 +80,10 @@ export type { PreTradeOptions, PreTradeView } from './usePreTrade'
 export { initSettings, useSettings, useDefaultMode, settingsStore, applySettings, DEFAULT_SETTINGS, MODE_CHOICES, SETTINGS_STORAGE_KEY } from './settings'
 export type { Settings, SettingsHandle, DefaultMode, ThemeChoice, DensityChoice, PnlScheme } from './settings'
 
+// The welcome guide: what this browser has seen, and the request to run it
+export { useGuide, useModeNoteOffer, guideStore, GUIDE_STORAGE_KEY } from './guide'
+export type { GuideHandle, GuideOrigin, GuideRun, GuideState } from './guide'
+
 // Margin (also importable as a folder: `../data/pro`)
 export { ProProvider, MarginProvider, ProLoader, MarginLoader, usePro, useMargin, useProClient } from './pro'
 export type { ProProviderProps, ProLoaderProps, ProCtxValue, Outcome, ProCall, ProClientState } from './pro'

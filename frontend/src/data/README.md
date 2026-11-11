@@ -203,6 +203,14 @@ seed. An entry found in storage still in flight after a reload is shown as `unkn
 
 Storage that is missing or throws is tolerated: the choice then holds for the page.
 
+## The welcome guide
+
+| Export | Signature | Meaning |
+|---|---|---|
+| `useGuide` | `(): { seen; persistent; run; start(id, origin); shown(id); decline(); end(run?) }` | `seen`: per guide (`tour`, `mode`), `0` declined, `n` shown at content version `n`, absent never. `persistent`: false when storage cannot be read or written (then nothing is offered). `run`: the guide asked for now, in memory only. The shell and the Markets page call `start`; the tour (mounted by `src/app`) calls `shown` and `end`. |
+| `useModeNoteOffer` | `(onTradeTab: boolean, asset: string): void` | For the asset page: asks once for the note on the mode switch, by the rule `canOpenModeNote` of `core/guide`. |
+| `guideStore`, `GUIDE_STORAGE_KEY` | store and constant | The external store behind the hook (`subscribe`, `get`, `start`, `shown`, `decline`, `end`, `reload`); its own key, `stellsec.guide.v1`, so resetting the settings never brings the welcome back. Storage is first touched when the state is first read. |
+
 ## Margin (`src/data/pro`)
 
 ```tsx
@@ -230,6 +238,7 @@ import { ProLoader, usePro } from '../../data/pro'
 | `tx/runner.ts`, `tx/useTx.ts`, `tx/activityStore.ts`, `tx/useActivity.ts`, `tx/invalidation.ts`, `tx/flights.ts`, `tx/copy.ts` | The transaction layer. |
 | `mutations.ts`, `usePreTrade.ts` | The twelve Covered writes and the pre-trade hook. |
 | `settings.ts` | The settings store. |
+| `guide.ts` | What this browser has seen of the welcome guide, and the request to run it. |
 | `pro/` | The Margin provider. |
 
 Checks: `npx vitest run src/data`, `npx oxlint src/data`.

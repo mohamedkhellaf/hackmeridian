@@ -1,5 +1,6 @@
 import { Outlet, useMatches } from '@tanstack/react-router'
 import { Suspense, lazy } from 'react'
+import { GuideMount } from './GuideMount'
 import { loadShell } from './shellChunk'
 import { StatusPage } from './StatusPage'
 
@@ -17,6 +18,7 @@ export function RootLayout() {
       <AppShell>
         <Outlet />
       </AppShell>
+      <GuideMount />
     </Suspense>
   )
 }

@@ -1,0 +1,170 @@
+@layer ui {
+  .positioner {
+    z-index: var(--z-popover);
+  }
+
+  /* A popover with an ink rule across the top: the rule is what tells a guide note from an ordinary popover. */
+  .popup {
+    display: flex;
+    flex-direction: column;
+    width: var(--popover-max);
+    max-width: calc(100vw - var(--s-24));
+    max-height: calc(100dvh - var(--s-24));
+    padding: var(--s-12) var(--s-16) var(--s-16);
+    border-top: 2px solid var(--text);
+    border-radius: 0 0 var(--r-card) var(--r-card);
+    background: var(--raised);
+    color: var(--text);
+    box-shadow: var(--shadow-popover);
+    outline: none;
+    /*
+     * Entrances are keyframes, not transitions from a starting style: Base UI switches transitions off for a
+     * popup that is open when it mounts, which is how the first note of a visit arrives.
+     */
+    animation: coach-in var(--dur-popover) var(--ease-enter) backwards;
+    transition: opacity var(--dur-hover) var(--ease-exit);
+
+    /* A note that opened by itself only fades in: nothing travels that the visitor did not ask for. */
+    &[data-self-opened] {
+      animation-name: coach-fade;
+    }
+
+    /*
+     * From one note to the next the note appears at its new place and fades in; it never slides across the
+     * page. Two names for the same keyframes: a change of name restarts the animation while the note stays.
+     */
+    &[data-turn='a'] {
+      animation-name: coach-turn-a;
+    }
+
+    &[data-turn='b'] {
+      animation-name: coach-turn-b;
+    }
+
+    &[data-ending-style] {
+      opacity: 0;
+    }
+
+    /* On phones the note takes the width of the page column. Its height also leaves the tab bar free. */
+    @media (max-width: 767.98px) {
+      width: calc(100vw - 2 * var(--gutter));
+      max-width: none;
+      max-height: calc(100dvh - var(--s-24) - var(--s-56) - env(safe-area-inset-bottom, 0px));
+    }
+
+    @media (forced-colors: active) {
+      border: 1px solid CanvasText;
+      border-top-width: 2px;
+    }
+  }
+
+  @keyframes coach-in {
+    from {
+      opacity: 0;
+      transform: translateY(calc(var(--s-4) * -1));
+    }
+  }
+
+  @keyframes coach-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes coach-turn-a {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes coach-turn-b {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /*
+   * The title, with the close button in the corner. The button is taken out of the row, centred on the title's
+   * first line: a 44 px touch target then adds no height to the note.
+   */
+  .head {
+    position: relative;
+    flex: none;
+    padding-inline-end: var(--s-32);
+  }
+
+  .title {
+    padding-block: var(--s-2);
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+
+  /* Its box hangs into the padding, so the cross lines up with the edge of the text under it. */
+  .close {
+    position: absolute;
+    top: calc(var(--h3-line) / 2 + var(--s-2));
+    inset-inline-end: calc(var(--s-6) * -1);
+    transform: translateY(-50%);
+  }
+
+  /* The body is the part that scrolls when the screen is too short for the note (a phone held sideways). */
+  .body {
+    min-height: 0;
+    margin-top: var(--s-4);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text);
+  }
+
+  .foot {
+    flex: none;
+    margin-top: var(--s-8);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  /* The last row: where the reader is in the sequence, then the buttons. */
+  .bar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12);
+    margin-top: var(--s-12);
+  }
+
+  .counter {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    margin-inline-start: auto;
+  }
+
+  /*
+   * The mark on the control a note is about: a ruled box in ink, drawn by the control itself, so there is nothing
+   * to track and it survives forced colours. Ink, not the accent: the accent ring is keyboard focus, and when the
+   * control is focused that ring shows and this one does not.
+   */
+  :global([data-coach-target]:not(:focus-visible)) {
+    outline: 2px solid var(--text);
+    outline-offset: var(--s-4);
+  }
+
+  /* A control at the edge of the screen (the phone tab bar): the mark is drawn inside. */
+  :global([data-coach-target='inset']:not(:focus-visible)) {
+    outline-offset: -2px;
+  }
+}

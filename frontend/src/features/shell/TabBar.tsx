@@ -1,4 +1,5 @@
 import { PRO_ENABLED } from '../../core/config'
+import { guideAnchor } from '../../core/guide'
 import { Badge, IconMore } from '../../ui'
 import { PRIMARY_NAV, actionsWaitingLabel, containsSection, moreNav } from './nav'
 import { RouteLink } from './RouteLink'
@@ -19,7 +20,7 @@ export interface TabBarProps {
 export function TabBar({ pathname, actionsWaiting, moreOpen, onOpenMore }: TabBarProps) {
   const moreCurrent = containsSection(moreNav(PRO_ENABLED), pathname)
   return (
-    <nav aria-label="Main" className={styles.bar}>
+    <nav aria-label="Main" className={styles.bar} {...guideAnchor('nav', { ring: 'inset' })}>
       <ul role="list" className={styles.tabs}>
         {PRIMARY_NAV.map((entry) => {
           const Icon = SECTION_ICON[entry.id]

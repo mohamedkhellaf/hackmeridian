@@ -49,6 +49,7 @@ import { ReceiptIcon } from '@phosphor-icons/react/dist/csr/Receipt'
 import { ScalesIcon } from '@phosphor-icons/react/dist/csr/Scales'
 import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut'
 import { SignatureIcon } from '@phosphor-icons/react/dist/csr/Signature'
+import { SignpostIcon } from '@phosphor-icons/react/dist/csr/Signpost'
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal'
 import { StampIcon } from '@phosphor-icons/react/dist/csr/Stamp'
 import { SunIcon } from '@phosphor-icons/react/dist/csr/Sun'
@@ -148,6 +149,7 @@ export const IconWallet = /* @__PURE__ */ icon(WalletIcon, 'IconWallet')
 export const IconDisconnect = /* @__PURE__ */ icon(SignOutIcon, 'IconDisconnect')
 export const IconUser = /* @__PURE__ */ icon(UserIcon, 'IconUser')
 export const IconSettings = /* @__PURE__ */ icon(SlidersHorizontalIcon, 'IconSettings')
+export const IconGuide = /* @__PURE__ */ icon(SignpostIcon, 'IconGuide')
 export const IconThemeLight = /* @__PURE__ */ icon(SunIcon, 'IconThemeLight')
 export const IconThemeDark = /* @__PURE__ */ icon(MoonIcon, 'IconThemeDark')
 export const IconThemeSystem = /* @__PURE__ */ icon(DesktopIcon, 'IconThemeSystem')

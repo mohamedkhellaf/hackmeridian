@@ -31,8 +31,8 @@ replaced by the canonical segment, and anything else gets the not-found view, wh
 | `model.ts` | Pure decisions, unit-tested: `indexList`, `obviousAsset`, `needsTestFunds`, `fundingProgress`, `assetRequests` |
 | `copy.ts` | Every sentence of the feature (required disclosures come from `core/disclosures`); `copy.test.ts` checks the wording rules |
 | `parts.tsx`, `values.ts` | `Money`, `ChainId`, `BackToMarkets`, `ShortfallNotice`; `moneyText`, `assetGlyph` |
-| `index-page/` | `MarketsIndexPage`, `IntentCards`, `AssetChoice`, `AssetsTable` (table from 768 px, cards below), `GetFunds` |
-| `asset/` | `AssetPage`, `AssetHeader`, `AssetTabs` (sub-tabs and mode switch), `AssetStates` (skeleton, error, not found), `RequestsTab`, `AboutTab`, `TicketIdle` |
+| `index-page/` | `MarketsIndexPage`, `IntentCards`, `AssetChoice`, `AssetsTable` (table from 768 px, cards below), `GetFunds`, `GuideSlip` (the welcome of the guide: a first visit only, in the page flow under the header; it gives way to `GetFunds`). The two sections carry the guide's anchors `guideAnchor('intents')` and `guideAnchor('assets')` |
+| `asset/` | `AssetPage`, `AssetHeader`, `AssetTabs` (sub-tabs and mode switch; the switch's wrapper carries `guideAnchor('mode')`, and `useModeNoteOffer` asks for the guide's one note on it), `AssetStates` (skeleton, error, not found), `RequestsTab`, `AboutTab`, `TicketIdle` |
 
 ## Decisions
 

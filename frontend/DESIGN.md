@@ -87,6 +87,8 @@ Import from `src/ui` only. `@base-ui/react` and `@phosphor-icons/react` are impo
 | An assumed price in a hypothetical figure | `Slider` with `valueText` | a slider bound to a signed amount |
 | A label for an icon | `Tooltip` (never essential: touch has none) | `title` attributes, anywhere |
 | An explanation or an exact value on request | `Popover` | a tooltip |
+| Saying what a control does, on request, at the control | `Coachmark` (through the welcome guide, `features/tour`) | a tooltip; a tour library; a dimmed page |
+| The first-visit welcome | `GuideSlip`: one, on Markets, a plain ruled block in the page flow | a dialog, a banner, a toast, an illustration |
 | Actions on one object, settings | `Menu` | a select |
 | A decision that interrupts | `Dialog` (one per flow, never stacked) | nested dialogs |
 | The ticket from 768 to 1199 px | `Drawer` (right, 420 px) | |

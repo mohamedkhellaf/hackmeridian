@@ -14,6 +14,7 @@ import { createOptionsClient, isMockMode } from '../core/options/createClient'
 import { useWallet } from '../wallet'
 import { bindSigner, createClientSource } from './clientSource'
 import type { ClientSource } from './clientSource'
+import { GUIDE_STORAGE_KEY, guideStore } from './guide'
 import { queryClient as appQueryClient } from './queryClient'
 import { SETTINGS_STORAGE_KEY, settingsStore } from './settings'
 import { ACTIVITY_KEY_PREFIX, activityStore } from './tx/activityStore'
@@ -53,6 +54,7 @@ function useStorageSync(): void {
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === null || e.key === SETTINGS_STORAGE_KEY) settingsStore.reload()
+      if (e.key === null || e.key === GUIDE_STORAGE_KEY) guideStore.reload()
       if (e.key?.startsWith(ACTIVITY_KEY_PREFIX)) activityStore.reload(e.key.slice(ACTIVITY_KEY_PREFIX.length))
     }
     window.addEventListener('storage', onStorage)

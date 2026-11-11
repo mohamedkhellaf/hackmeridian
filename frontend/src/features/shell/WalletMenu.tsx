@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { IS_MOCK } from '../../core/config'
 import { explorerAccount } from '../../core/explorer'
+import { guideAnchor } from '../../core/guide'
 import { useActivity, useAssets, useBalances } from '../../data'
 import {
   Button,
@@ -84,7 +85,7 @@ export function WalletMenu({ address, walletName, tier, triggerRef, onDisconnect
       align="end"
       size="tall"
       trigger={
-        <Button ref={triggerRef} variant="secondary" size={tier === 'phone' ? 'sm' : 'md'} className={styles.button}>
+        <Button ref={triggerRef} variant="secondary" size={tier === 'phone' ? 'sm' : 'md'} className={styles.button} {...guideAnchor('wallet')}>
           <span className="ui-vh">Wallet menu, </span>
           <span className={styles.address}>{shortenAddress(address, 'short')}</span>
         </Button>

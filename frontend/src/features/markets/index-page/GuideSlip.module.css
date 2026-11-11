@@ -1,0 +1,55 @@
+@layer features {
+  /*
+   * A plain block in the page flow, ruled above and below like a row of a term sheet: no fill, no frame, no
+   * icon. Its height is the same before and after the answer, so nothing under it moves (from 768 px).
+   */
+  .root {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12) var(--s-24);
+    min-width: 0;
+    min-height: calc(var(--h3-line) + var(--ui-line) + var(--s-2) + 2 * var(--s-16) + 2px);
+    padding-block: var(--s-16);
+    border-block: 1px solid var(--rule);
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    letter-spacing: 0;
+    color: var(--text);
+  }
+
+  .body,
+  .line {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text-2);
+  }
+
+  .actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  /* Phones: the words, then the two buttons in a row. */
+  @media (max-width: 767.98px) {
+    .root[data-state='offered'] {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+}

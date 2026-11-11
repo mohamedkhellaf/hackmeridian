@@ -1,4 +1,5 @@
 import { PRO_ENABLED } from '../../core/config'
+import { guideAnchor } from '../../core/guide'
 import { Badge, IconChevronDown, Mark, Menu, MenuLinkItem, Wordmark } from '../../ui'
 import { PRIMARY_NAV, actionsWaitingLabel, containsSection, moreNav, secondaryNav, sectionTitle } from './nav'
 import type { NavEntry } from './nav'
@@ -71,7 +72,7 @@ export function TopBar({ tier, pathname, actionsWaiting }: TopBarProps) {
         {phone ? (
           <span className={styles.pageTitle}>{sectionTitle(pathname)}</span>
         ) : (
-          <nav aria-label="Main" className={styles.primary}>
+          <nav aria-label="Main" className={styles.primary} {...guideAnchor('nav')}>
             <ul role="list" className={styles.links}>
               {PRIMARY_NAV.map((entry) => (
                 <NavItem key={entry.id} entry={entry} count={entry.id === 'portfolio' ? actionsWaiting : 0} />

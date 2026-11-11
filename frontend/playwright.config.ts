@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { guideSeen } from './e2e/guideState'
 
 // PW_PORT picks the port. With a dev server already running there (reuseExistingServer), the suite runs against
 // it: `PW_PORT=5199 npx playwright test e2e/shell.spec.ts`. Otherwise Playwright starts its own on that port.
@@ -23,6 +24,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL: `http://localhost:${PORT}`,
+    // Every spec runs as a returning visitor: the welcome guide has been seen (e2e/guideState.ts).
+    storageState: guideSeen(`http://localhost:${PORT}`),
     trace: 'retain-on-failure',
     // Motion is tested by eye, not here: with reduced motion a scan or a screenshot never lands mid-transition.
     contextOptions: { reducedMotion: 'reduce' },

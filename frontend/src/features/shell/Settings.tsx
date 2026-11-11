@@ -16,6 +16,7 @@ import {
   THEME_CHOICES,
 } from '../../ui'
 import { DENSITY_GROUP, DENSITY_LABEL, PNL_GROUP, PNL_LABEL, SETTINGS_TITLE, THEME_GROUP, THEME_LABEL } from './copy'
+import { GuideMenuGroup } from './GuideEntry'
 import styles from './Settings.module.css'
 
 const THEME_ICON: Record<ThemeChoice, typeof IconThemeSystem> = { system: IconThemeSystem, light: IconThemeLight, dark: IconThemeDark }
@@ -28,7 +29,7 @@ const THEME_ICON: Record<ThemeChoice, typeof IconThemeSystem> = { system: IconTh
 export function SettingsMenu() {
   const { theme, density, pnl, set } = useSettings()
   return (
-    <Menu trigger={<IconButton label={SETTINGS_TITLE} icon={<IconSettings />} />}>
+    <Menu size="tall" trigger={<IconButton label={SETTINGS_TITLE} icon={<IconSettings />} />}>
       <MenuRadioGroup<ThemeChoice> label={THEME_GROUP} value={theme} onValueChange={(next) => set({ theme: next })}>
         {THEME_CHOICES.map((choice) => {
           const Icon = THEME_ICON[choice]
@@ -55,6 +56,7 @@ export function SettingsMenu() {
           </MenuRadioItem>
         ))}
       </MenuRadioGroup>
+      <GuideMenuGroup />
     </Menu>
   )
 }

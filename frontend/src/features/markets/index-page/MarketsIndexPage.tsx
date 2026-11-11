@@ -3,6 +3,7 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import { ASSET_LIST_NOTE, TIER_MEANING } from '../../../core/assets'
 import type { AssetTier } from '../../../core/assets'
+import { guideAnchor } from '../../../core/guide'
 import { shortTokens } from '../../../core/reserves/reserves'
 import { useAssets, useBalances, useBalancesById, useHealth, useMarketsIndex, useMe, useNowSec, useOptionsClient } from '../../../data'
 import { Button, Callout, EmptyNote, Link, PageHeader, Skeleton } from '../../../ui'
@@ -26,6 +27,7 @@ import { EXACT, MARKETS_ROUTE, compactSearch, useMarketsSearch } from '../routin
 import { AssetChoice } from './AssetChoice'
 import { AssetsTable } from './AssetsTable'
 import { GetFunds } from './GetFunds'
+import { GuideSlip } from './GuideSlip'
 import { IntentCards } from './IntentCards'
 import styles from './MarketsIndexPage.module.css'
 
@@ -51,8 +53,9 @@ export function MarketsIndexPage() {
       <PageHeader title={MARKETS_TITLE} description={MARKETS_LEAD} />
 
       {firstRun && balances.data ? <GetFunds address={me} balances={balances.data} quoteId={quote.contractId} mock={isMock} /> : null}
+      <GuideSlip displaced={firstRun} pending={me !== null && (assets.isPending || balances.isPending)} />
 
-      <section className={styles.section} aria-labelledby="markets-intents">
+      <section className={styles.section} aria-labelledby="markets-intents" {...guideAnchor('intents')}>
         <h2 id="markets-intents" className={styles.heading}>
           {INTENTS_HEADING}
         </h2>
@@ -62,7 +65,7 @@ export function MarketsIndexPage() {
         ) : null}
       </section>
 
-      <section className={styles.section} aria-labelledby="markets-assets" aria-busy={index.isLoading || undefined}>
+      <section className={styles.section} aria-labelledby="markets-assets" aria-busy={index.isLoading || undefined} {...guideAnchor('assets')}>
         <div className={styles.sectionHead}>
           <h2 id="markets-assets" className={styles.heading}>
             {ASSETS_HEADING}

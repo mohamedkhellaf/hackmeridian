@@ -14,6 +14,7 @@ except the types of `search.ts`.
 | `RouteError.tsx`, `routeErrors.ts`, `NotFoundPage.tsx`, `RoutePending.tsx`, `StatusPage.tsx` | The pages the router shows itself: a page that failed, an unknown address, slow code. |
 | `MarginRoute.tsx` | The component of `/margin`: one `MarginPage` for the five screens. |
 | `shellChunk.ts` | The one dynamic import of the app shell, and its warm-up. |
+| `GuideMount.tsx` | The welcome guide beside the shell: loads `features/tour` the first time a guide is asked for (`useGuide().run`). No feature imports the tour. |
 | `DesignPage.tsx` | `/design`: the ui gallery, then the chart kit. |
 | `legacyHash.ts`, `legacyRedirect.ts` | Old `#/…` links to the new paths, before the router starts. |
 | `CrashPage.tsx` | Test builds only: a page that throws, for the error-boundary test. |
