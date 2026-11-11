@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 
@@ -6,10 +7,15 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   return {
     plugins: [react()],
-    // StellSec Pro is behind VITE_ENABLE_PRO=1. Pinning the value at build time (also when unset) lets the bundler
-    // drop the Pro chunk entirely from a default build.
+    // Margin is behind VITE_ENABLE_PRO=1. Pinning the value at build time (also when unset) lets the bundler
+    // drop the Margin chunk entirely from a default build.
     define: { 'import.meta.env.VITE_ENABLE_PRO': JSON.stringify(env.VITE_ENABLE_PRO ?? '') },
-    // src/payoff imports ../packages/payoff (outside the frontend root) by relative path.
+    css: { transformer: 'lightningcss', modules: { localsConvention: 'camelCaseOnly' } },
+    build: {
+      cssMinify: 'lightningcss',
+      rollupOptions: { input: { main: resolve(import.meta.dirname, 'index.html') } },
+    },
+    // src/core/payoff imports ../packages/payoff (outside the frontend root) by relative path.
     server: { fs: { allow: ['..'] } },
   }
 })

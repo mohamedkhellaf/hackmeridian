@@ -1,0 +1,6 @@
+/* Self-hosted fonts (Fontsource). Source Serif 4 without the optical-size axis, Instrument Sans with width and weight,
+   IBM Plex Mono 400 and 500, latin subsets selected by unicode-range. */
+@import '@fontsource-variable/source-serif-4/wght.css';
+@import '@fontsource-variable/instrument-sans/wdth.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
