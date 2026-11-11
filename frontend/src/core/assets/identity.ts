@@ -15,13 +15,11 @@ export const ASSET_TIERS: readonly AssetTier[] = ['Reference', 'Domain-linked', 
 
 /** What each tier word means, for the legend beside the column. */
 export const TIER_MEANING: Record<AssetTier, string> = {
-  Reference: "Issued by this project's test issuer and kept in the app's asset list.",
+  Reference: "Kept in the app's asset list.",
   'Domain-linked': "The issuer's home domain publishes a stellar.toml that names this asset.",
   'No domain link': 'Listed in the contract. Nothing ties the issuer to a domain.',
 }
 
-/** The note under the tier legend: what the list is, and what it is not. */
-export const ASSET_LIST_NOTE = 'Anyone can list an asset. The list decides what this app shows first. It gives nobody power over the contract.'
 
 /** The minimum the app knows about a listed asset. `TokenInfo` satisfies it; `issuer` is added when it was read. */
 export interface ListedAsset {

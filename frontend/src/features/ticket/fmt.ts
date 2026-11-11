@@ -19,9 +19,9 @@ export function firstBlocker(issues: readonly PreTradeIssue[] | undefined): PreT
   return issues?.find((i) => i.level === 'block' && i.code !== 'not-connected') ?? null
 }
 
-/** When the subject of a ticket was last read: `Re-read from the contract at 14:02:11 UTC`. `ms` is 0 before the first read. */
+/** When the subject of a ticket was last read, `14:02:11 UTC`, for the checks sentence. `ms` is 0 before the first read. */
 export function readAtText(ms: number): string | undefined {
-  return ms > 0 ? `Re-read from the contract at ${utcClock(Math.floor(ms / 1000))}` : undefined
+  return ms > 0 ? utcClock(Math.floor(ms / 1000)) : undefined
 }
 
 /** The message of a failed read, for telling "no such id" (data `isNotFoundMessage`) from a network failure. */

@@ -6,8 +6,8 @@ import type { BookRow } from '../../../core/market/book'
 import { seriesRefOf } from '../../../core/market/selection'
 import { requiredCollateral } from '../../../core/options/types'
 import { stoppedStage } from '../../../core/tx/machine'
-import { describeTx, useCancelBid, useCancelOffer, useOptionsClient } from '../../../data'
-import { Button, Dialog, KeyValue, KeyValueItem, TxLink, TxStepper } from '../../../ui'
+import { describeTx, useCancelBid, useCancelOffer, useOptionsClient, useUnsettledTx } from '../../../data'
+import { Button, Dialog, KeyValue, KeyValueItem, TxLink, TxStepper, UnsettledNotice } from '../../../ui'
 import { COPY } from './copy'
 import { strikeText } from './model'
 import styles from './CancelDialog.module.css'
@@ -17,9 +17,6 @@ export interface CancelDialogProps {
   row: BookRow | null
   onClose: () => void
 }
-
-/** Where a failed transaction stopped, for the stepper: before sending, on the way, or on the ledger. */
-
 
 export function CancelDialog({ row, onClose }: CancelDialogProps) {
   return row ? <CancelBody key={row.key} row={row} onClose={onClose} /> : null
@@ -33,6 +30,8 @@ function CancelBody({ row, onClose }: { row: BookRow; onClose: () => void }) {
   const tx = isBid ? cancelBid : cancelOffer
   const { state } = tx
   const idle = state.phase === 'idle'
+  // An earlier transaction of this wallet with an unknown outcome: this one waits for it.
+  const unsettled = useUnsettledTx()
   const ref = seriesRefOf(row)
   const back = isBid ? { amount: row.totalPremium, token: row.quote } : requiredCollateral(row)
 
@@ -51,7 +50,7 @@ function CancelBody({ row, onClose }: { row: BookRow; onClose: () => void }) {
   const footer = idle ? (
     <>
       <Button onClick={onClose}>{isBid ? COPY.keepBid : COPY.keepOffer}</Button>
-      <Button variant="primary" onClick={run}>
+      <Button variant="primary" onClick={run} disabled={unsettled !== null} disabledReason={unsettled?.reason}>
         {isBid ? COPY.cancelBidAction : COPY.cancelOfferAction}
       </Button>
     </>
@@ -81,11 +80,12 @@ function CancelBody({ row, onClose }: { row: BookRow; onClose: () => void }) {
           {ref ? `${row.underlying.code} ${strikeText(ref.strikePerUnit, row.quote.decimals)} ${row.kind}` : `${row.underlying.code} ${row.kind}`}
         </KeyValueItem>
         <KeyValueItem label="Quantity">{formatMoney(row.underlyingQty, row.underlying)}</KeyValueItem>
-        <KeyValueItem label="Expiry">{formatUtc(row.expiry)}</KeyValueItem>
+        <KeyValueItem label="Deadline">{formatUtc(row.expiry)}</KeyValueItem>
         <KeyValueItem label={isBid ? COPY.premiumRefunded : COPY.collateralReturned} marked>
           {formatUnits(back.amount, back.token.decimals)} {back.token.code}
         </KeyValueItem>
       </KeyValue>
+      {idle && unsettled ? <UnsettledNotice onCheck={unsettled.check}>{unsettled.reason}</UnsettledNotice> : null}
       {state.phase !== 'idle' ? (
         <div className={styles.progress}>
           <TxStepper state={state.phase} failedAt={stoppedStage(state)} hash={state.hash ? <TxLink hash={state.hash} explorerUrl={isMock ? undefined : explorerTx(state.hash)} copy /> : undefined}>

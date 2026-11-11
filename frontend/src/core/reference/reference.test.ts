@@ -63,8 +63,9 @@ describe('labels and notes', () => {
     }
   })
 
-  it('says what the demo and the faucet figures are not', () => {
-    expect(REFERENCE_NOTE.demo).toContain('Not a market.')
+  it('says where the demo and the faucet figures come from', () => {
+    // Ruling R25: the asset header reads "Demo price. A fixed figure chosen by the team."
+    expect(REFERENCE_NOTE.demo).toBe('A fixed figure chosen by the team.')
     expect(REFERENCE_NOTE.fixed).toContain('Not a market.')
   })
 })
@@ -87,7 +88,7 @@ describe('demoReference (mock mode)', () => {
       kind: 'demo',
       perUnit: q('10.2'),
       label: 'Demo price',
-      note: 'Chosen by the team for this demo. Not a market.',
+      note: 'A fixed figure chosen by the team.',
       asOf: null,
       source: 'Mock data.',
     })
@@ -354,15 +355,15 @@ describe('describeReference', () => {
       "Testnet faucet price: 10.00 USDx per RWA. Fixed by the team's faucet. Not a market.",
     )
     expect(describeReference(demoReference('BOND'), { quoteCode: 'USDx', quoteDecimals: 7, underlyingCode: 'BOND' })).toBe(
-      'Demo price: 99.40 USDx per BOND. Chosen by the team for this demo. Not a market.',
+      'Demo price: 99.40 USDx per BOND. A fixed figure chosen by the team.',
     )
   })
 
   it('can show more digits for a low price', () => {
-    const cents: ReferencePrice = { kind: 'demo', perUnit: q('0.064'), label: 'Demo price', note: 'Chosen by the team for this demo. Not a market.', asOf: null }
+    const cents: ReferencePrice = { kind: 'demo', perUnit: q('0.064'), label: 'Demo price', note: 'A fixed figure chosen by the team.', asOf: null }
     const o = { quoteCode: 'USDx', quoteDecimals: 7, underlyingCode: 'MXBx' }
-    expect(describeReference(cents, o)).toBe('Demo price: 0.06 USDx per MXBx. Chosen by the team for this demo. Not a market.')
-    expect(describeReference(cents, { ...o, dp: 4 })).toBe('Demo price: 0.0640 USDx per MXBx. Chosen by the team for this demo. Not a market.')
+    expect(describeReference(cents, o)).toBe('Demo price: 0.06 USDx per MXBx. A fixed figure chosen by the team.')
+    expect(describeReference(cents, { ...o, dp: 4 })).toBe('Demo price: 0.0640 USDx per MXBx. A fixed figure chosen by the team.')
   })
 
   it('says so when there is none', () => {

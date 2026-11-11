@@ -1,8 +1,10 @@
 // Pure decisions of the markets pages, kept out of the components so they can be tested: which assets the index
 // lists, where an intent card leads, when the first-run strip shows and how far its steps are.
 import type { AssetSearch, Intent, MarketsSearch } from '../../app/search'
+import type { BookRow } from '../../core/market/book'
 import { GUIDED_INTENTS } from '../../core/payoff/strategies'
 import type { Bid } from '../../core/requests/types'
+import type { HolderStatus } from '../../core/assetfacts/assetFacts'
 import type { TokenBalance } from '../../core/stellar/tokens'
 import { byPremiumPerUnit } from '../../core/units'
 import type { MarketIndexRow } from '../../data'
@@ -44,14 +46,24 @@ export function obviousAsset(intent: Intent, rows: readonly MarketIndexRow[], ba
   return held.length === 1 ? held[0] : null
 }
 
+const empty = (b: TokenBalance): boolean => b.balance === null || b.balance === 0n
+
 /**
- * True for a connected wallet that holds none of the tokens traded here: no quote token and no listed asset.
- * False while the balances are not read (never flash the strip), and false when a read failed.
+ * True for a connected wallet that holds no quote token: it cannot pay a premium or a strike, whatever else it
+ * holds. False while the balances are not read (never flash the strip), and false when the quote read failed.
  */
-export function needsTestFunds(balances: readonly TokenBalance[] | null | undefined): boolean {
-  if (!balances || balances.length === 0) return false
-  if (balances.some((b) => b.status === 'error')) return false
-  return balances.every((b) => b.balance === null || b.balance === 0n)
+export function needsTestFunds(balances: readonly TokenBalance[] | null | undefined, quoteId: string): boolean {
+  const quote = balances?.find((b) => b.contractId === quoteId)
+  if (!quote || quote.status === 'error') return false
+  return empty(quote)
+}
+
+/** What the strip's lead says: the wallet holds nothing traded here, no quote token, or the strip was asked for. */
+export type FundsLead = 'none' | 'noQuote' | 'asked'
+
+export function fundsLead(balances: readonly TokenBalance[], quoteId: string): FundsLead {
+  if (balances.length > 0 && balances.every(empty)) return 'none'
+  return needsTestFunds(balances, quoteId) ? 'noQuote' : 'asked'
 }
 
 export type FundingStep = 'fund' | 'trust' | 'swap'
@@ -74,7 +86,6 @@ export function fundingProgress(balances: readonly TokenBalance[], quoteId: stri
 
 // ------------------------------------------------------------------------------------------- requests of one asset
 
-
 export interface AssetRequest {
   bid: Bid
   /** Posted by the connected wallet. */
@@ -96,4 +107,40 @@ export function assetRequests(bids: readonly Bid[], assetId: string, me: string 
   const open = onAsset.filter(isOpen).sort((a, b) => byPremiumPerUnit(b, a) || a.expiry - b.expiry || byId(a, b))
   const mineLapsed = me === null ? [] : onAsset.filter((b) => b.buyer === me && lapsed(b)).sort((a, b) => a.expiry - b.expiry || byId(a, b))
   return [...open.map((bid) => ({ bid, mine: me !== null && bid.buyer === me, open: true })), ...mineLapsed.map((bid) => ({ bid, mine: true, open: false }))]
+}
+
+/** A request in the shape of a row of the book, for the dialog that cancels it (the same one as in the chain). */
+export const requestRow = (bid: Bid): BookRow => ({
+  key: `b${bid.id}`,
+  source: 'bid',
+  kind: bid.kind,
+  underlying: bid.underlying,
+  quote: bid.quote,
+  underlyingQty: bid.underlyingQty,
+  totalStrike: bid.totalStrike,
+  totalPremium: bid.totalPremium,
+  expiry: bid.expiry,
+  counterparty: bid.buyer,
+  bid,
+})
+
+// ------------------------------------------------------------------------------------------- access to one asset
+
+/** Which sentence "Your access" says: what the wallet itself lacks first, then the issuer's decision. */
+export type AccessCase = 'unfunded' | 'noTrustline' | 'issuer' | 'maintainOnly' | 'no' | 'yes' | 'checking' | 'error'
+
+/**
+ * `status` is the wallet's balance status for the asset, `holder` the trustline read from Horizon (live builds),
+ * `eligible` the contract's own answer (undefined while it is read, null when the read failed). A missing account
+ * or trustline is the wallet's own fix and is said before any authorization.
+ */
+export function accessCase(status: TokenBalance['status'] | undefined, holder: HolderStatus | undefined, eligible: boolean | null | undefined): AccessCase {
+  if (status === 'unfunded' || holder === 'unfunded') return 'unfunded'
+  if (status === 'no-trustline' || holder === 'no-trustline') return 'noTrustline'
+  if (holder === 'issuer') return 'issuer'
+  if (holder === 'maintain-only') return 'maintainOnly'
+  if (status === 'not-authorized' || holder === 'unauthorized') return 'no'
+  if (eligible === undefined) return 'checking'
+  if (eligible === null) return 'error'
+  return eligible ? 'yes' : 'no'
 }

@@ -1,9 +1,9 @@
-// The worked examples of the Learn page: one fictional lot of 5.00 BOND seen through the four intents.
+// The worked examples of the Learn page: one example lot of 5.00 BOND seen through the four intents.
 //
 // The terms are exact integer units (7 decimals) and are formatted as such. Everything that depends on a price
 // (breakeven, the most you can lose or gain, the three scenarios, the curves) comes from core/payoff/strategies,
-// is a display number, and is shown beside a figure captioned "Hypothetical payoff at expiry. Not a quote."
-// Nothing here is an offer, a quote or an amount that is ever signed.
+// is a display number, and is shown beside a figure captioned with the required payoff sentence
+// (core/disclosures PAYOFF_CAPTION). Nothing here is an offer, a quote or an amount that is ever signed.
 
 import { formatMoney, formatNumber, formatUnits, formatUtc, NBSP, noBreak, URGENCY_48H_SECONDS } from '../../core/format'
 import type { UnitToken } from '../../core/format'

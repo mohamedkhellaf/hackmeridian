@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ActivityEntry } from '../../data'
 import { TX_EFFECT_TEXT, TX_PHASE_HELP } from '../../data'
-import { activityRow, activityRows, noteOf, settledCount, targetOf } from './model'
+import { unknownNote } from './copy'
+import { activityRow, activityRows, groupRows, noteOf, settledCount, targetOf, termsText, utcClock, zoneLabel } from './model'
 
 const HASH = 'b3c8fdd1a609e688f2b76b92e9dc9ce3f867062129a09fcc6092e667c7c7808e'
 
@@ -29,11 +30,12 @@ const entry = (part: Partial<ActivityEntry> = {}): ActivityEntry => ({
 const ON = { marginEnabled: true }
 
 describe('activityRow', () => {
-  it('describes a confirmed transaction with its word, ledger and explorer link', () => {
+  it('describes a confirmed transaction with its word, ledger and explorer link, and no note line', () => {
     const row = activityRow(entry(), ON)
     expect(row.state).toBe('Confirmed')
     expect(row.tone).toBe('confirmed')
-    expect(row.note).toBe('Bought, in ledger 58,331,204.')
+    expect(row.ledger).toBe('58,331,204')
+    expect(row.note).toBeNull()
     expect(row.hashUrl).toBe(`https://stellar.expert/explorer/testnet/tx/${HASH}`)
     expect(row.settled).toBe(true)
     expect(row.canCheck).toBe(false)
@@ -43,7 +45,8 @@ describe('activityRow', () => {
     const row = activityRow(entry({ mock: true, ledger: null }), ON)
     expect(row.hash).toBe(HASH)
     expect(row.hashUrl).toBeNull()
-    expect(row.note).toBe('Bought.')
+    expect(row.ledger).toBeNull()
+    expect(row.note).toBeNull()
   })
 
   it('tells a failure that charged the fee from one that sent nothing', () => {
@@ -61,15 +64,30 @@ describe('activityRow', () => {
     const unknown = activityRow(entry({ phase: 'unknown', effect: 'outcome-unknown', ledger: null }), ON)
     expect(unknown.state).toBe('Outcome unknown')
     expect(unknown.tone).toBe('unknown')
-    expect(unknown.note).toBe(TX_PHASE_HELP.unknown)
+    expect(unknown.note).toBe(unknownNote(null))
     expect(unknown.canCheck).toBe(true)
     expect(unknown.settled).toBe(false)
     expect(activityRow(entry({ phase: 'unknown', effect: 'outcome-unknown', hash: null }), ON).canCheck).toBe(false)
   })
 
-  it('keeps the explanation of an interrupted transaction', () => {
-    const note = 'The page was closed before a ledger confirmed this transaction. It was sent and can still be included. Check again.'
-    expect(noteOf(entry({ phase: 'unknown', effect: 'outcome-unknown', error: note }))).toBe(note)
+  it('says an unknown outcome in the ticket\'s words, with the cut-off while it is ahead', () => {
+    const now = Date.UTC(2026, 10, 11, 14, 30, 0)
+    const maxTime = Date.UTC(2026, 10, 11, 14, 37, 47) / 1000
+    const unknown = entry({ phase: 'unknown', effect: 'outcome-unknown', ledger: null, maxTime })
+    expect(noteOf(unknown, { now })).toBe(unknownNote('14:37:47\u00a0UTC'))
+    expect(noteOf(unknown, { now: now + 3_600_000 })).toBe(unknownNote(null))
+  })
+
+  it('says when a look found nothing, on the row', () => {
+    const checked = new Map([['e1', Date.UTC(2026, 10, 11, 14, 22, 5)]])
+    const note = noteOf(entry({ phase: 'unknown', effect: 'outcome-unknown', ledger: null }), { checkedAt: checked })
+    expect(note).toBe(`${unknownNote(null)} Checked at 14:22:05\u00a0UTC: not included yet.`)
+  })
+
+  it('keeps the explanation of an interrupted transaction that has no hash to look up', () => {
+    const note = 'The page was closed while this transaction was being sent. Its outcome is not known. Look at the account on the explorer before sending it again.'
+    expect(noteOf(entry({ phase: 'unknown', effect: 'outcome-unknown', hash: null, error: note }))).toBe(note)
+    expect(noteOf(entry({ phase: 'unknown', effect: 'outcome-unknown', hash: null }))).toBe(TX_PHASE_HELP.unknown)
   })
 
   it('reads a pending transaction as in flight', () => {
@@ -145,5 +163,46 @@ describe('targetOf, for what a transaction created and for issuer actions', () =
   it('links an issuer action to the issuer console, whatever it acted on', () => {
     expect(targetOf({ product: 'covered', action: 'issuer-freeze', subject: 'issuer:CASSET:GHOLDER' }, ON)).toEqual({ kind: 'issuer', label: 'Issuer console' })
     expect(targetOf({ product: 'covered', action: 'issuer-clawback', subject: null }, ON)).toEqual({ kind: 'issuer', label: 'Issuer console' })
+  })
+})
+
+describe('groupRows', () => {
+  const day = (d: number, h = 9) => Date.UTC(2026, 10, d, h, 0, 0)
+  it('lists open rows first, an unknown outcome before one in flight, then the finished ones by UTC day', () => {
+    const rows = activityRows(
+      [
+        entry({ id: 'p', phase: 'pending', startedAt: day(11, 12) }),
+        entry({ id: 'a', startedAt: day(11, 11) }),
+        entry({ id: 'u', phase: 'unknown', startedAt: day(11, 10) }),
+        entry({ id: 'b', phase: 'failed', startedAt: day(11, 8) }),
+        entry({ id: 'c', startedAt: day(10, 23) }),
+      ],
+      ON,
+    )
+    const groups = groupRows(rows)
+    expect(groups.map((g) => g.title)).toEqual(['Waiting for an outcome', '11 Nov 2026', '10 Nov 2026'])
+    expect(groups.map((g) => g.rows.map((r) => r.id))).toEqual([['u', 'p'], ['a', 'b'], ['c']])
+  })
+
+  it('has no open group when everything is final', () => {
+    expect(groupRows(activityRows([entry({ id: 'a' })], ON)).map((g) => g.key)).toEqual(['day:2026-11-11'])
+  })
+})
+
+describe('time and terms', () => {
+  it('formats the clock in UTC to the second', () => {
+    expect(utcClock(Date.UTC(2026, 10, 11, 8, 1, 30))).toBe('08:01:30 UTC')
+  })
+
+  it('names the viewer\'s zone only when it is not UTC', () => {
+    const at = Date.UTC(2026, 10, 11, 12)
+    expect(zoneLabel(at, 'UTC')).toBeNull()
+    expect(zoneLabel(at, 'Europe/Lisbon')).toBeNull()
+    expect(zoneLabel(at, 'Europe/Paris')).toBe('UTC+1')
+    expect(zoneLabel(at, 'America/St_Johns')).toBe('UTC\u22123:30')
+  })
+
+  it('keeps a date inside the terms on one line', () => {
+    expect(termsText('Strike 99.00 USDx per BOND, deadline 13 Nov 2026, 08:00 UTC')).toBe('Strike 99.00 USDx per BOND, deadline 13\u00a0Nov\u00a02026,\u00a008:00\u00a0UTC')
   })
 })

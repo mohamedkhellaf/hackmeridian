@@ -1,29 +1,32 @@
+import { Link as RouterLink } from '@tanstack/react-router'
 import { useState } from 'react'
 import { countOf } from '../../../core/format'
 import { PRO_ERRORS, proErrorName } from '../../../core/pro/errors'
 import type { AccountView } from '../../../core/pro/types'
+import { VAULT } from '../../../core/pro/types'
 import { usePro } from '../../../data'
-import { Button, Callout, EmptyNote, KeyValue, KeyValueItem, useIsPhone } from '../../../ui'
-import { HealthBar } from '../../../viz'
-import { NO_VALUE_NOTE } from '../copy'
+import { Button, Callout, EmptyNote, KeyValue, KeyValueItem, Link, useIsPhone } from '../../../ui'
 import { HEALTH_WORD, healthOf } from '../model/health'
-import { QUOTE, lots, toChartNumber, usdx } from '../model/money'
-import { contractName, partyName } from '../model/names'
+import { QUOTE, lots, usdxExact } from '../model/money'
+import { contractTitle, partyName } from '../model/names'
 import { takeovers } from '../model/settlement'
 import type { Takeover } from '../model/settlement'
 import { ConfirmDialog } from '../parts/ConfirmDialog'
 import { DeskTable } from '../parts/DeskTable'
 import type { DeskColumn } from '../parts/DeskTable'
-import { NoValue, Usdx, Who } from '../parts/figures'
+import { Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
-import type { ResultFact } from '../parts/marginUi'
+import type { ResultView } from '../parts/marginUi'
 import { Footnote, Section } from '../parts/Section'
 import { useLast } from '../parts/useLast'
+import { useReplayable } from '../parts/useReplayable'
 import css from './LiquidationsScreen.module.css'
 
 type Mode = 'vault' | 'private'
 
 const isBelow = (a: AccountView) => a.cushion !== null && a.cushion < 0n
+/** A takeover is only offered where the contract can accept it: below the liquidation level, or not known. */
+const canBeTaken = (a: AccountView) => a.shorts.length > 0 && (a.cushion === null || a.cushion < 0n)
 
 /**
  * Writers and their distance to the liquidation level. An account below it can be taken over: by the vault
@@ -33,6 +36,7 @@ const isBelow = (a: AccountView) => a.cushion !== null && a.cushion < 0n
 export function LiquidationsScreen() {
   const { client, model, me, simulated, busy } = usePro()
   const { act, canAct, connect } = useMarginUi()
+  const replay = useReplayable()
   const [taking, setTaking] = useState<{ account: AccountView; mode: Mode } | null>(null)
   const shown = useLast(taking)
   // Row actions are 28 px on a desk and full touch height, full width, in the phone list.
@@ -45,45 +49,35 @@ export function LiquidationsScreen() {
   const below = writers.filter(isBelow)
   const log = takeovers(model.history)
   const seriesOf = (id: number) => model.series.find((s) => s.id === id)
-  const shortsText = (a: AccountView) => (a.shorts.length === 0 ? 'None' : a.shorts.map((s) => `${lots(s.qty)} lots, ${contractName(seriesOf(s.seriesId))}`).join('; '))
+  const shortsText = (a: AccountView) => (a.shorts.length === 0 ? 'None' : a.shorts.map((s) => `${lots(s.qty)} lots, ${contractTitle(seriesOf(s.seriesId))}`).join('; '))
+  const scripted = (a: AccountView, mode: Mode) => replay.can('liquidate', (args) => args[1] === a.id && args[2] === (mode === 'vault' ? VAULT : me))
 
   const takeOver = (account: AccountView, mode: Mode) => {
     const what = mode === 'vault' ? { label: 'Take over to the vault', done: 'Taken over by the vault' } : { label: 'Private takeover', done: 'Taken over privately' }
-    void act(what, (opts) => client.liquidate(me, account.id, mode === 'vault' ? null : me, opts), (v): ResultFact[] => [
-      { label: 'Takeover price', value: v.x },
-      { label: 'Paid by the account', value: v.paid },
-      { label: 'Shortfall, now its debt to the vault', value: v.deficit, loss: v.deficit > 0n },
-    ])
+    void act(what, (opts) => client.liquidate(me, account.id, mode === 'vault' ? null : me, opts), (v): ResultView => ({
+      facts: [
+        { label: 'Takeover price', value: v.x },
+        { label: 'Paid by the account', value: v.paid },
+        { label: 'Shortfall, now its debt to the vault', value: v.deficit, loss: v.deficit > 0n },
+      ],
+    }))
   }
 
   const accountColumns: ReadonlyArray<DeskColumn<AccountView>> = [
     { id: 'account', header: 'Account', rowHeader: true, phone: 'title', cell: (a) => <Who id={a.id} me={me} /> },
-    { id: 'shorts', header: 'Short calls', cell: shortsText },
+    { id: 'shorts', header: 'Short calls', cell: (a) => <span className={css.wrap}>{shortsText(a)}</span> },
     { id: 'nlv', header: `Account value (${QUOTE})`, numeric: true, cell: (a) => <Usdx v={a.requirement?.nlv} /> },
     { id: 'mm', header: `Liquidation level (${QUOTE})`, numeric: true, cell: (a) => <Usdx v={a.requirement?.mm} /> },
     { id: 'distance', header: `Distance (${QUOTE})`, numeric: true, cell: (a) => <Usdx v={a.cushion} tone={isBelow(a) ? 'loss' : undefined} /> },
     {
-      id: 'health',
-      header: 'Health',
+      id: 'state',
+      header: 'State',
       phone: 'aside',
       cell: (a) => {
         const h = healthOf(a.requirement)
-        const req = a.requirement
         return (
-          <span className={css.health} data-state={h.state}>
-            {req ? (
-              <HealthBar
-                variant="compact"
-                nlv={toChartNumber(req.nlv)}
-                mm={toChartNumber(req.mm)}
-                im={toChartNumber(req.im)}
-                nlvLabel={`Account value ${usdx(req.nlv)}`}
-                mmLabel={`Liquidation level ${usdx(req.mm)}`}
-                imLabel={`Opening requirement ${usdx(req.im)}`}
-                stateLabel={HEALTH_WORD[h.state]}
-              />
-            ) : null}
-            <span className={css.word}>{HEALTH_WORD[h.state]}</span>
+          <span className={css.state} data-state={h.state}>
+            {HEALTH_WORD[h.state]}
           </span>
         )
       },
@@ -95,7 +89,8 @@ export function LiquidationsScreen() {
       pinned: true,
       phone: 'actions',
       cell: (a) => {
-        if (a.shorts.length === 0) return <span className={css.muted}>No short calls</span>
+        // An account above its liquidation level cannot be taken over: nothing to offer here.
+        if (!canBeTaken(a)) return null
         if (!canAct) {
           return (
             <Button {...row} onClick={connect}>
@@ -104,15 +99,35 @@ export function LiquidationsScreen() {
           )
         }
         const own = a.id === me
+        const toVault = (
+          <Button
+            {...row}
+            variant={own ? 'secondary' : 'primary'}
+            disabled={busy || !scripted(a, 'vault')}
+            disabledReason={!scripted(a, 'vault') ? replay.reason(`takeover of ${partyName(a.id)} by the vault`) : undefined}
+            aria-label={`Take over to the vault: ${partyName(a.id)}`}
+            onClick={() => setTaking({ account: a, mode: 'vault' })}
+          >
+            Take over to the vault
+          </Button>
+        )
+        if (own) {
+          // Your own account: the way out is a deposit; the vault takeover stays available, as the contract allows it.
+          const distance = a.cushion !== null && a.cushion < 0n ? -a.cushion : null
+          return (
+            <span className={css.actions}>
+              <Link render={<RouterLink to="/margin" />}>{distance !== null ? `Deposit ${usdxExact(distance)} ${QUOTE}` : 'Deposit on Account'}</Link>
+              {toVault}
+            </span>
+          )
+        }
         return (
           <span className={css.actions}>
-            <Button {...row} variant={isBelow(a) ? 'primary' : 'secondary'} disabled={busy} aria-label={`Take over to the vault: ${partyName(a.id)}`} onClick={() => setTaking({ account: a, mode: 'vault' })}>
-              Take over to the vault
-            </Button>
+            {toVault}
             <Button
               {...row}
-              disabled={own || busy}
-              disabledReason={own ? (simulated ? 'You cannot take over your own account. Act as another writer in the replay.' : 'You cannot take over your own account.') : undefined}
+              disabled={busy || !scripted(a, 'private')}
+              disabledReason={!scripted(a, 'private') ? replay.reason(`takeover of ${partyName(a.id)} by ${partyName(me)}`) : undefined}
               aria-label={`Private takeover: ${partyName(a.id)}`}
               onClick={() => setTaking({ account: a, mode: 'private' })}
             >
@@ -160,20 +175,13 @@ export function LiquidationsScreen() {
           columns={accountColumns}
           rows={writers}
           rowKey={(a) => a.id}
-          empty={<EmptyNote size="sm" title="No margin account has a short call." hint="An account is listed here once it has written a call." />}
+          empty={<EmptyNote size="sm" title="No margin account has a short call." />}
         />
-        {writers.some((a) => !a.requirement) ? <Footnote>{NO_VALUE_NOTE}</Footnote> : null}
         {!simulated ? <Footnote>The contract has no list of accounts. This table shows the accounts that appear in offers, positions and books, and the connected wallet.</Footnote> : null}
       </Section>
 
       <Section title="Takeovers" note={simulated ? undefined : 'Takeovers made from this browser. The contract keeps no history of them.'}>
-        <DeskTable
-          caption="Takeovers"
-          columns={logColumns}
-          rows={log}
-          rowKey={(t) => t.index}
-          empty={<EmptyNote size="sm" title="No takeover has been made." hint="Each one is listed here with its price and any shortfall." />}
-        />
+        <DeskTable caption="Takeovers" columns={logColumns} rows={log} rowKey={(t) => t.index} empty={<EmptyNote size="sm" title="No takeover has been made." />} />
       </Section>
 
       <ConfirmDialog
@@ -183,13 +191,18 @@ export function LiquidationsScreen() {
         title={mode === 'vault' ? 'Take over to the vault' : 'Private takeover'}
         description={account ? `${partyName(account.id)}: ${shortsText(account)}.` : undefined}
         confirmLabel={mode === 'vault' ? 'Take over to the vault' : 'Take over privately'}
+        expectRefusal={notBelow}
         onConfirm={() => account && takeOver(account, mode)}
       >
         {account ? (
           <>
             <KeyValue>
-              <KeyValueItem label="Account value (NLV)">{account.requirement ? `${usdx(account.requirement.nlv)} ${QUOTE}` : <NoValue />}</KeyValueItem>
-              <KeyValueItem label="Liquidation level (MM)">{account.requirement ? `${usdx(account.requirement.mm)} ${QUOTE}` : <NoValue />}</KeyValueItem>
+              <KeyValueItem label="Account value (NLV)">
+                <Usdx v={account.requirement?.nlv} unit figure="serif" />
+              </KeyValueItem>
+              <KeyValueItem label="Liquidation level (MM)">
+                <Usdx v={account.requirement?.mm} unit figure="serif" />
+              </KeyValueItem>
               <KeyValueItem label="Distance">
                 <Usdx v={account.cushion} unit tone={isBelow(account) ? 'loss' : undefined} figure="serif" />
               </KeyValueItem>
@@ -209,11 +222,11 @@ export function LiquidationsScreen() {
                 {PRO_ERRORS[218].name}, 218), or if your account value would end under your opening requirement.
               </p>
             )}
-            <p>The price, what was paid and any shortfall are in the result and in the takeovers list.</p>
+            <p>The contract has no view of the takeover price before the call, so it is not shown here; the result gives it.</p>
             {notBelow ? (
-              <Callout variant="warning" label="Expect a refusal" title="This account is not below its liquidation level.">
+              <Callout variant="warning" title="This account is not below its liquidation level.">
                 <p>
-                  {PRO_ERRORS[211].name} (211). {PRO_ERRORS[211].message}
+                  {PRO_ERRORS[211].message} <span className={css.code}>{PRO_ERRORS[211].name} (211)</span>
                 </p>
               </Callout>
             ) : null}

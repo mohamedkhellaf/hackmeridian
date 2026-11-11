@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Logo, Segmented, applyDensity, applyPnlScheme, applyTheme } from '../../ui'
+import { Segmented, applyDensity, applyPnlScheme, applyTheme } from '../../ui'
 import type { DensityChoice, PnlScheme, ThemeChoice } from '../../ui'
 import { BrandSection } from './sections/Brand'
 import { ControlsSection } from './sections/Controls'
@@ -53,8 +53,8 @@ function readPageSettings(): GallerySettings {
 
 /**
  * The component gallery: every token and every component of `src/ui`, in all states, with the theme, density and
- * gain/loss scheme switchers. It is part of the product (linked from the footer as "Design system"), so it is
- * held to the same rules as any other page.
+ * gain/loss scheme switchers. It is part of the product (served at /design), so it is held to the same rules as
+ * any other page.
  */
 export default function Gallery({ settings, onSettingsChange, embedded = false }: GalleryProps) {
   const [own, setOwn] = useState<GallerySettings>(readPageSettings)
@@ -81,13 +81,11 @@ export default function Gallery({ settings, onSettingsChange, embedded = false }
     <div className={styles.root} data-embedded={embedded || undefined}>
       <header className={styles.masthead}>
         <div className={styles.mastheadMain}>
-          <Logo size={22} />
           <h1 className={styles.title} tabIndex={-1}>
             Design system
           </h1>
           <p className={styles.lead}>
-            Term Sheet: paper and ink, serif figures, ruled tables, a highlighter on your own terms. Every token and
-            every component of the app, in every state, in both themes.
+            Every token and every component of the app, in every state, in both themes.
           </p>
         </div>
         <div className={styles.switches} role="group" aria-label="Display settings">
@@ -99,8 +97,8 @@ export default function Gallery({ settings, onSettingsChange, embedded = false }
             onValueChange={(theme) => change({ theme })}
             options={[
               { value: 'system', label: 'System' },
-              { value: 'light', label: 'Paper' },
-              { value: 'dark', label: 'Carbon' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
             ]}
           />
           <Segmented<DensityChoice>

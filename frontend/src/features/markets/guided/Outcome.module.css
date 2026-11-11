@@ -1,10 +1,21 @@
 @layer features {
-  .root {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-16);
+  .cards {
     min-width: 0;
-    container-type: inline-size;
+  }
+
+  /* The figure and, beside it on a wide column, the two figures the ticket prints too. */
+  .detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-16) var(--s-24);
+    align-items: start;
+    min-width: 0;
+  }
+
+  @container (min-width: 44rem) {
+    .detail {
+      grid-template-columns: minmax(0, 1fr) 13rem;
+    }
   }
 
   .chart {
@@ -16,6 +27,15 @@
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
+    font-variant-numeric: tabular-nums lining-nums;
+
+    &[data-direction='gain'] {
+      color: var(--gain);
+    }
+
+    &[data-direction='loss'] {
+      color: var(--loss);
+    }
   }
 
   .sentence {
@@ -29,79 +49,14 @@
     min-height: calc(var(--body-line) * 2);
   }
 
-  .hint {
-    margin-top: var(--s-8);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
-  }
-
   .facts {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--s-24);
-    margin: 0;
-    padding-top: var(--s-16);
+    min-width: 0;
     border-top: 1px solid var(--rule);
   }
 
-  .facts[data-count='1'] {
-    grid-template-columns: minmax(0, var(--measure));
-  }
-
-  .fact {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-4);
-    min-width: 0;
-
-    & dt {
-      font-size: var(--label-size);
-      line-height: var(--label-line);
-      font-weight: var(--label-weight);
-      font-stretch: var(--label-stretch);
-      color: var(--muted);
-    }
-
-    & dd {
-      display: flex;
-      flex-direction: column;
-      gap: var(--s-4);
-      margin: 0;
-    }
-  }
-
-  .factValue {
-    font-family: var(--font-serif);
-    font-size: var(--figure-lg-size);
-    line-height: var(--figure-lg-line);
-    font-weight: var(--figure-weight);
-    font-variant-numeric: tabular-nums lining-nums;
-    color: var(--text);
-  }
-
-  .factHint {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: var(--body-weight);
-    color: var(--text-2);
-    text-wrap: pretty;
-  }
-
-  @container (max-width: 35.99rem) {
+  @container (min-width: 44rem) {
     .facts {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--s-16);
-    }
-
-    .fact {
-      padding-bottom: var(--s-16);
-      border-bottom: 1px solid var(--hairline);
-
-      &:last-child {
-        padding-bottom: 0;
-        border-bottom: 0;
-      }
+      border-top: 0;
     }
   }
 }

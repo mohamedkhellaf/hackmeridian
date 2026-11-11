@@ -33,9 +33,10 @@ export interface LiveChoices {
   /** Reference assets with a put on offer. */
   assets: { id: string; code: string; typeLabel: string | null }[]
   assetId: string
-  /** Floors on offer at the chosen deadline, per unit in quote units, with the cheapest premium per unit. */
-  strikes: { value: bigint; perUnit: bigint | null }[]
-  expiries: number[]
+  /** Floors on offer at the chosen deadline, per unit in quote units, with the cheapest premium per unit and its lot. */
+  strikes: { value: bigint; perUnit: bigint | null; qty: bigint }[]
+  /** Deadlines with a put on offer, each with the lot the note would show there for the floor chosen now. */
+  expiries: { value: number; qty: bigint | null }[]
   /** Set when the floor asked for is not on offer at this deadline and the nearest one is shown. */
   movedFrom: bigint | null
 }

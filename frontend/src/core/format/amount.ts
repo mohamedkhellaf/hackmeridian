@@ -120,18 +120,30 @@ export interface FormatNumberOptions {
   group?: boolean
 }
 
+/** Below this a float is noise from arithmetic (0.1 + 0.2 - 0.3), not a figure: it prints as zero. */
+const FLOAT_NOISE = 1e-9
+
 /**
- * A JavaScript number as display text, for chart labels and hypothetical payoff figures only. It rounds to the
- * nearest `dp` digits (binary floats such as 9.639999999 must read 9.64), so it must never be used for a token
- * amount: those are `bigint` and go through `formatUnits`.
+ * A JavaScript number as display text, for chart labels and hypothetical payoff figures only. The same rule as
+ * `formatUnits`: truncated toward zero, never rounded up, and a non-zero figure is never shown as zero (`<0.01`).
+ * A binary float that sits a hair under a digit (9.639999999) still reads 9.64: the error of the float is taken
+ * off before truncating. Never for a token amount: those are `bigint` and go through `formatUnits`.
  */
 export function formatNumber(value: number, opts: FormatNumberOptions = {}): string {
   const { sign = false, group = true } = opts
   const dp = isCount(opts.dp ?? 2) ? Math.min(opts.dp ?? 2, 20) : 2
   if (Number.isNaN(value)) return NO_VALUE
   if (!Number.isFinite(value)) return `${value < 0 ? MINUS : sign ? '+' : ''}∞`
-  const fixed = Math.abs(value).toFixed(dp)
-  const zero = !/[1-9]/.test(fixed)
-  const [whole, fraction] = fixed.split('.')
-  return `${signOf(value < 0 && !zero, zero, sign)}${group ? groupDigits(whole) : whole}${fraction ? `.${fraction}` : ''}`
+  const abs = Math.abs(value)
+  if (abs < FLOAT_NOISE) return dp > 0 ? `0.${'0'.repeat(dp)}` : '0'
+  const scale = 10 ** dp
+  // A float a hair under a digit boundary belongs to the digit above it. The tolerance (a millionth of the last
+  // digit shown) stays far below the smallest token unit (1e-7), so no real amount is pushed up by it.
+  const truncated = Math.floor(abs * scale + 1e-6)
+  const negative = value < 0
+  if (truncated === 0) return `${signOf(negative, false, sign)}<${dp === 0 ? '1' : `0.${'0'.repeat(dp - 1)}1`}`
+  const digits = truncated.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 0 }).padStart(dp + 1, '0')
+  const whole = dp > 0 ? digits.slice(0, -dp) : digits
+  const fraction = dp > 0 ? digits.slice(-dp) : ''
+  return `${signOf(negative, false, sign)}${group ? groupDigits(whole) : whole}${fraction ? `.${fraction}` : ''}`
 }

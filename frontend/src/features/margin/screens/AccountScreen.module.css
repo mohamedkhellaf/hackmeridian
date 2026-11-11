@@ -29,39 +29,68 @@
     top: var(--s-72);
   }
 
+  /* The distance to liquidation leads the account, at the size of a closing figure. */
+  .lead {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    text-wrap: pretty;
+
+    &[data-state='liquidatable'] {
+      color: var(--loss);
+    }
+
+    &[data-state='unknown'] {
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+      color: var(--text-2);
+    }
+  }
+
   .figures {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-8);
+  }
+
+  /* Wide: the three requirement figures as one ruled row. */
+  .figureRow {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--s-16) var(--s-32);
+    gap: var(--s-24);
+    align-self: stretch;
+    padding-block: var(--s-4);
+    border-block: 1px solid var(--hairline);
   }
 
-  .health {
-    max-width: 45rem;
-  }
-
-  .restore {
+  .definitions {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-8) var(--s-12);
-  }
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: 22rem;
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
 
-  .restoreNote,
-  .replay {
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
+    & dt {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    & dd {
+      margin: 0;
+      color: var(--text-2);
+    }
   }
 
   .muted {
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
-  }
-
-  .replay {
-    padding-top: var(--s-12);
-    border-top: 1px solid var(--hairline);
   }
 
   .shorts {
@@ -98,8 +127,7 @@
     }
 
     .figures {
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--s-12);
+      align-items: stretch;
     }
   }
 }

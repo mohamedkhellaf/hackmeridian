@@ -19,17 +19,18 @@
     margin-inline-start: auto;
   }
 
-  /* Phones: asset and kind share a line, the order takes the next one. Nothing is cut short. */
-  @media (max-width: 767.98px) {
-    .root {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: var(--s-12);
-    }
+  /* Phones: one line of controls, the labels kept for screen readers (each control names its own choice). */
+  .root[data-compact] {
+    flex-wrap: nowrap;
+    gap: var(--s-8);
 
-    .sort {
-      grid-column: 1 / -1;
-      margin: 0;
+    & .asset {
+      flex: 1 1 auto;
+      min-width: 0;
     }
+  }
+
+  .sortButton {
+    flex: none;
   }
 }

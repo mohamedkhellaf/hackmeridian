@@ -11,23 +11,22 @@
     min-width: 0;
   }
 
-  .controls {
-    display: grid;
-    gap: var(--s-12);
-    min-width: 0;
-  }
-
   .caption,
-  .legend,
-  .hint {
+  .legend {
     color: var(--muted);
     font-size: var(--caption-size);
     line-height: var(--caption-line);
   }
 
+  /* The one instruction, while nothing is selected: a premium is a control, and this says so. */
   .hint {
-    padding-top: var(--s-16);
-    border-top: 1px solid var(--rule);
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  /* The URL named a date the chain does not show. */
+  .moved {
     color: var(--text-2);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
@@ -47,8 +46,51 @@
     }
   }
 
+  /* ---- First load: the chain's own shape, so nothing jumps when it lands ---- */
+
   .skeleton {
     display: grid;
-    gap: var(--s-16);
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .skeletonTable {
+    display: grid;
+    max-inline-size: 46rem;
+  }
+
+  .skeletonRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) calc(var(--s-72) + var(--s-24)) minmax(0, 1fr);
+    align-items: center;
+    height: var(--row-h-compact);
+    border-bottom: 1px solid var(--hairline);
+
+    &[data-head] {
+      border-bottom-color: var(--rule);
+    }
+  }
+
+  .skeletonSide {
+    display: flex;
+    padding-inline: var(--s-12);
+
+    &[data-side='call'] {
+      justify-content: flex-end;
+    }
+  }
+
+  .skeletonStrike {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    background: color-mix(in srgb, var(--text) 7%, transparent);
+  }
+
+  @media (max-width: 767.98px) {
+    .skeletonRow {
+      height: var(--touch);
+    }
   }
 }

@@ -1,10 +1,6 @@
 // Every string of the Issuer page. Sentences are whole (never assembled from fragments); counts go through Intl.
 // The clawback shortfall sentence is not here: it comes from core/disclosures.
 import { countOf } from '../../core/format'
-import type { PluralForms } from '../../core/format'
-
-const OPTION: PluralForms = { one: 'option', other: 'options' }
-const ACTIVE_OPTION: PluralForms = { one: 'active option', other: 'active options' }
 
 /** The state words of a holder, as shown in the Authorization column. */
 export const STATE_LABEL = {
@@ -17,91 +13,71 @@ export const STATE_LABEL = {
   unknown: 'Unknown',
 } as const
 
-/** What each state means for the asset, in one line under the word. */
+/**
+ * What a state means for the asset, in one line under the word. "Authorized" and "Issuer" say it all and have
+ * no line.
+ */
 export const STATE_DETAIL = {
-  authorized: (code: string) => `Can send and receive ${code}.`,
   'maintain-only': (code: string) => `Keeps its open offers. Cannot send or receive ${code}.`,
   unauthorized: (code: string) => `Cannot send or receive ${code}.`,
   'no-trustline': (code: string) => `Cannot hold ${code} until it opens a trustline.`,
   unfunded: () => 'Not funded on Testnet.',
-  issuer: () => 'The issuing account.',
   unknown: () => 'The read failed.',
 } as const
 
 export const COPY = {
   page: {
     title: 'Issuer',
+    /** The description of the console (a Testnet build). A mock build prints `mock.sentence` instead. */
     description: "Who can hold a listed asset, who is frozen and what is taken back. Only the asset's issuer can sign.",
     assetLabel: 'Asset',
     loading: 'Loading the listed assets',
     assetsError: 'The listed assets could not be read.',
     noAssets: 'No asset is listed in the contract.',
-    noAssetsHint: 'The console opens once the options contract lists an asset.',
-    retry: 'Try again',
+    noAssetsHint: 'The console opens once the Covered contract lists an asset.',
+    retry: 'Read again',
   },
 
   mock: {
-    /** Exact wording, checked by the e2e spec. */
-    sentence: 'Issuer actions need a Testnet contract.',
-    hint: 'This build runs on mock data. There is no asset contract to read and no transaction to sign.',
-    whatTitle: 'What the console does on Testnet',
-    whatLead:
-      'The issuer of a listed asset connects its account and decides who can hold the asset. Each action is one transaction signed by the issuer, and each one changes what an option on that asset can do.',
-    actionHeader: 'Action',
-    signsHeader: 'What the issuer signs',
-    optionsHeader: 'What it means for options',
-    actions: [
-      {
-        name: 'Authorize',
-        signs: 'Approves an account or a contract to hold the asset. The options contract needs this approval before it can take the asset as collateral.',
-        options: 'An authorized holder can exercise. An authorized writer can claim delivery and reclaim.',
-      },
-      {
-        name: 'Freeze',
-        signs: 'Revokes that approval. The balance stays where it is and cannot move.',
-        options:
-          'A frozen holder cannot exercise. A frozen writer cannot claim delivery or reclaim. If the options contract is frozen, no option written on the asset can settle.',
-      },
-      {
-        name: 'Claw back',
-        signs: 'Removes an amount of the asset from an account or a contract, without its consent. The tokens are destroyed, not sent to the issuer.',
-        options:
-          'Taken from the options contract, it leaves the collateral short: holders are paid first come, first served until the balance runs out.',
-      },
-    ],
-    readsTitle: 'What it reads',
-    reads: [
-      {
-        name: 'Issuer flags',
-        text: 'Authorization required, authorization revocable and clawback enabled, each with what it allows, and whether the issuer can still change them.',
-      },
-      {
-        name: 'Accounts',
-        text: 'Every account with a trustline for the asset: its balance and whether it is authorized, restricted or not authorized.',
-      },
-      {
-        name: 'The options contract',
-        text: 'Always the first row: its balance, its authorization and how many open options depend on it.',
-      },
-    ],
-    whoTitle: 'Who can sign',
-    who: 'Only the issuer account of the asset. Anyone else sees the flags and the options contract, read only. Accounts are handled with classic operations through Horizon, contracts through the asset contract.',
-    reservesLink: 'See what the contract holds',
-    learnLink: 'How an issuer action affects an option',
+    /** Ruling R24, word for word: the one sentence of the page on mock data. Checked by the e2e spec. */
+    sentence: 'On mock data there is no asset contract to read and no transaction to sign.',
   },
 
   access: {
-    /** Exact wording kept from the previous console. */
-    guestTitle: "Connect the asset issuer's account in your wallet.",
-    guestBody: (code: string) => `Authorize, freeze and claw back are signed by the ${code} issuer. The flags and the options contract below are public and need no wallet.`,
     connect: 'Connect wallet',
     checking: (code: string) => `Reading who issues ${code}.`,
-    notIssuerTitle: (code: string) => `The connected account is not the ${code} issuer.`,
-    notIssuerIssuedBy: (code: string) => `${code} is issued by`,
-    notIssuerYouAre: 'You are connected as',
-    notIssuerFix: 'Switch to the issuer account in your wallet to authorize, freeze or claw back.',
-    notIssuerUnknown: (code: string) => `The issuer of ${code} could not be read from the asset contract, so this account cannot be checked against it.`,
+    /** Followed by the issuer's address. */
+    readOnly: (code: string) => `Read only. Actions on ${code} are signed by its issuer:`,
+    readOnlyUnknown: (code: string) => `Read only. Actions on ${code} are signed by its issuer.`,
+    notIssuer: (code: string) => `The connected account is not the ${code} issuer.`,
+    unchecked: (code: string) => `Could not check who issues ${code}.`,
+    otherIssued: (code: string) => `You issue ${code}.`,
+    openOther: (code: string) => `Open ${code}`,
     issuer: (code: string) => `You are connected as the ${code} issuer.`,
+  },
+
+  contract: {
+    title: 'Covered contract',
+    held: 'Held',
+    reserved: 'Reserved for open options',
+    short: 'Short',
+    authorization: 'Authorization',
+    open: 'Open options',
+    openNone: 'None',
+    openSplit: (active: number, offered: number, awaiting: number) => `${active} active, ${offered} offered, ${awaiting} waiting for a claim or a reclaim`,
+    notRead: 'Not read',
+    notAuthorized: (code: string) => `No ${code} option can be exercised, claimed or reclaimed until the issuer authorizes the Covered contract.`,
+    reservesLink: 'See what the contract holds',
+  },
+
+  powers: {
+    // The title, the column heads, the state words and the fourth row are core/assetfacts's, shared with the asset
+    // About tab.
+    caption: 'Issuer powers',
+    missing: 'The issuer account does not exist on Testnet.',
+    error: (message: string) => `Could not load the flags: ${message}`,
+    unknownIssuer: 'The flags are read from the issuer account, which is not known.',
+    learnLink: 'How an issuer action affects an option',
   },
 
   asset: {
@@ -110,30 +86,15 @@ export const COPY = {
     issuer: 'Issuer',
     contract: 'Asset contract',
     homeDomain: 'Home domain',
-    noHomeDomain: 'None published',
+    noHomeDomain: 'Not set',
     issuerUnknown: 'Could not be read',
+    keys: 'Issuer keys',
+    keysLocked: 'No key can sign for the issuer. Its settings can no longer change.',
+    keysLive: 'The issuer account can still sign.',
     copyIssuer: 'Copy issuer address',
     copyContract: 'Copy asset contract id',
     viewIssuer: 'View the issuer on the explorer',
     viewContract: 'View the asset contract on the explorer',
-  },
-
-  flags: {
-    title: 'Issuer flags',
-    on: 'On',
-    off: 'Off',
-    canChange: 'Flags can still change',
-    canChangeYes: 'Yes',
-    canChangeNo: 'No',
-    canChangeYesText: 'The issuer can turn any of these on or off later.',
-    canChangeNoText: 'Fixed. The issuer can never change them.',
-    locked: 'Issuer account locked',
-    lockedYes: 'Yes',
-    lockedText: 'No key can sign for the issuer. Supply and flags are frozen.',
-    missing: 'The issuer account does not exist on Testnet.',
-    error: (message: string) => `Could not load the flags: ${message}`,
-    unknownIssuer: 'The flags are read from the issuer account, which is not known.',
-    retry: 'Read again',
   },
 
   trustlines: {
@@ -146,16 +107,14 @@ export const COPY = {
 
   accounts: {
     title: 'Accounts',
-    caption: (code: string) => `Accounts and contracts for ${code}`,
+    caption: (code: string) => `Accounts holding ${code}`,
     account: 'Account',
     balance: (code: string) => `${code} balance`,
     authorization: 'Authorization',
     actions: 'Actions',
-    escrowName: 'Options contract',
-    escrowDetail: (code: string) => `Escrow of every ${code} option.`,
-    escrowOwes: (amount: string, code: string) => `Escrow of every ${code} option. ${amount} ${code} is reserved for open options.`,
-    escrowNotAuthorized: (code: string) => `No ${code} option can be exercised, claimed or reclaimed until the issuer authorizes the options contract.`,
-    addedName: 'Added by you',
+    escrowName: 'Covered contract',
+    /** The contract as the object of an action, in an accessible name: "Freeze the Covered contract". */
+    escrowWho: 'the Covered contract',
     reading: 'Reading',
     noBalance: 'No balance line',
     readError: (message: string) => `Could not read: ${message}`,
@@ -166,7 +125,6 @@ export const COPY = {
     holdersError: (code: string, message: string) => `The ${code} trustlines could not be listed: ${message}`,
     holdersNone: (code: string) => `No account has a ${code} trustline yet.`,
     holdersMore: (shown: number) => `Showing the first ${countOf(shown, { one: 'trustline', other: 'trustlines' })}. Add an address to manage any other account.`,
-    holdersForIssuer: (code: string) => `The issuer also sees every account with a ${code} trustline here.`,
     remove: (who: string) => `Remove ${who} from the list`,
     authorize: 'Authorize',
     freeze: 'Freeze',
@@ -174,6 +132,11 @@ export const COPY = {
     authorizeName: (who: string) => `Authorize ${who}`,
     freezeName: (who: string) => `Freeze ${who}`,
     clawbackName: (who: string) => `Claw back from ${who}`,
+    more: (who: string) => `More actions for ${who}`,
+    filterLabel: 'Accounts to show',
+    filterAll: 'All',
+    filterDecide: 'Needs a decision',
+    filterCount: 'accounts',
     copyAddress: 'Copy address',
     viewAddress: 'View on the explorer',
   },
@@ -188,32 +151,30 @@ export const COPY = {
     duplicate: 'This address is already in the list.',
   },
 
+  /** What the issuer's flags rule out for every account of the asset, said once above the accounts. */
+  limits: {
+    freeze: 'Freeze is not available: Authorization revocable is off.',
+    clawback: 'Claw back is not available: Clawback enabled is off.',
+  },
+
   reasons: {
     busy: 'Another transaction is in progress.',
     unknownPending: 'The last transaction is not confirmed yet. Check it again first.',
     issuerRow: 'This is the issuing account.',
     unfunded: 'This account does not exist on Testnet.',
     noTrustline: (code: string) => `This account has no ${code} trustline.`,
-    notRevocable: 'Freeze needs the Authorization revocable flag, which is off.',
-    clawbackOff: 'Claw back needs the Clawback enabled flag, which is off.',
-    clawbackNotOnLine: 'Clawback does not apply to this trustline: it was opened before clawback was enabled.',
-    nothingToClaw: (code: string) => `The ${code} balance is zero.`,
   },
 
+  /** What an account or the contract has open on the asset, as rows of the confirmations. */
   exposure: {
-    none: (code: string) => `It has no open option on ${code} in this contract.`,
-    holdingOnly: (holding: number, code: string) => `It holds ${countOf(holding, ACTIVE_OPTION)} on ${code}.`,
-    writtenOnly: (written: number, code: string) => `It wrote ${countOf(written, OPTION)} on ${code} that ${written === 1 ? 'is' : 'are'} still open.`,
-    both: (holding: number, written: number, code: string) =>
-      `It holds ${countOf(holding, ACTIVE_OPTION)} on ${code} and wrote ${countOf(written, OPTION)} that ${written === 1 ? 'is' : 'are'} still open.`,
-    escrowNone: (code: string) => `No option on ${code} is open in the contract.`,
-    escrow: (total: number, active: number, offered: number, awaiting: number, code: string) =>
-      `${countOf(total, OPTION)} on ${code} ${total === 1 ? 'is' : 'are'} open in the contract: ${active} active, ${offered} offered, ${awaiting} waiting for a claim or a reclaim.`,
+    written: 'Open options written',
+    held: 'Active options held',
+    open: 'Open options',
   },
 
   freeze: {
     title: (who: string, code: string) => `Freeze ${who} for ${code}`,
-    escrowTitle: (code: string) => `Freeze the options contract for ${code}`,
+    escrowTitle: (code: string) => `Freeze the Covered contract for ${code}`,
     description: (code: string) => `Freezing revokes the authorization to hold ${code}. You can authorize it again later.`,
     asset: 'Asset',
     account: 'Account',
@@ -222,20 +183,34 @@ export const COPY = {
     blocksTitle: 'What freezing blocks',
     accountBlocks: (code: string) => [
       `The account cannot send or receive ${code} until you authorize it again.`,
-      `Options written on ${code} cannot settle for it: as a holder it cannot exercise, as a writer it cannot claim delivery or reclaim.`,
+      `Options written on ${code} cannot settle for it: as a holder it cannot exercise, as a maker it cannot claim delivery or reclaim.`,
     ],
     escrowBlocks: (code: string) => [
-      `The options contract cannot send or receive ${code} until you authorize it again.`,
+      `The Covered contract cannot send or receive ${code} until you authorize it again.`,
       `Settlement stops for every option written on ${code}: no exercise, no claim, no reclaim.`,
     ],
-    cancel: 'Cancel',
     confirm: 'Freeze',
+  },
+
+  /** Authorize asks first only when the issuer cannot revoke: then it cannot be undone. */
+  authorizeFinal: {
+    title: (who: string, code: string) => `Authorize ${who} for ${code}`,
+    escrowTitle: (code: string) => `Authorize the Covered contract for ${code}`,
+    description: (code: string) => `Authorization revocable is off for ${code}, so once this account is authorized it can never be frozen.`,
+    escrowDescription: (code: string) => `Authorization revocable is off for ${code}, so once the Covered contract is authorized it can never be frozen.`,
+    confirm: 'Authorize',
+  },
+
+  dialog: {
+    cancel: 'Cancel',
+    /** The close button once a transaction started: it hides the dialog, the transaction goes on. */
+    hide: 'Hide',
   },
 
   clawback: {
     title: (code: string) => `Claw back ${code}`,
     description: (code: string) => `Removes ${code} from the account. The tokens are destroyed, not sent to the issuer.`,
-    escrowDescription: (code: string) => `Removes ${code} from the options contract. The tokens are destroyed, not sent to the issuer.`,
+    escrowDescription: (code: string) => `Removes ${code} from the Covered contract. The tokens are destroyed, not sent to the issuer.`,
     from: 'From',
     balance: 'Balance',
     balanceUnknown: 'Not read',
@@ -249,18 +224,19 @@ export const COPY = {
     heldAfter: 'Held after this',
     shortAfter: 'Short after this',
     notShort: 'None',
-    impactUnknown: 'The reserves of the options contract could not be read, so the effect on open options is not shown.',
-    warningWord: 'Warning',
-    escrowWarningTitle: 'This can create a shortfall for option holders',
-    escrowWarning: (code: string) => `The options contract holds this ${code} as collateral for open options.`,
+    impactUnknown: 'The reserves of the Covered contract could not be read, so the effect on open options is not shown.',
+    free: (amount: string, code: string) => `Up to ${amount} ${code} is not reserved.`,
+    freeNone: 'All of it is reserved: any amount leaves the contract short.',
+    covered: (held: string, reserved: string) => `The contract still holds what it owes: ${held} held, ${reserved} reserved.`,
+    shortTitle: (amount: string, code: string) => `This leaves the Covered contract ${amount} ${code} short`,
+    unknownTitle: 'This can create a shortfall for option holders',
     /** Exact wording kept from the previous console. */
     accountWarning: "This takes the tokens without the holder's consent and cannot be undone.",
     confirmLabel: (phrase: string) => `Type ${phrase} to confirm`,
     confirmLabelIdle: 'Type the confirmation',
-    confirmHint: 'The amount, the asset code and the last four characters of the account.',
+    confirmHint: 'The amount, the asset code and the last four characters of the address.',
     confirmHintIdle: 'Enter the amount first.',
     confirmMismatch: (phrase: string) => `That does not match. Type ${phrase}.`,
-    cancel: 'Cancel',
     confirm: 'Claw back',
     blocked: 'Enter an amount and type the confirmation exactly.',
   },
@@ -269,6 +245,13 @@ export const COPY = {
     authorize: (who: string, code: string) => `Authorize ${who} for ${code}`,
     freeze: (who: string, code: string) => `Freeze ${who} for ${code}`,
     clawback: (amount: string, code: string, who: string) => `Claw back ${amount} ${code} from ${who}`,
+  },
+
+  /** A confirmed action, in one line. */
+  done: {
+    authorize: (who: string, code: string) => `Authorized ${who} for ${code}.`,
+    freeze: (who: string, code: string) => `Frozen ${who} for ${code}.`,
+    clawback: (amount: string, code: string, who: string) => `Clawed back ${amount} ${code} from ${who}.`,
   },
 
   tx: {
@@ -284,21 +267,20 @@ export const COPY = {
     neverIncluded: 'The transaction expired without being included. Nothing was charged.',
     checkAgain: 'Check again',
     dismiss: 'Dismiss',
-    transaction: 'Transaction',
-    tryAgain: 'You can send it again.',
   },
 
   log: {
     title: 'Recent actions',
-    caption: 'Issuer actions signed from this browser',
+    caption: (code: string) => `Issuer actions on ${code} signed from this browser`,
     time: 'Time (UTC)',
     action: 'Action',
     account: 'Account',
     state: 'State',
     transaction: 'Transaction',
-    none: 'No issuer action yet.',
-    noneHint: 'Each action you sign here is listed with its transaction.',
     noHash: 'Not sent',
+    authorize: 'Authorize',
+    freeze: 'Freeze',
+    all: 'All transactions',
   },
 } as const
 

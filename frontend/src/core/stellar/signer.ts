@@ -2,6 +2,7 @@ import type { contract, rpc } from '@stellar/stellar-sdk'
 import { config } from '../config'
 import { TxError, errorMessage, isWalletRejection } from '../tx/errors'
 import { notFoundStatus } from '../tx/machine'
+import { STOPPED_WAITING } from '../tx/types'
 import type { TxCheck, TxOptions } from '../tx/types'
 import { describeError } from './errors'
 
@@ -71,7 +72,7 @@ export interface SendOptions extends TxOptions {
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 /** What the signed transaction looks like to this module (a Transaction or a FeeBumpTransaction). */
-interface SignedLike {
+export interface SignedLike {
   hash(): ArrayLike<number>
   timeBounds?: { maxTime?: string | number } | null
   innerTransaction?: { timeBounds?: { maxTime?: string | number } | null }
@@ -145,29 +146,62 @@ export async function checkTransaction(server: TxServer, hash: string, maxTime: 
  * time bound.
  */
 export async function signAndSend<T>(tx: contract.AssembledTransaction<T>, opts: SendOptions = {}): Promise<{ hash: string; result: T; ledger: number | null }> {
-  const sleep = opts.sleep ?? realSleep
-  const now = opts.now ?? Date.now
   const stage = opts.onStage ?? (() => {})
 
   // ---- sign: nothing has been sent, whatever happens here
   stage({ stage: 'signing' })
+  const signal = opts.signal
+  if (signal?.aborted) throw new TxError('declined', STOPPED_WAITING)
   try {
-    await tx.sign()
+    // A wallet that never answers would hold every write of the page: the user can stop waiting (`signal`). The
+    // signature that may still come afterwards is dropped here, so nothing is ever sent for it.
+    let stop: (() => void) | undefined
+    const stopped = signal
+      ? new Promise<'stopped'>((resolve) => {
+          stop = () => resolve('stopped')
+          signal.addEventListener('abort', stop, { once: true })
+        })
+      : null
+    try {
+      const outcome = await (stopped ? Promise.race([tx.sign().then(() => 'signed' as const), stopped]) : tx.sign().then(() => 'signed' as const))
+      if (outcome === 'stopped') throw new TxError('declined', STOPPED_WAITING)
+    } finally {
+      if (signal && stop) signal.removeEventListener('abort', stop)
+    }
   } catch (e) {
+    if (e instanceof TxError) throw e
     // The wallet layer already words its failures for the user and names the wallet: keep that sentence.
     const raw = errorMessage(e)
     const declined = isWalletRejection(e)
-    const message = declined && /^You rejected the request in /.test(raw) ? raw : describeError(e)
+    const message = declined && /^You declined to sign in /.test(raw) ? raw : describeError(e)
     throw new TxError(declined ? 'declined' : 'refused', message, { cause: e })
   }
   const signed = tx.signed as unknown as (SignedLike & Parameters<TxServer['sendTransaction']>[0]) | undefined
   if (!signed) throw new TxError('refused', 'The wallet returned no signed transaction.')
+  const server: TxServer = opts.server ?? (tx.options.server as TxServer | undefined) ?? (await import('./rpc')).server
+  return sendAndWait(signed, server, (value) => tx.options.parseResultXdr(value as Parameters<typeof tx.options.parseResultXdr>[0]), opts)
+}
+
+/**
+ * The second half of `signAndSend`, for a transaction signed elsewhere (the issuer console signs a hand-built
+ * one): send it, resend on TRY_AGAIN_LATER while it can still be included, then wait for a ledger, reporting
+ * `submitting` and `pending`. `parse` reads the return value of a confirmed contract call (pass `() => undefined`
+ * for a transaction that returns nothing). Rejects with a `TxError` as `signAndSend` does (review finding 50).
+ */
+export async function sendAndWait<T>(
+  signed: SignedLike & Parameters<TxServer['sendTransaction']>[0],
+  server: TxServer,
+  parse: (returnValue: unknown) => T,
+  opts: Omit<SendOptions, 'server' | 'signal'> = {},
+): Promise<{ hash: string; result: T; ledger: number | null }> {
+  const sleep = opts.sleep ?? realSleep
+  const now = opts.now ?? Date.now
+  const stage = opts.onStage ?? (() => {})
   const maxTime = maxTimeOf(signed)
   let hash = toHex(signed.hash())
 
   // ---- send
   stage({ stage: 'submitting' })
-  const server: TxServer = opts.server ?? (tx.options.server as TxServer | undefined) ?? (await import('./rpc')).server
   const resendDelay = opts.resendDelayMs ?? 2000
   let resends = 0
   for (;;) {
@@ -207,7 +241,7 @@ export async function signAndSend<T>(tx: contract.AssembledTransaction<T>, opts:
     if (check.status === 'confirmed') {
       let result: T
       try {
-        result = tx.options.parseResultXdr(check.returnValue as Parameters<typeof tx.options.parseResultXdr>[0])
+        result = parse(check.returnValue)
       } catch (e) {
         // Included, but its return value could not be decoded here. That is not a failure of the transaction:
         // report it as not settled, so a later check (which needs no return value) confirms it.

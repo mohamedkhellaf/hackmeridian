@@ -66,6 +66,21 @@ export function standardExpiries(nowSec: number): number[] {
   return [...out].sort((a, b) => a - b)
 }
 
+/**
+ * The expiries the chain shows at `nowSec`: the listed ones (`standardExpiries`), and before them a Friday 08:00 UTC
+ * that is less than an hour away. That deadline is closed to new orders, but the orders already on it stay on their
+ * own tab, as standard, until it passes (late finding errors-edge 3). New orders pick from `standardExpiries` only.
+ */
+export function chainExpiries(nowSec: number): number[] {
+  const listed = standardExpiries(nowSec)
+  if (!Number.isFinite(nowSec)) return listed
+  const now = Math.floor(nowSec)
+  const sinceFriday = (((now - FRIDAY_0800_UTC_OFFSET) % WEEK_SECONDS) + WEEK_SECONDS) % WEEK_SECONDS
+  const closing = now + (WEEK_SECONDS - sinceFriday) // the next Friday 08:00 UTC strictly after now
+  if (closing - now < MIN_EXPIRY_LEAD_SECONDS && !listed.includes(closing)) return [closing, ...listed]
+  return listed
+}
+
 /** `weekly` or `monthly` for a Friday 08:00 UTC expiry, null for any other instant. */
 export function expiryCycle(ts: number): 'weekly' | 'monthly' | null {
   if (!isStandardExpiry(ts)) return null

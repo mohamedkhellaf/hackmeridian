@@ -23,6 +23,11 @@
     min-width: 0;
   }
 
+  /* Brought into view after a press below 1200 px: a little air above it. */
+  .heading {
+    scroll-margin-top: var(--s-16);
+  }
+
   .glyph {
     display: inline-flex;
     color: var(--text);
@@ -35,7 +40,8 @@
   }
 
   .terms,
-  .deadline {
+  .deadline,
+  .own {
     grid-column: 1 / -1;
     color: var(--text-2);
     font-size: var(--ui-size);
@@ -46,6 +52,21 @@
     margin-top: calc(var(--s-4) * -1);
   }
 
+  .keep {
+    white-space: nowrap;
+  }
+
+  .local {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    white-space: nowrap;
+  }
+
+  .own {
+    color: var(--text);
+  }
+
   .note {
     max-width: var(--measure);
     color: var(--muted);
@@ -53,45 +74,10 @@
     line-height: var(--caption-line);
   }
 
-  .sides {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--s-24) var(--s-32);
-  }
-
-  .side {
-    min-width: 0;
-  }
-
-  .sideTitle {
-    display: flex;
-    align-items: baseline;
-    gap: var(--s-8);
-    margin-bottom: var(--s-4);
-  }
-
-  .sideCount {
-    color: var(--muted);
-    font-family: var(--font-sans);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    font-weight: 450;
-  }
-
-  .sideEmpty {
-    padding: var(--s-8) 0;
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--hairline);
-    color: var(--muted);
+  .empty {
+    color: var(--text-2);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
-  }
-
-  /* Side by side only when each side keeps at least 520 px. */
-  @container (min-width: 67rem) {
-    .sides[data-two] {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
   }
 
   /* Phones: the actions take a line of their own, full width. */

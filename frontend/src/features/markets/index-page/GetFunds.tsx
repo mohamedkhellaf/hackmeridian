@@ -2,13 +2,12 @@
 // real steps (README "Try it"): they happen in the wallet, so the strip reads how far the wallet is from its
 // balances and never claims a step it did not see. The one-click version is later work.
 import { QUOTE_ASSETS, referenceAssets } from '../../../core/assets'
-import { explorerAsset } from '../../../core/explorer'
 import { formatList } from '../../../core/format'
 import { FAUCET_SOURCE } from '../../../core/reference'
 import type { TokenBalance } from '../../../core/stellar/tokens'
-import { Address, Card, IconCheck, Link } from '../../../ui'
-import { FUNDS_LEAD, FUNDS_MOCK_NOTE, FUNDS_STEPS, FUNDS_TITLE, STEP_DONE, STEP_NEXT } from '../copy'
-import { fundingProgress } from '../model'
+import { Address, Button, Card, IconCheck, Link } from '../../../ui'
+import { FUNDS_CHECK, FUNDS_LEAD, FUNDS_MOCK_NOTE, FUNDS_STEPS, FUNDS_TITLE, STEP_DONE } from '../copy'
+import { fundingProgress, fundsLead } from '../model'
 import type { FundingStep, StepState } from '../model'
 import type { ReactNode } from 'react'
 import styles from './GetFunds.module.css'
@@ -21,10 +20,14 @@ export interface GetFundsProps {
   quoteId: string
   /** The build runs on mock data: the steps are shown as the Testnet steps and cannot change what is on screen. */
   mock: boolean
+  /** Reads the balances again (a wallet popup does not refocus the page, so nothing else would). */
+  onCheck: () => void
+  checking: boolean
 }
 
 const friendbotUrl = (address: string): string => `https://friendbot.stellar.org/?addr=${encodeURIComponent(address)}`
 
+/** The step to do now is marked by the ink rule above it (and `aria-current`); a done step says so. */
 function Step({ state, title, children }: { state: StepState; title: string; children: ReactNode }) {
   return (
     <li className={styles.step} data-state={state} aria-current={state === 'next' ? 'step' : undefined}>
@@ -35,8 +38,6 @@ function Step({ state, title, children }: { state: StepState; title: string; chi
             <IconCheck size={14} />
             {STEP_DONE}
           </span>
-        ) : state === 'next' ? (
-          <span className={styles.state}>{STEP_NEXT}</span>
         ) : null}
       </div>
       <div className={styles.stepBody}>{children}</div>
@@ -44,7 +45,7 @@ function Step({ state, title, children }: { state: StepState; title: string; chi
   )
 }
 
-export function GetFunds({ address, balances, quoteId, mock }: GetFundsProps) {
+export function GetFunds({ address, balances, quoteId, mock, onCheck, checking }: GetFundsProps) {
   const quote = QUOTE_ASSETS.testnet
   const assets = referenceAssets('testnet')
   // Mock balances cannot move with these steps, so no step is marked done or next there.
@@ -53,9 +54,10 @@ export function GetFunds({ address, balances, quoteId, mock }: GetFundsProps) {
     assets.map((a) => a.code),
     'disjunction',
   )
+  const lead = fundsLead(balances, quoteId)
   return (
     <Card as="section" title={FUNDS_TITLE} headingLevel={2} aria-label={FUNDS_TITLE} className={styles.root}>
-      <p className={styles.lead}>{FUNDS_LEAD}</p>
+      <p className={styles.lead}>{lead === 'noQuote' ? FUNDS_LEAD.noQuote(quote.code) : FUNDS_LEAD[lead]}</p>
       {mock ? <p className={styles.lead}>{FUNDS_MOCK_NOTE}</p> : null}
       <ol className={styles.steps}>
         <Step state={progress.fund} title={FUNDS_STEPS.fund.title}>
@@ -72,11 +74,7 @@ export function GetFunds({ address, balances, quoteId, mock }: GetFundsProps) {
           <p>{FUNDS_STEPS.trust.body(quote.code)}</p>
           <dl className={styles.issuers}>
             <div>
-              <dt>
-                <Link external tone="ink" href={explorerAsset(quote.code, quote.issuer)}>
-                  {quote.code}
-                </Link>
-              </dt>
+              <dt>{quote.code}</dt>
               <dd>
                 <Address value={quote.issuer} length="medium" copyLabel={`Copy the ${quote.code} issuer`} />
               </dd>
@@ -94,6 +92,13 @@ export function GetFunds({ address, balances, quoteId, mock }: GetFundsProps) {
           <p className={styles.source}>{FAUCET_SOURCE}</p>
         </Step>
       </ol>
+      {mock ? null : (
+        <p className={styles.check}>
+          <Button variant="secondary" size="sm" loading={checking} onClick={onCheck}>
+            {FUNDS_CHECK}
+          </Button>
+        </p>
+      )}
     </Card>
   )
 }

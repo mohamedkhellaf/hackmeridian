@@ -19,6 +19,8 @@ export {
   formatUtcDate,
   formatUtcDay,
   formatUtcTime,
+  formatUtcClock,
+  zoneLabel,
   formatLocal,
   isoUtc,
   secondsUntil,
@@ -30,5 +32,6 @@ export {
 } from './time'
 export type { DeadlineUrgency } from './time'
 export { plural, pluralize, countOf, formatList } from './words'
+export { serialOf, KIND_WORD, strikePerUnitText, strikePerUnitExact } from './option'
 export type { PluralForms } from './words'
 export { parseAmount } from '../options/format'

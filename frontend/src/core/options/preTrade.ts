@@ -10,14 +10,14 @@
 //   - messages give the cause, the consequence and the fix, with exact amounts, and no contract error names.
 import { clawbackShortfallDisclosure } from '../disclosures'
 import { lowestOpenInSeries } from '../maker/lowestOffer'
-import { optionMoneyness, priceOf } from '../reference/moneyness'
+import { exerciseValue, optionMoneyness, priceOf } from '../reference/moneyness'
 import type { PriceInput } from '../reference/moneyness'
 import type { Bid, NewBid } from '../requests/types'
 import { MAX_OPEN_BIDS_PER_BUYER } from '../requests/types'
 import { resaleCheck, selfTradeReason } from '../resale/resale'
 import { shortfallFor } from '../reserves/reserves'
 import type { BalanceStatus } from '../stellar/tokens'
-import { amt, shortBy } from '../units'
+import { amt, amtExact, shortBy } from '../units'
 import { deliveryAmount } from './abi'
 import type { OptionsClient } from './client'
 import { exerciseFeasibility, implausibleTerms } from './feasibility'
@@ -99,6 +99,11 @@ export type IssueDetail =
   | { code: 'implausible-terms' }
   /** Exercising now is worth nothing at the given price. */
   | { code: 'out-of-the-money'; pricePerUnit: bigint; pays: Money; receives: Money; worth: Money }
+  /**
+   * Write, fill or list: what the signer is paid is below what exercising would be worth at once at the given price
+   * (the holder could take `value` the moment the option is theirs). Never blocks.
+   */
+  | { code: 'below-exercise-value'; pricePerUnit: bigint; value: Money; paid: Money }
   /** Inside the last 15 minutes: a signature may not land before the deadline. */
   | { code: 'last-minutes'; secondsLeft: number }
   | { code: 'invalid-price' }
@@ -165,7 +170,7 @@ const FUNDS_FIX: Record<FundsPurpose, (need: Money, have: Money, short: Money) =
   escrow: (need, have) => `You have ${amt(have.amount, have.token)}; this request escrows ${amt(need.amount, need.token)}. Get test funds or lower the premium.`,
   collateral: (need, have) => `You have ${amt(have.amount, have.token)}; this locks ${amt(need.amount, need.token)}. Get test funds or lower the quantity.`,
   exercise: (need, have, short) =>
-    `You have ${amt(have.amount, have.token)}; exercising takes ${amt(need.amount, need.token)}. Acquire ${amt(short.amount, short.token)} before the deadline.`,
+    `You have ${amt(have.amount, have.token)}; exercising takes ${amt(need.amount, need.token)}. Acquire ${amtExact(short.amount, short.token)} before the deadline.`,
 }
 
 const PURPOSE_VERB: Record<FundsPurpose, string> = {
@@ -198,13 +203,40 @@ function fundsCheck(purpose: FundsPurpose, need: Money, facts: PreTradeFacts): {
   }
   if (status !== 'ok' || bal.balance === null) return { line: line(label, 'unknown', 'Not checked'), issue: null }
   const have: Money = { token: need.token, amount: bal.balance }
-  if (bal.balance >= need.amount) return { line: line(label, 'ok', `${amt(have.amount, have.token)}, enough`), issue: null }
+  if (bal.balance >= need.amount) return { line: line(label, 'ok', amt(have.amount, have.token)), issue: null }
   const short: Money = { token: need.token, amount: shortBy(bal.balance, need.amount) }
   const message = FUNDS_FIX[purpose](need, have, short)
   return {
-    line: line(label, 'fail', `${amt(short.amount, short.token)} short`),
+    line: line(label, 'fail', `${amtExact(short.amount, short.token)} short`),
     issue: { level: 'block', code: 'insufficient-funds', purpose, need, have, short, message },
   }
+}
+
+/** How the price behind a warning is named: the reference's own label ("demo price"), or "assumed price". */
+const priceLabel = (ref: PriceInput | undefined): string => (typeof ref === 'object' && ref ? ref.label.toLowerCase() : 'assumed price')
+
+/**
+ * A warning when the signer gives away exercise value: a maker paid less than an immediate exercise would take
+ * (write, fill), or a holder listing for less than exercising now is worth (list). Null without a price, or when
+ * the option is at or out of the money there.
+ */
+function belowExerciseValue(
+  terms: { kind: OptionOffer['kind']; underlying: TokenInfo; quote: TokenInfo; underlyingQty: bigint; totalStrike: bigint },
+  paid: bigint,
+  facts: PreTradeFacts,
+  side: 'maker' | 'holder',
+): PreTradeIssue | null {
+  const price = priceOf(facts.reference)
+  const value = price === null ? null : exerciseValue(terms, price)
+  if (price === null || value === null || value <= 0n || paid >= value) return null
+  const at = `${priceLabel(facts.reference)} of ${amt(price, terms.quote)} per ${terms.underlying.code}`
+  const v: Money = { token: terms.quote, amount: value }
+  const p: Money = { token: terms.quote, amount: paid }
+  const message =
+    side === 'maker'
+      ? `At the ${at}, the holder could exercise at once for ${amt(value, terms.quote)}. You are paid ${amt(paid, terms.quote)}.`
+      : `At the ${at}, exercising now is worth ${amt(value, terms.quote)}. You list for ${amt(paid, terms.quote)}.`
+  return { level: 'warn', code: 'below-exercise-value', pricePerUnit: price, value: v, paid: p, message }
 }
 
 function accountLine(token: TokenInfo, facts: PreTradeFacts): PreTradeLine {
@@ -363,12 +395,13 @@ function fillBid(bid: Bid, facts: PreTradeFacts): PreTradeResult {
     locks,
     receives: { token: bid.quote, amount: bid.totalPremium },
     issues: [
-      gone ? { level: 'block', code: 'gone', what: 'request', message: 'This request is no longer open: it was filled, withdrawn or has expired.' } : null,
+      gone ? { level: 'block', code: 'gone', what: 'request', message: 'This request is no longer open: it was filled, cancelled or has expired.' } : null,
       me !== null && bid.buyer === me ? { level: 'block', code: 'self-trade', what: 'own-request', message: 'This is your own request. You cannot fill it.' } : null,
       // The writer receives the underlying on a put exercise and locks it for a call: both need the issuer's authorization.
       facts.eligible === false ? notAuthorized(bid.underlying, 'You cannot fill this request yet.') : null,
       funds.issue,
       shortfallIssue(bid, facts, 'block'),
+      gone ? null : belowExerciseValue(bid, bid.totalPremium, facts, 'maker'),
       gone ? null : lastMinutes(bid.expiry, facts),
     ],
   })
@@ -401,6 +434,7 @@ function writeOffer(offer: NewOffer, quote: TokenInfo, facts: PreTradeFacts): Pr
       funds.issue,
       shortfallIssue(terms, facts, 'block'),
       implausibleTerms(offer) ? { level: 'warn', code: 'implausible-terms', message: 'The premium is at least the total strike. Buyers see a "Check terms" note on such an offer.' } : null,
+      belowExerciseValue(terms, offer.totalPremium, facts, 'maker'),
     ],
   })
 }
@@ -451,7 +485,7 @@ function exercise(option: OptionOffer, facts: PreTradeFacts): PreTradeResult {
     const u = option.underlying
     // Value of the underlying leg at that price, in quote units, floored.
     const worth: Money = { token: option.quote, amount: (option.underlyingQty * price) / 10n ** BigInt(u.decimals) }
-    const label = typeof facts.reference === 'object' && facts.reference ? facts.reference.label.toLowerCase() : 'assumed price'
+    const label = priceLabel(facts.reference)
     const at = amt(price, option.quote)
     const message =
       option.kind === 'put'
@@ -505,6 +539,7 @@ function listForSale(option: OptionOffer, askTotal: bigint | null, facts: PreTra
       !live ? { level: 'block', code: 'gone', what: 'option', message: 'Only an active option before its deadline can be listed for sale.' } : null,
       live && me !== null && fresh.holder !== me ? { level: 'block', code: 'not-holder', message: 'Only the holder can list this option for sale.' } : null,
       askTotal === null || askTotal <= 0n ? { level: 'block', code: 'invalid-price', message: 'Enter a price above zero.' } : null,
+      live && askTotal !== null && askTotal > 0n ? belowExerciseValue(option, askTotal, facts, 'holder') : null,
       live ? lastMinutes(option.expiry, facts) : null,
     ],
   })

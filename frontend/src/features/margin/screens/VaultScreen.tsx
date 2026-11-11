@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { PRO_ERRORS } from '../../../core/pro/errors'
+import { seriesStatus } from '../../../core/pro/helpers'
 import type { BookView, SeriesView } from '../../../core/pro/types'
 import { VAULT } from '../../../core/pro/types'
 import { usePro } from '../../../data'
 import { AmountField, Button, Callout, Card, EmptyNote, KeyValue, KeyValueItem, Stat, Tag } from '../../../ui'
 import type { TagAppearance } from '../../../ui'
 import { Waterfall } from '../../../viz'
-import { AMOUNT_ERROR, LP_LOCK_NOTE, NO_VALUE_NOTE } from '../copy'
-import { QUOTE, lots, toChartNumber, usdx, usdxExact } from '../model/money'
-import { contractName, contractTitle } from '../model/names'
+import { AMOUNT_ERROR, LP_LOCK_NOTE } from '../copy'
+import { QUOTE, bpsPercent, lots, toChartNumber, usdx } from '../model/money'
+import { contractTitle, partyName } from '../model/names'
 import { splitSentence } from '../../../core/pro/coverage'
 import { oracleView } from '../model/oracle'
-import { seriesSettlements, vaultSeriesState } from '../model/settlement'
-import type { VaultSeriesState } from '../model/settlement'
+import { seriesSettlements } from '../model/settlement'
 import { parseUsdx } from '../model/write'
 import { ConfirmDialog } from '../parts/ConfirmDialog'
 import { DeskTable } from '../parts/DeskTable'
@@ -20,9 +20,10 @@ import type { DeskColumn } from '../parts/DeskTable'
 import { Sub, Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
 import { Footnote, Section } from '../parts/Section'
+import { useReplayable } from '../parts/useReplayable'
 import css from './VaultScreen.module.css'
 
-const SERIES_LOOK: Record<VaultSeriesState, TagAppearance> = { Open: 'live', Settling: 'open', Closed: 'done' }
+const SERIES_LOOK: Record<string, TagAppearance> = { Live: 'live', Expired: 'ended', Settling: 'open', Closed: 'done' }
 
 interface ShareRow {
   lp: string
@@ -40,14 +41,17 @@ const percent = (bps: bigint | null) => (bps === null ? '–' : `${(bps / 100n).
 export function VaultScreen() {
   const { client, model, me, simulated, busy } = usePro()
   const { act, canAct, connect } = useMarginUi()
+  const replay = useReplayable()
   const [amount, setAmount] = useState('')
   const [confirming, setConfirming] = useState(false)
   const v = model.vault
   const units = parseUsdx(amount) ?? 0n
   const valid = units > 0n
   const pending = oracleView(model).pending.length > 0
+  const scripted = replay.can('lp_deposit', (args) => args[0] === me)
 
   const shareRows: ShareRow[] = v.lpShares.map((l) => ({ lp: l.lp, shares: l.shares, bps: v.totalShares > 0n ? (l.shares * 10_000n) / v.totalShares : null }))
+  const mine = me !== '' ? v.lpShares.find((l) => l.lp === me)?.shares : undefined
   const vaultBooks = model.books.filter((b) => b.owner === VAULT)
   const settlements = seriesSettlements(model).filter((s) => s.due > 0n && s.deficit !== null)
   const scale = settlements.reduce((max, s) => Math.max(max, toChartNumber(s.due)), 0)
@@ -84,8 +88,8 @@ export function VaultScreen() {
       header: 'State',
       phone: 'aside',
       cell: (s) => {
-        const state = vaultSeriesState(s)
-        return <Tag state={state} appearance={SERIES_LOOK[state]} />
+        const label = seriesStatus(s, model.now).label
+        return <Tag state={label} appearance={SERIES_LOOK[label]} />
       },
     },
   ]
@@ -98,7 +102,7 @@ export function VaultScreen() {
       phone: 'title',
       cell: (b) => (
         <>
-          {contractName(seriesOf(b.seriesId))} <Sub>Book {b.id}</Sub>
+          {contractTitle(seriesOf(b.seriesId))} <Sub>Book {b.id}</Sub>
         </>
       ),
     },
@@ -115,24 +119,32 @@ export function VaultScreen() {
   return (
     <div className={css.root}>
       <div className={css.figures}>
-        <Stat size="lg" label="Vault value" value={<Usdx v={v.value} none="No value at this moment" />} unit={v.value !== null ? QUOTE : undefined} hint="What backs the next shortfall." />
-        <Stat size="lg" label="Cash" value={<Usdx v={v.cash} />} unit={QUOTE} />
-        <Stat size="lg" label="Reserved for takeovers" value={<Usdx v={v.reserved} />} unit={QUOTE} hint="Takeover payments kept for the books it took over." />
-        <Stat size="lg" label="Owed by writers" value={<Usdx v={v.debtsOwed} tone="loss" />} unit={QUOTE} hint="Takeover shortfalls not collected yet." />
+        <Stat size="lg" label="Vault value" value={<Usdx v={v.value} none="No value at this moment" />} unit={v.value !== null ? QUOTE : undefined} />
+        <Stat label="Cash" value={<Usdx v={v.cash} />} unit={QUOTE} hint={`Includes the ${bpsPercent(model.config.reserveFeeBps)} reserve fee taken from every premium.`} />
+        <Stat label="Reserved for takeovers" value={<Usdx v={v.reserved} />} unit={QUOTE} hint="Takeover payments kept for the books it took over." />
+        <Stat label="Owed by writers" value={<Usdx v={v.debtsOwed} tone="loss" />} unit={QUOTE} hint="Takeover shortfalls not collected yet." />
       </div>
-      {v.value === null ? <Footnote>{NO_VALUE_NOTE}</Footnote> : null}
 
       <div className={css.columns}>
         <div className={css.main}>
-          <Section title="Capital providers" note="Shares are shown on the same 7-decimal scale as USDx.">
+          <Section title="Shares" aside={mine !== undefined && mine > 0n ? `Yours ${usdx(mine)}` : undefined}>
             {v.totalShares === 0n ? (
               <EmptyNote title="Nobody has funded the vault yet." hint="Without capital in the vault, a shortfall goes straight to a deficit." />
             ) : (
               <>
-                {shareRows.length > 0 ? <DeskTable caption="LP shares of the vault" columns={shareColumns} rows={shareRows} rowKey={(r) => r.lp} empty={null} /> : null}
-                <KeyValue variant="plain" figures="sans">
-                  <KeyValueItem label="All shares">{usdx(v.totalShares)}</KeyValueItem>
-                </KeyValue>
+                <DeskTable
+                  caption="LP shares of the vault"
+                  columns={shareColumns}
+                  rows={shareRows}
+                  rowKey={(r) => r.lp}
+                  narrow
+                  total={{ label: 'All shares', cells: { shares: <Usdx v={v.totalShares} counts="shares" /> } }}
+                  empty={
+                    <KeyValue variant="plain" figures="sans" className={css.total}>
+                      <KeyValueItem label="All shares">{usdx(v.totalShares)}</KeyValueItem>
+                    </KeyValue>
+                  }
+                />
                 {!simulated ? <Footnote>The contract gives shares per account, not a list of providers: only the connected wallet and the accounts seen in this session can be listed.</Footnote> : null}
               </>
             )}
@@ -143,6 +155,10 @@ export function VaultScreen() {
               <DeskTable caption="Books owned by the vault" columns={bookColumns} rows={vaultBooks} rowKey={(b) => b.id} empty={null} />
             </Section>
           ) : null}
+
+          <Section title="Debts owed by writers" note="A takeover shortfall is collected from the writer cash at any later takeover, when its last expired position settles, and before any withdrawal.">
+            <DeskTable caption="Debts owed to the vault" columns={debtColumns} rows={v.debtors} rowKey={(d) => d.writer} narrow empty={<EmptyNote size="sm" title="No writer owes the vault." />} />
+          </Section>
         </div>
 
         <Card title="Deposit to the vault" headingLevel={2} className={css.form}>
@@ -156,7 +172,12 @@ export function VaultScreen() {
             validate={(value) => (value.trim() === '' || (parseUsdx(value) ?? 0n) > 0n ? undefined : AMOUNT_ERROR)}
           />
           {canAct ? (
-            <Button variant="primary" disabled={!valid || busy} disabledReason={!valid ? 'Enter an amount first.' : undefined} onClick={() => setConfirming(true)}>
+            <Button
+              variant="primary"
+              disabled={!valid || !scripted || busy}
+              disabledReason={!valid ? 'Enter an amount first.' : !scripted ? replay.reason(`vault deposit by ${partyName(me)}`) : undefined}
+              onClick={() => setConfirming(true)}
+            >
               Deposit to the vault
             </Button>
           ) : (
@@ -198,21 +219,25 @@ export function VaultScreen() {
         ) : null}
       </Section>
 
-      <Section title="Debts owed by writers" note="A takeover shortfall is collected from the writer cash at any later takeover, when its last expired position settles, and before any withdrawal.">
-        <DeskTable caption="Debts owed to the vault" columns={debtColumns} rows={v.debtors} rowKey={(d) => d.writer} empty={<EmptyNote size="sm" title="No writer owes the vault." />} />
-      </Section>
-
       <ConfirmDialog
         open={confirming}
         onClose={() => setConfirming(false)}
         title="Deposit to the vault"
         description="You provide capital to the backstop and receive shares of the vault."
         confirmLabel="Deposit to the vault"
-        onConfirm={() => void act({ label: 'LP deposit', done: 'Deposited to the vault' }, (opts) => client.lpDeposit(me, units, opts), (shares) => [{ label: 'Shares minted', value: usdx(shares) }])}
+        expectRefusal={pending}
+        onConfirm={() =>
+          void act({ label: 'LP deposit', done: 'Deposited to the vault' }, (opts) => client.lpDeposit(me, units, opts), (shares) => ({
+            facts: [
+              { label: 'Deposited', value: units },
+              { label: 'Shares received', value: usdx(shares) },
+            ],
+          }))
+        }
       >
         <KeyValue>
           <KeyValueItem label="Amount" marked>
-            {usdxExact(units)} {QUOTE}
+            <Usdx v={units} unit figure="serif" />
           </KeyValueItem>
           <KeyValueItem label="Vault value now">
             <Usdx v={v.value} unit figure="serif" none="No value at this moment" />
@@ -220,9 +245,9 @@ export function VaultScreen() {
         </KeyValue>
         <p>{LP_LOCK_NOTE} The capital pays holders when a writer margin falls short, so it can be lost.</p>
         {pending ? (
-          <Callout variant="warning" label="Expect a refusal" title="A settlement price is pending.">
+          <Callout variant="warning" title="A settlement price is pending.">
             <p>
-              {PRO_ERRORS[225].name} (225). {PRO_ERRORS[225].message}
+              {PRO_ERRORS[225].message} <span className={css.code}>{PRO_ERRORS[225].name} (225)</span>
             </p>
           </Callout>
         ) : null}

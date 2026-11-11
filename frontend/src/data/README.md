@@ -255,8 +255,31 @@ Checks: `npx vitest run src/data`, `npx oxlint src/data`.
   is never described as "nothing was sent". `describeTx` and the announcements use it.
 - `isIssuerAction`, `issuerActionName`, `issuerSubject`, `parseIssuerSubject`: the issuer console's transactions
   are Covered entries under `issuer-authorize`, `issuer-freeze`, `issuer-clawback`.
-- `NETWORK_STATE_LABEL` reads "RPC ok", "RPC slow", "RPC down" (the shell uses it as is).
+- `NETWORK_STATE_LABEL` reads "Up to date", "Reads are late", "No connection" (the shell has its own words).
 - `usePro()` gains `canCheckAgain` and `checkAgain()` for an unknown Margin outcome.
 - `useAssetFacts` answers for a mock token with fixture flags marked `mock: true` (no counts are invented).
 - `activityStore` is exported (the E2E hook and tests use the app's own instance).
+
+## Added in the review pass (11 Nov 2026, evening)
+
+- **Ledger time.** `clock.ts` keeps the offset between the latest ledger's close time and this device when it is
+  15 s or more (`noteLedgerTime`, called by the ledger query); `useNowSec`, `useLedgerNowMs` and every kit
+  `Countdown` (through the `ClockProvider` that `DataProvider` mounts) follow it. Mock data: no offset.
+- **One unknown outcome at a time.** `runTransaction` refuses a write of an account while an earlier one of the same
+  product is unknown and can still land (`unsettledEntry`, looked up once first; `txUnsettledMessage`), and
+  `resumeUnknown` (mounted by `DataProvider`) restarts the look-up timer for unknown entries found in Activity.
+  `useUnsettledTx()` gives a screen the same fact before the press.
+- **After the screen closed.** A run whose screen unmounted tells its end state in a toast (`RunnerDeps.notify`,
+  `noticeFor`) instead of only in the live region.
+- **Stop waiting.** `TxController.signingSince` / `stopWaiting()`, `useActivity().signingSince(id)` /
+  `stopWaiting(id)`, `STOP_WAITING_AFTER_MS`: a wallet that never answers can be given up after 60 s; nothing is
+  sent, even if it signs later.
+- **Activity.** Labels carry the money (`Buy put on 5.00 BOND for 1.80 USDx`, `..., locking 95.00 USDx, asking 0.21
+  USDx`, `..., escrowing 0.50 USDx`, `..., locking 104.00 USDx, receiving 2.80 USDx`); `restore(entries)` undoes a
+  clear; an error and the fee sentence are joined with a full stop (`asSentence`).
+- **Portfolio.** `useRequestTodo()` (expired requests to take back), counted by `useActionsWaiting`;
+  `usePortfolioKpis` reads the wallet's requests for `escrowed`, `lockedNow` and `readyToTakeBack`.
+- **Guided.** `GuidedMatch.lots`: every quantity of the chosen series, uncapped.
+- **Market.** `useMarket` builds its tabs with `chainExpiries`: a deadline less than an hour away keeps its tab.
+- **Settings.** A stored density is no longer read back (the control left the menu).
 

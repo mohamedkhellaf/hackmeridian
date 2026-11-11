@@ -11,13 +11,6 @@
     color: var(--text);
   }
 
-  .compact {
-    display: inline-block;
-    width: 4rem;
-    line-height: 0;
-    vertical-align: middle;
-  }
-
   .trackBox {
     fill: none;
     stroke: var(--control);
@@ -40,12 +33,6 @@
   .marker {
     stroke: var(--text);
     stroke-width: 2;
-  }
-
-  /* The distance between the account value and the liquidation level, drawn as a rule through the track. */
-  .distance {
-    stroke: var(--text);
-    stroke-width: 1.5;
   }
 
   .status {
@@ -78,8 +65,7 @@
   @media (forced-colors: active) {
     .trackBox,
     .threshold,
-    .marker,
-    .distance {
+    .marker {
       stroke: CanvasText;
     }
   }

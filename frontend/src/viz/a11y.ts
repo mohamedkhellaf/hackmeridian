@@ -1,7 +1,7 @@
 // Accessibility helpers shared by the charts: slider keyboard steps (APG slider pattern), the words that go
 // with every gain and loss, and plain-text summaries for screen readers. Pure functions.
 
-import { formatNumber } from './format.ts'
+import { formatNumber, isNoise } from './format.ts'
 
 export interface SliderStepInput {
   value: number
@@ -58,10 +58,10 @@ export function sliderKeyValue(key: string, { value, min, max, step, largeStep, 
 
 export type Direction = 'gain' | 'loss' | 'even'
 
-/** Which side of zero a result is on. Values that would print as zero count as even. */
+/** Which side of zero a result is on. Only arithmetic noise counts as even: a real sub-cent amount prints `<0.01` with its side. */
 export function direction(value: number, decimals = 2): Direction {
   if (!Number.isFinite(value)) return value > 0 ? 'gain' : value < 0 ? 'loss' : 'even'
-  if (Math.abs(value) < 0.5 / 10 ** decimals) return 'even'
+  if (isNoise(value, decimals)) return 'even'
   return value > 0 ? 'gain' : 'loss'
 }
 

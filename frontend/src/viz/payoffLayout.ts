@@ -11,7 +11,6 @@ import { clamp, extent, linearScale } from './scales.ts'
 import type { LinearScale } from './scales.ts'
 
 export const LANE_H = 28
-export const FLAG_H = 20
 /** Text plus padding and the two grips of the flag. */
 export const FLAG_EXTRA = 28
 

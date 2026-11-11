@@ -1,5 +1,10 @@
 @layer ui {
+  /* The insets keep text and controls clear of a notch or the rounded corners, in landscape and as a home-screen app. */
   .frame {
+    --frame-pad: var(--s-24);
+    --frame-pad-start: max(var(--frame-pad), env(safe-area-inset-left, 0px));
+    --frame-pad-end: max(var(--frame-pad), env(safe-area-inset-right, 0px));
+
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -22,7 +27,18 @@
     justify-content: space-between;
     gap: var(--s-16);
     flex: none;
-    padding: var(--s-20) var(--s-24) var(--s-12);
+    padding: var(--s-20) var(--frame-pad-end) var(--s-12) var(--frame-pad-start);
+    border-bottom: 1px solid transparent;
+    transition: border-color var(--dur-hover) var(--ease-enter);
+  }
+
+  .frame[data-at-top] .header {
+    padding-top: max(var(--s-20), calc(env(safe-area-inset-top, 0px) + var(--s-8)));
+  }
+
+  /* Once the body scrolls under it, the header draws the same hairline as the footer. */
+  .frame:has(.body[data-scrolled]) .header {
+    border-bottom-color: var(--hairline);
   }
 
   .title {
@@ -78,8 +94,18 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--s-4) var(--s-24) var(--s-24);
+    padding: var(--s-4) var(--frame-pad-end) var(--s-24) var(--frame-pad-start);
     scroll-padding-block: var(--s-24);
+  }
+
+  /* With no footer the body is the last thing above the bottom edge; while more is below, the fold fades out. */
+  .body:last-child {
+    padding-bottom: max(var(--s-24), env(safe-area-inset-bottom, 0px));
+
+    &[data-more] {
+      /* A mask reads only alpha: any opaque token will do. */
+      mask-image: linear-gradient(to bottom, var(--text) calc(100% - var(--s-32)), transparent);
+    }
   }
 
   .description {
@@ -96,26 +122,35 @@
     justify-content: flex-end;
     gap: var(--s-8);
     flex: none;
-    padding: var(--s-12) var(--s-24);
+    padding: var(--s-12) var(--frame-pad-end) var(--s-12) var(--frame-pad-start);
     padding-bottom: max(var(--s-12), env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--hairline);
     background: var(--surface);
   }
 
   @media (max-width: 767.98px) {
+    .frame {
+      --frame-pad: var(--s-16);
+    }
+
     .header {
-      padding: var(--s-16) var(--s-16) var(--s-8);
+      padding-top: var(--s-16);
+      padding-bottom: var(--s-8);
     }
 
     .body {
-      padding: var(--s-4) var(--s-16) var(--s-20);
+      padding-top: var(--s-4);
+      padding-bottom: var(--s-20);
     }
 
-    /* Phones: full-width actions, primary on top. */
+    .body:last-child {
+      padding-bottom: max(var(--s-20), env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Phones: full-width actions in markup order, so focus order matches the screen: the primary, last, at the thumb. */
     .footer {
-      flex-direction: column-reverse;
+      flex-direction: column;
       align-items: stretch;
-      padding-inline: var(--s-16);
     }
 
     /* A page's action bar: 64 px with the hairline (a 48 px action, 8 px above and below), plus the safe area. */

@@ -5,7 +5,7 @@ export interface BadgeProps {
   count: number
   /** What the number counts, for screen readers ("2 actions waiting"). Without it the number is read alone. */
   label?: string
-  /** `solid` is ink (actions waiting). `quiet` is an outlined count next to a tab label. */
+  /** `solid` is ink, for the one count that asks for action (Portfolio in the navigation). `quiet` is a plain muted numeral after a tab label. */
   tone?: 'solid' | 'quiet'
   /** Largest number shown; above it the badge reads "99+". */
   max?: number

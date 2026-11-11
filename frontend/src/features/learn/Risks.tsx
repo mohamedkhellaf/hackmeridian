@@ -1,7 +1,7 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { PRO_ENABLED } from '../../core/config'
-import { Card, Link } from '../../ui'
+import { ButtonLink, Card } from '../../ui'
 import {
   ISSUER_QUOTE_NOTE,
   ISSUER_ROWS,
@@ -61,8 +61,10 @@ export function Risks() {
           ))}
         </ul>
         {PRO_ENABLED ? (
-          <p>
-            <Link render={<RouterLink to="/margin" />}>{MARGIN_LINK}</Link>
+          <p className={css.action}>
+            <ButtonLink variant="secondary" render={<RouterLink to="/margin" />}>
+              {MARGIN_LINK}
+            </ButtonLink>
           </p>
         ) : null}
       </Card>

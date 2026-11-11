@@ -28,21 +28,6 @@ export async function submitClassic(
   }
 }
 
-export async function submitSoroban(
-  server: rpc.Server,
-  tx: Transaction,
-  sign: Signer,
-  networkPassphrase: string,
-): Promise<string> {
-  const prepared = await server.prepareTransaction(tx)
-  const signed = TransactionBuilder.fromXDR(await sign(prepared.toXDR()), networkPassphrase)
-  const sent = await server.sendTransaction(signed)
-  if (sent.status === 'ERROR') throw new Error(`Submission failed: ${sent.errorResult?.toXDR('base64') ?? 'unknown'}`)
-  const done = await server.pollTransaction(sent.hash, { attempts: 30 })
-  if (done.status !== rpc.Api.GetTransactionStatus.SUCCESS) throw new Error(`Transaction ${done.status}: ${sent.hash}`)
-  return sent.hash
-}
-
 export async function readSacAuthorized(
   server: rpc.Server,
   sacId: string,

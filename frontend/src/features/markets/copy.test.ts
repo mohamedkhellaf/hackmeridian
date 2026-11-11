@@ -17,7 +17,7 @@ const ALL = strings(copy)
 
 describe('markets copy', () => {
   it('collects the copy', () => {
-    expect(ALL.length).toBeGreaterThan(120)
+    expect(ALL.length).toBeGreaterThan(100)
     expect(ALL).toContain('What do you want to do?')
     expect(ALL).toContain('No open offers on BOND.')
   })
@@ -45,10 +45,8 @@ describe('markets copy', () => {
   })
 
   it('says how many assets the index shows', () => {
-    expect(copy.listCountLine(3, 0, false)).toBe('Showing 3 reference assets. No other asset is listed in the contract.')
-    expect(copy.listCountLine(3, 1, false)).toBe('Showing 3 reference assets. 1 more is listed in the contract.')
-    expect(copy.listCountLine(1, 4, false)).toBe('Showing 1 reference asset. 4 more are listed in the contract.')
-    expect(copy.listCountLine(7, 0, true)).toBe('Showing all 7 assets listed in the contract.')
-    expect(copy.listCountLine(1, 0, true)).toBe('Showing the 1 asset listed in the contract.')
+    // Only said when assets are hidden: a count of the rows on screen alone tells nothing.
+    expect(copy.listCountLine(3, 1)).toBe('Showing 3 reference assets. 1 more is listed in the contract.')
+    expect(copy.listCountLine(1, 4)).toBe('Showing 1 reference asset. 4 more are listed in the contract.')
   })
 })

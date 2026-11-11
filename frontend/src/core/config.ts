@@ -25,6 +25,3 @@ export const IS_MOCK = !config.optionsContractId
  * directly so the bundler can fold it (vite.config.ts pins the value with `define`).
  */
 export const PRO_ENABLED = import.meta.env.VITE_ENABLE_PRO === '1'
-
-/** True when Margin is enabled but has no contract id: it replays fixtures and must say "simulated". */
-export const PRO_ON_FIXTURES = PRO_ENABLED && !config.proContractId

@@ -1,7 +1,7 @@
 # `src/features/ticket`: the one order ticket
 
 Six modes (buy an offer, write an offer, post a request, fill a request, buy a resale listing, list a position
-for sale or re-price it), four steps (Terms, Review, Sign, Receipt), three containers. Other features import
+for sale or re-price it), up to four steps (Terms for the forms, Review, Sign, Receipt), three containers. Other features import
 `index.tsx` and nothing else from this folder.
 
 ## Public API (`index.tsx`)
@@ -59,23 +59,30 @@ route: the portfolio keeps it in its own state.
 
 ## What each step does
 
-- **Terms.** Read-only terms for buy, fill and resale; a price for list; the form for write and request. The form
-  defaults to the standard grid (expiry chips from `core/series`, nine strikes around the reference price) with a
-  "Custom terms" disclosure for anything else. One validator (`core/maker/buildOffer`): positive amounts, exact
-  strike times quantity, a future expiry within two years. Blocking findings of the pre-trade check are shown
-  here already and disable Review with the reason. A guest sees everything and a Connect wallet action.
-- **Review.** A serif impact summary (you pay or receive, you lock, breakeven, most you can lose, deadline in UTC
-  with the countdown and the local time, counterparty), the three status lines of `usePreTrade` (the offer,
-  request, listing or option re-read from the contract; issuer eligibility; the balance), the payoff figure with
-  the assumed-price handle starting at the reference price, the required sentences at their home, and the
-  consent checkbox that gates the action. Consent is tied to the exact action label: a re-priced listing asks again.
-- **Sign.** `recheck()` reads everything again, fresh; a blocking change returns to the review and says so.
-  Then the mutation runs and `TxStepper` shows the state machine, each state in words. An unknown outcome offers
-  "Check again" only; the copy names the end of the validity window. Nothing sent, outcome unknown and fee charged
-  always read differently.
-- **Receipt.** The contract note prints with its serial line, the transaction, who acts next and by when, the
-  deadline as an .ics download and a Google Calendar link (buy and resale buy), "View position" and "Done". Focus
-  moves to the heading of every step and of the receipt.
+The heading names the step; there is no step trail. Buy, fill and resale buy have nothing to set, so they open on
+their review; write, request and list have a Terms step first (`startAt="review"` skips it when the terms are
+complete). The wallet signature is the consent: there is no tick box.
+
+- **Terms (the forms).** A ticket opened on a series shows it as three rows (kind, strike, deadline) with the pickers
+  behind "Change terms": the standard grid (deadline chips from `core/series`, nine strikes around the reference
+  price) and "Custom terms" for anything else. The premium is typed per unit; the total is computed exactly and
+  shown, and the URL keeps the total. One validator (`core/maker/buildOffer`) plus the exactness of the total.
+  Blocking findings of the pre-trade check are shown here already; the reason a button is disabled is printed above
+  it. Enter in a field goes to the review. A guest sees everything and a Connect wallet action.
+- **Review.** Ordered by what informs the decision: what moves (the first figure large, the premium sentence beside
+  it), the issuer sentence (every mode but a listing), the checks that passed as one sentence with the read time
+  ("Read from the contract at 13:45:12 UTC: the offer is open, ..."; a line that did not pass stays a row with its
+  mark), the terms (strike, quantity, deadline, breakeven, most you can lose or, for a written call, what it gives
+  up, the other party by role), the outcome on either side of the strike with the commitment sentence, and the
+  payoff figure last, closed. A listing draws no figure. A transaction of this wallet whose outcome is unknown
+  blocks every review until it is checked.
+- **Sign.** `recheck()` reads everything again, fresh; a blocking change returns to the review and says so. Closing
+  the ticket before the wallet is asked cancels the attempt. Then the mutation runs and `TxStepper` shows the state
+  machine; the heading follows the state. What is printed is a snapshot of what was sent.
+- **Receipt.** The contract note prints with its serial line, the transaction, the right in words for a holder,
+  the deadline as an .ics download and a Google Calendar link (buy and resale buy), the way on ("View position",
+  left out on that very page), "Write another" or "Post another" for the forms, and "Done". New terms from the page
+  after a settled transaction start the form again at Terms.
 
 ## Checks ported from the old UI
 
@@ -85,8 +92,10 @@ escrow and collateral affordability with exact figures; exercise feasibility (wa
 (the required sentence, blocking); self-trade (own offer, own request, own listing, own written option); the caps
 of 50 open offers per writer and 50 open requests per buyer; the two-year tenor; exact strike times quantity;
 implausible terms ("Check terms"); the lowest open offer in the series; what is locked and the balance after;
-the last 15 minutes before a deadline; the collateral choice (Full collateral or Margin) when writing in a build
-with Margin, which links to the Margin section instead of mixing the two regimes.
+the last 15 minutes before a deadline; a link to Margin under the write form in a build with Margin, instead of
+mixing the two regimes; an offer that a buyer could take and exercise at once (warning); a request on the same
+series that pays at least the premium asked (fill it instead) and an offer that costs no more than a request (buy it
+instead).
 
 ## Files
 
@@ -99,23 +108,25 @@ with Margin, which links to the Margin section instead of mixing the two regimes
 | `copy.ts` | Every sentence of the ticket that is not a required disclosure. `copy.test.ts` checks the wording rules. |
 | `TicketHost.tsx` | The three containers, the tabs, focus on open and close. |
 | `frame.ts`, `Actions.tsx` | What a flow gets from its container; the portal into the action bar. |
-| `Flow.tsx` | The four steps, the re-check, the consent gate. Every mode supplies a `Deal`. |
+| `Flow.tsx` | The steps, the re-check, the review's order, the snapshot of what was sent. Every mode supplies a `Deal`. |
 | `BuyFlow`, `ResaleFlow`, `FillFlow`, `ListFlow`, `OrderFlow` | One per mode (write and request share `OrderFlow`). |
-| `SignStep`, `ReceiptStep`, `PayoffFigure`, `TermsList`, `StepTrail`, `ChoiceChips`, `parts`, `rows`, `states` | The pieces. |
+| `SignStep`, `ReceiptStep`, `PayoffFigure`, `TermsList`, `parts`, `rows`, `words`, `states` | The pieces. |
 | `harness/` | A test-only page (`/src/features/ticket/harness/index.html` on the dev server): lists what can be opened, switches the test wallet, stages how the next transaction ends. Not in the build. |
 
 ## Decisions
 
 - **Phones get the drawer as a page.** Below 768 px the kit's `Drawer` fills the viewport; its footer is the
-  action bar, outside the scrolling body, so no control can sit under it (the e2e spec measures the consent box
-  against the bar). The rail's actions are inline at the end of the sheet.
+  action bar, outside the scrolling body, so no control can sit under it (the e2e spec measures the issuer
+  sentence against the bar at 375 x 667 and 360 x 640). In the rail the action bar is pinned to the bottom of the
+  scrolling column.
 - **One offer is one lot.** The buy ticket shows the quantity as a term, not as an input: the contract sells an
   offer whole.
 - **Figures on the term sheet are exact.** Breakeven and worst case are integer arithmetic on the contract's
   totals (`terms.ts`), truncated; the floats of packages/payoff only position the drawing.
-- **A covered call has no capped loss on the option itself.** The row says "No cap" and what is given up, rather
-  than a figure that would depend on an entry price the ticket does not know.
-- **Required sentences.** Issuer control: review of buy, fill and resale buy. Premium: next to "You pay" in the buy
-  review; the resale sentence next to the price in the resale review. Escrow: the request ticket (terms and
-  review). Clawback shortfall: through the pre-trade issue, on any ticket for that token. Payoff caption: every
-  payoff figure. Collateral cards: the write form, Margin builds only.
+- **A written call locks the underlying itself.** It gets no loss figure and never "No cap" or "unlimited": the row
+  "You give up: Every rise above 25.00 USDx per EQTY" with "You cannot owe more than the 4.00 EQTY you lock; it can
+  still fall in price.", and the chart says "Gives up the rise above 25.00". (The wording is open for Dev 1.)
+- **Required sentences.** Issuer: review of buy, write, request, fill and resale buy, as a plain paragraph.
+  Premium: next to "You pay" in the buy review; the resale sentence next to the price in the resale review.
+  Escrow: the request ticket (terms and review). Clawback shortfall: through the pre-trade issue, on any ticket for
+  that token. Payoff caption: every payoff figure.

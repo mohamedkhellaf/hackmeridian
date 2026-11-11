@@ -44,20 +44,34 @@ export function tenthsText(tenths: bigint): string {
 }
 
 /**
- * The sentence after the state word: the distance to liquidation. A distance is truncated like every other
- * figure; an amount the user would have to add is given in full, because a truncated one falls short.
- * `simulated` picks the wording for a missing requirement (a replay step without one, or a failed read).
+ * The distance to liquidation, the line that leads the account: "20,437.84 USDx below the liquidation level".
+ * Truncated like every other figure. `simulated` picks the wording for a missing requirement (a replay step
+ * without one, or a failed read).
  */
-export function healthSentence(h: Health, simulated: boolean): string {
+export function healthLead(h: Health, simulated: boolean): string {
   const share = h.aboveTenths !== null ? ` (${tenthsText(h.aboveTenths)})` : ''
   switch (h.state) {
     case 'liquidatable':
-      return `${usdx(h.distance)} USDx below the liquidation level. A deposit of at least ${usdxExact(h.distance)} USDx brings the account value back to it.`
+      return `${usdx(h.distance)} USDx below the liquidation level`
     case 'restricted':
-      return `${usdx(h.distance)} USDx above the liquidation level${share}. A new call needs ${usdxExact(h.toOpen)} USDx more.`
     case 'open':
-      return `${usdx(h.distance)} USDx above the liquidation level${share}.`
+      return `${usdx(h.distance)} USDx above the liquidation level${share}`
     default:
-      return simulated ? 'The replay has no requirement for this account at this step. Nothing is assumed.' : 'The margin requirement could not be read. Nothing is assumed.'
+      return simulated ? 'This step of the scenario has no requirement for this account.' : 'The margin requirement could not be read.'
+  }
+}
+
+/**
+ * What it takes to move on, after the state word. An amount the user would have to add is given in full,
+ * because a truncated one falls short. Null when there is nothing to add.
+ */
+export function healthNext(h: Health): string | null {
+  switch (h.state) {
+    case 'liquidatable':
+      return `A deposit of at least ${usdxExact(h.distance)} USDx brings the account value back to the liquidation level.`
+    case 'restricted':
+      return `A new call needs ${usdxExact(h.toOpen)} USDx more.`
+    default:
+      return null
   }
 }

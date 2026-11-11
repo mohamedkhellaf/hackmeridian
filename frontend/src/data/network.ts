@@ -1,4 +1,4 @@
-// The state of the network chip: "Testnet", the ledger number and a word for how the RPC is doing.
+// The state of the network indicator: "Testnet", the ledger number and a word for how the reads are doing.
 import { useMemo } from 'react'
 import { useNowSec } from './clock'
 import { POLL_MS } from './queryClient'
@@ -15,15 +15,15 @@ import { useOptionsClient } from './useOptionsClient'
 export type NetworkState = 'mock' | 'connecting' | 'ok' | 'delayed' | 'down'
 
 /**
- * The word shown beside the dot. Colour is never the only signal. It names what is being judged, the RPC the
- * reads come from, not the network itself (the design library's shell bars use the same three words).
+ * A word for each state, in the user's terms (how fresh the reads are), never the developer's ("RPC"). The shell's
+ * indicator has words of its own (features/shell/copy.ts); these are for any other place that names the state.
  */
 export const NETWORK_STATE_LABEL: Record<NetworkState, string> = {
   mock: 'Mock data',
   connecting: 'Connecting',
-  ok: 'RPC ok',
-  delayed: 'RPC slow',
-  down: 'RPC down',
+  ok: 'Up to date',
+  delayed: 'Reads are late',
+  down: 'No connection',
 }
 
 export interface NetworkStatus {
@@ -47,7 +47,7 @@ export function networkState(input: { mock: boolean; hasData: boolean; isError: 
   return 'ok'
 }
 
-/** The network chip's data. Reads the latest ledger every 30 s over plain fetch; nothing is read in mock mode. */
+/** The network indicator's data. Reads the latest ledger every 30 s over plain fetch; nothing is read in mock mode. */
 export function useNetworkStatus(): NetworkStatus {
   const { isMock } = useOptionsClient()
   const ledger = useLedger()

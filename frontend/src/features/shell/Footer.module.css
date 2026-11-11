@@ -67,14 +67,29 @@
       display: inline-flex;
       align-items: center;
       min-height: var(--s-24);
+
+      /* Touch screens, tablets included: links tall enough to press. */
+      @media (pointer: coarse) {
+        min-height: var(--touch);
+      }
     }
   }
 
-  .contract {
-    display: flex;
-    flex-wrap: wrap;
+  /* The contracts as a two-column list, name then id, so the ids line up whatever the length of the names. */
+  .contracts {
+    display: grid;
+    grid-template-columns: auto auto;
     align-items: center;
-    gap: var(--s-2) var(--s-8);
+    gap: var(--s-2) var(--s-12);
+    margin: 0;
+  }
+
+  .contract {
+    display: contents;
+
+    & dd {
+      margin: 0;
+    }
   }
 
   /* Tablet and phones: one column, in reading order: copyright, notice, links, contract. */
@@ -92,7 +107,6 @@
     }
   }
 
-  /* Phones: links tall enough to press. */
   @media (max-width: 767.98px) {
     .inner {
       gap: var(--s-12);
@@ -101,10 +115,6 @@
 
     .links {
       gap: 0 var(--s-20);
-
-      & a {
-        min-height: var(--touch);
-      }
     }
   }
 }

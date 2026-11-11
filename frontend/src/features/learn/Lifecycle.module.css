@@ -45,16 +45,8 @@
   }
 
   .branch {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-16);
-    padding-top: var(--s-12);
+    min-width: 0;
+    padding-top: var(--s-16);
     border-top: 1px solid var(--rule);
-  }
-
-  .branchTitle {
-    font-size: var(--h3-size);
-    line-height: var(--h3-line);
-    font-weight: var(--h3-weight);
   }
 }

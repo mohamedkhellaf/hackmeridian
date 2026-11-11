@@ -38,9 +38,10 @@
       cursor: not-allowed;
     }
 
+    /* Touch: a 44 px row; the radio stays on the first line of its label, never centred on a long option. */
     @media (pointer: coarse) {
       min-height: var(--touch);
-      align-items: center;
+      padding-block: calc((var(--touch) - var(--ui-line)) / 2);
     }
   }
 
@@ -69,10 +70,6 @@
 
     &[data-disabled] {
       border-color: var(--hairline);
-    }
-
-    @media (pointer: coarse) {
-      margin-top: 0;
     }
   }
 

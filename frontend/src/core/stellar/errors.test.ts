@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeError, OPTIONS_ERRORS, SAC_ERRORS } from './errors'
+import { describeError, NETWORK_UNREACHABLE, OPTIONS_ERRORS, SAC_ERRORS } from './errors'
 
 describe('describeError', () => {
   it('decodes v1.1+ options codes (101-115)', () => {
@@ -59,9 +59,31 @@ describe('transaction-level failures', () => {
     expect(describeError('txInsufficientFee')).toMatch(/Fee too low/)
   })
   it('keeps the wallet and network cases', () => {
-    expect(describeError(new Error('User declined access'))).toBe('You rejected the request in your wallet.')
+    expect(describeError(new Error('User declined access'))).toBe('You declined to sign in your wallet.')
     expect(describeError(new Error('networkPassphrase mismatch'))).toMatch(/wrong network/)
     expect(describeError(new Error('Account not found'))).toMatch(/not funded/)
+  })
+  it('gives a switched account or network its own sentence', () => {
+    expect(describeError(new Error('tx_bad_auth'))).toMatch(/another account, or for another network/)
+    expect(describeError('txBadAuth')).not.toMatch(/wrong network\. Switch/)
+  })
+  it('says a network or loading failure plainly, never with the URL', () => {
+    for (const raw of ['TypeError: Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed', 'Failed to fetch dynamically imported module: http://localhost:5199/src/core/options/mockClient.ts']) {
+      expect(describeError(new Error(raw))).toBe(NETWORK_UNREACHABLE)
+    }
+  })
+  it('words the commonest failures with their cause and what to do', () => {
+    expect(OPTIONS_ERRORS[106]).toMatch(/^The option changed before your transaction landed/)
+    expect(OPTIONS_ERRORS[125]).toMatch(/the most one account can have/)
+    expect(OPTIONS_ERRORS[125]).not.toMatch(/on this asset/)
+    expect(OPTIONS_ERRORS[115]).toMatch(/^Clawback shortfall/)
+    expect(describeError('Error(Contract, #6) account entry is missing')).toMatch(/Friendbot/)
+  })
+  it('uses the product words: maker, deadline, request, Covered contract (ruling R7)', () => {
+    for (const text of Object.values(OPTIONS_ERRORS)) {
+      expect(text, text).not.toMatch(/\bwriter\b|\bexpiry\b|\bbids?\b|options contract/i)
+      expect(text, text).not.toMatch(/[—–→←!]/)
+    }
   })
   it('never says "please"', () => {
     for (const raw of ['timeout', 'expired', 'txTooLate', 'txBadSeq', 'denied', 'tx_insufficient_balance']) expect(describeError(raw)).not.toMatch(/please/i)

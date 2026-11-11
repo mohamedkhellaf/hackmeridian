@@ -33,6 +33,9 @@
     font-weight: var(--h1-weight);
     letter-spacing: var(--h1-track);
     color: var(--text);
+    /* The ring of a title focused after navigation hugs the words, not the width of the page. */
+    width: fit-content;
+    max-width: calc(100% + 2 * var(--s-6));
     margin-inline: calc(var(--s-6) * -1);
     padding-inline: var(--s-6);
     border-radius: var(--r-control);

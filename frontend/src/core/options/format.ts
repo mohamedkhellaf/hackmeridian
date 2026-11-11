@@ -15,10 +15,6 @@ export function formatAmount(units: bigint, decimals: number, maxFraction = 2, m
   return `${neg ? '-' : ''}${whole.toLocaleString('en-US')}${frac ? '.' + frac : ''}`
 }
 
-/** Standard display: at least 2 decimals ("2.00", "0.40", "1,080.00"), at most `maxFraction` (4). */
-export function formatDisplay(units: bigint, decimals: number, maxFraction = 4): string {
-  return formatAmount(units, decimals, Math.min(decimals, maxFraction), Math.min(decimals, 2))
-}
 
 // Parses a user-entered decimal ("12.5") into exact token units. Returns null if invalid
 // or if it has more fraction digits than the token supports.
@@ -39,8 +35,4 @@ export function strikePerUnit(o: OptionOffer): string {
 
 export function shortAddress(a: string): string {
   return a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a
-}
-
-export function formatExpiry(unix: number): string {
-  return new Date(unix * 1000).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 }

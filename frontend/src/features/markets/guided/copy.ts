@@ -1,7 +1,8 @@
 // Every sentence of the guided flow, per intent. Whole sentences only: a figure is dropped into a template,
 // nothing is glued together from fragments. The words put, call, strike and premium each appear once, in
 // passing (`lead`), and never carry the meaning alone. Required sentences are not here: they come from
-// core/disclosures. No promise words (brief section 0), no em dashes, no arrows.
+// core/disclosures. No promise words (brief section 0), no em dashes, no arrows. A figure of the deal is stated
+// in the note's rows and in the sentence of the closing block, and nowhere else unless it is a new fact.
 import type { GuidedIntent } from '../../../core/payoff/strategies'
 import type { PayoffGlyph } from '../../../ui'
 
@@ -22,7 +23,7 @@ export interface IntentCopy {
   glyph: PayoffGlyph
   /** The heading of the note: the intent with the asset in it. */
   heading: (a: string) => string
-  /** One line in the intent picker. */
+  /** One line about the intent, read with its name in the intent picker. */
   line: string
   /** Whether money leaves or arrives at the start. */
   money: { label: string; value: string }
@@ -33,7 +34,7 @@ export interface IntentCopy {
   /** Labels of the three inputs (brief 4.3). */
   qtyLabel: string
   strikeLabel: string
-  /** The chosen level on the chart: `Floor 99.00`. */
+  /** The chosen level on the chart and in a suggestion: `Floor 99.00`. */
   level: (strike: string) => string
   /** Direct labels of the two chart lines. */
   withLabel: string
@@ -44,7 +45,7 @@ export interface IntentCopy {
   sameAs: string
   /** Accessible name of the chart. */
   chartTitle: (w: Words) => string
-  /** The whole deal in one sentence, above the action. */
+  /** The whole deal in one sentence, in the closing block. */
   summary: (w: Words & { deadline: string }) => string
 }
 
@@ -90,11 +91,11 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
   'earn-buy': {
     glyph: 'short-put',
     heading: (a) => `Earn while waiting to buy ${a}`,
-    line: 'Lock USDx and agree to buy at a lower price if a holder asks before the deadline.',
+    line: 'Lock USDx and agree to buy at a lower price if the other side sells to you before the deadline.',
     money: { label: 'You are paid', value: 'a premium now' },
     contract: 'A put, written',
     lead: (a, q) =>
-      `You lock ${q} in the contract and agree to buy ${a} at your price if the holder asks before the deadline. The holder's right is called a put, what they pay you is the premium, and your price is its strike.`,
+      `You lock ${q} in the contract and agree to buy ${a} at your price if the other side sells to you before the deadline. Their right is called a put, what the put's buyer pays you is the premium, and your price is its strike.`,
     qtyLabel: 'I would buy',
     strikeLabel: 'At, per unit',
     level: (strike) => `Buy at ${strike}`,
@@ -104,7 +105,7 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
     lessThan: 'less than keeping the cash',
     sameAs: 'the same as keeping the cash',
     chartTitle: (w) => `What you would hold at the deadline with an agreement to buy ${w.qty} ${w.a} at ${w.strike} ${w.q}, and without`,
-    summary: (w) => `You are paid ${w.premium} ${w.q} now and lock ${w.strikeTotal} ${w.q}. Until ${w.deadline} the holder can sell you ${w.qty} ${w.a} for it.`,
+    summary: (w) => `You are paid ${w.premium} ${w.q} now and lock ${w.strikeTotal} ${w.q}. Until ${w.deadline} the put's buyer can sell you ${w.qty} ${w.a} for it.`,
   },
   'lock-buy': {
     glyph: 'long-call',
@@ -130,7 +131,6 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
 // ------------------------------------------------------------------------------------------- picker
 
 export const PICKER_LABEL = 'What do you want to do?'
-export const SECONDARY_INTENT_LEAD = 'Something else'
 
 // ------------------------------------------------------------------------------------------- terms
 
@@ -143,10 +143,10 @@ export const STRIKE_CHIPS_LABEL: Record<GuidedIntent, string> = {
 }
 export const EXPIRY_CHIPS_LABEL = 'Choose the deadline'
 
-/** Under the chips: what the tick and the dashed outline mean. */
-export const FUNDED_LEGEND: Record<'buy' | 'write', string> = {
-  buy: 'A tick marks a choice with a funded offer you can take now. A dashed one has none yet: you can post a request for it.',
-  write: 'A tick marks a choice where a buyer has already escrowed a premium. A dashed one has no buyer yet: you can post your own offer.',
+/** The key under the chips, beside the tick it explains. Shown only when a chip carries the tick. */
+export const FUNDED_KEY: Record<'buy' | 'write', string> = {
+  buy: 'Funded offer available',
+  write: 'A buyer is waiting',
 }
 export const FUNDED_WORD: Record<'buy' | 'write', { yes: string; no: string }> = {
   buy: { yes: 'funded offer available', no: 'no offer yet' },
@@ -157,6 +157,7 @@ export const QTY_EMPTY = 'Enter a quantity.'
 export const HOLD = (amount: string, code: string) => `You hold ${amount} ${code}`
 export const HAVE = (amount: string, code: string) => `You have ${amount} ${code}`
 export const MAX_HOLDING = (amount: string, code: string) => `use all you hold, ${amount} ${code}`
+export const MAX_LOT = (amount: string, code: string) => `the largest offer you hold enough for, ${amount} ${code}`
 export const MAX_AFFORD = (amount: string, code: string) => `the most your balance pays for, ${amount} ${code}`
 export const LOCKS = (amount: string, q: string) => `Locks ${amount} ${q} in the contract.`
 export const NEEDS_LATER = (amount: string, q: string) => `Buying at this price later takes ${amount} ${q}.`
@@ -165,11 +166,21 @@ export const SHORT_ASSET = (held: string, need: string, short: string, a: string
   `You hold ${held} ${a}; locking ${need} ${a} needs ${short} ${a} more. Lower the quantity or get test funds.`
 export const SHORT_QUOTE = (have: string, need: string, short: string, q: string) =>
   `You have ${have} ${q}; locking ${need} ${q} needs ${short} ${q} more. Lower the quantity or the price, or get test funds.`
+/** Under the quantity: the lots that exist at the chosen price and date. Offers are sold and requests filled whole. */
+export const LOTS: Record<'buy' | 'write', (lots: string, a: string) => string> = {
+  buy: (lots, a) => `Offers at this price and date come in lots of ${lots} ${a}.`,
+  write: (lots, a) => `Requests at this price and date are for ${lots} ${a}.`,
+}
 export const DISTANCE_FULL = (short: string, label: string, price: string) => `${short} the ${label}, ${price}`
 export const AT_REFERENCE = (label: string, price: string) => `At the ${label}, ${price}`
 export const TIME_LEFT = (left: string) => `${left} left`
 export const YOUR_TIME = (local: string) => `${local}, your time`
 export const qtyNotExact = (a: string) => `At this price the total is not an exact amount. Use fewer decimals of ${a}.`
+/** Said once above the chips when a link named a price or a date that is not on the list. */
+export const OFF_GRID = {
+  strike: (asked: string, shown: string, q: string) => `${asked} ${q} is not a listed price. Showing ${shown} ${q}.`,
+  expiry: (asked: string, shown: string) => `${asked} is not a listed deadline. Showing ${shown}.`,
+}
 
 /** Said when the deadline is close (brief D17): 48 hours, 2 hours, and the last 15 minutes. */
 export const DEADLINE_NEAR: Record<'within48h' | 'within2h' | 'within15min', { title: string; body: string }> = {
@@ -190,13 +201,19 @@ export const DEADLINE_NEAR: Record<'within48h' | 'within2h' | 'within15min', { t
 // ------------------------------------------------------------------------------------------- available
 
 export const AVAILABLE_HEADING = 'Available now for exactly these terms'
-/** What the number on the note's serial line is, by where the matched order comes from. */
+/** What the number beside the heading is, by where the matched order comes from. */
 export const SERIAL_LABEL = { maker: 'Offer No.', resale: 'Listing No.', bid: 'Request No.' } as const
-export const NOTHING_HEADING = 'Nothing funded for exactly these terms'
+/** The buyer side with no exact match: a smaller offer of the same terms exists, or none does. */
+export const NO_SINGLE_OFFER = (qty: string, a: string) => `No single offer for ${qty} ${a} at these terms`
+export const NO_OFFER_HEADING = 'No offer at these terms'
+/** The seller side opens on posting an offer: that is the normal way to earn here (E13). */
+export const WRITE_HEADING = 'Post an offer at your price'
+export const NO_BUYER = 'No buyer is waiting for these terms.'
 /** While the quantity field is empty: what is funded cannot be matched yet. */
 export const NO_QTY_HEADING: Record<'buy' | 'write', string> = { buy: 'Offers come in fixed quantities', write: 'Requests come in fixed quantities' }
-export const SUGGESTIONS_HEADING = 'Nearest funded terms'
+export const SUGGESTIONS_HEADING: Record<'buy' | 'write', string> = { buy: 'Nearest offers', write: 'Requests at other terms' }
 export const USE_TERMS = 'Use these terms'
+export const READ_AT = (time: string) => `Read at ${time}. Could not refresh.`
 
 /** Read out when a change of terms changes what is available (the block sits well below the chips). */
 export const ANNOUNCE = {
@@ -204,34 +221,35 @@ export const ANNOUNCE = {
   listing: (premium: string, q: string) => `A resale listing matches these terms. You pay ${premium} ${q}.`,
   request: (premium: string, q: string) => `A buyer's request matches these terms. You are paid ${premium} ${q}.`,
   nothing: 'Nothing funded for exactly these terms.',
+  terms: (qty: string, a: string, strike: string, q: string, day: string) => `Terms changed: ${qty} ${a} at ${strike} ${q} until ${day}.`,
+  stale: 'Could not refresh. The figures are from the last successful read.',
 } as const
 
-/** One sentence on what was found, by intent and by where the order comes from. */
-export const FOUND: Record<GuidedIntent, (w: Words & { collateral: string }) => string> = {
-  floor: (w) => `A maker sells this floor for ${w.premium} ${w.q}. The ${w.collateral} they would pay you is already locked in the contract.`,
-  'lock-buy': (w) => `A maker sells this right for ${w.premium} ${w.q}. The ${w.collateral} they would deliver is already locked in the contract.`,
-  'earn-hold': (w) => `A buyer has escrowed ${w.premium} ${w.q} for exactly this. You are paid when you sign, and you lock ${w.collateral}.`,
-  'earn-buy': (w) => `A buyer has escrowed ${w.premium} ${w.q} for exactly this. You are paid when you sign, and you lock ${w.collateral}.`,
-}
-export const FOUND_RESALE = (w: Words & { collateral: string }) =>
-  `A holder is reselling this right for ${w.premium} ${w.q}. The maker's ${w.collateral} stays locked in the contract.`
-
-/** The same deal in the contract's own words: where put, call, strike and premium are named with their figures. */
-export const IN_CONTRACT_WORDS: Record<GuidedIntent, (w: Words) => string> = {
-  floor: (w) => `In contract words: you buy a put on ${w.qty} ${w.a}, strike ${w.strike} ${w.q}, premium ${w.premium} ${w.q}. It can be used at any time before the deadline.`,
-  'lock-buy': (w) => `In contract words: you buy a call on ${w.qty} ${w.a}, strike ${w.strike} ${w.q}, premium ${w.premium} ${w.q}. It can be used at any time before the deadline.`,
-  'earn-hold': (w) => `In contract words: you write a call on ${w.qty} ${w.a}, strike ${w.strike} ${w.q}, premium ${w.premium} ${w.q}. The buyer can use it at any time before the deadline.`,
-  'earn-buy': (w) => `In contract words: you write a put on ${w.qty} ${w.a}, strike ${w.strike} ${w.q}, premium ${w.premium} ${w.q}. The holder can use it at any time before the deadline.`,
-}
-
-export const NOT_FOUND: Record<'buy' | 'write', (w: Words & { deadline: string }) => string> = {
-  buy: (w) => `No maker offers ${w.qty} ${w.a} at ${w.strike} ${w.q} until ${w.deadline}. An offer is sold whole, so the quantity has to match too.`,
-  write: (w) => `No buyer has escrowed a premium for ${w.qty} ${w.a} at ${w.strike} ${w.q} until ${w.deadline}. A request is filled whole, so the quantity has to match too.`,
-}
+export const NOT_FOUND = (w: Words & { deadline: string }) =>
+  `No maker offers ${w.qty} ${w.a} at ${w.strike} ${w.q} until ${w.deadline}. An offer is sold whole, so the quantity has to match too.`
 export const NOT_FOUND_NO_QTY: Record<'buy' | 'write', string> = {
   buy: 'Enter a quantity to see the offers that match it. An offer is sold whole.',
   write: 'Enter a quantity to see the requests that match it. A request is filled whole.',
 }
+
+const COUNT_WORD = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'] as const
+const countWord = (n: number) => COUNT_WORD[n] ?? String(n)
+
+/** Smaller offers of the same terms, taken one by one. `count` is at least 1. */
+export const COVER = (count: number, total: string, qty: string, a: string) =>
+  count === 1
+    ? `A smaller offer at these terms covers ${total} of your ${qty} ${a}. It is sold whole.`
+    : `${countWord(count)} smaller offers at these terms cover ${total} of your ${qty} ${a}, in ${countWord(count).toLowerCase()} purchases. Each is sold whole and signed on its own.`
+export const START_WITH = (qty: string, a: string, perUnit: string) => `Start with ${qty} ${a} at ${perUnit}`
+
+/** One suggestion, led by what differs from the terms asked for. */
+export const DIFFERS = {
+  qty: (theirs: string, yours: string, a: string) => `${theirs} ${a} instead of ${yours}`,
+  strike: (level: string, yours: string) => `${level} instead of ${yours}`,
+  expiry: (theirs: string, yours: string) => `Until ${theirs} instead of ${yours}`,
+}
+export const PER_UNIT = (perUnit: string, q: string) => `${perUnit} ${q} per unit`
+export const IN_TOTAL = (total: string, q: string) => `${total} ${q} in total`
 
 export const FALLBACK: Record<'buy' | 'write', { heading: string; body: (collateral: string) => string; field: string; first: string }> = {
   buy: {
@@ -241,7 +259,7 @@ export const FALLBACK: Record<'buy' | 'write', { heading: string; body: (collate
     first: 'No offer at this price and date to compare with.',
   },
   write: {
-    heading: 'Post an offer at your price',
+    heading: WRITE_HEADING,
     body: (collateral) => `You name the premium you ask and lock ${collateral}. You are paid when a buyer takes the offer, and you can cancel while nobody has.`,
     field: 'Premium you ask, in total',
     first: 'Nobody offers this price and date yet. Yours would be the first offer.',
@@ -249,7 +267,7 @@ export const FALLBACK: Record<'buy' | 'write', { heading: string; body: (collate
 }
 export const LOWEST_OFFER = (perUnit: string, q: string, qty: string, a: string) => `Lowest open offer at this price and date: ${perUnit} ${q} per unit, for ${qty} ${a}.`
 export const matchPrice = (perUnit: string) => `Use ${perUnit} per unit`
-export const perUnitHint = (perUnit: string, q: string, a: string) => `${perUnit} ${q} per ${a}.`
+export const perUnitHint = (perUnit: string, q: string) => `${perUnit} ${q} per unit.`
 
 /** Field labels of the found order. */
 export const FIELD = {
@@ -262,125 +280,112 @@ export const FIELD = {
   seller: 'Seller',
   buyer: 'Buyer',
   collateral: 'Collateral',
-  offer: 'Offer',
-  listing: 'Listing',
-  request: 'Request',
 } as const
 export const PAID_ONCE = 'Once, when you sign.'
 export const PAID_AT_SIGN = 'When you sign, in the same transaction.'
-export const LOCKED_IN_CONTRACT = 'locked in the contract'
-export const LOCK_UNTIL = 'In the contract, until the deadline or until the other side uses the right.'
+export const LOCKED_IN_CONTRACT = 'Locked in the contract.'
+export const LOCK_UNTIL = 'In the contract until you claim after an exercise or reclaim after the deadline.'
+
+/** What the wallet already has for these terms: said first, so a second order is never the obvious next step. */
+export const OWN = {
+  holding: (w: Words & { deadline: string }) => `You already hold these terms: ${w.qty} ${w.a} at ${w.strike} ${w.q} until ${w.deadline}.`,
+  written: (w: Words & { deadline: string }) => `A buyer took your offer at these terms: ${w.qty} ${w.a} at ${w.strike} ${w.q} until ${w.deadline}.`,
+  offer: (serial: string, qty: string, a: string, premium: string, q: string) => `Your offer No. ${serial} is open at these terms: ${qty} ${a}, asking ${premium} ${q}.`,
+  request: (serial: string, qty: string, a: string, premium: string, q: string) => `Your request No. ${serial} is open at these terms: ${qty} ${a}, ${premium} ${q} escrowed.`,
+} as const
+export const VIEW = { position: 'View position', offer: 'View your offer', request: 'View your request' } as const
 
 // ------------------------------------------------------------------------------------------- outcome
 
 export const OUTCOME_HEADING = 'What you would hold at the deadline'
-export const OUTCOME_HINT = 'Move the price to see both lines answer. Arrow keys work too.'
-export const NO_PREMIUM_NOTE = 'No premium is known for these terms yet, so the figures below leave it out.'
-export const OWN_PREMIUM_NOTE = (premium: string, q: string) => `The figures below use your premium of ${premium} ${q}. Someone has to accept it first.`
+export const DETAIL_HEADING = 'At any price at the deadline'
+export const OWN_PREMIUM_NOTE = (premium: string, q: string) => `With your premium of ${premium} ${q}. Someone has to accept it first.`
+export const ASSUMED_NOTE = (perUnit: string, q: string) => `Assuming ${perUnit} ${q} per unit, the lowest open offer at this price and date.`
 export const NEED_QTY = 'Enter a quantity to see what you would hold.'
+export const NEED_PREMIUM = 'Enter a premium to see what you would hold.'
 export const SLIDER_LABEL = (a: string) => `Assumed ${a} price at the deadline`
 export const READOUT_LABEL = (a: string, price: string) => `If ${a} is at ${price} at the deadline`
-export const CARDS_LABEL = 'Three prices at the deadline'
+export const CARDS_LABEL = 'A lower and a higher price at the deadline'
 
-export interface OutcomeWords extends Words {
+export interface OutcomeWords extends Omit<Words, 'premium'> {
+  /** The premium the figures use, formatted. */
+  premium: string
   /** Value of the asset quantity at the assumed price, formatted. */
   value: string
 }
 
-/**
- * What the user would hold at an assumed price, in one sentence. `used` is true when the right would be used at
- * that price (the option is in the money). Each branch exists with and without a premium.
- */
+/** What the user would hold at an assumed price, in one sentence. `used` is true when the right would be used there. */
 export function outcomeSentence(intent: GuidedIntent, used: boolean, w: OutcomeWords): string {
   const p = w.premium
   switch (intent) {
     case 'floor':
-      if (used) return p ? `You sell ${w.qty} ${w.a} at ${w.strike} and hold ${w.strikeTotal} ${w.q}, less the ${p} you paid.` : `You sell ${w.qty} ${w.a} at ${w.strike} and hold ${w.strikeTotal} ${w.q}.`
-      return p ? `You keep ${w.qty} ${w.a}, worth ${w.value} ${w.q} at that price, less the ${p} you paid.` : `You keep ${w.qty} ${w.a}, worth ${w.value} ${w.q} at that price.`
+      return used
+        ? `You sell ${w.qty} ${w.a} at ${w.strike} and hold ${w.strikeTotal} ${w.q}, less the ${p} you paid.`
+        : `You keep ${w.qty} ${w.a}, worth ${w.value} ${w.q} at that price, less the ${p} you paid.`
     case 'earn-hold':
-      if (used) return p ? `The buyer takes your ${w.qty} ${w.a} at ${w.strike}. You hold ${w.strikeTotal} ${w.q}, plus the ${p} premium.` : `The buyer takes your ${w.qty} ${w.a} at ${w.strike}. You hold ${w.strikeTotal} ${w.q}.`
-      return p ? `You keep ${w.qty} ${w.a}, worth ${w.value} ${w.q} at that price, plus the ${p} premium.` : `You keep ${w.qty} ${w.a}, worth ${w.value} ${w.q} at that price.`
+      return used
+        ? `The buyer takes your ${w.qty} ${w.a} at ${w.strike}. You hold ${w.strikeTotal} ${w.q}, plus the ${p} premium.`
+        : `You keep ${w.qty} ${w.a}, worth ${w.value} ${w.q} at that price, plus the ${p} premium.`
     case 'earn-buy':
-      if (used) return p ? `You buy ${w.qty} ${w.a} at ${w.strike}. You hold ${w.a} worth ${w.value} ${w.q} at that price, plus the ${p} premium.` : `You buy ${w.qty} ${w.a} at ${w.strike}. You hold ${w.a} worth ${w.value} ${w.q} at that price.`
-      return p ? `Nobody sells to you. You keep your ${w.strikeTotal} ${w.q}, plus the ${p} premium.` : `Nobody sells to you. You keep your ${w.strikeTotal} ${w.q}.`
+      return used
+        ? `You buy ${w.qty} ${w.a} at ${w.strike}. You hold ${w.a} worth ${w.value} ${w.q} at that price, plus the ${p} premium.`
+        : `Nobody sells to you. You keep your ${w.strikeTotal} ${w.q}, plus the ${p} premium.`
     case 'lock-buy':
-      if (used) return p ? `You buy ${w.qty} ${w.a} at ${w.strike}. You hold ${w.a} worth ${w.value} ${w.q} at that price, less the ${p} you paid.` : `You buy ${w.qty} ${w.a} at ${w.strike}. You hold ${w.a} worth ${w.value} ${w.q} at that price.`
-      return p ? `You do not buy. You keep your ${w.strikeTotal} ${w.q}, less the ${p} you paid.` : `You do not buy. You keep your ${w.strikeTotal} ${w.q}.`
+      return used
+        ? `You buy ${w.qty} ${w.a} at ${w.strike}. You hold ${w.a} worth ${w.value} ${w.q} at that price, less the ${p} you paid.`
+        : `You do not buy. You keep your ${w.strikeTotal} ${w.q}, less the ${p} you paid.`
   }
 }
 
 export const SCENARIO = {
   low: (a: string, price: string) => `If ${a} falls to ${price}`,
-  mid: (a: string, price: string, label: string | null) => (label ? `If ${a} stays at ${price}, the ${label}` : `If ${a} is at ${price}`),
   high: (a: string, price: string) => `If ${a} rises to ${price}`,
 }
 
 export const FACT = {
   breakeven: 'Breakeven',
   maxLoss: 'Most you can lose',
-  keep: 'What you keep',
-  giveUp: 'What you give up',
+  giveUp: 'You give up',
 } as const
 
 export interface FactWords extends Words {
-  breakeven: string
-  maxLoss: string
-  maxGain: string | null
-  /** `demo price 99.40`, or null when the asset has no reference price. */
-  reference: string | null
+  /** The premium per unit the figures use, formatted. */
+  premiumPerUnit: string
 }
 
+/** What the breakeven is for each intent, in its own words (the label stays "Breakeven", as in the ticket). */
 export const BREAKEVEN_HINT: Record<GuidedIntent, (w: FactWords) => string> = {
-  floor: (w) => `${w.a} below this price at the deadline leaves you better off with the floor than without it.`,
-  'earn-hold': (w) => `${w.a} above this price at the deadline would have paid you more if you had just held.`,
-  'earn-buy': (w) => `${w.a} below this price at the deadline leaves you worse off than keeping the cash.`,
-  'lock-buy': (w) => `${w.a} above this price at the deadline leaves you better off than keeping the cash.`,
+  floor: (w) => `Your floor after the premium: ${w.strike} less the ${w.premiumPerUnit} you pay per ${w.a}.`,
+  'earn-hold': (w) => `Your sale price with the premium: ${w.strike} plus the ${w.premiumPerUnit} you are paid per ${w.a}.`,
+  'earn-buy': (w) => `Your buy price after the premium: ${w.strike} less the ${w.premiumPerUnit} you are paid per ${w.a}.`,
+  'lock-buy': (w) => `Your buy price with the premium: ${w.strike} plus the ${w.premiumPerUnit} you pay per ${w.a}.`,
 }
 
-export const MAX_LOSS_HINT: Record<GuidedIntent, (w: FactWords) => string> = {
-  floor: (w) => (w.reference ? `Counted from the ${w.reference}: the fall to your floor, plus the premium.` : 'The premium. Your floor takes any fall below it.'),
-  'earn-hold': (w) =>
-    w.reference ? `If ${w.a} fell to zero: its value at the ${w.reference}, less the premium. The agreement does not limit a fall.` : `If ${w.a} fell to zero. The agreement does not limit a fall.`,
+/** The hint of "Most you can lose": the same figure as the ticket's, from core/payoff/leg. Not used for earn-hold. */
+export const MAX_LOSS_HINT: Record<Exclude<GuidedIntent, 'earn-hold'>, (w: FactWords) => string> = {
+  floor: () => 'The premium, if you never use the floor.',
+  'lock-buy': () => 'The premium, if you never use the right.',
   'earn-buy': (w) => `If ${w.a} fell to zero after you bought it: the ${w.strikeTotal} ${w.q} you locked, less the premium.`,
-  'lock-buy': (w) => `The premium. If ${w.a} ends below your price you simply do not buy.`,
 }
 
-export const THIRD_FACT: Record<GuidedIntent, { label: string; value: (w: Words) => string; hint: (w: FactWords) => string }> = {
-  floor: {
-    label: FACT.keep,
-    value: (w) => `Any rise in ${w.a}`,
-    hint: () => 'The floor has no cap. Above it you simply do not use it.',
-  },
-  'earn-hold': {
-    label: FACT.giveUp,
-    value: (w) => `Any rise above ${w.strike}`,
-    hint: (w) =>
-      w.maxGain && w.reference
-        ? `However high ${w.a} goes, the buyer can take it at ${w.strike}. Your gain stops at ${w.maxGain} ${w.q}, counted from the ${w.reference}.`
-        : `However high ${w.a} goes, the buyer can take it at ${w.strike}.`,
-  },
-  'earn-buy': {
-    label: FACT.giveUp,
-    value: (w) => `Any fall below ${w.strike}`,
-    hint: (w) => (w.maxGain ? `However low ${w.a} goes, you buy at ${w.strike}. Your gain stops at the premium, ${w.maxGain} ${w.q}.` : `However low ${w.a} goes, you buy at ${w.strike}.`),
-  },
-  'lock-buy': {
-    label: FACT.keep,
-    value: (w) => `Any rise above ${w.strike}`,
-    hint: () => 'The locked price has no cap. Below it you simply do not use it.',
-  },
+/** A written covered call has no loss figure (E14): what is given up, and what cannot be owed. */
+export const GIVE_UP = {
+  value: (w: Words) => `Every rise above ${w.strike} ${w.q} per ${w.a}`,
+  hint: (w: Words) => `You cannot owe more than the ${w.qty} ${w.a} you lock; it can still fall in price.`,
 }
 
 // ------------------------------------------------------------------------------------------- timeline
 
 export const WHEN_HEADING = 'What happens and when'
-export const WHEN_LEAD = 'Nothing settles by itself. The holder of the right must exercise it before the deadline, or it ends.'
 export const WHEN_NEED_QTY = 'Enter a quantity to see each step with its amounts.'
-export const WHEN = { now: 'Now', until: 'Until the deadline', at: 'At the deadline', after: 'After the deadline' } as const
-export const ACTOR = { you: 'You', maker: 'The maker', buyer: 'The buyer', holder: 'The holder', nobody: 'Nobody' } as const
+export const WHEN = {
+  now: 'Now',
+  until: 'Until the deadline',
+  at: (day: string, time: string) => `At the deadline, ${day}, ${time}`,
+  after: 'After the deadline',
+} as const
 
 export interface Step {
-  actor: string
   title: string
   body: string
 }
@@ -388,115 +393,112 @@ export interface Step {
 /** How the order comes about: an order that is already funded, or terms of the user's own waiting for a taker. */
 export type Route = 'take' | 'own'
 
+const AT_HOLDER = 'If you have not exercised by then, the right expires and the premium stays with the maker.'
+const AT_REQUEST =
+  'If a maker accepted and you have not exercised by then, the right expires and the premium stays with the maker. If nobody accepted, the request can no longer be filled.'
+const escrowNow = (p: string | null, q: string, locks: string) =>
+  p
+    ? `Your ${p} ${q} waits in the contract until a maker accepts your terms and locks ${locks}. Until then you can cancel and take it back.`
+    : `Your premium waits in the contract until a maker accepts your terms and locks ${locks}. Until then you can cancel and take it back.`
+
 export function timelineSteps(intent: GuidedIntent, route: Route, w: Words): { now: Step; until: Step; at: Step; after: Step } {
   const p = w.premium
+  const own = route === 'own'
   switch (intent) {
     case 'floor':
       return {
-        now: {
-          actor: ACTOR.you,
-          title: route === 'take' ? 'You pay the premium' : 'You escrow your premium',
-          body:
-            route === 'own'
-              ? `It waits in the contract until a maker accepts your terms and locks ${w.strikeTotal} ${w.q}. Until then you can cancel.`
-              : p
-                ? `${p} ${w.q}, once. The maker's ${w.strikeTotal} ${w.q} is already locked in the contract.`
-                : `Once. The maker's ${w.strikeTotal} ${w.q} is already locked in the contract.`,
-        },
-        until: {
-          actor: ACTOR.you,
-          title: 'You can sell at your floor',
-          body: `At any moment you can deliver ${w.qty} ${w.a} and receive ${w.strikeTotal} ${w.q} in one transaction. This is called exercising. You decide if and when.`,
-        },
-        at: {
-          actor: ACTOR.nobody,
-          title: 'The right ends',
-          body: 'Nothing settles by itself. If you have not exercised by then, the right expires and the premium stays with the maker.',
-        },
-        after: {
-          actor: ACTOR.maker,
-          title: 'The maker takes back the collateral',
-          body: `If you did not exercise, you still hold your ${w.a} and there is nothing left for you to do.`,
-        },
+        now: own
+          ? { title: 'You escrow your premium', body: escrowNow(p, w.q, `${w.strikeTotal} ${w.q}`) }
+          : { title: 'You pay the premium', body: p ? `${p} ${w.q}, once.` : 'Once, when you sign.' },
+        until: own
+          ? {
+              title: 'If a maker accepts, you can sell at your floor',
+              body: `From then until the deadline you can deliver ${w.qty} ${w.a} and receive ${w.strikeTotal} ${w.q} in one transaction. This is called exercising. Until a maker accepts you have no floor.`,
+            }
+          : {
+              title: 'You can sell at your floor',
+              body: `At any moment you can deliver ${w.qty} ${w.a} and receive ${w.strikeTotal} ${w.q} in one transaction. This is called exercising. You decide if and when.`,
+            },
+        at: own
+          ? { title: 'The deadline passes', body: AT_REQUEST }
+          : { title: 'The deadline passes', body: AT_HOLDER },
+        after: own
+          ? { title: 'You take back an unfilled premium', body: 'If nobody accepted, cancel the request: the premium stays in the contract until you do.' }
+          : { title: 'The maker takes back the collateral', body: `If you did not exercise, you still hold your ${w.a} and there is nothing left for you to do.` },
       }
     case 'lock-buy':
       return {
-        now: {
-          actor: ACTOR.you,
-          title: route === 'take' ? 'You pay the premium' : 'You escrow your premium',
-          body:
-            route === 'own'
-              ? `It waits in the contract until a maker accepts your terms and locks ${w.qty} ${w.a}. Until then you can cancel.`
-              : p
-                ? `${p} ${w.q}, once. The maker's ${w.qty} ${w.a} is already locked in the contract.`
-                : `Once. The maker's ${w.qty} ${w.a} is already locked in the contract.`,
-        },
-        until: {
-          actor: ACTOR.you,
-          title: 'You can buy at your price',
-          body: `At any moment you can pay ${w.strikeTotal} ${w.q} and receive ${w.qty} ${w.a} in one transaction. This is called exercising. You need the ${w.strikeTotal} ${w.q} at that moment.`,
-        },
-        at: {
-          actor: ACTOR.nobody,
-          title: 'The right ends',
-          body: 'Nothing settles by itself. If you have not exercised by then, the right expires and the premium stays with the maker.',
-        },
-        after: {
-          actor: ACTOR.maker,
-          title: 'The maker takes back the collateral',
-          body: 'If you did not exercise, there is nothing left for you to do.',
-        },
+        now: own
+          ? { title: 'You escrow your premium', body: escrowNow(p, w.q, `${w.qty} ${w.a}`) }
+          : { title: 'You pay the premium', body: p ? `${p} ${w.q}, once.` : 'Once, when you sign.' },
+        until: own
+          ? {
+              title: 'If a maker accepts, you can buy at your price',
+              body: `From then until the deadline you can pay ${w.strikeTotal} ${w.q} and receive ${w.qty} ${w.a} in one transaction. This is called exercising. Until a maker accepts you have no right to buy.`,
+            }
+          : {
+              title: 'You can buy at your price',
+              body: `At any moment you can pay ${w.strikeTotal} ${w.q} and receive ${w.qty} ${w.a} in one transaction. This is called exercising. You need the ${w.strikeTotal} ${w.q} at that moment.`,
+            },
+        at: own
+          ? { title: 'The deadline passes', body: AT_REQUEST }
+          : { title: 'The deadline passes', body: AT_HOLDER },
+        after: own
+          ? { title: 'You take back an unfilled premium', body: 'If nobody accepted, cancel the request: the premium stays in the contract until you do.' }
+          : { title: 'The maker takes back the collateral', body: 'If you did not exercise, there is nothing left for you to do.' },
       }
     case 'earn-hold':
       return {
         now: {
-          actor: ACTOR.you,
           title: `You lock ${w.qty} ${w.a}`,
-          body:
-            route === 'take'
-              ? 'The premium the buyer escrowed is paid to you in the same transaction.'
-              : `You are paid only when a buyer takes your offer. Until then you can cancel and take your ${w.a} back.`,
+          body: own ? `You are paid only when a buyer takes your offer. Until then you can cancel and take your ${w.a} back.` : 'The premium the buyer escrowed is paid to you in the same transaction.',
         },
-        until: {
-          actor: ACTOR.buyer,
-          title: `The buyer can take your ${w.a}`,
-          body: `At any moment, not only at the end, the buyer can pay ${w.strikeTotal} ${w.q} and receive your ${w.qty} ${w.a}. This is called exercising. The ${w.q} then waits in the contract until you claim it.`,
-        },
+        until: own
+          ? {
+              title: `If a buyer takes your offer, they can take your ${w.a}`,
+              body: `From then until the deadline, not only at the end, the buyer can pay ${w.strikeTotal} ${w.q} and receive your ${w.qty} ${w.a}. This is called exercising. The ${w.q} then waits in the contract until you claim it.`,
+            }
+          : {
+              title: `The buyer can take your ${w.a}`,
+              body: `At any moment, not only at the end, the buyer can pay ${w.strikeTotal} ${w.q} and receive your ${w.qty} ${w.a}. This is called exercising. The ${w.q} then waits in the contract until you claim it.`,
+            },
         at: {
-          actor: ACTOR.nobody,
-          title: "The buyer's right ends",
-          body: `Nothing settles by itself. If the buyer has not exercised by then, your ${w.a} stays locked until you act.`,
+          title: 'The deadline passes',
+          body: own ? `If nobody took the offer, or the buyer has not exercised by then, your ${w.a} stays locked until you act.` : `If the buyer has not exercised by then, your ${w.a} stays locked until you act.`,
         },
         after: {
-          actor: ACTOR.you,
           title: `You reclaim your ${w.a}`,
-          body: `One transaction takes your ${w.qty} ${w.a} back from the contract. The premium is yours either way.`,
+          body: own
+            ? `One transaction takes your ${w.qty} ${w.a} back from the contract. You keep the premium only if a buyer took the offer.`
+            : `One transaction takes your ${w.qty} ${w.a} back from the contract. The premium is yours either way.`,
         },
       }
     case 'earn-buy':
       return {
         now: {
-          actor: ACTOR.you,
           title: `You lock ${w.strikeTotal} ${w.q}`,
-          body:
-            route === 'take'
-              ? 'The premium the buyer escrowed is paid to you in the same transaction.'
-              : `You are paid only when a buyer takes your offer. Until then you can cancel and take your ${w.q} back.`,
+          body: own ? `You are paid only when a buyer takes your offer. Until then you can cancel and take your ${w.q} back.` : "The premium the put's buyer escrowed is paid to you in the same transaction.",
         },
-        until: {
-          actor: ACTOR.holder,
-          title: 'The holder can sell to you',
-          body: `At any moment the holder can deliver ${w.qty} ${w.a} and take your ${w.strikeTotal} ${w.q}, even if ${w.a} is then worth far less. This is called exercising. The ${w.a} then waits in the contract until you claim it.`,
-        },
+        until: own
+          ? {
+              title: 'If a buyer takes your offer, they can sell to you',
+              body: `From then until the deadline the put's buyer can deliver ${w.qty} ${w.a} and take your ${w.strikeTotal} ${w.q}, even if ${w.a} is then worth far less. This is called exercising. The ${w.a} then waits in the contract until you claim it.`,
+            }
+          : {
+              title: "The put's buyer can sell to you",
+              body: `At any moment the put's buyer can deliver ${w.qty} ${w.a} and take your ${w.strikeTotal} ${w.q}, even if ${w.a} is then worth far less. This is called exercising. The ${w.a} then waits in the contract until you claim it.`,
+            },
         at: {
-          actor: ACTOR.nobody,
-          title: "The holder's right ends",
-          body: `Nothing settles by itself. If the holder has not exercised by then, your ${w.q} stays locked until you act.`,
+          title: 'The deadline passes',
+          body: own
+            ? `If nobody took the offer, or the put's buyer has not exercised by then, your ${w.q} stays locked until you act.`
+            : `If the put's buyer has not exercised by then, your ${w.q} stays locked until you act.`,
         },
         after: {
-          actor: ACTOR.you,
           title: `You reclaim your ${w.q}`,
-          body: `One transaction takes your ${w.strikeTotal} ${w.q} back from the contract. The premium is yours either way.`,
+          body: own
+            ? `One transaction takes your ${w.strikeTotal} ${w.q} back from the contract. You keep the premium only if a buyer took the offer.`
+            : `One transaction takes your ${w.strikeTotal} ${w.q} back from the contract. The premium is yours either way.`,
         },
       }
   }
@@ -516,17 +518,17 @@ export const ACTION = {
   ownPriceRequest: 'Post a request at your own price',
   ownPriceOffer: 'Post an offer at your own price',
 } as const
-export const GUEST_NOTE = 'Connect a Testnet wallet to review and sign. The terms stay as you set them.'
-export const NEXT_NOTE = 'Next: the ticket reads the order from the contract again, shows what you pay and lock, and asks before anything is signed.'
+export const ACTION_REGION = 'Next step'
 export const OWN_SUMMARY: Record<'buy' | 'write', (w: Words & { collateral: string; deadline: string }) => string> = {
-  buy: (w) => `Your ${w.premium} ${w.q} waits in the contract until a maker accepts ${w.qty} ${w.a} at ${w.strike} ${w.q} until ${w.deadline}, or until you cancel.`,
+  buy: (w) => `You escrow ${w.premium} ${w.q} now. It waits in the contract until a maker accepts ${w.qty} ${w.a} at ${w.strike} ${w.q} until ${w.deadline}, or until you cancel.`,
   write: (w) => `You lock ${w.collateral} and ask ${w.premium} ${w.q}. You are paid only if a buyer takes the offer before ${w.deadline}.`,
 }
-export const OWN_SUMMARY_NO_PREMIUM: Record<'buy' | 'write', string> = {
-  buy: 'Enter the premium you would pay above, or set it in the ticket.',
-  write: 'Enter the premium you ask above, or set it in the ticket.',
-}
+/** What the figure in the action bar is. */
+export const BAR_FIGURE = { pay: 'You pay', paid: 'You are paid', escrow: 'You escrow', ask: 'You ask' } as const
 export const NEED_QTY_ACTION = 'Enter a quantity first.'
+/** The wallet cannot pay what the action needs (E25). */
+export const CANNOT_PAY = (have: string, need: string, q: string) => `You have ${have} ${q}; this needs ${need} ${q}.`
+export const GET_FUNDS = 'Get test funds'
 
 // ------------------------------------------------------------------------------------------- states
 
@@ -534,7 +536,9 @@ export const LOADING_LABEL = 'Loading the guided flow'
 export const LOAD_ERROR_TITLE = 'Could not read this market'
 export const LOAD_ERROR_BODY = 'Nothing was read from the contract. Check your connection and try again.'
 export const RETRY = 'Try again'
-export const REFRESH_FAILED = 'Could not refresh. These figures are from the last successful read.'
 export const NOT_LISTED = 'This asset is not listed in the contract.'
-export const NO_GRID = 'There is no reference price and no offer to build a list of prices from.'
+export const NO_GRID = 'There is no reference price, and no offer with an exact price per unit, to build a list of prices from.'
 export const NO_GRID_HINT = 'Switch to Chain to post the first offer or request with terms of your own.'
+/** The same, when offers off the list exist: Chain lists them under "Other offers". */
+export const NO_GRID_OTHERS = (count: number) =>
+  count === 1 ? 'Switch to Chain: the one offer on this asset is listed there, under Other offers.' : `Switch to Chain: the ${count} offers on this asset are listed there, under Other offers.`

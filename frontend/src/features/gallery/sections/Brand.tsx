@@ -25,7 +25,7 @@ const DOMAIN_WORDS: Record<string, string> = {
   reserve: 'Reserves',
   margin: 'Margin',
   issuer: 'Issuer',
-  expiry: 'Expiry',
+  expiry: 'Deadline',
 }
 
 /* Every icon the barrel exports, found by its name, so a new icon shows up here without touching this file. */

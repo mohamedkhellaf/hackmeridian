@@ -1,26 +1,26 @@
 // Fill a buyer's funded request: the maker locks the collateral, receives the escrowed premium at once, and
-// has written the option; the buyer holds it.
+// has written the option; the buyer holds it. The terms are the buyer's, so the ticket opens on its review.
 import { useMemo } from 'react'
 import { formatUtc } from '../../core/format'
 import type { PreTradeAction } from '../../core/options/preTrade'
 import { requiredCollateral } from '../../core/options/types'
 import type { Bid } from '../../core/requests/types'
 import { plainDecimal } from '../../core/series'
-import { isNotFoundMessage, useBid, useFillBid, useMe, useReference } from '../../data'
-import { CONSENT, LOADING_TITLE, optionPhrase, receiptReminder, receiptTitle, settlementSentence, signSummary, ticketTitle } from './copy'
+import { isNotFoundMessage, useBid, useFillBid, useMe, useNowSec, useReference } from '../../data'
+import { COMMITMENT, LOADING_TITLE, optionPhrase, receiptReminder, receiptTitle, signSummary, ticketTitle } from './copy'
 import { Flow } from './Flow'
 import type { Deal } from './Flow'
-import { errorText, moneyText, priceText, readAtText } from './fmt'
+import { errorText, moneyText, priceText } from './fmt'
 import type { TicketIntent } from './intent'
-import { Party } from './parts'
 import type { ReceiptView } from './ReceiptStep'
-import { breakevenRow, deadlineRow, kindRow, moneyRow, mostYouCanLoseRow, quantityRow, receiptTerms, strikeRow } from './rows'
+import { breakevenRow, deadlineRow, leadRow, moneyRow, mostYouCanLoseRow, partyRow, quantityRow, receiptTerms, strikeRow } from './rows'
 import { FlowError, FlowGone, FlowLoading } from './states'
-import { exerciseGives, exerciseReceives, glyphOf, positionWords, premiumPerUnit, serialOf, strikePerUnit } from './terms'
-import { TermsList } from './TermsList'
+import { glyphOf, positionWords, serialOf, strikePerUnit } from './terms'
+import { outcomeFor } from './words'
 
-export function FillFlow({ intent, startAt }: { intent: Extract<TicketIntent, { mode: 'fill' }>; startAt?: 'terms' | 'review' }) {
+export function FillFlow({ intent }: { intent: Extract<TicketIntent, { mode: 'fill' }> }) {
   const query = useBid(intent.bidId, { cadence: 'book' })
+  const nowSec = useNowSec(30)
   const bid = query.data
   if (!bid) {
     if (query.isError) {
@@ -33,10 +33,10 @@ export function FillFlow({ intent, startAt }: { intent: Extract<TicketIntent, { 
   if (bid.state === 'cancelled' || bid.state === 'pruned') {
     return <FlowGone title={LOADING_TITLE.fill} sentence="This request is closed." hint="The buyer withdrew it or it expired, and the premium went back to the buyer." />
   }
-  return <FillTicket bid={bid} readAt={query.isPlaceholderData ? 0 : query.dataUpdatedAt} startAt={startAt} />
+  return <FillTicket bid={bid} readAt={query.isPlaceholderData ? 0 : query.dataUpdatedAt} nowSec={nowSec} />
 }
 
-function FillTicket({ bid, readAt, startAt }: { bid: Bid; readAt: number; startAt?: 'terms' | 'review' }) {
+function FillTicket({ bid, readAt, nowSec }: { bid: Bid; readAt: number; nowSec: number }) {
   const me = useMe()
   const fill = useFillBid()
   const reference = useReference(bid.underlying)
@@ -56,36 +56,19 @@ function FillTicket({ bid, readAt, startAt }: { bid: Bid; readAt: number; startA
     leg: bid,
     side: 'short',
     action,
-    terms: (
-      <TermsList
-        rows={[
-          kindRow(bid.kind),
-          strikeRow(bid),
-          deadlineRow(bid.expiry),
-          quantityRow(bid),
-          { label: 'Request', value: `No. ${serialOf(bid.id)}`, hint: <Party role="Buyer" address={bid.buyer} me={me} /> },
-          { label: 'Premium per unit', value: priceText(premiumPerUnit(bid), q), hint: `${moneyText(premium)} in total, already escrowed in the contract by the buyer.` },
-          moneyRow('You lock', collateral, 'In the contract, until the option is exercised or the deadline passes.'),
-        ]}
-        total={{ label: 'You receive', value: moneyText(premium) }}
-      />
-    ),
+    terms: null,
     termsError: null,
-    impact: [
-      moneyRow('You receive', premium, "Paid to you from the buyer's escrow when the transaction confirms."),
-      moneyRow('You lock', collateral, 'Until the buyer exercises, or until you reclaim it after the deadline.'),
-      breakevenRow(bid, 'short'),
-      mostYouCanLoseRow(bid, 'short'),
-      deadlineRow(bid.expiry, true),
-      { label: 'Counterparty', value: <Party role="Buyer" address={bid.buyer} me={me} />, hint: 'Becomes the holder of the option.' },
-    ],
-    readAt: readAtText(readAt),
-    settlement: settlementSentence('short', bid.kind, moneyText(exerciseGives(bid)), moneyText(exerciseReceives(bid))),
+    gone: bid.state === 'filled' ? 'Another maker filled this request.' : bid.state !== 'open' || bid.expiry <= nowSec ? `Its deadline passed at ${formatUtc(bid.expiry)}.` : undefined,
+    serial: `Request No. ${serialOf(bid.id)}`,
+    money: [leadRow('You receive', premium, "Paid to you from the buyer's escrow when the transaction confirms."), moneyRow('You lock', collateral)],
+    details: [strikeRow(bid), quantityRow(bid), deadlineRow(bid.expiry), breakevenRow(bid), mostYouCanLoseRow(bid, 'short'), partyRow('Buyer', bid.buyer, me)],
+    readAt,
+    outcome: outcomeFor(bid, 'short'),
+    commitment: COMMITMENT.fill,
     issuerDisclosure: true,
-    consent: CONSENT.fill,
     actionLabel: `Lock ${moneyText(collateral)} and fill`,
-    chartTitle: `Payoff at expiry, short ${bid.kind} on ${moneyText({ token: u, amount: bid.underlyingQty })}`,
-    series: { assetId: u.contractId, kind: bid.kind, strike: strike === null ? undefined : plainDecimal(strike, q.decimals), expiry: bid.expiry },
+    chartTitle: `Payoff at the deadline, short ${bid.kind} on ${moneyText({ token: u, amount: bid.underlyingQty })}`,
+    series: { assetId: u.contractId, code: u.code, kind: bid.kind, strike: strike === null ? undefined : plainDecimal(strike, q.decimals), expiry: bid.expiry },
     reference,
   }
 
@@ -101,5 +84,5 @@ function FillTicket({ bid, readAt, startAt }: { bid: Bid; readAt: number; startA
     link: result ? { label: 'View position', to: '/portfolio/$id', params: { id: result.optionId.toString() } } : { label: 'View portfolio', to: '/portfolio', search: { tab: 'written' } },
   })
 
-  return <Flow deal={deal} tx={fill} start={() => fill.run(bid)} receipt={receipt} startAt={startAt} />
+  return <Flow deal={deal} tx={fill} start={() => fill.run(bid)} receipt={receipt} />
 }

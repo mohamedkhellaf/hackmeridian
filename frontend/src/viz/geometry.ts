@@ -1,5 +1,5 @@
 // Pure geometry for the charts: polylines, the bands between two lines, SVG path strings, slider snapping.
-// Everything is piecewise-linear, which is exactly what an option payoff at expiry is.
+// Everything is piecewise-linear, which is exactly what an option payoff at the deadline is.
 
 export interface Point {
   x: number
@@ -53,7 +53,7 @@ export function interpolateAt(points: readonly Point[], x: number): number {
 
 /**
  * Samples a piecewise-linear function at the two ends of `domain` and at every kink inside it. That is all a
- * payoff at expiry needs, and it keeps the corners exact (no rounded strike). Pass `steps` for a curve that is
+ * payoff at the deadline needs, and it keeps the corners exact (no rounded strike). Pass `steps` for a curve that is
  * not piecewise-linear.
  */
 export function samplePiecewise(

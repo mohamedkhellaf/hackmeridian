@@ -39,6 +39,11 @@
     color: var(--text);
   }
 
+  /* The highlighter bleeds past a marked figure: keep the unit's air after it. */
+  .figure:has(> mark) {
+    margin-inline-end: var(--s-4);
+  }
+
   .unit {
     font-family: var(--font-sans);
     font-size: var(--ui-size);
@@ -47,14 +52,15 @@
     color: var(--text-2);
   }
 
-  /* A term that can be changed is underlined in ink, like a blank filled in on a form, and carries a caret. */
+  /* A term that can be changed carries a caret; the rule of a blank on a form appears under it on hover. One cue
+     at rest, not two. */
   .value[data-editable] {
-    border-bottom-color: var(--control);
+    border-bottom-color: transparent;
     transition: border-color var(--dur-hover) var(--ease-enter);
 
     @media (hover: hover) {
       &:hover {
-        border-bottom-color: var(--text);
+        border-bottom-color: var(--control);
       }
     }
 

@@ -14,7 +14,7 @@ import type { Ask, OptionKind, OptionOffer, TokenInfo } from '../../core/options
 import { moneyness, priceOf } from '../../core/reference'
 import type { Moneyness, ReferencePrice } from '../../core/reference'
 import type { Bid } from '../../core/requests/types'
-import { LADDER_ROWS, NON_STANDARD_REASONS, classifyOffer, expiryCycle, expiryDayKey, standardExpiries, strikeLadder, strikesOf } from '../../core/series'
+import { LADDER_ROWS, NON_STANDARD_REASONS, classifyOffer, expiryCycle, expiryDayKey, chainExpiries, strikeLadder, strikesOf } from '../../core/series'
 import type { NonStandardReason } from '../../core/series'
 import { premiumUnits } from '../../core/units'
 
@@ -199,7 +199,8 @@ const cheaper = (a: BookRow, b: BookRow | null): boolean => {
 export function buildMarket(src: MarketSource, asset: TokenInfo, quote: TokenInfo, reference: ReferencePrice): MarketView {
   const input = marketInputs(src)
   const rows = assetRows(input, asset.contractId)
-  const expiries = standardExpiries(src.nowSec)
+  // The listed deadlines, and a closing one (less than an hour away) whose orders keep their tab until it passes.
+  const expiries = chainExpiries(src.nowSec)
   const ladder = ladderFor(reference, quote.decimals, rows)
 
   const standardKeys = new Set<string>()

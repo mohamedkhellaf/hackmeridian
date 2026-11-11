@@ -16,7 +16,7 @@ export interface OverlayProps {
   /** One or two sentences under the title. Linked to the dialog as its description. */
   description?: ReactNode
   children?: ReactNode
-  /** Actions. The primary action comes last in the markup; on phones it is shown first, full width. */
+  /** Actions. The primary action comes last in the markup; on phones they stack full width in that order, the primary at the bottom, by the thumb. */
   footer?: ReactNode
   /** Where focus goes on open. Focus is trapped while open and returns to the opener on close. */
   initialFocus?: InitialFocus

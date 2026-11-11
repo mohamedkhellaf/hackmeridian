@@ -12,7 +12,7 @@ export {
   isReferenceAsset,
 } from './referenceList'
 export type { AssetNetwork, AssetType, ReferenceAsset, QuoteAsset } from './referenceList'
-export { ASSET_TIERS, TIER_MEANING, ASSET_LIST_NOTE, assetKey, tierOf, parseAssetParam, assetParam, assetPath, resolveAssetParam } from './identity'
+export { ASSET_TIERS, TIER_MEANING, assetKey, tierOf, parseAssetParam, assetParam, assetPath, resolveAssetParam } from './identity'
 export type { AssetTier, ListedAsset, AssetParam, AssetResolution } from './identity'
 export { skeleton, codeResemblance, similarCodeFlag } from './similarCode'
 export type { CodeResemblance, SimilarCodeFlag } from './similarCode'

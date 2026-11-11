@@ -10,7 +10,10 @@ const WORD: Record<CalloutVariant, string> = { info: 'Note', warning: 'Warning',
 export interface CalloutProps {
   /** `info` explains, `warning` asks for attention before acting, `danger` reports something broken or blocking. */
   variant?: CalloutVariant
-  /** The word next to the icon. Each variant has one, so the meaning never rests on colour. */
+  /**
+   * A short word shown in place of a title. Shown only when there is no `title`. Each variant's own word
+   * ("Note", "Warning", "Problem") is always given to screen readers, so the meaning never rests on colour or icon.
+   */
   label?: string
   /** A short heading in ink. */
   title?: ReactNode
@@ -32,12 +35,14 @@ export function Callout({ variant = 'info', label, title, children, actions, ale
     <div className={cx(styles.root, className)} data-variant={variant} role={alert ? 'alert' : undefined}>
       <span className={styles.icon}>
         <Icon size={20} />
+        <span className="ui-vh">{`${WORD[variant]}: `}</span>
       </span>
       <div className={styles.content}>
-        <p className={styles.head}>
-          <span className={styles.word}>{label ?? WORD[variant]}</span>
-          {title ? <span className={styles.title}>{title}</span> : null}
-        </p>
+        {title || label ? (
+          <p className={styles.head}>
+            <span className={styles.title}>{title || label}</span>
+          </p>
+        ) : null}
         {children ? <div className={styles.body}>{children}</div> : null}
         {actions ? <div className={styles.actions}>{actions}</div> : null}
       </div>

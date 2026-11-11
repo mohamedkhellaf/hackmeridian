@@ -15,11 +15,57 @@
     padding-top: var(--s-4);
   }
 
-  /* Outside the shell, on the landing route. */
+  .details {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+
+    & > summary {
+      width: fit-content;
+      min-height: var(--control-h-sm);
+      padding-block: var(--s-4);
+      cursor: pointer;
+      border-radius: var(--r-control);
+    }
+  }
+
+  .message {
+    max-width: 100%;
+    margin-top: var(--s-8);
+    padding: var(--s-12);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    color: var(--text-2);
+    background: var(--sunken);
+    border-radius: var(--r-control);
+  }
+
+  .wordmark {
+    font-size: var(--h2-size);
+  }
+
+  /* The logo on a page with no bar around it: where the bar would put it. */
+  .pageBrand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    align-self: flex-start;
+    margin-inline-start: calc(var(--s-4) * -1);
+    padding: var(--s-4);
+    border-radius: var(--r-control);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  /* Outside the shell, on the landing route or when the frame itself failed. */
   .bare {
     max-width: var(--page-max);
     margin-inline: auto;
-    padding: var(--s-56) var(--gutter);
+    padding: var(--s-56) max(var(--gutter), env(safe-area-inset-right, 0px)) var(--s-56) max(var(--gutter), env(safe-area-inset-left, 0px));
 
     @media (width < 768px) {
       padding-block: var(--s-32);
@@ -27,8 +73,9 @@
   }
 
   /*
-   * Before the shell's code arrives: the measures of features/shell (bar height, hairline, page gutters, the
-   * reserved scrollbar gutter), so the skeleton stays where it is when the real chrome replaces this frame.
+   * Before the shell's code arrives: the measures of features/shell (bar height, the logo at the gutter, the
+   * hairline over the text block, page gutters, the reserved scrollbar gutter), so the skeleton stays where it is
+   * when the real chrome replaces this frame.
    */
   .shell {
     display: flex;
@@ -37,8 +84,42 @@
   }
 
   .bar {
-    height: calc(var(--s-56) + env(safe-area-inset-top, 0px));
-    border-bottom: 1px solid var(--hairline);
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .barInner {
+    --bar-pad-start: max(var(--gutter), env(safe-area-inset-left, 0px));
+    --bar-pad-end: max(var(--gutter), env(safe-area-inset-right, 0px));
+
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: var(--s-56);
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding-inline: var(--bar-pad-start) var(--bar-pad-end);
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset-inline: var(--bar-pad-start) var(--bar-pad-end);
+      bottom: 0;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    @media (pointer: coarse) and (min-width: 768px) {
+      height: calc(var(--s-56) + var(--s-8));
+    }
+  }
+
+  .barBrand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    margin-inline-start: calc(var(--s-4) * -1);
+    padding: var(--s-4);
+    color: var(--text);
+    text-decoration: none;
   }
 
   .page {
@@ -46,9 +127,38 @@
     max-width: var(--page-max);
     margin-inline: auto;
     padding: var(--s-32) max(var(--gutter), env(safe-area-inset-right, 0px)) var(--s-56) max(var(--gutter), env(safe-area-inset-left, 0px));
+  }
 
-    @media (width < 768px) {
+  /* From 768 to 899 px the bar shows the mark alone. */
+  @media (min-width: 768px) and (max-width: 899.98px) {
+    .barBrand .wordmark {
+      display: none;
+    }
+  }
+
+  /* Phones: the bar is 56 px plus a hairline that runs edge to edge, as the shell's. */
+  @media (max-width: 767.98px) {
+    .bar {
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .barInner::after {
+      content: none;
+    }
+
+    .barBrand {
+      min-height: var(--touch);
+      padding-block: 0;
+    }
+
+    .page {
       padding-block: var(--s-20) var(--s-40);
+    }
+  }
+
+  @media (max-width: 359.98px) {
+    .barBrand .wordmark {
+      display: none;
     }
   }
 

@@ -1,10 +1,11 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import { PAYOFF_CAPTION } from '../../core/disclosures'
 import type { GuidedIntent } from '../../core/payoff/strategies'
-import { Card, ContractNote, DateTime, Link } from '../../ui'
+import { ButtonLink, Card, ContractNote, DateTime } from '../../ui'
 import type { NoteTerm, PayoffGlyph } from '../../ui'
-import { OutcomeCards, PayoffChart, WithWithoutChart } from '../../viz'
-import { EXAMPLE_SERIAL_LABEL, INTENT_COPY, OUTCOMES_LABEL, TERM_LABELS, exampleSerial, premiumPerUnit, scenarioDelta, scenarioLabel } from './content'
+import { OutcomeCards, WithWithoutChart } from '../../viz'
+import { INTENT_COPY, OUTCOMES_LABEL, OUTCOMES_TITLE, TERM_LABELS, breakevenLabel, premiumPerUnit, scenarioDelta, scenarioLabel } from './content'
+import { Disclosure } from './Disclosure'
 import type { WorkedExample } from './examples'
 import css from './IntentExample.module.css'
 
@@ -20,96 +21,74 @@ const CHART_HEIGHT = 280
 
 export interface IntentExampleProps {
   example: WorkedExample
-  /** Position in the series, from 1, and its length: printed on the note as "Example 1 of 4". */
-  index: number
-  total: number
   /** The example deadline, in unix seconds, and its canonical UTC text. */
   deadline: number
   deadlineText: string
+  /** Open when the page loads: the first example only. */
+  defaultOpen?: boolean
 }
 
 /**
- * One intent as a worked example: what you do in a sentence, the deal in exact figures, the terms as a contract
- * note, the payoff figure with its caption, and three outcomes that say who acts.
+ * One intent as a worked example, in a disclosure. Closed, it reads as the intent's name and what it does. Open:
+ * the deal in exact figures, the terms on a note, the with-and-without figure the guided page draws (captioned
+ * with the required sentence), what it costs, three outcomes, and the way into Markets.
  */
-export function IntentExample({ example: x, index, total, deadline, deadlineText }: IntentExampleProps) {
+export function IntentExample({ example: x, deadline, deadlineText, defaultOpen = false }: IntentExampleProps) {
   const copy = INTENT_COPY[x.intent]
   const unit = x.quoteCode
 
   const terms: NoteTerm[] = [
     { label: TERM_LABELS.quantity, value: x.qtyText },
-    { label: copy.strikeLabel(x), value: `${x.strikePerUnitText} ${unit}`, marked: true },
+    { label: copy.strikeLabel(x), value: `${x.strikePerUnitText} ${unit}` },
     { label: copy.premiumLabel, value: x.premiumText, hint: premiumPerUnit(x) },
     { label: copy.collateralLabel, value: x.collateralText },
     { label: TERM_LABELS.deadline, value: <DateTime value={deadline * 1000} local="below" /> },
-    { label: copy.breakevenLabel(x), value: `${x.breakevenText} ${unit}`, hint: copy.breakevenHint },
-    { label: TERM_LABELS.maxLoss, value: `${x.maxLossText} ${unit}`, hint: copy.maxLossHint(x) },
+    { label: breakevenLabel(x), value: `${x.breakevenText} ${unit}` },
+    copy.givesUp
+      ? { label: TERM_LABELS.givesUp, value: copy.givesUp.value(x), hint: copy.givesUp.hint(x) }
+      : { label: TERM_LABELS.maxLoss, value: `${x.maxLossText} ${unit}`, hint: copy.maxLossHint?.(x) },
     {
       label: TERM_LABELS.maxGain,
       value: x.maxGainText === null ? TERM_LABELS.noCap : `${x.maxGainText} ${unit}`,
-      hint: copy.maxGainHint(x),
+      hint: copy.maxGainHint?.(x),
     },
   ]
 
-  const chart =
-    x.starts === 'asset' ? (
-      <WithWithoutChart
-        title={copy.chartTitle(x)}
-        points={x.curve.map((p) => ({ x: p.s, with: p.withValue, without: p.withoutValue }))}
-        domain={x.domain}
-        level={copy.levelLabel ? { value: x.strike, label: copy.levelLabel(x) } : undefined}
-        withLabel={copy.withLabel}
-        withoutLabel={copy.withoutLabel}
-        defaultPrice={copy.openAt}
-        unit={unit}
-        asset={x.assetCode}
-        height={CHART_HEIGHT}
-        caption={PAYOFF_CAPTION}
-      />
-    ) : (
-      <PayoffChart
-        title={copy.chartTitle(x)}
-        points={x.curve.map((p) => ({ x: p.s, y: p.payoff }))}
-        domain={x.domain}
-        strike={{ value: x.strike, label: x.strikePerUnitText }}
-        breakevens={[{ value: x.breakeven, label: x.breakevenText }]}
-        maxGain={x.maxGainText === null ? { value: Infinity } : { value: x.maxGain ?? 0, label: x.maxGainText }}
-        maxLoss={{ value: x.maxLoss, label: x.maxLossText, at: x.side === 'write' ? 0 : undefined }}
-        defaultPrice={copy.openAt}
-        unit={unit}
-        asset={x.assetCode}
-        height={CHART_HEIGHT}
-        caption={PAYOFF_CAPTION}
-      />
-    )
+  // The content model of `summary` allows a heading and phrasing content, so the two sit in the row directly.
+  const summary = (
+    <>
+      <h3 className={css.name}>{x.name}</h3>
+      <span className={css.statement}>
+        {copy.statement} {copy.contract}
+      </span>
+    </>
+  )
 
   return (
-    <div className={css.root} data-intent={x.intent}>
-      <div className={css.lead}>
-        <h3 className={css.name}>{x.name}</h3>
-        <p className={css.statement}>
-          {copy.statement} {copy.contract}
-        </p>
-        <p className={css.deal}>{copy.deal(x, deadlineText)}</p>
-      </div>
+    <Disclosure className={css.root} summaryClassName={css.summary} bodyClassName={css.body} summary={summary} defaultOpen={defaultOpen} data-intent={x.intent}>
+      <p className={css.deal}>{copy.deal(x, deadlineText)}</p>
       <div className={css.pair}>
-        <ContractNote
-          className={css.note}
-          serialLabel={EXAMPLE_SERIAL_LABEL}
-          serial={exampleSerial(index, total)}
-          glyph={GLYPH[x.intent]}
-          kind={copy.position(x)}
-          headingLevel={4}
-          terms={terms}
-          footer={<Link render={<RouterLink to="/markets" search={{ intent: x.intent }} />}>{copy.action}</Link>}
-        />
+        <ContractNote className={css.note} plain glyph={GLYPH[x.intent]} kind={copy.position(x)} headingLevel={4} terms={terms} />
         <div className={css.figure}>
           <Card as="div" className={css.sheet}>
-            {chart}
+            <WithWithoutChart
+              title={copy.chartTitle(x)}
+              points={x.curve.map((p) => ({ x: p.s, with: p.withValue, without: p.withoutValue }))}
+              domain={x.domain}
+              level={{ value: x.strike, label: copy.levelLabel(x) }}
+              withLabel={copy.withLabel}
+              withoutLabel={copy.withoutLabel}
+              defaultPrice={copy.openAt}
+              unit={unit}
+              asset={x.assetCode}
+              height={CHART_HEIGHT}
+              caption={PAYOFF_CAPTION}
+            />
           </Card>
           <p className={css.trade}>{copy.trade(x)}</p>
         </div>
       </div>
+      <h4 className={css.outcomesTitle}>{OUTCOMES_TITLE}</h4>
       <OutcomeCards
         className={css.outcomes}
         label={`${x.name}: ${OUTCOMES_LABEL}`}
@@ -122,6 +101,11 @@ export function IntentExample({ example: x, index, total, deadline, deadlineText
           sentence: copy.outcome(x, s),
         }))}
       />
-    </div>
+      <p className={css.action}>
+        <ButtonLink variant="secondary" render={<RouterLink to="/markets" search={{ intent: x.intent }} />}>
+          {copy.action}
+        </ButtonLink>
+      </p>
+    </Disclosure>
   )
 }

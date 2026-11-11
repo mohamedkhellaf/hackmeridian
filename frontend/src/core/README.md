@@ -56,11 +56,11 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 
 | Module | Exports |
 |---|---|
-| `config.ts` | `config` (`rpcUrl`, `horizonUrl`, `networkPassphrase`, `optionsContractId`, `proContractId`), `TESTNET_PASSPHRASE`, `IS_MOCK`, `PRO_ENABLED`, `PRO_ON_FIXTURES`. No SDK import (the passphrase is a literal, checked against the SDK in `stellar/passphrase.test.ts`). |
+| `config.ts` | `config` (`rpcUrl`, `horizonUrl`, `networkPassphrase`, `optionsContractId`, `proContractId`), `TESTNET_PASSPHRASE`, `IS_MOCK`, `PRO_ENABLED`. No SDK import (the passphrase is a literal, checked against the SDK in `stellar/passphrase.test.ts`). |
 | `explorer.ts` | The one stellar.expert URL builder: `explorerUrl(kind, id)`, `explorerTx`, `explorerAccount`, `explorerContract`, `explorerAsset(code, issuer)`, `explorerLedger`, `explorerAddress` (G or C), `isMockId` (mock ids have no page: show text, not a link). |
 | `time.ts` | `nowSec`, `nowMs`, `MONTHS`, `SECONDS_PER_DAY`, `expiryDay(unix)` (UTC `YYYY-MM-DD`), `dayLabel(day)`, `compactCountdown(expiry, atMs?)` (`3d 0h`), `formatDuration(seconds)`, `formatExpiryShort` (local), `formatUtcShort`, `toLocalInput`, `fromLocalInput`. Compact forms for the Margin tables; new screens format time with `format/` (`formatUtc`, `formatCountdown(secondsLeft)`, `deadlineUrgency`). |
 | `units.ts` | `amt(units, token)` (`5.00 FUND`), `plainAmount` (input prefill), `perUnit(total, sized)` (bigint, floored), `strikeUnits`, `premiumUnits`, `perUnitText`, `compareRatio`, `byPremiumPerUnit`, `byStrikePerUnit`, `byId`, `shortBy`, types `UnitToken`, `Sized`. |
-| `disclosures.ts` **(core-new)** | Every required sentence, the Margin banners, warning bullets and collateral cards, banned-word lists. |
+| `disclosures.ts` **(core-new)** | Every required sentence, the Margin banners and warning bullets, the footer's `legalNotice(isMock)`, banned-word lists. |
 | `guide.ts` | The welcome guide below the features: `GUIDE_ANCHORS` and `guideAnchor(name, { ring? })` (the `data-tour` attribute a component spreads on the control a note explains), `GuideId`, `GuideSeen`, `GUIDE_VERSION`, `TOUR_NOTES_ON_MARKETS`, `GUIDE_COPY` (the words shared by the welcome and the replay entry), and the two rules `canOfferTour`, `canOpenModeNote`. |
 
 ### `tx/` transaction stages
@@ -70,7 +70,6 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | `tx/types.ts` | `TxStage` (`checking`, `signing`, `submitting`, `pending` with `hash` and `maxTime`), `TxStageName`, `TxOptions` (`{ onStage? }`), `TxReceipt`, `TxCheck` (`confirmed`, `failed`, `expired`, `unknown`), `TxOutcome`, `Notice`. |
 | `tx/errors.ts` | `TxError` (`kind`: `declined`, `refused`, `failed`, `unknown`, `expired`; `hash`; `maxTime`), `TxErrorKind`, `isTxError`, `errorMessage`, `isWalletRejection`. |
 | `tx/machine.ts` | `TxState` (`phase`, `hash`, `maxTime`, `ledger`, `error`, `effect`), `TxPhase` (idle, checking, signing, submitting, pending, confirmed, failed, unknown, expired, declined), `TxEffect` (`nothing-sent`, `outcome-unknown`, `fee-charged`), `TxEvent`, `TX_IDLE`, `reduce(state, event)`, `runMachine(write, emit, from?)`, selectors `isWorking`, `isSettled`, `canStart`, `canCheckAgain`, `hasHash`, and `notFoundStatus(latestLedgerCloseTime, maxTime)`. |
-| `tx/runTx.ts` | `runTx(label, mock, fn, hooks)`: the old one-shot runner (notice plus refresh). Kept for callers that do not need stages. |
 
 `TxState.effect` is what the copy must say: `nothing-sent` (no fee), `outcome-unknown`, `fee-charged`.
 
@@ -95,11 +94,11 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | `options/mockClient.ts` | `MockOptionsClient(seed?)`: the contract's rules in memory, a demo ledger of balances that moves with every trade, the four stages over 600 ms, `failNextWith(kind)` to stage a declined, refused, failed, expired or unknown outcome. `MOCK_CONTRACT`, `MOCK_READ_MS`, `MOCK_TX_MS`. |
 | `options/mockSeed.ts` | `demoSeed(atSec?)` (the demo market, below), `bareSeed()` (empty contract, for tests), `MockSeed`, `MOCK_QUOTE`, `MOCK_UNDERLYINGS`, `demoStrikes(asset)`, `demoExpiries(atSec)`, `demoPremiumPerUnit(...)`. |
 | `options/demoAccounts.ts` | `DEMO_WALLETS` (`a`, `b`: the two test wallet identities), `DEMO_MAKERS` (`a` to `d`), `DEMO_HEDGERS` (`a`, `b`). |
-| `options/sorobanClient.ts` (SDK) | `SorobanOptionsClient` (feature-detects contract v1.2 to v1.5; also `transferHolder`, `listAsset`, `isListed`, `pruneExpired`, `pruneBids`, `extendTtl`, `openIds`, which are not on the interface), `unwrap`. Import only through `createOptionsClient`. |
+| `options/sorobanClient.ts` (SDK) | `SorobanOptionsClient` (feature-detects contract v1.2 to v1.5; also `transferHolder`, `listAsset`, `isListed`, `pruneExpired`, `pruneBids`, `extendTtl`, `openIds`, which are not on the interface and have no screen yet: no hook or page calls them (capability phase, brief section 8)), `unwrap`. Import only through `createOptionsClient`. |
 | `options/preTrade.ts` | `preTrade(action, facts): PreTradeResult` (pure), `readPreTradeFacts(client, action, me)`, `tokensFor(action)`, types `PreTradeAction` (`buy`, `buy-resale`, `fill-bid`, `write-offer`, `post-bid`, `exercise`, `list-for-sale`), `PreTradeFacts`, `Fact<T>`, `PreTradeIssue` (`level`, `code`, typed figures, `message`), `PreTradeLine`, `PreTradeResult` (`issues`, `blocked`, `pending`, `state`, `account`, `funds`, `pays`, `locks`, `receives`, `lowestInSeries`), `LAST_MINUTES_SECONDS`. |
 | `options/feasibility.ts` | `exerciseFeasibility`, `premiumUnaffordable`, `implausibleTerms`, `BalanceView`, `Feasibility`. |
 | `options/abi.ts` | ABI mapping: `optionFromAbi`, `stateFromAbi`, `kindFromAbi`, `kindToAbi`, `askFromAbi`, `askTotalFromAbi`, `idToU32`, `expiryToU64`, `expiryFromU64`, `assertI128`; `deliveryAmount(o)` (what the writer claims: put, the underlying; call, the strike), `collateralLines(options, bids?)`, `reservedOf(line)`. |
-| `options/format.ts` | `parseAmount` (the exact input parser), `formatAmount(units, decimals, maxFraction, minFraction)` and `formatDisplay` (the formatters the ported logic uses; new screens use `format/`, whose `formatAmount(units, token)` has a different signature), `strikePerUnit(o)` (text, 2 decimals), `shortAddress`, `formatExpiry`. |
+| `options/format.ts` | `parseAmount` (the exact input parser), `formatAmount(units, decimals, maxFraction, minFraction)` (kept for a few ported callers; every amount on screen goes through `format/` `formatUnits`), `strikePerUnit(o)` (text, 2 decimals), `shortAddress`. |
 
 ### `market/`, `maker/`, `requests/`, `resale/`
 
@@ -108,13 +107,13 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | `market/selection.ts` | Exact series: `SeriesRef`, `seriesRefOf(terms)`, `cellKey(ref)`, `sameSeriesRef`, `chainCells(input, underlyingId): Map<cellKey, CellSummary>` (best offer, best bid, makers, counts, `mine`, `holding`, `wrote`), `seriesBook(input, ref): SeriesBook`, `lowestPremiums(offers, underlyingId)`, `allRows(input)`. Order-driven view: `selectMarket(input, pick): MarketSelection`, `MarketPick`, `MarketInputs`, `seriesKeyOf`, `parseSeriesKey`, `isBidOnly`. Prefill: `Prefill`, `prefillFor`, `prefillsOf`, `prefillForRef`. Row rules: `bookRowAction(row, me)`. |
 | `market/book.ts` | `BookRow`, `BookSource` (`bid`, `maker`, `resale`), `bookRows(offers, resale, bids, nowSec)`, `sortBook(rows)`, `asSample(row)`. |
 | `market/chain.ts` | Order-driven chain: `buildChain(column)` (exact strike order), `ChainRow`, `ChainSide`, `assetCodes`, `defaultAsset`, `expiryDays`, `inColumn`, `seriesKey`, `seriesOffers`, `rankOffers`, `defaultSeries`, `settlementLine(o)`, `premiumUnit(o)`. |
-| `market/series.ts` | `sameSeries`, `sortOffers`, `filterOffers`, `KindFilter`. (The standard grid is `series/`, a different thing.) |
 | `market/marginAck.ts` | `MARGIN_ACK_KEY`, `hasMarginAck`, `setMarginAck`, `MARGIN_TRADE_HREF` (`/margin/trade`). |
 | `maker/buildOffer.ts` | `buildOffer(assets, form): Draft`: the one validator of offer and bid forms (exact strike times quantity, tenor up to 2 years). |
 | `maker/lowestOffer.ts` | `lowestOpenInSeries(offers, draft, quote)` (same UTC expiry day as the chain), `premiumPerUnitText`. |
 | `requests/types.ts` | `Bid`, `BidState`, `NewBid`, `MAX_OPEN_BIDS_PER_BUYER`. |
 | `requests/abi.ts` | `bidFromAbi`, `bidStateFromAbi`, `AbiBid`. |
 | `requests/requests.ts` | `marketBids`, `myOpenBids`, `fillBlockReason`, `fillCollateral`, `perUnit(total, bid)` (text), `STATUS_LABEL`. |
+| `requests/rows.ts` | The one view model of a request (`requestRow`, `requestRows`, `RequestRow`, `Figure`, `STATE_NAME`, `ESCROW_STATUS`, `holdsEscrow`, `lockShortfall`) for the Requests board, the asset page and the Portfolio. |
 | `resale/resale.ts` | `resaleRows`, `resaleCheck` (`ok`, `fail`, `changed`), `selfTradeReason`, `canList`, `isLive`, `askOf`, `askPerUnit`, `formatAskPerUnit`, `ResaleRow`. |
 
 ### `portfolio/`, `reserves/`, `payoff/`
@@ -123,7 +122,6 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 |---|---|
 | `portfolio/positions.ts` | `roleOf`, `statusOf`, `actionKindOf`, `ActionKind`, `ACTION_LABEL`, `RowAction` (`kind`, `label`, `onClick`, `disabled?`), `claimAmount`, `actionLabel`, `premiumOf`, `counterpartyLine`, `countdown`, `expirySub`, `filterPositions`, `computeKpis`, `waitingActions`; new: `todoItems(options, me, nowSec, referenceOf?)` with `TodoItem` (`kind`, `actionable`, `deadline`, `moneyness`, `amount`), `actionsWaiting(items)` (the navigation badge), `portfolioSummary(options, me)`. |
 | `reserves/reserves.ts` | `backingFor(line, health)`, `Backing`, `lineTotal`, `shortfall`, `ratioTenths` (rounds down), `formatTenths`, `formatFixed`, `shortTokens(health)`, `shortfallFor(option, health)`. |
-| `payoff/buyerPayoff.ts` | Adapter to `packages/payoff`: `legOf`, `strikeOf`, `buyerPnl`, `riskLines`, `chartModel`, `fmtNum`, `fmtSigned`. |
 | `payoff/strategies.ts` **(core-new)** | The four guided intents on top of `packages/payoff`. |
 
 ### `assetfacts/`, `issuer/`
@@ -131,7 +129,7 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | Module | Exports |
 |---|---|
 | `assetfacts/assetFacts.ts` | Parsers `parseSacName`, `parseAssetsResponse`, `parseIssuerAccount`, `parseHolderStatus`, `describeFlags`; cached reads `fetchAssetFacts(contractId, code)` (rejects for mock tokens), `fetchHolderStatus(code, issuer, address)`; types `AssetFacts`, `AssetFlags`, `IssuerFacts`, `HolderStatus`, `FlagFact`. No static SDK import. Explorer links moved to `explorer.ts`. |
-| `issuer/issuerView.ts` | `authStateFromTrust`, `authStateFromSac`, `actionsFor`, `stateTone`, `flagItems`, `isNotFound`, `targetKindLabel`, `AuthState`. |
+| `issuer/issuerView.ts` | `actionsFor`, `AuthState`. |
 | `issuer/issuerTx.ts` (SDK) | Builders: `buildSetAuthorizedTx`, `buildClawbackTx`, `sacSetAuthorizedOp`, `sacClawbackOp`, `buildSacTx`, `buildSacAuthorizedQuery`, `sacContractId`, `trustStatus`, `missingFlags`, `isAccountId`, `isContractId`, `STROOPS_DECIMALS`. |
 | `issuer/issuerNet.ts` (SDK) | `submitClassic`, `submitSoroban`, `readSacAuthorized`, `horizonError`, `Signer`. The issuer route is lazy: import these two only from it. |
 
@@ -146,8 +144,6 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | `pro/errors.ts` | `PRO_ERRORS`, `PRO_ERROR_CODES`, `proErrorName`, `proErrorMessage`, `parseProErrorCode`. |
 | `pro/format.ts` | `usdx`, `perLot`, `exact`, `lots`, `duration`, `when`, `whenShort`, `countdown`, `DASH`. |
 | `pro/helpers.ts` | `seriesLabel`, `seriesStatus`, `snapshotAge`, `ageText`. |
-| `pro/proRoutes.ts` | `PRO_NAV` (route, label, path), `proHref(route)` (`/margin`, `/margin/trade`...), `parseProRoute(hash)` for old `#/pro/*` links. |
-| `pro/copy.ts` | `AMOUNT_HINT`. The banners are in `disclosures.ts`. |
 | `pro/FixtureProClient.ts`, `pro/replay.ts` | The fixture replay (`FixtureProClient` with `scenarioNames`, `setScenario`, `moveTo`, `parties`, `position`, `stepCount`; `DEFAULT_SCENARIO`, `DEFAULT_CURSOR`, `NOT_SCRIPTED`). Import only through `createProClient`. |
 | `pro/SorobanProClient.ts` (SDK), `pro/proAbi.ts`, `pro/proSpec.ts` | The live client (`setWallet`, `refresh`, `start`, `getStatus`), `ProCallError`, `failureOf`, `emptyModel`. Import only through `createProClient`. |
 
@@ -160,7 +156,7 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 ## Bundle facts (measured on a probe entry, 2026-11-11)
 
 A probe that statically imports `config`, both `createClient` modules, `preTrade`, `selection`, the tx machine,
-`tokens`, `ledger`, `assetFacts`, `explorer`, `positions`, `pro/phase`, `errors`, `reserves` and `buyerPayoff`
+`tokens`, `ledger`, `assetFacts`, `explorer`, `positions`, `pro/phase`, `errors`, and `reserves`
 builds to a 32 kB entry chunk with no Stellar SDK in it. The SDK (669 kB + 82 kB minified) and the clients are
 separate chunks loaded on demand. With `VITE_OPTIONS_CONTRACT_ID` and `VITE_PRO_CONTRACT_ID` set, the build emits
 neither the mock market chunk nor the 1.18 MB fixture chunk. For the reverse (a mock build that drops the live
@@ -208,4 +204,19 @@ Used when the build has no `VITE_OPTIONS_CONTRACT_ID`. All of it is computed fro
 | `assetfacts` | `mockAssetFacts(code)`: fixture flags for mock assets (`mock: true`, no counts). |
 | `options/mockClient.ts` | `failNextRead(method?, times)`, `clawBack(tokenId, units)`; `DEMO_WALLETS.c` is an empty wallet. `createOptionsClient` no longer keeps a failed load of the mock chunk. |
 | `disclosures.ts` | `MARGIN_PAYOUT_RISK`, `MARGIN_PUBLISHER_LINE` (the on-chain banner is the two together). |
+
+## Added in the review pass (11 Nov 2026, evening)
+
+| Module | What |
+|---|---|
+| `glossary.ts` | `GLOSSARY` (id, term, one-sentence definition), `definitionOf(id)`, `glossaryEntry(id)`: Learn's glossary and the kit's `Term` popovers say the same sentence. |
+| `format/option.ts` | `serialOf`, `KIND_WORD`, `strikePerUnitText`, `strikePerUnitExact`: one copy of the words that name an option. |
+| `format/time.ts` | `formatUtcClock` (`13:45:12 UTC`), `zoneLabel` (`UTC−10`, never `GMT-10`). |
+| `series/standard.ts` | `chainExpiries(now)`: the listed deadlines and a Friday less than an hour away, whose orders keep their tab. |
+| `payoff/leg.ts` | `givesUp(leg, side)`: a written call's side of "Most you can lose" (ruling E14). |
+| `portfolio/positions.ts` | `requestTodoItems(bids, me)` (expired requests whose premium is still escrowed) and the `escrowed`, `lockedNow`, `readyToTakeBack` sums of `portfolioSummary(options, me, resale?, bids?)`. |
+| `options/preTrade.ts` | The `below-exercise-value` warning on write, fill and list. |
+| `tx/types.ts` | `TxOptions.signal` and `STOPPED_WAITING`: a write that waits for a wallet can be stopped before it is signed. |
+| `deployments.ts` | `CONTRACT_TESTS`, `CONTRACT_TEST_TOTAL`, `RECORDED_PUT_FEES`. |
+| `units.ts` | `amtExact` for a shortfall; `amt` and `perUnitText` now follow `formatUnits` (two decimals). `formatDisplay` is gone. |
 

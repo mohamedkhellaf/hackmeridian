@@ -1,20 +1,23 @@
 // Every string of the Requests page. Sentences are whole (never built from fragments); counts go through Intl.
-// Vocabulary: "request" in headings and prose, "bid" in the action that sells to one, "deadline" for the expiry.
-import { countOf, groupDigits } from '../../core/format'
-import type { EscrowStatus, Figure, RequestRow, RequestSort } from './board'
+// Vocabulary (DESIGN.md, rulings R7 and E7): "request" everywhere a user reads, never "bid"; "deadline" for the
+// instant; a maker fills a request ("seller" is only a holder reselling); the buyer posted it.
+import { countOf, formatList, groupDigits } from '../../core/format'
+import type { Figure, RequestRow, RequestSort } from './board'
 import { money } from './board'
 
 export const PAGE_TITLE = 'Requests'
 /** The one line that says what a request is. */
-export const PAGE_LEAD = "A request is a buyer's premium already escrowed in the contract, waiting for a seller."
+export const PAGE_LEAD = "A request is a buyer's premium already escrowed in the contract, waiting for a maker."
 
 export const POST_REQUEST = 'Post a request'
-export const SELL_TO_BID = 'Sell to this bid'
+export const FILL_REQUEST = 'Fill request'
 export const CANCEL_REQUEST = 'Cancel request'
 export const KEEP_REQUEST = 'Keep request'
 export const VIEW_POSITION = 'View position'
 export const CONNECT_WALLET = 'Connect wallet'
 export const YOURS = 'Yours'
+/** The action on the wallet's own expired request: the premium is still in the contract until it is cancelled. */
+export const takeBack = (premium: Figure): string => `Take back ${money(premium)}`
 
 export const TAB_BOARD = 'Open requests'
 export const TAB_MINE = 'My requests'
@@ -28,12 +31,17 @@ export const KIND_OPTIONS = [
   { value: 'put', label: 'Put' },
   { value: 'call', label: 'Call' },
 ] as const
+export const FILTERS_LABEL = 'Filter and sort the requests'
 export const SORT_LABEL = 'Sort by'
+/** The visible word of the order menu on phones; its accessible name adds the order chosen. */
+export const SORT_SHORT = 'Sort'
+export const sortMenuLabel = (current: string): string => `${SORT_LABEL}: ${current}`
 export const SORT_OPTIONS: ReadonlyArray<{ value: RequestSort; label: string }> = [
   { value: 'deadline', label: 'Soonest deadline' },
   { value: 'premium', label: 'Highest premium per unit' },
 ]
 export const CLEAR_FILTERS = 'Clear filters'
+export const SHOW_CLOSED = 'Show closed'
 
 export const COL = {
   asset: 'Asset',
@@ -41,19 +49,24 @@ export const COL = {
   quantity: 'Quantity',
   strike: 'Strike',
   deadline: 'Deadline',
-  premium: 'Premium escrowed',
-  premiumMine: 'Premium',
+  premium: 'Premium per unit',
   buyer: 'Buyer',
   lock: 'You lock',
   state: 'State',
   action: 'Action',
 } as const
 
-export const BOARD_CAPTION = 'Open requests: funded bids a seller can take now'
-export const MINE_CAPTION = 'My requests, in every state'
+/** Read before the total premium of a list row, which has no column header. */
+export const PREMIUM_TOTAL = 'Premium in total'
+
+export const BOARD_CAPTION = 'Open requests a maker can fill now'
+export const MINE_CAPTION = 'My requests'
 
 export const perUnitOf = (row: Pick<RequestRow, 'premiumPerUnit' | 'assetCode'>): string => `${row.premiumPerUnit.text} per ${row.assetCode}`
+export const inTotal = (row: Pick<RequestRow, 'premium'>): string => `${money(row.premium)} in total`
 export const strikePerUnitOf = (row: Pick<RequestRow, 'strike' | 'assetCode'>): string => `${money(row.strike)} per ${row.assetCode}`
+/** The reference price under a strike, with its two-word source label and nothing more ("Demo price 10.20"). */
+export const referenceLine = (row: Pick<RequestRow, 'reference'>): string | null => (row.reference ? `${row.reference.label} ${row.reference.text}` : null)
 /** The first line of a phone row: what is wanted. */
 export const listTitle = (row: Pick<RequestRow, 'kindWord' | 'quantity'>): string => `${row.kindWord} on ${money(row.quantity)}`
 export const strikeLine = (row: Pick<RequestRow, 'strike'>): string => `Strike ${money(row.strike)}`
@@ -62,17 +75,19 @@ export const youHold = (have: Figure): string => `You hold ${money(have)}`
 export const serialText = (serial: string): string => `No. ${serial}`
 
 /** Accessible names: the visible label first, then the data it acts on. */
-export const sellLabel = (row: RequestRow): string => `${SELL_TO_BID}: ${row.terms}, you lock ${money(row.lock)}`
+export const fillLabel = (row: RequestRow): string => `${FILL_REQUEST}: ${row.terms}, you lock ${money(row.lock)}`
 export const cancelLabel = (row: RequestRow): string => `${CANCEL_REQUEST} ${serialText(row.serial)}: ${row.terms}`
+export const takeBackLabel = (row: RequestRow): string => `${takeBack(row.premium)} from request ${serialText(row.serial)}: ${row.terms}`
 export const positionLabel = (row: RequestRow): string => `${VIEW_POSITION} of request ${serialText(row.serial)}: ${row.terms}`
 
-/** One line under the state of the wallet's own request: where its premium is. */
-export const ESCROW_LINE: Record<EscrowStatus, string> = {
-  escrowed: 'Premium in the contract',
-  stranded: 'Premium still in the contract. Cancel to take it back.',
-  paid: 'Premium paid to the seller',
-  refunded: 'Premium returned',
-}
+/** Under the state of an expired request of the wallet: the one fact the tag cannot say. */
+export const STRANDED_LINE = 'Premium still in the contract'
+export const RETURNED_LINE = 'Premium returned'
+/** Under a deadline less than 15 minutes away (brief D17): a fill signed now may land after it. */
+export const LAPSE_LINE = 'A fill may land too late'
+export const NOT_FOR_OWN = 'Not for your own request'
+export const NO_ACTION = 'No action'
+export const shortBy = (missing: Figure): string => `, ${money(missing)} short`
 
 /** The line under the board: how many requests are listed and what they hold in the contract. */
 export function boardSummary(shown: number, total: number, escrowed: string | null): string {
@@ -80,78 +95,47 @@ export function boardSummary(shown: number, total: number, escrowed: string | nu
   if (shown === total) return escrowed === null ? `${all}.` : `${all}. ${escrowed} of premium is escrowed in the contract.`
   return escrowed === null ? `${shown} of ${all} shown.` : `${shown} of ${all} shown, with ${escrowed} of premium escrowed in the contract.`
 }
-export const openCount = (count: number): string => `${count} on the board`
-export const holdingCount = (count: number): string => `${count} with premium in the contract`
 export const SEE_RESERVES = 'See reserves'
+/** The page size of the board and the button that shows the next page. */
+export const PAGE_SIZE = 25
+export const showMore = (count: number): string => `Show ${count} more`
 
-export const EMPTY_BOARD = {
-  title: 'No open requests.',
-  hint: 'When no offer matches the terms you want, post a request: you name the strike, the deadline and the premium, and any seller can take it.',
-}
-export const EMPTY_FILTERED = {
-  title: 'No open requests match these filters.',
-  hint: 'Clear the filters to see every asset and kind.',
-}
-export const EMPTY_MINE = {
-  title: 'You have not posted a request.',
-  hint: 'A request names the option you want and escrows the premium you offer. A seller can take it until the deadline.',
-}
-export const GUEST_MINE = {
-  title: 'Connect a wallet to see your requests.',
-  hint: 'The board stays open without one. Posting and selling need a Testnet wallet.',
-}
-export const NO_REQUESTS_IN_CONTRACT = {
-  title: 'This contract version has no requests.',
-  hint: 'Requests need the Covered contract at version 1.5 or later.',
-}
+/** Once above the board when the wallet holds none of a token some requests would lock. */
+export const noFunds = (codes: readonly string[]): string => `Your wallet holds no ${formatList(codes, 'disjunction')}.`
+export const GET_TEST_FUNDS = 'Get test funds'
+
+export const EMPTY_BOARD = 'No open requests.'
+export const EMPTY_FILTERED = 'No open requests match these filters.'
+export const EMPTY_MINE = 'You have not posted a request.'
+export const EMPTY_MINE_OPEN = 'You have no open requests.'
+export const GUEST_MINE = 'Connect a wallet to see your requests.'
+export const NO_REQUESTS_IN_CONTRACT = 'Requests need the Covered contract at version 1.5 or later.'
 
 export const LOADING = 'Loading requests'
 export const LOAD_ERROR_TITLE = 'Requests could not be read.'
-export const LOAD_ERROR_FIX = 'Nothing was changed. Read the contract again.'
 export const RETRY = 'Try again'
-export const REFRESH_FAILED = 'Could not refresh. These are the requests from the last read.'
+/** Above the board when a refresh fails: the rows are from the last good read, at this time. */
+export const refreshFailed = (readAt: string): string => `Could not refresh. These requests were read at ${readAt}.`
 export const UNKNOWN_ASSET_FILTER = 'The asset in this link is not listed in the contract. Every asset is shown.'
 
 // ---- choosing the asset of a new request
 export const CHOOSER_TITLE = 'Post a request'
-export const CHOOSER_LEAD = 'Choose the asset the option is on. You set the kind, strike, deadline and premium next.'
-export const chooserOpenCount = (count: number): string => (count === 0 ? 'No open requests' : countOf(count, { one: 'open request', other: 'open requests' }))
-export const NO_REFERENCE = 'No reference price'
+export const CHOOSER_LEAD = 'Choose the asset the option is on.'
+export const CHOOSER_LOADING = 'Loading the assets'
+export const CHOOSER_ERROR = 'The assets could not be read.'
 
 // ---- cancelling
 export const cancelTitle = (serial: string): string => `Cancel request ${serialText(serial)}`
+export const takeBackTitle = (serial: string): string => `Take back the premium of request ${serialText(serial)}`
+export const CANCELLED_TITLE = 'Request cancelled'
 export const CANCEL_TERMS = { request: 'Request', strike: 'Strike', deadline: 'Deadline', refund: 'Returned to your wallet' } as const
 export const confirmedInLedger = (ledger: number): string => `confirmed in ledger ${groupDigits(String(ledger))}`
-export const CANCEL_NOTE_OPEN = 'The contract returns the premium in the same transaction. Until a ledger confirms it, a seller can still take the request.'
-export const CANCEL_NOTE_EXPIRED = 'The deadline has passed and nobody took it. The contract returns the premium in the same transaction.'
-export const cancelDone = (premium: Figure): string => `Request cancelled. ${money(premium)} returned to your wallet.`
+export const CANCEL_NOTE_OPEN = 'The contract returns the premium in the same transaction. Until a ledger confirms it, a maker can still fill the request.'
+export const CANCEL_NOTE_EXPIRED = 'Nobody filled it before the deadline. The contract returns the premium in the same transaction.'
 export const CANCELLING = 'Cancelling'
+export const TAKING_BACK = 'Taking back'
 export const TX_BUSY_REASON = 'Another transaction is in progress. Wait for it to finish.'
 export const DONE = 'Done'
 export const CLOSE = 'Close'
 export const CHECK_AGAIN = 'Check again'
 export const TX_LABEL = 'Transaction'
-
-// ---- how a request works (who acts and by when)
-export const HOW_TITLE = 'How a request works'
-export const HOW_STEPS = [
-  {
-    when: 'Now',
-    who: 'The buyer',
-    title: 'Names the terms and escrows the premium',
-    text: 'Kind, quantity, strike, deadline and the premium offered. The premium moves into the contract at once.',
-  },
-  {
-    when: 'Until the deadline',
-    who: 'A seller',
-    title: 'Locks the collateral and is paid',
-    text: 'The full strike in USDx for a put, the asset itself for a call. The premium is paid in the same transaction and the buyer holds the option.',
-  },
-  {
-    when: 'If nobody sells',
-    who: 'The buyer',
-    title: 'Cancels and takes the premium back',
-    text: 'Before or after the deadline. The premium stays in the contract until the request is cancelled.',
-  },
-] as const
-export const HOW_MORE = 'How options work'

@@ -1,6 +1,6 @@
 // The receipt: the contract note "prints" with its serial line, the transaction, what to do next and by when,
 // the deadline as a calendar entry, and the way on.
-import { Link as RouterLink } from '@tanstack/react-router'
+import { Link as RouterLink, useRouterState } from '@tanstack/react-router'
 import { ICS_MIME_TYPE, buildDeadlineIcs, deadlineIcsFileName, googleCalendarUrl } from '../../core/calendar'
 import type { DeadlineEvent } from '../../core/calendar'
 import { explorerTx } from '../../core/explorer'
@@ -22,7 +22,7 @@ export interface ReceiptLink {
 }
 
 export interface ReceiptView {
-  /** The heading: "Bought. The put is yours." */
+  /** The heading: "Put bought". */
   title: string
   /** The id printed on the serial line, when the outcome carries one. */
   serial?: string
@@ -38,7 +38,12 @@ export interface ReceiptView {
   /** The deadline as a calendar entry, for the modes where the user must act before it. */
   calendar: DeadlineEvent | null
   link: ReceiptLink | null
+  /** Starts the next order of the same kind from the same terms (a written offer, a posted request). */
+  another?: { label: string; onClick: () => void }
 }
+
+/** The path a receipt link goes to, to leave it out when the ticket was opened from that very page. */
+const pathOf = (link: ReceiptLink): string => link.to.replace(/\$(\w+)/g, (_, name: string) => link.params?.[name] ?? '')
 
 /** Hands the .ics text to the browser as a download. Nothing leaves the page. */
 function downloadIcs(event: DeadlineEvent): void {
@@ -56,7 +61,9 @@ function downloadIcs(event: DeadlineEvent): void {
 export function ReceiptStep({ view, state }: { view: ReceiptView; state: TxState }) {
   const frame = useFrame()
   const { isMock } = useOptionsClient()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
   const ledger = state.ledger !== null ? groupDigits(String(state.ledger)) : undefined
+  const link = view.link && pathOf(view.link) !== pathname ? view.link : null
   return (
     <>
       <ContractNote
@@ -93,10 +100,24 @@ export function ReceiptStep({ view, state }: { view: ReceiptView; state: TxState
         </div>
       ) : null}
       <Actions>
-        {view.link ? (
+        {view.another ? (
           <>
-            <ButtonLink variant="primary" fullWidth className={styles.primary} render={<RouterLink to={view.link.to as never} params={view.link.params as never} search={view.link.search as never} />}>
-              {view.link.label}
+            {link ? (
+              <ButtonLink variant="quiet" render={<RouterLink to={link.to as never} params={link.params as never} search={link.search as never} />}>
+                {link.label}
+              </ButtonLink>
+            ) : null}
+            <Button variant="quiet" onClick={frame.close}>
+              Done
+            </Button>
+            <Button variant="primary" fullWidth className={styles.primary} onClick={view.another.onClick}>
+              {view.another.label}
+            </Button>
+          </>
+        ) : link ? (
+          <>
+            <ButtonLink variant="primary" fullWidth className={styles.primary} render={<RouterLink to={link.to as never} params={link.params as never} search={link.search as never} />}>
+              {link.label}
             </ButtonLink>
             <Button variant="quiet" onClick={frame.close}>
               Done

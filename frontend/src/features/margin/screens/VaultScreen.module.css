@@ -6,10 +6,26 @@
     min-width: 0;
   }
 
+  /* The vault value leads; cash, reserved payments and debts follow at the figure size. */
   .figures {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
     gap: var(--s-16) var(--s-32);
+    align-items: start;
+  }
+
+  .total {
+    max-width: 34rem;
+  }
+
+  /* The contract's name and number for a refusal: a quiet reference after the sentence. */
+  .code {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+    color: var(--muted);
+    white-space: nowrap;
   }
 
   .columns {
@@ -54,7 +70,11 @@
 
   @media (max-width: 1199.98px) {
     .figures {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .figures > :first-child {
+      grid-column: 1 / -1;
     }
 
     .columns {
@@ -68,6 +88,7 @@
     }
 
     .figures {
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--s-12) var(--s-16);
     }
   }

@@ -34,13 +34,6 @@ export function seriesSettlements(model: Pick<ProModel, 'series' | 'books'>): Se
   return out
 }
 
-export type VaultSeriesState = 'Open' | 'Settling' | 'Closed'
-
-/** The vault's view of a series: open until a settlement price exists, closed once the vault has settled it. */
-export function vaultSeriesState(s: SeriesView): VaultSeriesState {
-  return s.closed ? 'Closed' : s.settlementPrice != null ? 'Settling' : 'Open'
-}
-
 export interface Takeover {
   /** Position in the call history (the replay step, or the order of calls made from this browser). */
   index: number
@@ -69,4 +62,39 @@ export function takeovers(history: readonly HistoryEntry[]): Takeover[] {
       deficit: h.ok && h.result ? (h.result.deficit ?? null) : null,
       code: h.ok ? null : h.code,
     }))
+}
+
+/** Where an expired series stands in the three calls that settle it. */
+export type SettleStep = 'await-price' | 'settle-books' | 'settle-series' | 'claim' | 'done'
+
+export interface ExpiredSeries {
+  series: SeriesView
+  step: SettleStep
+  /** Books of the series, and how many are settled. */
+  books: BookView[]
+  booksSettled: number
+  /** The book the next `settle` call is for, while the step is `settle-books`. */
+  nextBook: BookView | null
+  /** Positions that settle at expiry (not exercised early), and how many their holders have claimed. */
+  positions: number
+  claimed: number
+}
+
+/**
+ * Every expired series with the step it is at: waiting for the publisher's settlement price, settle each writer
+ * book, settle the series against the vault, then each holder claims. Read from the model's own flags; the same
+ * order as core/pro/phase.ts gives each position.
+ */
+export function expiredSeries(model: Pick<ProModel, 'series' | 'books' | 'positions' | 'now'>): ExpiredSeries[] {
+  return model.series
+    .filter((s) => model.now >= s.expiry)
+    .map((series) => {
+      const books = model.books.filter((b) => b.seriesId === series.id)
+      const open = books.filter((b) => !b.settled)
+      const held = model.positions.filter((p) => p.seriesId === series.id && !p.exercised)
+      const claimed = held.filter((p) => p.claim !== null).length
+      const step: SettleStep =
+        series.settlementPrice == null ? 'await-price' : open.length > 0 ? 'settle-books' : !series.closed ? 'settle-series' : claimed < held.length ? 'claim' : 'done'
+      return { series, step, books, booksSettled: books.length - open.length, nextBook: open[0] ?? null, positions: held.length, claimed }
+    })
 }

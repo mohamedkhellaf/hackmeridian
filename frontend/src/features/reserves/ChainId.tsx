@@ -13,10 +13,20 @@ export interface ChainIdProps {
 }
 
 /**
- * An id as proof: mono, with copy and an explorer link. A mock id has no explorer page and nothing worth
- * copying, so it is shown as plain text.
+ * An id as proof: mono, with an explorer link. Only an id printed in full also has a copy button: a shortened id
+ * is checked on the explorer page it links to, which shows it whole. A mock id has no explorer page and nothing
+ * worth copying, so it is shown as plain text.
  */
 export function ChainId({ value, length = 'medium', what, name }: ChainIdProps) {
   if (isMockId(value)) return <Address value={value} length={length === 'full' ? 'medium' : length} copyLabel={null} name={name} />
-  return <Address value={value} length={length} name={name} copyLabel={`Copy the id of ${what}`} explorerUrl={explorerAddress(value)} explorerLabel={`View ${what} on the explorer`} />
+  return (
+    <Address
+      value={value}
+      length={length}
+      name={name}
+      copyLabel={length === 'full' ? `Copy the id of ${what}` : null}
+      explorerUrl={explorerAddress(value)}
+      explorerLabel={`View ${what} on the explorer`}
+    />
+  )
 }

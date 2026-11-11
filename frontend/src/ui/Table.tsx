@@ -117,9 +117,9 @@ interface CellLook {
   align?: 'start' | 'center' | 'end'
   /** Sticks to the right edge while the table scrolls: the action column. */
   pinned?: boolean
-  /** The strike column: serif, semibold, on the sunken tone, centred. */
+  /** The strike column: serif, semibold, on the cell tone, centred. */
   strike?: boolean
-  /** The sunken tone, for in-the-money cells. Always paired with a word elsewhere in the row. */
+  /** The cell tone (`--cell-tone`), for in-the-money cells. Always paired with a word elsewhere in the row. */
   sunken?: boolean
 }
 

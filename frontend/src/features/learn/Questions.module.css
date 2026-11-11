@@ -13,34 +13,11 @@
     border-bottom-color: var(--rule);
   }
 
+  /* A question is a row of the list, in the interface's voice: sans, medium. Serif is for the headings. */
   .question {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s-16);
-    min-height: var(--touch);
-    padding-block: var(--s-8);
-    font-family: var(--font-serif);
-    font-size: var(--figure-size);
-    line-height: var(--figure-line);
-    font-weight: 600;
-    color: var(--text);
-    cursor: pointer;
-    list-style: none;
-    border-radius: var(--r-tag);
-
-    &::-webkit-details-marker {
-      display: none;
-    }
-  }
-
-  .chevron {
-    color: var(--muted);
-    transition: rotate var(--dur-hover) var(--ease-enter);
-  }
-
-  .item[open] .chevron {
-    rotate: 180deg;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 550;
   }
 
   .answer {

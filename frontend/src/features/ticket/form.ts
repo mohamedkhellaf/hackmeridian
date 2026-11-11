@@ -19,8 +19,13 @@ export interface TermsForm {
   expiry: number | null
   /** Underlying units, as typed. */
   qty: string
-  /** Total premium in quote units, as typed. */
+  /** Premium for one whole unit of underlying, in quote units, as typed. The total is computed exactly. */
   premium: string
+}
+
+export interface FormDecimals {
+  underlying: number
+  quote: number
 }
 
 export type FormField = 'kind' | 'strike' | 'expiry' | 'qty' | 'premium'
@@ -44,18 +49,42 @@ export function gridFor(args: { nowSec: number; referencePerUnit: bigint | null;
 export const strikeText = (perUnit: bigint, quoteDecimals: number): string => plainDecimal(perUnit, quoteDecimals)
 
 /**
- * The form a ticket opens with: the intent's own terms where it has them, else the first listed expiry and
- * the strike nearest the reference price. Quantity and premium stay empty: the ticket never invents them.
+ * The total premium of the form, as a plain decimal: quantity times the premium per unit, exact. `inexact` when
+ * that product is not a whole number of quote units; null while either field does not parse.
  */
-export function initialForm(intent: FormIntent, grid: Grid, referencePerUnit: bigint | null, quoteDecimals: number): TermsForm {
+export function premiumTotalText(form: Pick<TermsForm, 'qty' | 'premium'>, d: FormDecimals): string | 'inexact' | null {
+  const qty = parseAmount(form.qty, d.underlying)
+  const unit = parseAmount(form.premium, d.quote)
+  if (qty === null || unit === null) return null
+  const scaled = qty * unit
+  const base = 10n ** BigInt(d.underlying)
+  if (scaled % base !== 0n) return 'inexact'
+  return plainDecimal(scaled / base, d.quote)
+}
+
+/** The premium per unit for a total over a quantity (both as typed), truncated: what a link's total means per unit. */
+export function unitFromTotal(totalText: string, qtyText: string, d: FormDecimals): string | null {
+  const total = parseAmount(totalText, d.quote)
+  const qty = parseAmount(qtyText, d.underlying)
+  if (total === null || qty === null || qty <= 0n) return null
+  return plainDecimal((total * 10n ** BigInt(d.underlying)) / qty, d.quote)
+}
+
+/**
+ * The form a ticket opens with: the intent's own terms where it has them, else the first listed expiry and
+ * the strike nearest the reference price. Quantity and premium stay empty: the ticket never invents them. The
+ * intent's premium is a total (the URL keeps totals); the form holds it per unit.
+ */
+export function initialForm(intent: FormIntent, grid: Grid, referencePerUnit: bigint | null, d: FormDecimals): TermsForm {
   const middle = grid.ladder.length > 0 ? grid.ladder[Math.floor((grid.ladder.length - 1) / 2)] : null
   const nearest = nearestStrike(referencePerUnit, grid.ladder) ?? middle
+  const qty = intent.qty ?? ''
   return {
     kind: intent.kind,
-    strike: intent.strike ?? (nearest === null ? '' : strikeText(nearest, quoteDecimals)),
+    strike: intent.strike ?? (nearest === null ? '' : strikeText(nearest, d.quote)),
     expiry: intent.expiry ?? grid.expiries[0] ?? null,
-    qty: intent.qty ?? '',
-    premium: intent.premium ?? '',
+    qty,
+    premium: intent.premium === undefined ? '' : (unitFromTotal(intent.premium, qty, d) ?? ''),
   }
 }
 
@@ -68,7 +97,31 @@ export function isOnGrid(form: Pick<TermsForm, 'strike' | 'expiry'>, grid: Grid,
   return k !== null && grid.ladder.includes(k) && form.expiry !== null && grid.expiries.includes(form.expiry)
 }
 
-export type Draft = { ok: true; offer: NewOffer } | { ok: false; error: string; field: FormField }
+/** A form that does not describe an option yet: the first problem, and every field's own problem. */
+export type Draft = { ok: true; offer: NewOffer } | { ok: false; error: string; field: FormField; errors?: Partial<Record<FormField, string>> }
+
+const FIELD_ORDER: readonly FormField[] = ['qty', 'strike', 'premium', 'expiry']
+
+/**
+ * Each field on its own, so a field is marked as soon as it is left (a quantity of 0 while the premium is still
+ * empty), and the reason on the action names every open problem.
+ */
+export function fieldErrors(form: TermsForm, underlying: TokenInfo, assets: SupportedAssets): Partial<Record<FormField, string>> {
+  const q = assets.quote
+  const errors: Partial<Record<FormField, string>> = {}
+  const positive = (text: string, decimals: number) => {
+    const v = parseAmount(text, decimals)
+    return v !== null && v > 0n
+  }
+  if (form.qty.trim() === '') errors.qty = `Enter a quantity of ${underlying.code}.`
+  else if (!positive(form.qty, underlying.decimals)) errors.qty = `Quantity must be a positive amount of ${underlying.code}.`
+  if (form.strike.trim() === '') errors.strike = 'Pick a strike.'
+  else if (!positive(form.strike, q.decimals)) errors.strike = `Strike must be a positive ${q.code} price.`
+  if (form.premium.trim() === '') errors.premium = `Enter the premium per ${underlying.code}, in ${q.code}.`
+  else if (!positive(form.premium, q.decimals)) errors.premium = `Premium must be a positive ${q.code} amount.`
+  if (form.expiry === null) errors.expiry = 'Pick a deadline, or enter a date and a time in UTC.'
+  return errors
+}
 
 /** Which field a validator message is about, so it can be shown under that field. */
 export function fieldOfError(message: string): FormField {
@@ -81,32 +134,39 @@ export function fieldOfError(message: string): FormField {
 /**
  * The offer (or bid: same terms) the form describes, or the first thing wrong with it. Blank fields get a
  * plain request; everything else is `buildOffer` of core/maker, the one validator: positive amounts, an exact
- * strike times quantity, an expiry in the future and within two years.
+ * strike times quantity, an expiry in the future and within two years. The premium is typed per unit; its total
+ * must be exact too.
  */
 export function draftOf(form: TermsForm, underlying: TokenInfo, assets: SupportedAssets): Draft {
-  if (form.qty.trim() === '') return { ok: false, field: 'qty', error: `Enter a quantity of ${underlying.code}.` }
-  if (form.strike.trim() === '') return { ok: false, field: 'strike', error: 'Pick a strike.' }
-  if (form.premium.trim() === '') return { ok: false, field: 'premium', error: `Enter the premium in ${assets.quote.code}.` }
-  if (form.expiry === null) return { ok: false, field: 'expiry', error: 'Pick an expiry, or enter a date and a time in UTC.' }
+  const errors = fieldErrors(form, underlying, assets)
+  const first = FIELD_ORDER.find((f) => errors[f] !== undefined)
+  if (first !== undefined || form.expiry === null) {
+    const field = first ?? 'expiry'
+    return { ok: false, field, error: errors[field] ?? '', errors }
+  }
+  const total = premiumTotalText(form, { underlying: underlying.decimals, quote: assets.quote.decimals })
   const built = buildOffer(assets, {
     kind: form.kind,
     underlyingId: underlying.contractId,
     qty: form.qty,
     strike: form.strike,
-    premium: form.premium,
+    // An inexact total is refused below, once every other field has passed: the unit price stands in meanwhile.
+    premium: total !== null && total !== 'inexact' ? total : form.premium,
     expiry: new Date(form.expiry * 1000).toISOString(),
   })
   if ('error' in built) return { ok: false, field: fieldOfError(built.error), error: withStop(built.error) }
+  if (total === 'inexact') return { ok: false, field: 'premium', error: 'Premium × quantity is not an exact amount; adjust one of them.' }
   return { ok: true, offer: built.offer }
 }
 
 /** Validator messages come without a full stop; sentences on screen end with one. */
 const withStop = (message: string): string => (/[.?]$/.test(message) ? message : `${message}.`)
 
-const DATE = /^(\d{4})-(\d{2})-(\d{2})$/
-const TIME = /^(\d{1,2}):(\d{2})$/
+// The separators are optional: a phone's number pad has no hyphen and often no colon (`20261218`, `0800`).
+const DATE = /^(\d{4})-?(\d{2})-?(\d{2})$/
+const TIME = /^(\d{1,2}):?(\d{2})$/
 
-/** `2026-12-18` and `08:00`, read as UTC, to unix seconds. Null when either does not parse or the day does not exist. */
+/** `2026-12-18` and `08:00` (or `20261218` and `0800`), read as UTC, to unix seconds. Null when either does not parse or the day does not exist. */
 export function parseUtcDateTime(date: string, time: string): number | null {
   const d = DATE.exec(date.trim())
   const t = TIME.exec(time.trim())
@@ -143,15 +203,23 @@ const sameDecimal = (a: string, b: string, decimals: number): boolean => {
 /**
  * What the form takes over when the URL changes under it (another cell of the chain was chosen): every field the
  * intent carries and that differs from the form. An echo of the form's own terms differs in nothing. The expiry
- * is compared by its UTC day, the precision of the URL, so a custom time of day survives its own echo. A field
- * the intent does not carry is left alone: the URL never clears what was typed.
+ * is compared by its UTC day, the precision of the URL, so a custom time of day survives its own echo. The URL's
+ * premium is a total: it is compared with the form's total and taken over per unit. A field the intent does not
+ * carry is left alone: the URL never clears what was typed.
  */
-export function takeOver(form: TermsForm, intent: FormIntent, decimals: { underlying: number; quote: number }): Partial<TermsForm> | null {
+export function takeOver(form: TermsForm, intent: FormIntent, decimals: FormDecimals): Partial<TermsForm> | null {
   const patch: Partial<TermsForm> = {}
   if (intent.kind !== form.kind) patch.kind = intent.kind
   if (intent.strike !== undefined && !sameDecimal(intent.strike, form.strike, decimals.quote)) patch.strike = intent.strike
   if (intent.expiry !== undefined && (form.expiry === null || expiryDayKey(intent.expiry) !== expiryDayKey(form.expiry))) patch.expiry = intent.expiry
   if (intent.qty !== undefined && !sameDecimal(intent.qty, form.qty, decimals.underlying)) patch.qty = intent.qty
-  if (intent.premium !== undefined && !sameDecimal(intent.premium, form.premium, decimals.quote)) patch.premium = intent.premium
+  if (intent.premium !== undefined) {
+    const qty = patch.qty ?? form.qty
+    const total = premiumTotalText({ qty, premium: form.premium }, decimals)
+    if (total === null || total === 'inexact' || !sameDecimal(intent.premium, total, decimals.quote)) {
+      const unit = unitFromTotal(intent.premium, qty, decimals)
+      if (unit !== null && !sameDecimal(unit, form.premium, decimals.quote)) patch.premium = unit
+    }
+  }
   return Object.keys(patch).length > 0 ? patch : null
 }

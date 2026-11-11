@@ -3,7 +3,7 @@ import type { TokenInfo } from '../../core/options/types'
 import type { Bid } from '../../core/requests/types'
 import type { TokenBalance } from '../../core/stellar/tokens'
 import type { MarketIndexRow } from '../../data'
-import { assetRequests, choosingSearch, fundingProgress, guidedSearch, indexList, needsTestFunds, obviousAsset } from './model'
+import { accessCase, assetRequests, choosingSearch, fundingProgress, fundsLead, guidedSearch, indexList, needsTestFunds, obviousAsset } from './model'
 
 const token = (code: string): TokenInfo => ({ contractId: `C_${code}`, code, decimals: 7, issuer: 'GISSUER' })
 const USDX = token('USDX')
@@ -76,25 +76,40 @@ describe('where an intent leads', () => {
 })
 
 describe('needsTestFunds', () => {
+  const Q = USDX.contractId
+
   it('is false until the balances are read', () => {
-    expect(needsTestFunds(undefined)).toBe(false)
-    expect(needsTestFunds(null)).toBe(false)
-    expect(needsTestFunds([])).toBe(false)
+    expect(needsTestFunds(undefined, Q)).toBe(false)
+    expect(needsTestFunds(null, Q)).toBe(false)
+    expect(needsTestFunds([], Q)).toBe(false)
   })
 
-  it('is true for a wallet that holds nothing: zero, unfunded or without trustlines', () => {
-    expect(needsTestFunds([bal('USDX', 0n), bal('FUND', 0n)])).toBe(true)
-    expect(needsTestFunds([bal('USDX', null, 'unfunded'), bal('FUND', null, 'unfunded')])).toBe(true)
-    expect(needsTestFunds([bal('USDX', 0n), bal('FUND', null, 'no-trustline')])).toBe(true)
+  it('is true for a wallet with no quote token: zero, unfunded or without a trustline', () => {
+    expect(needsTestFunds([bal('USDX', 0n), bal('FUND', 0n)], Q)).toBe(true)
+    expect(needsTestFunds([bal('USDX', null, 'unfunded'), bal('FUND', null, 'unfunded')], Q)).toBe(true)
+    expect(needsTestFunds([bal('USDX', null, 'no-trustline'), bal('FUND', 0n)], Q)).toBe(true)
   })
 
-  it('is false as soon as the wallet holds any token', () => {
-    expect(needsTestFunds([bal('USDX', 1n), bal('FUND', 0n)])).toBe(false)
-    expect(needsTestFunds([bal('USDX', 0n), bal('FUND', 10n)])).toBe(false)
+  it('is true for a holder of the asset with no quote token: it cannot pay a premium', () => {
+    expect(needsTestFunds([bal('USDX', 0n), bal('FUND', 10n)], Q)).toBe(true)
   })
 
-  it('is false when a balance could not be read: an error is not an empty wallet', () => {
-    expect(needsTestFunds([bal('USDX', null, 'error'), bal('FUND', 0n)])).toBe(false)
+  it('is false as soon as the wallet holds the quote token', () => {
+    expect(needsTestFunds([bal('USDX', 1n), bal('FUND', 0n)], Q)).toBe(false)
+  })
+
+  it('is false when the quote balance could not be read: an error is not an empty wallet', () => {
+    expect(needsTestFunds([bal('USDX', null, 'error'), bal('FUND', 0n)], Q)).toBe(false)
+  })
+})
+
+describe('fundsLead', () => {
+  const Q = USDX.contractId
+
+  it('says the wallet holds nothing, no quote token, or that the strip was asked for', () => {
+    expect(fundsLead([bal('USDX', 0n), bal('FUND', null, 'no-trustline')], Q)).toBe('none')
+    expect(fundsLead([bal('USDX', 0n), bal('FUND', 10n)], Q)).toBe('noQuote')
+    expect(fundsLead([bal('USDX', 5n), bal('FUND', 10n)], Q)).toBe('asked')
   })
 })
 
@@ -179,5 +194,29 @@ describe('assetRequests', () => {
       NOW,
     )
     expect(rows).toEqual([])
+  })
+})
+
+describe('accessCase', () => {
+  it('says what the wallet itself lacks before anything about authorization', () => {
+    expect(accessCase('unfunded', undefined, false)).toBe('unfunded')
+    expect(accessCase('no-trustline', undefined, false)).toBe('noTrustline')
+    expect(accessCase('ok', 'no-trustline', false)).toBe('noTrustline')
+    expect(accessCase(undefined, 'unfunded', undefined)).toBe('unfunded')
+  })
+
+  it('tells the issuer, a restricted holder and a refused one apart', () => {
+    expect(accessCase('ok', 'issuer', true)).toBe('issuer')
+    expect(accessCase('ok', 'maintain-only', false)).toBe('maintainOnly')
+    expect(accessCase('not-authorized', undefined, false)).toBe('no')
+    expect(accessCase('ok', 'unauthorized', true)).toBe('no')
+  })
+
+  it('falls back on the contract: authorized, refused, still checking or not known', () => {
+    expect(accessCase('ok', 'authorized', true)).toBe('yes')
+    expect(accessCase('mock', undefined, true)).toBe('yes')
+    expect(accessCase('ok', undefined, false)).toBe('no')
+    expect(accessCase('ok', undefined, undefined)).toBe('checking')
+    expect(accessCase('ok', undefined, null)).toBe('error')
   })
 })

@@ -3,9 +3,12 @@ import { TxLink } from '../../ui'
 import { NO_HASH_SHORT, NO_HASH_YET } from './copy'
 import type { ActivityRow } from './model'
 
-/** The hash with its explorer link and a copy button; a word when there is none. */
-export function HashCell({ row }: { row: Pick<ActivityRow, 'hash' | 'hashUrl' | 'tone'> }) {
-  if (row.hash) return <TxLink hash={row.hash} explorerUrl={row.hashUrl ?? undefined} copy />
+/**
+ * The hash with its explorer link and a copy button; a word when there is none. A mock hash has no explorer
+ * page and nothing anyone would paste elsewhere, so it is plain text.
+ */
+export function HashCell({ row }: { row: Pick<ActivityRow, 'hash' | 'hashUrl' | 'tone' | 'mock'> }) {
+  if (row.hash) return <TxLink hash={row.hash} explorerUrl={row.hashUrl ?? undefined} copy={!row.mock} />
   if (row.tone === 'working') return <span className="ui-muted">{NO_HASH_YET}</span>
   return (
     <>

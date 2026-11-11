@@ -29,7 +29,7 @@ id from its code and issuer with the SDK to prove the table is consistent.
 |---|---|
 | `assetKey(asset)` | The key in state, queries and lists: the contract id. |
 | `tierOf(asset, { domainLinked? })` | `Reference`, `Domain-linked` or `No domain link`. Only `Reference` can be computed today. |
-| `ASSET_TIERS`, `TIER_MEANING`, `ASSET_LIST_NOTE` | The tier words, their legend, and the note on what the list is. |
+| `ASSET_TIERS`, `TIER_MEANING` | The tier words and their legend. |
 | `parseAssetParam(param, network = 'testnet')` | Parses `$asset`: a slug (`bond`), `CODE-ISSUER` or `C...`. Checksums are enforced on Testnet; null for anything else. |
 | `resolveAssetParam(raw, network, listed)` | `found` (contract id, canonical segment, whether the URL should be replaced), `unknown` (well formed, not known) or `invalid`. |
 | `assetParam(asset)`, `assetPath(asset)` | The canonical segment and `/markets/<segment>`: slug for a reference asset, else `CODE-ISSUER`, else the contract id. |

@@ -34,3 +34,19 @@ export const TX_STATE_LABEL: Record<TxState, string> = {
   expired: 'Expired',
   declined: 'Declined',
 }
+
+/** How a transaction state reads: in flight, done, refused, unknown, or stopped (declined or expired). */
+export type TxStateTone = 'working' | 'confirmed' | 'failed' | 'unknown' | 'stopped'
+
+/** The tone of each state: which glyph and ink `TxStateWord` gives it. */
+export const TX_STATE_TONE: Record<TxState, TxStateTone> = {
+  checking: 'working',
+  signing: 'working',
+  submitting: 'working',
+  pending: 'working',
+  confirmed: 'confirmed',
+  failed: 'failed',
+  unknown: 'unknown',
+  expired: 'stopped',
+  declined: 'stopped',
+}

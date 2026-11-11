@@ -21,6 +21,8 @@
   .group {
     --segment-h: var(--control-h);
 
+    /* Positioned, so screen-reader text inside a scrolled strip stays in it and cannot widen the page. */
+    position: relative;
     display: inline-flex;
     max-width: 100%;
     border: 1px solid var(--control);
@@ -51,6 +53,15 @@
 
   .root[data-full-width] .group {
     display: flex;
+  }
+
+  /* Full width: equal segments, so stacked controls line up. Inline controls keep their content widths. */
+  .root[data-full-width] .segment {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    text-wrap: balance;
   }
 
   .segment {
@@ -89,10 +100,10 @@
       }
     }
 
+    /* The fill alone marks the choice: one weight in both states, so no segment changes width. */
     &[data-checked] {
       background: var(--primary);
       color: var(--primary-fg);
-      font-weight: 600;
     }
 
     &[data-checked] + &,

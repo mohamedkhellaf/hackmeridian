@@ -9,7 +9,11 @@ export interface WalletState {
   wrongNetwork: boolean
   /** Ready-made banner text for wrongNetwork, naming the connected wallet. */
   networkMessage: string | null
-  error: string | null
+  /**
+   * Asks the wallet again for its network and account (it is also done on window focus). Resolves once read; a
+   * wallet that cannot answer leaves the state as it was.
+   */
+  recheckNetwork: () => Promise<void>
   /** Opens the wallet picker (or connects instantly under the test wallet). */
   connect: () => Promise<void>
   disconnect: () => void

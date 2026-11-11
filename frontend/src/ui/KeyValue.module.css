@@ -5,11 +5,13 @@
     margin: 0;
   }
 
+  /* Label and figure share the first line; a hint takes a line of its own across the whole row. */
   .item {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--s-16);
+    gap: var(--s-2) var(--s-16);
     padding-block: var(--s-8);
   }
 
@@ -31,17 +33,16 @@
     color: var(--muted);
   }
 
+  /* The dd keeps its place in the structure (dl > div > dt + dd); its two parts lay out in the row. */
   .value {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--s-2);
-    min-width: 0;
-    margin: 0;
-    text-align: end;
+    display: contents;
   }
 
   .figure {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-inline-start: auto;
+    text-align: end;
     font-family: var(--font-serif);
     font-size: var(--figure-size);
     line-height: var(--figure-line);
@@ -51,6 +52,12 @@
     overflow-wrap: anywhere;
   }
 
+  /* A marked figure in a right-aligned column: the wash ends on the text, so it never runs past the column edge. */
+  .figure > mark {
+    margin-inline-end: 0;
+    padding-inline-end: 0;
+  }
+
   .root[data-figures='sans'] .figure {
     font-family: var(--font-sans);
     font-size: var(--ui-size);
@@ -58,11 +65,20 @@
     font-weight: 500;
   }
 
+  /* One line: flush right under the figure. Longer: the inner box fills the row and its text runs from the left. */
   .hint {
+    flex: 1 0 100%;
     font-family: var(--font-sans);
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     color: var(--muted);
+    text-align: end;
+  }
+
+  .hintText {
+    display: inline-block;
+    max-width: 100%;
+    text-align: start;
     text-wrap: pretty;
   }
 
@@ -101,8 +117,18 @@
       font-weight: var(--label-weight);
     }
 
-    & .value {
-      align-items: flex-start;
+    & .figure {
+      margin-inline-start: 0;
+      text-align: start;
+    }
+
+    & .figure > mark {
+      margin-inline: 0 -0.18em;
+      padding-inline: 0 0.18em;
+    }
+
+    & .hint {
+      flex: none;
       text-align: start;
     }
   }

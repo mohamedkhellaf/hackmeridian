@@ -1,12 +1,4 @@
 @layer features {
-  /* Who acts, under what happens: the same place on every step. */
-  .actor {
-    margin-top: var(--s-2);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
-  }
-
   .tx {
     display: flex;
     flex-wrap: wrap;
@@ -22,5 +14,13 @@
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     color: var(--muted);
+  }
+
+  .link {
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--touch);
+    }
   }
 }

@@ -2,20 +2,37 @@
   .root {
     display: flex;
     flex-direction: column;
+    gap: var(--s-20);
+    padding-top: var(--s-12);
+  }
+
+  .group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .groupHead {
+    padding-bottom: var(--s-6);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
     margin: 0;
-    border-top: 1px solid var(--rule);
   }
 
   .item {
     display: flex;
     flex-direction: column;
-    gap: var(--s-6);
-    padding-block: var(--s-16);
+    gap: var(--s-4);
+    padding-block: var(--s-12) var(--s-4);
     border-bottom: 1px solid var(--hairline);
-  }
-
-  .item:last-child {
-    border-bottom-color: var(--rule);
   }
 
   .head {
@@ -23,42 +40,52 @@
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--s-4) var(--s-12);
+    gap: 0 var(--s-12);
   }
 
   .label {
-    font-size: var(--body-size);
-    line-height: var(--body-line);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
     font-weight: 600;
     color: var(--text);
   }
 
-  .sub {
+  .what {
     font-size: var(--caption-size);
     line-height: var(--caption-line);
-    color: var(--muted);
-    text-wrap: pretty;
   }
 
   .note {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
     color: var(--text-2);
     text-wrap: pretty;
   }
 
-  .facts {
-    margin-top: var(--s-4);
-  }
-
+  /* Time and hash on the left, the link on the right; the link keeps a 44 px target. */
   .foot {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--s-12);
+    gap: 0 var(--s-12);
+    min-height: var(--touch);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
   }
 
-  /* 44 px targets: the link and the button are padded out to the touch size. */
+  .proof {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-12);
+    color: var(--text-2);
+  }
+
+  .target {
+    margin-inline-start: auto;
+  }
+
   .target :where(a) {
     display: inline-flex;
     align-items: center;
@@ -66,6 +93,8 @@
   }
 
   .check {
+    align-self: flex-start;
     min-height: var(--touch);
+    margin-bottom: var(--s-8);
   }
 }

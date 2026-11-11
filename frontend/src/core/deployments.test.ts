@@ -57,3 +57,12 @@ describe('recorded Testnet deployments', () => {
     expect(marginRecordFor('CSOMETHINGELSE')).toBeNull()
   })
 })
+
+describe('recorded proof figures', () => {
+  it('counts 250 contract tests and keeps the four fees of the recorded put', async () => {
+    const { CONTRACT_TESTS, CONTRACT_TEST_TOTAL, RECORDED_PUT_FEES } = await import('./deployments')
+    expect(CONTRACT_TEST_TOTAL).toBe(250)
+    expect(CONTRACT_TESTS).toEqual({ unit: 146, invariant: 18, negative: 86 })
+    expect(RECORDED_PUT_FEES).toEqual({ write: 309_366n, buy: 31_976n, exercise: 79_873n, claim: 10_223n })
+  })
+})

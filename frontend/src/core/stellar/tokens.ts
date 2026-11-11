@@ -27,8 +27,9 @@ const ADDRESS = /^[GC][A-Z2-7]{55}$/
 export async function readBalance(contractId: string, address: string): Promise<bigint> {
   if (isMockToken(contractId)) throw new Error('mock token')
   if (!ADDRESS.test(address)) throw new Error('Not a Stellar address')
-  const { server } = await import('./rpc')
-  const { result } = await server.queryContract<bigint>(contractId, 'balance', { id: address })
+  const [{ server }, { config }] = await Promise.all([import('./rpc'), import('../config')])
+  // The passphrase is passed so the SDK does not ask the RPC for it on every read (performance finding 0).
+  const { result } = await server.queryContract<bigint>(contractId, 'balance', { id: address }, config.networkPassphrase)
   return BigInt(result)
 }
 

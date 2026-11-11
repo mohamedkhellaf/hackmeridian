@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAmount, formatDisplay, parseAmount, shortAddress, strikePerUnit } from './format'
+import { formatAmount, parseAmount, shortAddress, strikePerUnit } from './format'
 import { requiredCollateral } from './types'
 import type { OptionOffer, TokenInfo } from './types'
 
@@ -67,19 +67,11 @@ describe('formatAmount', () => {
   })
 })
 
-describe('formatAmount minFraction / formatDisplay', () => {
+describe('formatAmount minFraction', () => {
   it('pads to the minimum fraction digits', () => {
     expect(formatAmount(2n * UNIT, 7, 2, 2)).toBe('2.00')
     expect(formatAmount(4_000_000n, 7, 2, 2)).toBe('0.40')
     expect(formatAmount(19_999_999n, 7, 2, 2)).toBe('1.99')
-  })
-  it('formatDisplay shows at least 2 and at most 4 decimals', () => {
-    expect(formatDisplay(1080n * UNIT, 7)).toBe('1,080.00')
-    expect(formatDisplay(18_000_000n, 7)).toBe('1.80')
-    expect(formatDisplay(12_345_678n, 7)).toBe('1.2345')
-    expect(formatDisplay(-5n * UNIT, 7)).toBe('-5.00')
-    expect(formatDisplay(42n, 0)).toBe('42')
-    expect(formatDisplay(5n, 1)).toBe('0.5')
   })
 })
 

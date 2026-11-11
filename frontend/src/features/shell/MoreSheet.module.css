@@ -1,4 +1,9 @@
 @layer features {
+  /* The sheet may take the 85 % of the screen the kit allows, whatever its usual cap: it holds pages and settings. */
+  .sheet {
+    --sheet-max-h: 100dvh;
+  }
+
   .links {
     display: flex;
     flex-direction: column;
@@ -49,10 +54,12 @@
     color: var(--muted);
   }
 
+  /* The last block: it clears the home indicator when the sheet is scrolled to its end. */
   .section {
     display: flex;
     flex-direction: column;
     gap: var(--s-12);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .heading {

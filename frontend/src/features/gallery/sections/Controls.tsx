@@ -115,7 +115,7 @@ export function ControlsSection() {
         </Example>
         <Example label="A link that looks like a button stays a link">
           <ButtonLink variant="primary" href="#controls">
-            Try it on Testnet
+            Open Markets
           </ButtonLink>
           <ButtonLink variant="secondary" href="#controls">
             View position
@@ -348,7 +348,7 @@ export function ControlsSection() {
             { value: 10, label: 'Floor 10.00' },
             { value: 12, label: '12.00' },
           ]}
-          hint="Your assumption, not a market price."
+          hint="An assumed price at the deadline."
         />
         <Slider label="Disabled" value={40} onValueChange={() => {}} min={0} max={100} disabled />
       </Specimen>

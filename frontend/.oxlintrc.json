@@ -51,7 +51,6 @@
     }
   ],
   "ignorePatterns": [
-    "legacy-ui/**",
     "dist/**",
     "test-results/**"
   ]

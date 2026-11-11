@@ -13,29 +13,6 @@ const PAYOFF: Record<PayoffGlyph, string> = {
 
 /* 24 grid, 1.5 px stroke, butt caps, mitred joins: drawn like the rules of a form, not like app icons. */
 const DOMAIN: Record<DomainGlyph, ReactElement> = {
-  /* A fund: a whole split into holdings. */
-  fund: (
-    <>
-      <circle cx="12" cy="12" r="8.25" />
-      <path d="M12 12V3.75M12 12L4.86 16.13M12 12L19.14 16.13" />
-    </>
-  ),
-  /* A bond: a certificate with its coupon stub. */
-  bond: (
-    <>
-      <rect x="3.75" y="5.75" width="16.5" height="12.5" />
-      <path d="M15.25 5.75V18.25" strokeDasharray="1.5 1.5" />
-      <path d="M6.5 10H12.5M6.5 13.5H10.5" />
-    </>
-  ),
-  /* Equity: a share of the whole. */
-  equity: (
-    <>
-      <rect x="4.75" y="4.75" width="14.5" height="14.5" />
-      <path d="M12 4.75V19.25M4.75 12H19.25" />
-      <rect x="12" y="4.75" width="7.25" height="7.25" fill="currentColor" stroke="none" />
-    </>
-  ),
   /* The quote token: a coin with two rules. */
   quote: (
     <>

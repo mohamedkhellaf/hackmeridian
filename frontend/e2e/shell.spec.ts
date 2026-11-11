@@ -8,7 +8,7 @@
  */
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { BANNED_TAGLINES, BANNED_WORDS, COPYRIGHT_NOTICE, LEGAL_NOTICE, MARGIN_BANNED_WORDS, findBannedWords } from '../src/core/disclosures'
+import { BANNED_TAGLINES, BANNED_WORDS, COPYRIGHT_NOTICE, MARGIN_BANNED_WORDS, TRADEMARK_NOTICE, findBannedWords, legalNotice } from '../src/core/disclosures'
 import {
   ALL_ROUTES,
   APP_ROUTES,
@@ -23,6 +23,9 @@ import {
 } from './helpers'
 import type { RouteInfo } from './helpers'
 
+/** The suite runs on the mock chain: every footer, the landing's included, carries the notice of that build. */
+const NOTICE = legalNotice(true)
+
 /** The one `h1` of each route. */
 const HEADING: Record<string, string | RegExp> = {
   '/': 'Set the lowest price you would sell at.',
@@ -33,11 +36,11 @@ const HEADING: Record<string, string | RegExp> = {
   '/reserves': 'Reserves',
   '/activity': 'Activity',
   '/issuer': 'Issuer',
-  '/learn': 'How it works',
+  '/learn': 'Learn',
   '/design': 'Design system',
-  '/margin': 'Margin account',
-  '/margin/trade': 'Margin trade',
-  '/margin/positions': 'Margin positions',
+  '/margin': 'Account',
+  '/margin/trade': 'Trade',
+  '/margin/positions': 'Positions',
   '/margin/liquidations': 'Liquidations',
   '/margin/vault': 'Vault',
 }
@@ -116,10 +119,13 @@ test.describe('the legal footer', () => {
       await expect(footer).toHaveCount(1)
       const text = await bodyText(page)
       expect(text.split(COPYRIGHT_NOTICE).length - 1, 'copyright line').toBe(1)
-      expect(text.split(LEGAL_NOTICE).length - 1, 'legal notice').toBe(1)
+      expect(text.split(NOTICE).length - 1, 'legal notice').toBe(1)
       const inFooter = await footer.innerText()
       expect(inFooter).toContain(COPYRIGHT_NOTICE)
-      expect(inFooter).toContain(LEGAL_NOTICE)
+      expect(inFooter).toContain(NOTICE)
+      // The trademark notice follows it, in the same footer, once.
+      expect(text.split(TRADEMARK_NOTICE).length - 1, 'trademark notice').toBe(1)
+      expect(inFooter).toContain(TRADEMARK_NOTICE)
     })
   }
 })
@@ -149,7 +155,7 @@ test.describe('navigation by keyboard', () => {
       [/^Portfolio/, '/portfolio', 'Portfolio'],
       [/^Requests/, '/requests', 'Requests'],
       [/^Reserves/, '/reserves', 'Reserves'],
-      [/^Learn/, '/learn', 'How it works'],
+      [/^Learn/, '/learn', 'Learn'],
       [/^Markets/, '/markets', 'Markets'],
     ]
     for (const [name, path, heading] of steps) {

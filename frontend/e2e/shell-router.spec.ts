@@ -12,6 +12,7 @@ import {
   connectButton,
   currentPath,
   disconnect,
+  expectAnnounced,
   expectNoAxeViolations,
   expectNoHorizontalOverflow,
   goTo,
@@ -207,6 +208,20 @@ test.describe('a page that fails', () => {
     })
     await page.getByRole('button', { name: 'Try again' }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Recovered' })).toBeVisible()
+    // As after a navigation, focus is on the page that came back.
+    await expect(page.getByRole('heading', { level: 1, name: 'Recovered' })).toBeFocused()
+  })
+
+  test('a retry that fails again says so and keeps focus on the button', async ({ page }) => {
+    await page.goto('/e2e/crash')
+    const retry = page.getByRole('button', { name: 'Try again' })
+    await expect(retry).toBeVisible()
+    await retry.click()
+    await expect(page.getByText(/^Tried again at \d{2}:\d{2} UTC\. The same error came back\.$/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeFocused()
+    await expectAnnounced(page, 'The same error came back.')
+    // The way out is not marked as the page you are on.
+    await expect(page.getByRole('link', { name: 'Go to Markets' })).not.toHaveAttribute('aria-current', /.*/)
   })
 
   test('other pages keep working after a failure', async ({ page }) => {
@@ -221,6 +236,41 @@ test.describe('a page that fails', () => {
   test('the error page passes axe in both themes and fits a phone @both', async ({ page }) => {
     await page.goto('/e2e/crash')
     await expect(page.getByRole('heading', { level: 1, name: 'This page could not be shown' })).toBeVisible()
+    await expectNoHorizontalOverflow(page)
+    await expectNoAxeViolations(page)
+  })
+})
+
+test.describe('a piece of chrome that fails', () => {
+  test('is left out, and the page and the other chrome keep working', async ({ page }) => {
+    await page.addInitScript(() => {
+      ;(window as unknown as { __stellsecCrashChrome: string }).__stellsecCrashChrome = 'part'
+    })
+    await page.goto('/reserves')
+    await expect(pageHeading(page)).toHaveText('Reserves')
+    await expect(shell(page)).toBeVisible()
+    // The bar is replaced by the logo and the four sections as plain links.
+    const bar = page.locator('header').first()
+    await expect(bar.getByRole('link', { name: 'StellSec home' })).toHaveAttribute('href', '/')
+    await expect(bar.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText(['Markets', 'Portfolio', 'Requests', 'Reserves'])
+    await bar.getByRole('link', { name: 'Markets' }).click()
+    await expect(page).toHaveURL((url) => url.pathname === '/markets')
+  })
+
+  test('the frame itself: a page of its own with the logo and a reload, no link into the broken shell @both', async ({ page }) => {
+    await page.addInitScript(() => {
+      ;(window as unknown as { __stellsecCrashChrome: string }).__stellsecCrashChrome = 'shell'
+    })
+    await page.goto('/reserves')
+    await expect(page.getByRole('heading', { level: 1, name: 'StellSec could not start' })).toBeVisible()
+    await expect(page.getByRole('main')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Reload the page' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'StellSec home' })).toHaveAttribute('href', '/')
+    await expect(shell(page)).toHaveCount(0)
+    // With the page gutters: nothing touches the edge.
+    expect(await page.getByRole('main').evaluate((el) => parseFloat(getComputedStyle(el).paddingLeft))).toBeGreaterThanOrEqual(16)
+    await page.getByText('Technical detail').click()
+    await expect(page.getByText('Test chrome: thrown on purpose (shell).')).toBeVisible()
     await expectNoHorizontalOverflow(page)
     await expectNoAxeViolations(page)
   })
@@ -259,8 +309,9 @@ test.describe('the stored theme', () => {
     await page.goto('/markets')
     const html = page.locator('html')
     await expect(html).toHaveAttribute('data-theme', 'dark')
-    await expect(html).toHaveAttribute('data-density', 'compact')
     await expect(html).toHaveAttribute('data-pnl', 'mono')
+    // The density setting left the menu (ruling E23): a value stored before that is no longer applied.
+    await expect(html).not.toHaveAttribute('data-density', 'compact')
   })
 
   test('a broken or foreign value is ignored', async ({ page }) => {
@@ -291,14 +342,29 @@ test.describe('the design route', () => {
 })
 
 test.describe('the landing page', () => {
-  test('does not fetch the shell, the wallet kit or the Stellar SDK', async ({ page }) => {
+  test('loads without the shell, the wallet kit or the Stellar SDK, then warms the shell and Markets when idle', async ({ page }) => {
     const requested: string[] = []
     page.on('request', (request) => requested.push(new URL(request.url()).pathname))
     await page.goto('/')
     await expect(page.locator('#root')).not.toBeEmpty()
+    // Up to the load event: nothing of the app (read from the page's own timeline, so the idle warm-up that may
+    // start right after it is not counted).
+    const shellCode = (path: string) => /features\/shell\/|\/shell-[^/]+\.js/.test(path)
+    const chainCode = (path: string) => /stellar-sdk|transaction_builder|stellar-wallets-kit|sorobanClient|SorobanProClient/.test(path)
+    await page.waitForFunction(() => (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.loadEventStart)
+    const beforeLoad = await page.evaluate(() => {
+      const loaded = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming).loadEventStart
+      return performance
+        .getEntriesByType('resource')
+        .filter((entry) => entry.startTime < loaded)
+        .map((entry) => new URL(entry.name).pathname)
+    })
+    expect(beforeLoad.filter((path) => shellCode(path) || chainCode(path))).toEqual([])
+    // Once idle, the shell and the Markets page are fetched, so the call to action opens with its chrome. The chain
+    // clients and the wallet kit still are not.
+    await expect.poll(() => requested.some(shellCode), { timeout: 15_000 }).toBe(true)
     await page.waitForLoadState('networkidle')
-    const heavy = requested.filter((path) => /features\/shell\/|\/shell-[^/]+\.js|stellar-sdk|transaction_builder|stellar-wallets-kit|sorobanClient|SorobanProClient/.test(path))
-    expect(heavy).toEqual([])
+    expect(requested.filter(chainCode)).toEqual([])
   })
 })
 

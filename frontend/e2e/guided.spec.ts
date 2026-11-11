@@ -1,6 +1,7 @@
 /**
  * Guided mode of the asset page: four intents in plain words, three terms, what the contract holds for them,
- * what the user would hold at the deadline, who acts and by when, and the one action that opens the ticket.
+ * what the user would hold at a lower and a higher price, the one action that opens the ticket (in the order
+ * rail from 1200 px, under the outcome below that), the figure at any price, and who acts and by when.
  * The mock market is rebuilt on every page load, so each test starts from the same book.
  */
 import { expect, test } from '@playwright/test'
@@ -11,10 +12,15 @@ import { connect, currentPath, expectNoAxeViolations, expectNoHorizontalOverflow
 const guided = (page: Page) => page.getByTestId('guided-mode')
 const picker = (page: Page) => guided(page).getByRole('radiogroup', { name: 'What do you want to do?' })
 const ticket = (page: Page) => page.getByTestId('ticket')
-const action = (page: Page) => guided(page).getByRole('region', { name: 'Next step' })
+// The closing block: in the order rail from 1200 px, in the guided page below that. One on screen at a time.
+const action = (page: Page) => page.getByRole('region', { name: 'Next step' })
 const sentence = (page: Page) => guided(page).getByTestId('outcome-sentence')
 const slider = (page: Page, code: string) => guided(page).getByRole('slider', { name: `Assumed ${code} price at the deadline` })
 const chip = (group: Locator, name: RegExp) => group.getByRole('radio', { name })
+/** Chooses a strike or deadline chip by pressing it, as a pointer user does. */
+async function pick(radio: Locator): Promise<void> {
+  await radio.check()
+}
 const query = (page: Page) => new URL(page.url()).searchParams
 
 /** Waits for the flow to be on screen: the note with its three terms. */
@@ -23,9 +29,10 @@ async function ready(page: Page, heading: string | RegExp): Promise<void> {
 }
 
 /** The ticket is open on its review step, with this heading. */
-async function expectReview(page: Page, title: string): Promise<void> {
+async function expectReview(page: Page, title: string | RegExp): Promise<void> {
   await expect(ticket(page)).toBeVisible()
-  await expect(page.getByRole('heading', { name: title }).or(page.getByText(title, { exact: true })).first()).toBeVisible()
+  const exact = typeof title === 'string'
+  await expect(page.getByRole('heading', { name: title }).or(page.getByText(title, { exact })).first()).toBeVisible()
   await expect(page.getByTestId('ticket-flow')).toHaveAttribute('data-step', 'review')
   expect(query(page).get('step')).toBe('review')
 }
@@ -36,12 +43,15 @@ test.describe('four intents reach the ticket review', () => {
     await ready(page, 'A floor on BOND')
     await expect(picker(page).getByRole('radio', { name: /^Set a floor/ })).toBeChecked()
 
-    // The default terms are a funded offer: its number is on the note, its premium in the block and in the summary.
+    // The default terms are a funded offer: its number is on the heading line of the block, its premium in the
+    // block and in the summary, each said once.
     const note = guided(page).getByRole('article')
-    const serial = (await note.getByText(/^Offer No\. \d{6}$/).first().innerText()).replace(/\D/g, '')
-    await expect(guided(page).getByTestId('guided-found')).toContainText(/A maker sells this floor for \d+\.\d{2} USDx/)
-    await expect(note).toContainText('locked in the contract')
-    await expect(guided(page).getByTestId('guided-summary')).toContainText(/^You pay \d+\.\d{2} USDx now\. Until .* UTC you can sell 2\.00 BOND for 198\.00 USDx\.$/)
+    const serial = (await guided(page).getByTestId('guided-number').innerText()).replace(/\D/g, '')
+    expect(serial).toMatch(/^\d{6}$/)
+    await expect(guided(page).getByTestId('guided-found')).toContainText(/You pay\s*\d+\.\d{2}\s*USDx/)
+    await expect(note).toContainText('Locked in the contract.')
+    await expect(note).not.toContainText('In contract words')
+    await expect(page.getByTestId('guided-summary')).toContainText(/^You pay \d+\.\d{2} USDx now\. Until .* UTC you can sell 2\.00 BOND for 198\.00 USDx\.$/)
 
     await action(page).getByRole('button', { name: 'Review this offer' }).click()
     await expectReview(page, 'Buy a put on BOND')
@@ -55,14 +65,15 @@ test.describe('four intents reach the ticket review', () => {
     // The ticket shows the same terms the guided flow chose.
     await expect(ticket(page)).toContainText('long put on 2.00 BOND')
     await expect(ticket(page)).toContainText('Strike 99.00')
-    await expect(ticket(page)).toContainText('198.00 USDx locked in the contract')
+    await expect(ticket(page)).toContainText('198.00 USDx')
   })
 
   test('earn on what you hold: fills the matched call request', async ({ page }) => {
     await openApp(page, '/markets/eqty?mode=guided&intent=earn-hold', { connect: true })
     await ready(page, 'Earn on the EQTY you hold')
-    await expect(guided(page).getByTestId('guided-found')).toContainText(/^A buyer has escrowed \d+\.\d{2} USDx for exactly this\./)
-    await expect(guided(page).getByTestId('guided-summary')).toContainText(/^You are paid \d+\.\d{2} USDx now and lock 4\.00 EQTY\./)
+    await expect(guided(page).getByTestId('guided-found')).toContainText(/You are paid\s*\d+\.\d{2}\s*USDx/)
+    await expect(guided(page).getByTestId('guided-found')).toContainText('Buyer')
+    await expect(page.getByTestId('guided-summary')).toContainText(/^You are paid \d+\.\d{2} USDx now and lock 4\.00 EQTY\./)
 
     await action(page).getByRole('button', { name: 'Review this request' }).click()
     await expectReview(page, 'Fill a request for a call on EQTY')
@@ -77,9 +88,9 @@ test.describe('four intents reach the ticket review', () => {
   test('earn while waiting to buy: fills the matched put request', async ({ page }) => {
     await openApp(page, '/markets/fund?mode=guided&intent=earn-buy', { connect: true })
     await ready(page, 'Earn while waiting to buy FUND')
-    await expect(guided(page).getByTestId('guided-found')).toContainText('A buyer has escrowed')
+    await expect(guided(page).getByTestId('guided-found')).toContainText(/You are paid\s*\d+\.\d{2}\s*USDx/)
     // The quantity field says what it locks, in USDx, before anything is signed.
-    await expect(guided(page).getByText(/^Locks \d+\.\d{2} USDx in the contract\.$/)).toBeVisible()
+    await expect(guided(page).getByText(/Locks \d+\.\d{2} USDx in the contract\./)).toBeVisible()
 
     await action(page).getByRole('button', { name: 'Review this request' }).click()
     await expectReview(page, 'Fill a request for a put on FUND')
@@ -93,7 +104,7 @@ test.describe('four intents reach the ticket review', () => {
     await picker(page).getByRole('radio', { name: /Lock a buy price/ }).check()
     await ready(page, 'Lock a buy price for BOND')
     expect(query(page).get('intent')).toBe('lock-buy')
-    await expect(guided(page).getByTestId('guided-found')).toContainText(/^A maker sells this right for \d+\.\d{2} USDx\./)
+    await expect(guided(page).getByTestId('guided-found')).toContainText(/You pay\s*\d+\.\d{2}\s*USDx/)
 
     await action(page).getByRole('button', { name: 'Review this offer' }).click()
     await expectReview(page, 'Buy a call on BOND')
@@ -108,13 +119,13 @@ test.describe('other orders the flow can match', () => {
     // The demo market has one listing: a holder resells a call on 5 FUND at 10.40 for the second listed date.
     await openApp(page, '/markets/fund?mode=guided&intent=lock-buy', { connect: true })
     await ready(page, 'Lock a buy price for FUND')
-    await guided(page).getByRole('radiogroup', { name: 'Choose your highest buy price' }).getByRole('radio', { name: /^10\.40 USDx/ }).check()
-    await guided(page).getByRole('radiogroup', { name: 'Choose the deadline' }).getByRole('radio').nth(1).check()
+    await pick(guided(page).getByRole('radiogroup', { name: 'Choose your highest buy price' }).getByRole('radio', { name: /^10\.40 USDx/ }))
+    await pick(guided(page).getByRole('radiogroup', { name: 'Choose the deadline' }).getByRole('radio').nth(1))
     await guided(page).getByRole('textbox', { name: /^I want/ }).fill('5')
 
-    await expect(guided(page).getByTestId('guided-found')).toContainText(/^A holder is reselling this right for \d+\.\d{2} USDx\. The maker's 5\.00 FUND stays locked in the contract\.$/)
+    await expect(guided(page).getByTestId('guided-found')).toContainText(/Price, per unit/)
     const note = guided(page).getByRole('article')
-    await expect(note.getByText(/^Listing No\. \d{6}$/).first()).toBeVisible()
+    await expect(guided(page).getByTestId('guided-number')).toHaveText(/^Listing No\. \d{6}$/)
     await expect(note.getByRole('term').filter({ hasText: /^Seller$/ })).toBeVisible()
     await expect(note.getByRole('term').filter({ hasText: /^Maker$/ })).toBeVisible()
 
@@ -133,7 +144,7 @@ test.describe('other orders the flow can match', () => {
     await expect(guided(page).getByText(/^This deadline is under/)).toHaveCount(0)
     const first = dates.getByRole('radio').first()
     const name = (await first.getAttribute('aria-label')) ?? ''
-    await first.check()
+    await pick(first)
     // Its name carries the time left ("13 Nov, 1 d 19 h left, ..."): under two days is under 48 hours.
     const close = /, (1 d\b|\d+ h\b|\d+ min\b|<1 min)/.test(name)
     await expect(guided(page).getByText(/^This deadline is under (48 hours|2 hours|15 minutes) away$/)).toHaveCount(close ? 1 : 0)
@@ -148,9 +159,9 @@ test.describe('state lives in the URL', () => {
     const dates = guided(page).getByRole('radiogroup', { name: 'Choose the deadline' })
     await expect(chip(floors, /^99\.00 USDx/)).toBeChecked()
 
-    await chip(floors, /^98\.00 USDx/).check()
+    await pick(chip(floors, /^98\.00 USDx/))
     await expect(page).toHaveURL(/strike=98/)
-    await dates.getByRole('radio').nth(2).check()
+    await pick(dates.getByRole('radio').nth(2))
     const day = query(page).get('expiry')
     expect(day).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     await guided(page).getByRole('textbox', { name: /^I hold/ }).fill('5')
@@ -169,7 +180,7 @@ test.describe('state lives in the URL', () => {
     await expect(guided(page).getByTestId('guided-strike')).toContainText('98.00')
 
     // A chip adds a history entry; typing does not.
-    await chip(guided(page).getByRole('radiogroup', { name: 'Choose your floor' }), /^97\.00 USDx/).check()
+    await pick(chip(guided(page).getByRole('radiogroup', { name: 'Choose your floor' }), /^97\.00 USDx/))
     await expect(page).toHaveURL(/strike=97/)
     await page.goBack()
     await expect(page).toHaveURL(/strike=98/)
@@ -199,7 +210,7 @@ test.describe('state lives in the URL', () => {
     await ready(page, 'A floor on BOND')
     // The third deadline has an offer for one BOND; the default terms are for two.
     const dates = guided(page).getByRole('radiogroup', { name: 'Choose the deadline' })
-    await dates.getByRole('radio').nth(2).check()
+    await pick(dates.getByRole('radio').nth(2))
     const qty = guided(page).getByRole('textbox', { name: /^I hold/ })
     await qty.fill('1')
     await expect(guided(page).getByTestId('guided-found')).toBeVisible()
@@ -220,29 +231,32 @@ test.describe('when nothing matches', () => {
   test('a seller with no buyer posts an offer at a price of their own, with the lowest offer as reference', async ({ page }) => {
     await openApp(page, '/markets/bond?mode=guided&intent=earn-hold', { connect: true })
     await ready(page, 'Earn on the BOND you hold')
-    await expect(guided(page).getByRole('heading', { name: 'Nothing funded for exactly these terms' })).toBeVisible()
-    await expect(guided(page).getByTestId('guided-not-found')).toContainText('No buyer has escrowed a premium for 1.00 BOND at 100.00 USDx')
+    // Writing an offer is the normal way to earn here: the block opens on it, with one line on the buyer side.
+    await expect(guided(page).getByRole('heading', { name: 'Post an offer at your price' })).toBeVisible()
+    await expect(guided(page).getByTestId('guided-not-found')).toHaveText('No buyer is waiting for these terms.')
     const fallback = guided(page).getByTestId('guided-fallback')
-    await expect(fallback.getByRole('heading', { name: 'Post an offer at your price' })).toBeVisible()
-    await expect(fallback).toContainText(/Lowest open offer at this price and date: \d+\.\d{2} USDx per unit/)
-    // Without a premium the figures say so, and the action opens the ticket on its terms.
-    await expect(guided(page)).toContainText('No premium is known for these terms yet')
+    await expect(fallback).toContainText(/Lowest open offer at this price and date: \d+\.\d{2} USDx per unit, for 2\.00 BOND\./)
+    // The quantity starts from that offer's lot, and the figures use its price, labelled as assumed.
+    await expect(guided(page).getByRole('textbox', { name: /^I lock/ })).toHaveValue('2.00')
+    await expect(guided(page)).toContainText(/Assuming \d+\.\d{2} USDx per unit, the lowest open offer at this price and date\./)
+    await expect(sentence(page)).toBeVisible()
+    await expect(guided(page)).not.toContainText('0.00 USDx, the same as')
     await expect(action(page).getByRole('button', { name: 'Post an offer' })).toBeVisible()
 
     await fallback.getByRole('button', { name: /^Use \d+\.\d{2} per unit$/ }).click()
     const premium = fallback.getByRole('textbox', { name: /^Premium you ask, in total/ })
     await expect(premium).toHaveValue(/^\d+\.\d{2}$/)
     const typed = await premium.inputValue()
-    await expect(guided(page)).toContainText(`The figures below use your premium of ${typed} USDx.`)
-    await expect(guided(page).getByTestId('guided-summary')).toContainText(`You lock 1.00 BOND and ask ${typed} USDx.`)
+    await expect(guided(page)).toContainText(`With your premium of ${typed} USDx. Someone has to accept it first.`)
+    await expect(page.getByTestId('guided-summary')).toContainText(`You lock 2.00 BOND and ask ${typed} USDx.`)
 
     await action(page).getByRole('button', { name: 'Review your offer' }).click()
-    await expectReview(page, 'Write a call on BOND')
+    await expectReview(page, /^(Write a call on BOND|Review your offer)$/)
     const q = query(page)
     expect(q.get('side')).toBe('write')
     expect(q.get('kind')).toBe('call')
     expect(q.get('strike')).toBe('100')
-    expect(q.get('qty')).toBe('1.00')
+    expect(q.get('qty')).toBe('2.00')
     expect(q.get('premium')).toBe(typed)
   })
 
@@ -250,11 +264,14 @@ test.describe('when nothing matches', () => {
     await openApp(page, '/markets/bond?mode=guided', { connect: true })
     await ready(page, 'A floor on BOND')
     await guided(page).getByRole('textbox', { name: /^I hold/ }).fill('7')
-    await expect(guided(page).getByTestId('guided-not-found')).toContainText('No maker offers 7.00 BOND at 99.00 USDx')
+    await expect(guided(page).getByRole('heading', { name: 'No single offer for 7.00 BOND at these terms' })).toBeVisible()
+    // The smaller lots of the same terms are summed, and the user can start with one of them.
+    await expect(guided(page).getByTestId('guided-not-found')).toContainText(/smaller offers? at these terms covers? \d+\.\d{2} of your 7\.00 BOND/)
+    await expect(guided(page).getByRole('button', { name: /^Start with 2\.00 BOND at \d+\.\d{2}$/ })).toBeVisible()
 
-    // Nothing is swapped in: the nearest funded terms are offered, each with what differs.
-    const suggestions = guided(page).getByRole('list').filter({ hasText: 'Differs from yours in' })
-    await expect(suggestions.getByRole('listitem').first()).toContainText('Differs from yours in quantity.')
+    // Nothing is swapped in: the nearest funded terms are offered, each led by what differs.
+    const suggestions = guided(page).getByRole('list').filter({ hasText: 'instead of' })
+    await expect(suggestions.getByRole('listitem').first()).toContainText('instead of')
     const fallback = guided(page).getByTestId('guided-fallback')
     await expect(fallback.getByRole('heading', { name: 'Post a request and escrow your premium' })).toBeVisible()
 
@@ -268,9 +285,56 @@ test.describe('when nothing matches', () => {
     expect(q.get('strike')).toBe('99')
     await page.getByRole('button', { name: 'Close ticket' }).click()
 
+    // Taking a suggestion moves focus to the block's heading, which now names the match.
     await suggestions.getByRole('button', { name: /^Use these terms/ }).first().click()
     await expect(guided(page).getByTestId('guided-found')).toBeVisible()
+    await expect(guided(page).getByRole('heading', { name: 'Available now for exactly these terms' })).toBeFocused()
     await expect(action(page).getByRole('button', { name: 'Review this offer' })).toBeVisible()
+  })
+
+  test('a premium typed for one set of terms does not follow the user to others', async ({ page }) => {
+    await openApp(page, '/markets/bond?mode=guided', { connect: true })
+    await ready(page, 'A floor on BOND')
+    await guided(page).getByRole('textbox', { name: /^I hold/ }).fill('7')
+    const premium = guided(page).getByRole('textbox', { name: /^Premium you offer, in total/ })
+    await premium.fill('6')
+    await expect(page).toHaveURL(/premium=6/)
+    await pick(guided(page).getByRole('radiogroup', { name: 'Choose your floor' }).getByRole('radio', { name: /^95\.00 USDx/ }))
+    await expect(page).not.toHaveURL(/premium=/)
+    await expect(premium).toHaveValue('')
+  })
+})
+
+test.describe('what the link says', () => {
+  test('a call chosen in the chain opens as a buy price to lock, not as a floor', async ({ page }) => {
+    // Switching from the chain keeps the selected cell's kind and strike and names no intent.
+    await openApp(page, '/markets/bond?mode=guided&kind=call&strike=101.00')
+    await ready(page, 'Lock a buy price for BOND')
+    await expect(picker(page).getByRole('radio', { name: /^Lock a buy price/ })).toBeChecked()
+    await expect(guided(page).getByTestId('guided-strike')).toContainText('101.00')
+    // A put's terms under a call's intent are not carried over.
+    await routeTo(page, '/markets/bond?mode=guided&intent=floor&kind=call&strike=101.00')
+    await ready(page, 'A floor on BOND')
+    await expect(guided(page).getByTestId('guided-strike')).not.toContainText('101.00')
+  })
+
+  test('a price or a date that is not on the list is replaced, and said once', async ({ page }) => {
+    await openApp(page, '/markets/bond?mode=guided&intent=floor&strike=97.5')
+    await ready(page, 'A floor on BOND')
+    await expect(guided(page).getByTestId('guided-off-grid')).toHaveText(/^97\.50 USDx is not a listed price\. Showing \d+\.\d{2} USDx\.$/)
+    await expect(page).not.toHaveURL(/strike=97\.5/)
+  })
+
+  test('the terms of a request the wallet already has are said first, with a way to it', async ({ page }) => {
+    // The default wallet's seeded request: a put on 2.00 BOND at 98.00, on the third listed date.
+    await openApp(page, '/markets/bond?mode=guided&intent=floor', { connect: true })
+    await ready(page, 'A floor on BOND')
+    await pick(guided(page).getByRole('radiogroup', { name: 'Choose the deadline' }).getByRole('radio').nth(2))
+    await pick(chip(guided(page).getByRole('radiogroup', { name: 'Choose your floor' }), /^98\.00 USDx/))
+    await guided(page).getByRole('textbox', { name: /^I hold/ }).fill('2')
+    await expect(guided(page).getByTestId('guided-own')).toContainText(/^Your request No\. 000000 is open at these terms: 2\.00 BOND, \d+\.\d{2} USDx escrowed\./)
+    // A second order is not the obvious next step.
+    await expect(action(page).getByRole('link', { name: 'View your request' })).toBeVisible()
   })
 })
 
@@ -284,7 +348,7 @@ test.describe('an empty quantity', () => {
     await expect(guided(page).getByRole('heading', { name: 'Offers come in fixed quantities' })).toBeVisible()
     await expect(guided(page).getByRole('heading', { name: 'Enter a quantity to see what you would hold.' })).toBeVisible()
     await expect(guided(page).getByText('Enter a quantity to see each step with its amounts.')).toBeVisible()
-    await expect(guided(page).getByTestId('guided-summary')).toHaveCount(0)
+    await expect(page.getByTestId('guided-summary')).toHaveCount(0)
     // Nothing prints a sentence with a hole in it.
     await expect(guided(page)).not.toContainText(/deliver\s+BOND|locks\s+USDx|\s{2,}USDx/)
 
@@ -292,13 +356,42 @@ test.describe('an empty quantity', () => {
     await expect(post).toBeDisabled()
     await expect(post).toHaveAccessibleDescription('Enter a quantity first.')
 
-    // Max fills in the holding: 12.00 BOND matches no single offer, so the request path stays, now enabled.
+    // Offers are sold whole: Max fills in the largest lot the holding covers, which an offer matches.
     await guided(page).getByRole('button', { name: /^Max/ }).click()
-    await expect(qty).toHaveValue('12.00')
-    await expect(post).toBeEnabled()
-    await expect(guided(page).getByTestId('guided-not-found')).toContainText('No maker offers 12.00 BOND')
+    await expect(qty).toHaveValue('2.00')
+    await expect(action(page).getByRole('button', { name: 'Review this offer' })).toBeEnabled()
   })
 
+  test('the quantity and the premium can be emptied with Backspace and retyped', async ({ page }) => {
+    await openApp(page, '/markets/bond?mode=guided', { connect: true })
+    await ready(page, 'A floor on BOND')
+    const qty = guided(page).getByRole('textbox', { name: /^I hold/ })
+    await expect(qty).toHaveValue('2.00')
+    await qty.click()
+    await page.keyboard.press('End')
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Backspace')
+    await expect(qty).toHaveValue('')
+    await expect(page).not.toHaveURL(/qty=/)
+    await page.keyboard.type('5')
+    await expect(qty).toHaveValue('5')
+    await expect(page).toHaveURL(/qty=5(&|$)/)
+    // A trailing dot stays while typing.
+    await page.keyboard.type('.')
+    await expect(qty).toHaveValue('5.')
+
+    const premium = guided(page).getByRole('textbox', { name: /^Premium you offer, in total/ })
+    await premium.click()
+    await page.keyboard.type('1.25')
+    await expect(premium).toHaveValue('1.25')
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Backspace')
+    await expect(premium).toHaveValue('')
+    await page.keyboard.type('3')
+    await expect(premium).toHaveValue('3')
+    await expect(page).toHaveURL(/premium=3(&|$)/)
+  })
+})
+
+test.describe('the quantity field', () => {
   test('more than the wallet holds is said with exact figures', async ({ page }) => {
     await openApp(page, '/markets/bond?mode=guided&intent=earn-hold&qty=15', { connect: true })
     await ready(page, 'Earn on the BOND you hold')
@@ -338,21 +431,31 @@ test.describe('outcome', () => {
     await expect(sentence(page)).toHaveText(/^You sell 2\.00 BOND at 99\.00/)
   })
 
-  test('says who acts and by when, and that nothing settles by itself', async ({ page }) => {
+  test('says who acts and by when, and what the deadline does', async ({ page }) => {
     await openApp(page, '/markets/eqty?mode=guided&intent=earn-hold')
     await ready(page, 'Earn on the EQTY you hold')
     const when = guided(page).getByRole('region', { name: 'What happens and when' })
-    await expect(when).toContainText('Nothing settles by itself. The holder of the right must exercise it before the deadline, or it ends.')
     const steps = when.getByRole('list', { name: 'What happens and when' }).getByRole('listitem')
     await expect(steps).toHaveCount(4)
     await expect(steps.nth(0)).toContainText('Now')
     await expect(steps.nth(1)).toContainText('Until the deadline')
     await expect(steps.nth(1)).toContainText('The buyer can take your EQTY')
-    await expect(steps.nth(2)).toContainText(/At the deadline, \d{1,2} \w{3} \d{4}, 08:00 UTC/)
+    await expect(steps.nth(2)).toContainText(/At the deadline, \d{1,2} \w{3}, 08:00 UTC/)
+    await expect(steps.nth(2)).toContainText('The deadline passes')
     await expect(steps.nth(3)).toContainText('You reclaim your EQTY')
-    // For a seller: what is given up, in words.
-    await expect(guided(page)).toContainText('What you give up')
-    await expect(guided(page)).toContainText('Any rise above 25.00')
+    await expect(when).not.toContainText('Nothing settles by itself')
+    // For a written covered call: what is given up, never a loss figure without a cap.
+    await expect(guided(page)).toContainText('You give up')
+    await expect(guided(page)).toContainText('Every rise above 25.00 USDx per EQTY')
+    await expect(guided(page)).not.toContainText(/No cap|unlimited/i)
+  })
+
+  test('a floor prints the same worst case as the ticket: the premium', async ({ page }) => {
+    await openApp(page, '/markets/bond?mode=guided', { connect: true })
+    await ready(page, 'A floor on BOND')
+    const total = /\d+\.\d{2}/.exec(await guided(page).getByTestId('guided-total').innerText())?.[0] ?? 'missing'
+    await expect(guided(page).locator('dt', { hasText: 'Most you can lose' }).locator('xpath=following-sibling::dd')).toContainText(`${total} USDx`)
+    await expect(guided(page)).toContainText('The premium, if you never use the floor.')
   })
 })
 
@@ -366,9 +469,9 @@ test.describe('guest', () => {
     await expect(guided(page).getByText(/^You hold /)).toHaveCount(0)
     await expect(guided(page).getByRole('button', { name: /^Max/ })).toHaveCount(0)
     await expect(action(page).getByRole('button', { name: /Review/ })).toHaveCount(0)
-    await expect(action(page)).toContainText('Connect a Testnet wallet to review and sign. The terms stay as you set them.')
+    await expect(action(page)).not.toContainText('Testnet')
 
-    await guided(page).getByRole('radiogroup', { name: 'Choose your floor' }).getByRole('radio', { name: /^98\.00 USDx/ }).check()
+    await pick(guided(page).getByRole('radiogroup', { name: 'Choose your floor' }).getByRole('radio', { name: /^98\.00 USDx/ }))
     await action(page).getByRole('button', { name: 'Connect wallet' }).click()
     await expect(action(page).getByRole('button', { name: 'Review this offer' })).toBeVisible()
     await expect(guided(page).getByText('You hold 12.00 BOND')).toBeVisible()
@@ -378,7 +481,9 @@ test.describe('guest', () => {
   test('the reference price always carries its source, and no price is called a market price', async ({ page }) => {
     await openApp(page, '/markets/bond?mode=guided')
     await ready(page, 'A floor on BOND')
-    await expect(guided(page)).toContainText('Demo price 99.40 USDx. Chosen by the team for this demo. Not a market.')
+    // The label goes with the figure; the sentence that explains it lives in the asset header.
+    await expect(guided(page)).toContainText('Demo price 99.40 USDx')
+    await expect(guided(page)).not.toContainText('Chosen by the team')
     await expect(guided(page)).not.toContainText(/market price|oracle price|live price|spot price/i)
     await expect(guided(page)).not.toContainText(/guarantee|insur|risk-free|protected|\bsafe\b/i)
   })
@@ -446,6 +551,20 @@ test.describe('accessibility and layout', () => {
     await ready(page, 'A floor on BOND')
     await expect(sentence(page)).toBeVisible()
     await expectNoHorizontalOverflow(page)
+    // The deadline figure stays inside the note down to the narrowest phones.
+    for (const width of [360, 320]) {
+      await page.setViewportSize({ width, height: 740 })
+      // The chart measures its box after a resize: wait for the page to settle at the new width.
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
+      await expectNoHorizontalOverflow(page)
+      const inside = await guided(page).evaluate((root) => {
+        const note = root.querySelector('article')?.getBoundingClientRect()
+        const until = root.querySelector('[data-testid="guided-expiry"]')?.getBoundingClientRect()
+        return !!note && !!until && until.right <= note.right
+      })
+      expect(inside, `deadline inside the note at ${width} px`).toBe(true)
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
     for (const group of ['What do you want to do?', 'Choose your floor', 'Choose the deadline']) {
       const boxes = await guided(page).getByRole('radiogroup', { name: group }).locator('label').evaluateAll((labels) => labels.map((l) => l.getBoundingClientRect().height))
       expect(boxes.length).toBeGreaterThan(2)
@@ -463,7 +582,7 @@ test.describe('accessibility and layout', () => {
   test('on a phone the action opens the ticket at its review step, and closing it returns to the same terms @phone', async ({ page }) => {
     await openApp(page, '/markets/bond?mode=guided', { connect: true })
     await ready(page, 'A floor on BOND')
-    await guided(page).getByRole('radiogroup', { name: 'Choose your floor' }).getByRole('radio', { name: /^98\.00 USDx/ }).check()
+    await pick(guided(page).getByRole('radiogroup', { name: 'Choose your floor' }).getByRole('radio', { name: /^98\.00 USDx/ }))
     await action(page).getByRole('button', { name: 'Review this offer' }).click()
     await expectReview(page, 'Buy a put on BOND')
     expect(query(page).get('strike')).toBe('98')

@@ -202,13 +202,13 @@ test.describe('a tour of Markets @both', () => {
     // A dialog that is not modal: named by its title, described by the count and the body; the page stays in reach.
     await expect(guideNote(page)).toHaveRole('dialog')
     await expect(guideNote(page)).toHaveAccessibleName('What do you want to do?')
-    await expect(guideNote(page)).toHaveAccessibleDescription(/^Note 1 of 4 Each card is one thing you can do here/)
+    await expect(guideNote(page)).toHaveAccessibleDescription(/^Note 1 of 4 Each row is one thing you can do here/)
     await expect(guideNote(page)).not.toHaveAttribute('aria-modal', 'true')
     expect(await page.locator('main').getAttribute('aria-hidden')).toBeNull()
     expect(await page.locator('main').getAttribute('inert')).toBeNull()
     // The control is described by the note while the note is open.
     const describedBy = (await ringed(page).getAttribute('aria-describedby')) ?? ''
-    await expect(page.locator(`[id="${describedBy}"]`)).toContainText('Each card is one thing you can do here')
+    await expect(page.locator(`[id="${describedBy}"]`)).toContainText('Each row is one thing you can do here')
 
     // The welcome is now its one line, and the tour is remembered.
     await expect(guideSlip(page)).toHaveCount(0)
@@ -299,7 +299,7 @@ test.describe('a tour of Markets @both', () => {
     // The first note has no Back: focus went to the main button.
     await expect(noteButton(page, 'Back')).toHaveCount(0)
     await expect(noteButton(page, 'Next')).toBeFocused()
-    await expectAnnounced(page, /^Note 1 of 4\. What do you want to do\? Each card/)
+    await expectAnnounced(page, /^Note 1 of 4\. What do you want to do\? Each row/)
   })
 
   test('the close button ends it for good', async ({ page }) => {
@@ -557,8 +557,8 @@ test.describe('"Show me around" in Settings, or under More on a phone @both', ()
         await expect(menu.getByRole('group', { name: GUIDE_COPY.group }).getByRole('menuitem')).toHaveText([GUIDE_COPY.start])
         // On screen without scrolling the menu.
         await expect(menu.getByRole('menuitem', { name: GUIDE_COPY.start })).toBeInViewport({ ratio: 1 })
-        // After the three groups of settings, as the last row.
-        await expect(menu.getByRole('menuitemradio')).toHaveCount(8)
+        // After the two groups of settings (theme, gain and loss colours), as the last row.
+        await expect(menu.getByRole('menuitemradio')).toHaveCount(6)
         await expect(menu.locator('[role^="menuitem"]').last()).toHaveText(GUIDE_COPY.start)
       }
       await page.keyboard.press('Escape')
@@ -752,8 +752,9 @@ test.describe('when the page changes under a note', () => {
 })
 
 test.describe('scrolling under a note', () => {
-  // A short window: the Markets page is then long enough to scroll its first section off the screen.
-  test.use({ viewport: { width: 1440, height: 520 } })
+  // A short window: the Markets page is then long enough to scroll its first section off the screen (the page is
+  // about 1,000 px tall at this width, so the window must be well under half of it).
+  test.use({ viewport: { width: 1440, height: 400 } })
 
   test('scrolling with the wheel leaves the note open, and its buttons stay in reach', async ({ page }) => {
     await openApp(page, '/markets')

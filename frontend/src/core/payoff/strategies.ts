@@ -2,7 +2,7 @@
 //
 // Everything here is a JavaScript `number`, for charts and outcome cards only: an illustration of a payoff at
 // expiry, never an amount that is signed or sent. Exact amounts stay `bigint` in the ticket; convert once with
-// `guidedTermsOf`. Show every figure from this module under the caption "Hypothetical payoff at expiry. Not a quote."
+// `guidedTermsOf`. Show every figure from this module under the caption "Hypothetical payoff at the deadline. Not a quote."
 //
 // Each intent is one option leg seen from the user's side:
 //

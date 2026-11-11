@@ -1,7 +1,8 @@
 /**
  * /activity: the transactions started from this browser as the connected wallet. What each one is, when, its
  * state in words (pending, confirmed, failed, outcome unknown, expired), its hash, a link to what it concerns,
- * and the line that says the list lives in this browser only.
+ * and, in the description, that the list lives in this browser only. Open ones first, then the finished ones
+ * under a heading per day.
  *
  * Two tests make a real transaction through the interface (an offer written in the ticket, a request cancelled
  * on the board) and then read the list. The states a mock transaction rarely ends in are staged: `stageEntries`
@@ -13,7 +14,7 @@ import { BANNED_TAGLINES, MARGIN_BANNED_WORDS, findBannedWords } from '../src/co
 import { ADDR_A, expectAnnounced, expectNoAxeViolations, expectNoHorizontalOverflow, failNextTx, goTo, isPhone, openApp, pageHeading, walletButton } from './helpers'
 import type { OpenOptions } from './helpers'
 
-const LOCAL_ONLY = 'This list is kept in this browser only. Another browser or device shows none of it, and clearing site data erases it.'
+const LOCAL_ONLY = 'Another browser or device shows none of them.'
 const HASH = /[0-9a-f]{8}…[0-9a-f]{4}/
 
 const rows = (page: Page): Locator => page.getByTestId('activity-row')
@@ -54,8 +55,9 @@ async function writeOffer(page: Page): Promise<Page | Locator> {
   await expect(ticket).toContainText('95.00 USDx')
   const scope = isPhone(page) ? page : ticket
   await scope.getByRole('button', { name: 'Review' }).click()
-  await scope.getByRole('checkbox').check()
-  await scope.getByRole('button', { name: /^Write put/ }).click()
+  const write = scope.getByRole('button', { name: /^Write put/ })
+  await expect(write).toBeVisible()
+  await write.click()
   return scope
 }
 
@@ -112,16 +114,21 @@ test.describe('Activity', () => {
   test('a guest is told where the list lives and can connect from the page', async ({ page }) => {
     await open(page, '/activity')
     await expect(pageHeading(page)).toHaveText('Activity')
-    await expect(page.getByTestId('local-only')).toContainText(LOCAL_ONLY)
+    await expect(main(page)).toContainText(LOCAL_ONLY)
     await expect(main(page).getByRole('heading', { name: 'Connect a wallet to see its transactions.' })).toBeVisible()
     await expect(rows(page)).toHaveCount(0)
+    // Said once, in the description: no note on mock data, no wallet line.
+    await expect(main(page)).not.toContainText('On mock data')
 
     await main(page).getByRole('button', { name: 'Connect wallet' }).click()
     await expect(walletButton(page)).toBeVisible()
-    await expect(main(page).getByRole('heading', { name: 'No transactions from this browser yet.' })).toBeVisible()
+    // The button is gone with the note that held it: focus goes to the page title, not to the page body.
+    await expect(pageHeading(page)).toBeFocused()
+    await expect(main(page).getByRole('heading', { name: 'No transactions yet.' })).toBeVisible()
     await expect(main(page).getByRole('link', { name: 'Go to markets' })).toHaveAttribute('href', /^\/markets/)
     // Still said, also with a wallet connected and nothing to list.
-    await expect(page.getByTestId('local-only')).toContainText(LOCAL_ONLY)
+    await expect(main(page)).toContainText(LOCAL_ONLY)
+    await expect(main(page)).not.toContainText('Wallet ')
   })
 
   test('lists a transaction after one is made: what, state, when, hash and a link', async ({ page }) => {
@@ -138,15 +145,18 @@ test.describe('Activity', () => {
     await expect(row.getByRole('rowheader')).toContainText('Write put on 1.00 BOND')
     await expect(row.getByRole('rowheader')).toContainText('Strike 95.00 USDx per BOND')
     await expect(state(row)).toHaveText('Confirmed')
-    await expect(row).toContainText('Offer written.')
     await expect(row.locator('time')).toHaveAttribute('datetime', /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
-    await expect(row.locator('time')).toContainText('UTC')
+    await expect(row.locator('time')).toHaveText(/^\d{2}:\d{2}$/)
     await expect(row).toContainText(HASH)
-    await expect(row.getByRole('button', { name: 'Copy transaction hash' })).toBeVisible()
-    // A mock hash has no explorer page: it is text, not a link.
+    // A mock hash has no explorer page and nothing to paste elsewhere: plain text, no link, no copy button.
+    await expect(row.getByRole('button', { name: 'Copy transaction hash' })).toHaveCount(0)
     await expect(row.getByRole('link', { name: /^View transaction/ })).toHaveCount(0)
     await expect(page.getByTestId('activity-count')).toHaveText('1 transaction.')
-    await expect(page.getByRole('table', { name: 'Transactions from this browser' }).getByRole('columnheader')).toHaveText(['Transaction', 'State', 'Started', 'Hash', 'Position or request'])
+    const table = page.getByRole('table', { name: 'Transactions from this browser' })
+    await expect(table.getByRole('columnheader')).toHaveText(['Transaction', 'State', /^Time, UTC/, 'Hash', 'Where it shows'])
+    // The day is said once, as the heading of its rows; a confirmed row is one line, with no note under it.
+    await expect(table.getByRole('rowheader', { name: /^\d{1,2} [A-Z][a-z]{2} \d{4}$/ })).toHaveCount(1)
+    expect((await row.boundingBox())!.height).toBeLessThan(50)
 
     // The entry records the option the contract created, so the link goes to that option, not to a list.
     const created = row.getByRole('link', { name: /^Position \d+$/ })
@@ -162,12 +172,12 @@ test.describe('Activity', () => {
     await mine.getByRole('button', { name: /^Cancel request No\. 000000/ }).click()
     const dialog = page.getByRole('dialog', { name: 'Cancel request No. 000000' })
     await dialog.getByRole('button', { name: 'Cancel request', exact: true }).click()
-    await dialog.getByRole('button', { name: 'Done' }).click()
+    // The dialog takes the outcome as its title once the transaction is through.
+    await page.getByRole('dialog').getByRole('button', { name: 'Done' }).click()
     await goToActivity(page)
 
     const row = rowOf(page, /Cancel request for put on 2\.00 BOND/)
     await expect(state(row)).toHaveText('Confirmed')
-    await expect(row).toContainText('Request cancelled.')
     await row.getByRole('link', { name: 'Request 0' }).click()
     await expect(page).toHaveURL((url) => url.pathname === '/requests' && url.searchParams.get('mine') === '1')
   })
@@ -175,7 +185,9 @@ test.describe('Activity', () => {
   test('an unknown outcome is not a failure: it is checked again, and the offer turns out written', async ({ page }) => {
     await open(page, '/activity', { connect: true })
     await failNextWith(page, 'unknown')
-    await writeOffer(page)
+    const ticket = await writeOffer(page)
+    // The ticket re-reads the terms before it asks the wallet: leave it once the transaction has been sent.
+    await expect(ticket.getByText('Outcome unknown').first()).toBeVisible()
     await goToActivity(page)
 
     const row = rowOf(page, 'Write put on 1.00 BOND')
@@ -185,7 +197,6 @@ test.describe('Activity', () => {
     // The click may lose the race against the page's own lookup: then the button is gone and the row is settled.
     if (await check.isVisible()) await check.click({ timeout: 3_000 }).catch(() => undefined)
     await expect(state(row)).toHaveText('Confirmed')
-    await expect(row).toContainText('Offer written.')
     await expect(row.getByRole('button', { name: 'Check again' })).toHaveCount(0)
     await expect(main(page)).not.toContainText('unknown outcome')
   })
@@ -194,8 +205,9 @@ test.describe('Activity', () => {
     await open(page, '/activity', { connect: true })
     await stageEntries(page, ADDR_A, STAGED)
     await expect(rows(page)).toHaveCount(STAGED.length)
-    // Newest first.
-    await expect(rows(page).first()).toContainText('Exercise put on 5.00 FUND')
+    // Open ones first (the unknown outcome before the one in flight), then the finished ones, newest first.
+    await expect(rows(page)).toContainText([/Write call on 2\.00 FUND/, /Exercise put on 5\.00 FUND/, /Buy put on 5\.00 BOND/, /Claim 98\.00 USDx/, /Reclaim 48\.00 USDx/])
+    await expect(page.getByRole('table').getByRole('rowheader', { name: 'Waiting for an outcome' })).toBeVisible()
     await expect(page.getByTestId('activity-count')).toHaveText('5 transactions. 1 in progress. 1 with an unknown outcome.')
 
     const pending = rowOf(page, 'Exercise put on 5.00 FUND')
@@ -205,11 +217,13 @@ test.describe('Activity', () => {
 
     const unknown = rowOf(page, 'Write call on 2.00 FUND')
     await expect(state(unknown)).toHaveText('Outcome unknown')
-    await expect(unknown).toContainText('Do not send it again: check again first.')
-    await expect(main(page)).toContainText('One transaction has an unknown outcome')
-    // A hash the chain does not know yet stays unknown: the row keeps its state and its one action.
+    // The ticket's words, with the time it can still go through until.
+    await expect(unknown).toContainText(/It can still go through until \d{2}:\d{2}:\d{2}\sUTC\. Do not send another one before that: check again first\./)
+    await expect(main(page)).not.toContainText('Checked at')
+    // A hash the chain does not know yet stays unknown: the row keeps its state and its one action, and says when it looked.
     await unknown.getByRole('button', { name: 'Check again' }).click()
     await expect(state(unknown)).toHaveText('Outcome unknown')
+    await expect(unknown).toContainText(/Checked at \d{2}:\d{2}:\d{2}\sUTC: not included yet\./)
     await expect(unknown.getByRole('button', { name: 'Check again' })).toBeEnabled()
     // Never an offer to send it a second time.
     await expect(unknown.getByRole('button', { name: /send|try again|retry/i })).toHaveCount(0)
@@ -227,21 +241,45 @@ test.describe('Activity', () => {
 
     const confirmed = rowOf(page, 'Reclaim 48.00 USDx')
     await expect(state(confirmed)).toHaveText('Confirmed')
-    await expect(confirmed).toContainText('Reclaimed.')
     // Only the unknown one offers an action.
     await expect(page.getByRole('button', { name: 'Check again' })).toHaveCount(1)
   })
 
-  test('Clear finished removes what is settled and keeps what is still open', async ({ page }) => {
+  test('Clear finished removes what is settled, keeps what is still open, and can be undone until the page is left', async ({ page }) => {
     await open(page, '/activity', { connect: true })
     await stageEntries(page, ADDR_A, STAGED)
     await expect(rows(page)).toHaveCount(5)
     await main(page).getByRole('button', { name: 'Clear finished' }).click()
     await expectAnnounced(page, '3 finished transactions removed from the list.')
     await expect(rows(page)).toHaveCount(2)
-    await expect(rows(page)).toContainText([/Exercise put on 5\.00 FUND/, /Write call on 2\.00 FUND/])
+    await expect(rows(page)).toContainText([/Write call on 2\.00 FUND/, /Exercise put on 5\.00 FUND/])
     await expect(main(page).getByRole('button', { name: 'Clear finished' })).toHaveCount(0)
     await expect(page.getByTestId('activity-count')).toHaveText('2 transactions. 1 in progress. 1 with an unknown outcome.')
+    // What happened stays said, with a way back; focus is on that line, not on the page body.
+    const line = page.getByTestId('activity-cleared')
+    await expect(line).toHaveText(/^3 finished transactions removed\.\s*Undo$/)
+    await expect(line).toBeFocused()
+    await line.getByRole('button', { name: 'Undo' }).click()
+    await expect(rows(page)).toHaveCount(5)
+    await expect(line).toHaveCount(0)
+
+    // Cleared again and the page left: the clear is final.
+    await main(page).getByRole('button', { name: 'Clear finished' }).click()
+    await expect(rows(page)).toHaveCount(2)
+    await goTo(page, 'Reserves')
+    await goToActivity(page)
+    await expect(rows(page)).toHaveCount(2)
+    await expect(page.getByTestId('activity-cleared')).toHaveCount(0)
+  })
+
+  test('after a clear that leaves nothing, the page does not say "yet"', async ({ page }) => {
+    await open(page, '/activity', { connect: true })
+    await stageEntries(page, ADDR_A, STAGED.slice(0, 3))
+    await expect(rows(page)).toHaveCount(3)
+    await main(page).getByRole('button', { name: 'Clear finished' }).click()
+    await expect(rows(page)).toHaveCount(0)
+    await expect(main(page)).toContainText('No transactions listed.')
+    await expect(main(page)).not.toContainText('No transactions yet.')
   })
 
   test('each wallet has its own list', async ({ page }) => {
@@ -258,6 +296,7 @@ test.describe('Activity', () => {
     await open(page, '/activity', { connect: true })
     await stageEntries(page, ADDR_A, STAGED)
     await expect(rows(page)).toHaveCount(5)
+    // The group headings are row headers of the table, not page headings.
     const levels = await main(page).locator('h1, h2, h3, h4, h5, h6').evaluateAll((list) => list.map((h) => Number(h.tagName[1])))
     expect(levels).toEqual([1])
     const text = await main(page).innerText()
@@ -271,7 +310,7 @@ test.describe('Activity', () => {
     await open(page, '/activity')
     await expectNoAxeViolations(page)
     await main(page).getByRole('button', { name: 'Connect wallet' }).click()
-    await expect(main(page).getByRole('heading', { name: 'No transactions from this browser yet.' })).toBeVisible()
+    await expect(main(page).getByRole('heading', { name: 'No transactions yet.' })).toBeVisible()
     await expectNoAxeViolations(page)
     await stageEntries(page, ADDR_A, STAGED)
     await expect(rows(page)).toHaveCount(5)
@@ -280,25 +319,27 @@ test.describe('Activity', () => {
 })
 
 test.describe('Activity on a phone', () => {
-  test('the list is blocks with every field, 44 px targets and no sideways scroll @phone', async ({ page }) => {
+  test('the list is grouped blocks with no field labels, 44 px targets and no sideways scroll @phone', async ({ page }) => {
     await open(page, '/activity', { connect: true })
     await stageEntries(page, ADDR_A, STAGED)
-    const list = page.getByRole('list', { name: 'Transactions from this browser' })
-    await expect(list.getByRole('listitem')).toHaveCount(5)
+    await expect(rows(page)).toHaveCount(5)
+    await expect(main(page).getByRole('heading', { level: 2 })).toHaveText(['Waiting for an outcome', /^\d{1,2} [A-Z][a-z]{2} \d{4}$/])
+    await expect(page.getByRole('list', { name: 'Waiting for an outcome' }).getByRole('listitem')).toHaveCount(2)
     await expect(page.getByRole('table')).toHaveCount(0)
     await expectNoHorizontalOverflow(page)
 
     const failed = rowOf(page, 'Buy put on 5.00 BOND')
     await expect(state(failed)).toHaveText('Failed')
     await expect(failed).toContainText('The network fee was charged.')
-    await expect(failed).toContainText('Started')
+    await expect(failed).not.toContainText('Started')
     await expect(failed).toContainText(HASH)
+    await expect(failed.locator('time')).toHaveText(/^\d{2}:\d{2} UTC$/)
     expect((await failed.getByRole('link', { name: 'Position 31' }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
 
     const check = rowOf(page, 'Write call on 2.00 FUND').getByRole('button', { name: 'Check again' })
     expect((await check.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     expect((await main(page).getByRole('button', { name: 'Clear finished' }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
-    await expect(page.getByTestId('local-only')).toContainText(LOCAL_ONLY)
+    await expect(main(page)).toContainText(LOCAL_ONLY)
   })
 
   test('a transaction made on a phone shows up in the list @phone', async ({ page }) => {

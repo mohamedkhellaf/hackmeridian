@@ -1,0 +1,37 @@
+@layer ui {
+  /* The word keeps the look of the text around it; a dotted underline says it can be pressed. */
+  .root {
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-tag);
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-align: inherit;
+    text-decoration: underline dotted;
+    text-decoration-color: var(--control);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.24em;
+    cursor: help;
+
+    @media (hover: hover) {
+      &:hover {
+        text-decoration-color: currentColor;
+      }
+    }
+
+    &[data-popup-open] {
+      text-decoration-color: currentColor;
+    }
+  }
+
+  .definition {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+}

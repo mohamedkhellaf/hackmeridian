@@ -1,10 +1,11 @@
-// Orders that are not on the standard grid: still tradable, listed with the rule each one does not meet. Nothing
-// is hidden: the count is in the heading line and every reason present is explained under the table.
+// Orders that are not on the standard grid: still tradable, listed with the rule each one does not meet. The
+// reason is said once per row, in its column, and what each reason present means is explained under the table.
 import type { BookRow } from '../../../core/market/book'
 import { NON_STANDARD_REASONS } from '../../../core/series'
 import type { MarketView } from '../../../data'
 import { useHealth, useOptionsClient, useTxBusy } from '../../../data'
-import { COPY, REASON_LABEL, REASON_MEANING } from './copy'
+import { COPY, OFF_GRID_NO_REFERENCE, REASON_LABEL, REASON_MEANING } from './copy'
+import { referenceLine } from './model'
 import { OrdersList } from './OrdersList'
 import { OrdersTable } from './OrdersTable'
 import styles from './OtherOffers.module.css'
@@ -27,6 +28,8 @@ export function OtherOffers({ view, narrow, ticketKey, onTake, onCancel }: Other
   const { isMock } = useOptionsClient()
   if (view.other.length === 0) return null
   const reasons = NON_STANDARD_REASONS.filter((r) => view.otherCounts[r] > 0)
+  // Without a reference price there is no ladder, and an "off-grid" strike means only that.
+  const noReference = referenceLine(view.reference, view.quote.decimals) === null
   const Orders = narrow ? OrdersList : OrdersTable
   return (
     <section className={styles.root} aria-labelledby={`${OTHER_OFFERS_ID}-title`} id={OTHER_OFFERS_ID} tabIndex={-1} data-testid="other-offers">
@@ -34,13 +37,12 @@ export function OtherOffers({ view, narrow, ticketKey, onTake, onCancel }: Other
         {COPY.otherHeading}
       </h2>
       <p className={styles.intro}>
-        {COPY.otherIntro(view.other.length)} Quantities in {view.asset.code}, premiums in {view.quote.code}.
+        {COPY.otherIntro(view.other.length)} {COPY.bookUnits(view.asset.code, view.quote.code)}
       </p>
       <Orders
         label={`${COPY.otherHeading} on ${view.asset.code}`}
-        side="mixed"
+        sections={[{ key: 'other', lines: view.other }]}
         showSeries
-        lines={view.other}
         ticketKey={ticketKey}
         health={health.data}
         explorer={!isMock}
@@ -51,10 +53,8 @@ export function OtherOffers({ view, narrow, ticketKey, onTake, onCancel }: Other
       <dl className={styles.reasons}>
         {reasons.map((r) => (
           <div key={r} className={styles.reason}>
-            <dt>
-              {REASON_LABEL[r]} <span className={styles.count}>{view.otherCounts[r]}</span>
-            </dt>
-            <dd>{REASON_MEANING[r]}</dd>
+            <dt>{REASON_LABEL[r]}</dt>
+            <dd>{r === 'off-grid strike' && noReference ? OFF_GRID_NO_REFERENCE : REASON_MEANING[r]}</dd>
           </div>
         ))}
       </dl>

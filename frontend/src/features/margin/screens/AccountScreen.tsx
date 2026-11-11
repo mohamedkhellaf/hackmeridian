@@ -1,25 +1,35 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import { usePro } from '../../../data'
-import { AmountField, Button, Callout, Card, EmptyNote, KeyValue, KeyValueItem, Link, Stat } from '../../../ui'
+import { AmountField, Button, Callout, Card, EmptyNote, IconInfo, KeyValue, KeyValueItem, Link, Popover, useIsPhone } from '../../../ui'
 import { HealthBar } from '../../../viz'
-import { AMOUNT_ERROR, NO_VALUE_NOTE, REPLAY_NOTE } from '../copy'
-import { HEALTH_WORD, healthOf, healthSentence } from '../model/health'
+import { AMOUNT_ERROR } from '../copy'
+import { HEALTH_WORD, healthLead, healthNext, healthOf } from '../model/health'
 import { QUOTE, lots, toChartNumber, usdx, usdxExact, usdxInput } from '../model/money'
 import { contractTitle, isAddress, partyName } from '../model/names'
+import { oracleView } from '../model/oracle'
 import { parseUsdx } from '../model/write'
 import { Usdx } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
-import { Footnote } from '../parts/Section'
+import { useReplayable } from '../parts/useReplayable'
 import css from './AccountScreen.module.css'
 
+/** What the three requirement figures are. Behind one button: the labels already carry the standard names. */
+const DEFINITIONS: readonly { term: string; text: string }[] = [
+  { term: 'Account value (NLV)', text: 'Cash less the short calls at the latest mark.' },
+  { term: 'Liquidation level (MM)', text: 'The maintenance margin. Below it, anyone can take the account over.' },
+  { term: 'Opening requirement (IM)', text: 'The initial margin, needed before a new call can be sold.' },
+]
+
 /**
- * The margin account of the acting account: account value against the liquidation level and the opening
- * requirement, the distance in words, what is owed to the vault, and deposit and withdraw.
+ * The margin account of the acting account: where it stands against the liquidation level (the lead line and
+ * the bar), the three requirement figures, what is in the contract, and deposit and withdraw in the rail.
  */
 export function AccountScreen() {
   const { client, model, me, simulated, busy } = usePro()
   const { act, canAct, connect } = useMarginUi()
+  const replay = useReplayable()
+  const phone = useIsPhone()
   const [amount, setAmount] = useState('')
   const amountRef = useRef<HTMLInputElement | null>(null)
 
@@ -27,6 +37,7 @@ export function AccountScreen() {
     return (
       <EmptyNote
         title="Connect a wallet to see your margin account."
+        headingLevel={2}
         hint="Series, offers, positions, liquidations and the vault can be read without one."
         action={
           <Button variant="primary" onClick={connect}>
@@ -42,6 +53,7 @@ export function AccountScreen() {
   const untouched = !account || (account.cash === 0n && account.owed === 0n && account.shorts.length === 0)
   const req = untouched ? null : (account?.requirement ?? null)
   const health = healthOf(req)
+  const next = healthNext(health)
   const wallet = model.wallets[me]
   const units = parseUsdx(amount) ?? 0n
   const valid = units > 0n
@@ -49,6 +61,10 @@ export function AccountScreen() {
   const blocked = account?.withdrawBlocked ?? false
   const amountReason = valid ? undefined : 'Enter an amount first.'
   const who = isAddress(me) ? 'This account' : partyName(me)
+  const canDeposit = replay.can('deposit', (args) => args[0] === me)
+  const canWithdraw = replay.can('withdraw', (args) => args[0] === me)
+  // The expired series of this account that still wait for the publisher's settlement price.
+  const waiting = oracleView(model).pending.filter((s) => account?.shorts.some((x) => x.seriesId === s.id))
 
   const prefill = () => {
     setAmount(usdxInput(health.distance))
@@ -59,28 +75,13 @@ export function AccountScreen() {
     <div className={css.root}>
       <section className={css.requirement} aria-label="Margin requirement">
         {untouched ? (
-          <EmptyNote title={`${who} has no margin posted yet.`} hint="A first deposit opens the account. A call can be written once the account holds its opening requirement." />
+          <EmptyNote headingLevel={2} title={`${who} has no margin posted yet.`} hint="A first deposit opens the account. A call can be written once the account holds its opening requirement." />
         ) : (
           <>
-            <div className={css.figures}>
-              <Stat size="lg" label="Account value (NLV)" value={<Usdx v={req?.nlv} none="No value at this moment" />} unit={req ? QUOTE : undefined} hint="Cash less the short calls at the latest mark." />
-              <Stat
-                size="lg"
-                label="Liquidation level (MM)"
-                value={<Usdx v={req?.mm} none="No value at this moment" />}
-                unit={req ? QUOTE : undefined}
-                hint="The maintenance margin. Below it, anyone can take the account over."
-              />
-              <Stat
-                size="lg"
-                label="Opening requirement (IM)"
-                value={<Usdx v={req?.im} none="No value at this moment" />}
-                unit={req ? QUOTE : undefined}
-                hint="The initial margin, needed before a new call can be sold."
-              />
-            </div>
+            <p className={css.lead} data-state={health.state}>
+              {healthLead(health, simulated)}
+            </p>
             <HealthBar
-              className={css.health}
               nlv={req ? toChartNumber(req.nlv) : Number.NaN}
               mm={req ? toChartNumber(req.mm) : Number.NaN}
               im={req ? toChartNumber(req.im) : Number.NaN}
@@ -90,17 +91,45 @@ export function AccountScreen() {
               mmShortLabel={req ? `MM ${usdx(req.mm)}` : undefined}
               imShortLabel={req ? `IM ${usdx(req.im)}` : undefined}
               stateLabel={HEALTH_WORD[health.state]}
-              status={healthSentence(health, simulated)}
+              status={next ?? undefined}
             />
-            {health.state === 'liquidatable' ? (
-              <div className={css.restore}>
+            {health.state === 'liquidatable' && !simulated ? (
+              <div>
                 <Button size="sm" onClick={prefill}>
                   Fill in {usdxExact(health.distance)} {QUOTE}
                 </Button>
-                <span className={css.restoreNote}>Puts that amount in the deposit field. Nothing is sent.</span>
               </div>
             ) : null}
-            {!req ? <Footnote>{NO_VALUE_NOTE}</Footnote> : null}
+            <div className={css.figures}>
+              <KeyValue variant={phone ? 'ruled' : 'plain'} layout={phone ? 'row' : 'stacked'} className={phone ? undefined : css.figureRow}>
+                <KeyValueItem label="Account value (NLV)">
+                  <Usdx v={req?.nlv} unit figure="serif" none="No value at this moment" />
+                </KeyValueItem>
+                <KeyValueItem label="Liquidation level (MM)">
+                  <Usdx v={req?.mm} unit figure="serif" none="No value at this moment" />
+                </KeyValueItem>
+                <KeyValueItem label="Opening requirement (IM)">
+                  <Usdx v={req?.im} unit figure="serif" none="No value at this moment" />
+                </KeyValueItem>
+              </KeyValue>
+              <Popover
+                title="The three figures"
+                trigger={
+                  <Button size="sm" variant="quiet" iconStart={<IconInfo />}>
+                    What these figures are
+                  </Button>
+                }
+              >
+                <dl className={css.definitions}>
+                  {DEFINITIONS.map((d) => (
+                    <div key={d.term}>
+                      <dt>{d.term}</dt>
+                      <dd>{d.text}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Popover>
+            </div>
           </>
         )}
       </section>
@@ -109,12 +138,14 @@ export function AccountScreen() {
         <Card title="In the contract" headingLevel={2} className={css.facts}>
           <KeyValue>
             <KeyValueItem label="Cash in the contract">
-              <Usdx v={account.cash} unit />
+              <Usdx v={account.cash} unit figure="serif" />
             </KeyValueItem>
             <KeyValueItem label="Owed to the vault" hint={account.owed > 0n ? 'A takeover shortfall. It is collected from your free cash before any withdrawal.' : undefined}>
-              <Usdx v={account.owed} unit tone="loss" />
+              <Usdx v={account.owed} unit figure="serif" tone="loss" />
             </KeyValueItem>
-            <KeyValueItem label="In your wallet">{wallet !== undefined ? <Usdx v={wallet} unit /> : <Usdx v={null} none="Not read" />}</KeyValueItem>
+            <KeyValueItem label={simulated ? `In ${partyName(me)}'s wallet` : 'In your wallet'}>
+              {wallet !== undefined ? <Usdx v={wallet} unit figure="serif" /> : <Usdx v={null} none="Not read" />}
+            </KeyValueItem>
             <KeyValueItem label="Short calls">
               {account.shorts.length === 0 ? (
                 'None'
@@ -147,31 +178,38 @@ export function AccountScreen() {
         <div className={css.actions}>
           <Button
             variant="primary"
-            disabled={!valid || tooMuch || busy}
-            disabledReason={amountReason ?? (tooMuch ? 'The amount is more than the wallet holds.' : undefined)}
+            disabled={!canDeposit || !valid || tooMuch || busy}
+            disabledReason={!canDeposit ? replay.reason(`deposit by ${partyName(me)}`) : (amountReason ?? (tooMuch ? 'The amount is more than the wallet holds.' : undefined))}
             onClick={() => void act({ label: 'Deposit', done: 'Deposited' }, (opts) => client.deposit(me, units, opts))}
           >
             Deposit
           </Button>
           <Button
-            disabled={!valid || blocked || busy}
-            disabledReason={blocked ? 'Blocked while an expired position is not settled.' : amountReason}
+            disabled={!canWithdraw || !valid || blocked || busy}
+            disabledReason={blocked ? 'Blocked while an expired position is not settled.' : !canWithdraw ? replay.reason(`withdrawal by ${partyName(me)}`) : amountReason}
             onClick={() => void act({ label: 'Withdraw', done: 'Withdrawn' }, (opts) => client.withdraw(me, units, opts))}
           >
             Withdraw
           </Button>
         </div>
         {blocked ? (
-          <Callout variant="warning" label="Withdrawals blocked" title="An expired position is not settled yet.">
+          <Callout variant="warning" title="Withdrawals are blocked: an expired position is not settled yet.">
             <p>
-              The contract refuses a withdrawal until every expired short call of this account is settled (SeriesExpired, 205). Settle it on{' '}
-              <Link render={<RouterLink to="/margin/positions" />}>Positions</Link>.
+              The contract refuses a withdrawal until every expired short call of this account is settled (SeriesExpired, 205).{' '}
+              {waiting.length > 0 ? (
+                <>
+                  Waiting for the publisher&apos;s settlement price for series {waiting.map((s) => s.id).join(', ')}: nothing can be settled until it is published.
+                </>
+              ) : (
+                <>
+                  Settle it on <Link render={<RouterLink to="/margin/positions" />}>Positions</Link>.
+                </>
+              )}
             </p>
           </Callout>
         ) : (
           <p className={css.muted}>A withdrawal is refused if it would leave the account value under the opening requirement.</p>
         )}
-        {simulated ? <p className={css.replay}>{REPLAY_NOTE}</p> : null}
       </Card>
     </div>
   )

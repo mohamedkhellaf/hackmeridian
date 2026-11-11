@@ -1,41 +1,19 @@
 @layer features {
-  .table :where(th, td) {
+  /* A finished row is one line at the kit's row height; a row with a note grows and its cells sit on the first line. */
+  .tall > :where(th, td) {
+    height: auto;
+    padding-block: var(--s-8);
     vertical-align: top;
   }
 
-  .table :where(tbody) :where(th, td) {
-    padding-block: var(--s-12);
-  }
-
   .what {
+    min-width: 18rem;
     white-space: normal;
-    min-width: 14rem;
-  }
-
-  .label {
-    display: block;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .sub {
-    display: block;
-    margin-top: var(--s-2);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    font-weight: 420;
-    color: var(--muted);
-    text-wrap: pretty;
-  }
-
-  .state {
-    white-space: normal;
-    min-width: 16rem;
-    max-width: 24rem;
   }
 
   .note {
     display: block;
+    max-width: 40rem;
     margin-top: var(--s-2);
     font-size: var(--caption-size);
     line-height: var(--caption-line);
@@ -44,13 +22,33 @@
     text-wrap: pretty;
   }
 
-  .cell {
+  /* The time header names both zones; the viewer's goes under UTC so the column stays as narrow as its times. */
+  .timeHead {
+    white-space: normal;
+  }
+
+  .zone {
+    display: block;
+    font-weight: 420;
     white-space: nowrap;
   }
 
-  /* The copy button is taller than a line of text: pull the hash up so its text sits on the row's first line. */
-  .hash {
-    display: inline-flex;
-    margin-top: calc(var(--s-4) * -1);
+  /* The heading of a group (the open transactions, or a day): a ruled line of the table, not sticky. */
+  .groupHead {
+    position: static;
+    height: auto;
+    padding-top: var(--s-20);
+    padding-bottom: var(--s-6);
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    color: var(--text);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    font-stretch: normal;
+  }
+
+  .group:first-of-type .groupHead {
+    padding-top: var(--s-12);
   }
 }

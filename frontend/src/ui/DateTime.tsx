@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import {
   countdownTickMs,
   formatCountdown,
@@ -9,6 +9,7 @@ import {
   toIsoUtc,
 } from './format'
 import type { DateInput, UtcFormat } from './format'
+import { useClockOffset } from './clockOffset'
 import { IconClock } from './icons'
 import { cx } from './internal/cx'
 import styles from './DateTime.module.css'
@@ -27,7 +28,7 @@ export interface DateTimeProps {
  * A point in time. UTC is canonical because the contract compares against ledger close time and both sides of a
  * trade must read the same string; the viewer's local time is secondary.
  */
-export function DateTime({ value, format = 'full', local = 'none', className }: DateTimeProps) {
+export const DateTime = memo(function DateTime({ value, format = 'full', local = 'none', className }: DateTimeProps) {
   const date = toDate(value)
   if (Number.isNaN(date.getTime())) return null
   return (
@@ -36,14 +37,14 @@ export function DateTime({ value, format = 'full', local = 'none', className }: 
       {local !== 'none' ? <span className={styles.local}>{formatLocalTime(date)}</span> : null}
     </time>
   )
-}
+})
 
 export interface CountdownProps {
   /** The deadline, in epoch milliseconds. */
   to: number
   /**
-   * The current time in epoch milliseconds. Pass the latest ledger close time: expiry is decided by the ledger,
-   * not by this device's clock. When left out the component ticks on the device clock.
+   * The current time in epoch milliseconds. When left out the component ticks on the device clock corrected by
+   * the ledger offset of the nearest `ClockProvider`: deadlines are decided by the ledger, not by this device.
    */
   now?: number
   /** Below this much time left the countdown takes the warning tone and a clock glyph. */
@@ -65,7 +66,8 @@ export function Countdown({
   className,
 }: CountdownProps) {
   const [clock, setClock] = useState(() => Date.now())
-  const current = now ?? clock
+  const offset = useClockOffset()
+  const current = now ?? clock + offset
   const left = to - current
 
   useEffect(() => {

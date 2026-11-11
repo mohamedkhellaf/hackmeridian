@@ -1,11 +1,8 @@
 // Pure selectors of the Requests board: which requests are shown, in what order, and how each row reads.
 // No React. Amounts stay exact integer units until they are formatted here; nothing is computed with floats.
-import { findReferenceAsset } from '../../core/assets'
-import { formatExact, formatUnits, formatUtc } from '../../core/format'
 import type { TokenInfo } from '../../core/options/types'
-import { fillCollateral } from '../../core/requests/requests'
 import type { Bid, BidState } from '../../core/requests/types'
-import { byId, compareRatio, perUnit, shortBy } from '../../core/units'
+import { byId, compareRatio } from '../../core/units'
 
 export type RequestSort = 'premium' | 'deadline'
 export type KindFilter = 'put' | 'call'
@@ -42,11 +39,19 @@ export function sortRequests(bids: readonly Bid[], sort: RequestSort): Bid[] {
 
 export const boardRequests = (bids: readonly Bid[], filter: BoardFilter, nowSec: number): Bid[] => sortRequests(filterRequests(openRequests(bids, nowSec), filter), filter.sort)
 
-const MINE_RANK: Record<BidState, number> = { open: 0, expired: 1, filled: 2, cancelled: 3, pruned: 3 }
+/**
+ * The state of each request at `nowSec`. The contract's own state is read at the last poll; an open request whose
+ * deadline has passed since then is already expired (its premium waits in the contract), so the page does not
+ * keep offering to cancel an open request that can no longer be filled.
+ */
+export const asOf = (bids: readonly Bid[], nowSec: number): Bid[] => bids.map((b) => (b.state === 'open' && b.expiry <= nowSec ? { ...b, state: 'expired' } : b))
+
+/** The order of "My requests": the one that asks for an action (expired, premium still in the contract) first. */
+const MINE_RANK: Record<BidState, number> = { expired: 0, open: 1, filled: 2, cancelled: 3, pruned: 3 }
 
 /**
- * Every request the wallet ever posted: the ones that still hold its premium first (open by deadline, then
- * expired), then filled, then closed. Newest first inside the finished groups.
+ * Every request the wallet ever posted: expired ones whose premium waits in the contract first, then open ones by
+ * deadline, then filled, then closed. Newest first inside the finished groups.
  */
 export function myRequests(bids: readonly Bid[], me: string | null): Bid[] {
   if (!me) return []
@@ -56,7 +61,10 @@ export function myRequests(bids: readonly Bid[], me: string | null): Bid[] {
 }
 
 /** The wallet's requests whose premium is still in the contract (open, or expired and not cancelled yet). */
-export const holdsEscrow = (b: Bid): boolean => b.state === 'open' || b.state === 'expired'
+export { holdsEscrow } from '../../core/requests/rows'
+
+/** Closed for good: cancelled, or expired and refunded by a prune. Hidden from "My requests" until asked for. */
+export const isClosed = (b: Bid): boolean => b.state === 'cancelled' || b.state === 'pruned'
 
 export interface BoardTotals {
   count: number
@@ -72,114 +80,13 @@ export function boardTotals(bids: readonly Bid[]): BoardTotals {
 }
 
 /** The contract's bid id as printed on a note: six digits. */
-export const serialOf = (id: bigint): string => id.toString().padStart(6, '0')
+import { serialOf } from '../../core/format/option'
+export { serialOf }
 
-export interface Figure {
-  /** Two decimals, grouped, truncated. */
-  text: string
-  /** Every digit, for the exact-value popover. */
-  exact: string
-  code: string
-}
-
-const figure = (units: bigint, token: { decimals: number; code: string }): Figure => ({
-  text: formatUnits(units, token.decimals),
-  exact: formatExact(units, token.decimals),
-  code: token.code,
-})
-
-export const money = (f: Figure): string => `${f.text} ${f.code}`
-
-/** What the money of a request is doing, by state. */
-export type EscrowStatus = 'escrowed' | 'stranded' | 'paid' | 'refunded'
-
-const ESCROW_STATUS: Record<BidState, EscrowStatus> = { open: 'escrowed', expired: 'stranded', filled: 'paid', cancelled: 'refunded', pruned: 'refunded' }
-
-/** The contract's own state name for the tag. A pruned request is `Expired` on chain. */
-export const STATE_NAME: Record<BidState, string> = { open: 'Open', expired: 'Expired', filled: 'Filled', cancelled: 'Cancelled', pruned: 'Expired' }
-
-export interface RequestRow {
-  bid: Bid
-  key: string
-  serial: string
-  assetCode: string
-  /** `Bond`, `Fund share`, `Equity` for a reference asset; null otherwise. */
-  typeLabel: string | null
-  kind: 'put' | 'call'
-  kindWord: 'Put' | 'Call'
-  /** The request is for a long option: the buyer will hold it. */
-  glyph: 'long-put' | 'long-call'
-  quantity: Figure
-  /** Quote units for one whole unit of underlying, truncated. */
-  strike: Figure
-  strikeTotal: Figure
-  premium: Figure
-  premiumPerUnit: Figure
-  /** What a seller locks to take it: the total strike for a put, the underlying for a call. */
-  lock: Figure
-  lockToken: TokenInfo
-  lockUnits: bigint
-  deadlineSec: number
-  /** `13 Nov 2026, 08:00 UTC`. */
-  deadlineText: string
-  state: BidState
-  stateName: string
-  escrow: EscrowStatus
-  mine: boolean
-  /** Set once the request was filled. */
-  optionId: bigint | null
-  /** Every term in one phrase, for accessible names: "put on 5.00 FUND at 10.00 USDx, until 13 Nov 2026, 08:00 UTC, premium 2.00 USDx". */
-  terms: string
-}
-
-export function toRow(bid: Bid, me: string | null): RequestRow {
-  const zero = { decimals: bid.quote.decimals, code: bid.quote.code }
-  const strike = figure(perUnit(bid.totalStrike, bid) ?? 0n, zero)
-  const premiumPerUnit = figure(perUnit(bid.totalPremium, bid) ?? 0n, zero)
-  const quantity = figure(bid.underlyingQty, bid.underlying)
-  const premium = figure(bid.totalPremium, bid.quote)
-  const collateral = fillCollateral(bid)
-  const deadlineText = formatUtc(bid.expiry)
-  const reference = findReferenceAsset(bid.underlying.contractId)
-  return {
-    bid,
-    key: bid.id.toString(),
-    serial: serialOf(bid.id),
-    assetCode: bid.underlying.code,
-    typeLabel: reference?.typeLabel ?? null,
-    kind: bid.kind,
-    kindWord: bid.kind === 'put' ? 'Put' : 'Call',
-    glyph: bid.kind === 'put' ? 'long-put' : 'long-call',
-    quantity,
-    strike,
-    strikeTotal: figure(bid.totalStrike, bid.quote),
-    premium,
-    premiumPerUnit,
-    lock: figure(collateral.amount, collateral.token),
-    lockToken: collateral.token,
-    lockUnits: collateral.amount,
-    deadlineSec: bid.expiry,
-    deadlineText,
-    state: bid.state,
-    stateName: STATE_NAME[bid.state],
-    escrow: ESCROW_STATUS[bid.state],
-    mine: me !== null && bid.buyer === me,
-    optionId: bid.optionId,
-    terms: `${bid.kind} on ${money(quantity)} at ${money(strike)}, until ${deadlineText}, premium ${money(premium)}`,
-  }
-}
-
-export const toRows = (bids: readonly Bid[], me: string | null): RequestRow[] => bids.map((b) => toRow(b, me))
-
-/**
- * How much of the collateral the wallet is missing, or null when it has enough or the balance is not known.
- * Only a hint on the row: the ticket runs the full checks before anything is signed.
- */
-export function lockShortfall(row: Pick<RequestRow, 'lockUnits' | 'lockToken'>, balance: bigint | null | undefined): { have: Figure; missing: Figure } | null {
-  if (balance === null || balance === undefined) return null
-  const missing = shortBy(balance, row.lockUnits)
-  return missing > 0n ? { have: figure(balance, row.lockToken), missing: figure(missing, row.lockToken) } : null
-}
+// The row view model (terms, figures, state and escrow words) lives in core/requests/rows, shared with the asset
+// page's Requests tab and Portfolio. These names are the board's own for it.
+export { ESCROW_STATUS, STATE_NAME, figureText as money, lockShortfall, requestRow as toRow, requestRows as toRows } from '../../core/requests/rows'
+export type { EscrowStatus, Figure, RequestRow, RowReference } from '../../core/requests/rows'
 
 /** Parses a bid id from the URL. Null for anything that is not a plain non-negative integer. */
 export function parseBidId(raw: string | undefined): bigint | null {

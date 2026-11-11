@@ -11,12 +11,4 @@
       max-width: var(--measure);
     }
   }
-
-  .replay {
-    padding-top: var(--s-12);
-    border-top: 1px solid var(--hairline);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
-  }
 }

@@ -26,12 +26,13 @@ export interface MoreSheetProps {
 
 /**
  * What the fifth tab opens on phones: the pages that have no tab (Learn, Margin, Issuer, Activity) as a menu of
- * links, and the display settings the desktop bar keeps in its settings menu.
+ * links, "Show me around" as the last row under them, and the display settings the desktop bar keeps in its
+ * settings menu.
  */
 export function MoreSheet({ open, onOpenChange }: MoreSheetProps) {
   const settingsId = useId()
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="More">
+    <Sheet open={open} onOpenChange={onOpenChange} title="More" className={styles.sheet}>
       <ul role="menu" aria-label="More pages" className={styles.links} onKeyDown={onListKeyDown}>
         {moreNav(PRO_ENABLED).map((entry, index) => {
           const Icon = SECTION_ICON[entry.id]

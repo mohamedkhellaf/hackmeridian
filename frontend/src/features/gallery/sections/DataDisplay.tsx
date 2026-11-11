@@ -204,11 +204,10 @@ export function DataSection() {
         <div className={styles.statRow}>
           <Stat size="lg" label="Premium paid" value="1.80" unit="USDx" />
           <Stat size="lg" label="Premium earned" value="3.80" unit="USDx" />
-          <Stat size="lg" label="Collateral locked" value="220.00" unit="USDx" hint="In the covered contract" />
-          <Stat size="lg" label="Positions open" value="3" />
+          <Stat size="lg" label="Collateral locked" value="220.00" unit="USDx" hint="In the Covered contract" />
         </div>
         <div className={styles.statRow}>
-          <Stat label="Reference price" value="9.82" unit="USDx" hint="Demo price, fixed, not a market" />
+          <Stat label="Reference price" value="9.82" unit="USDx" hint="Demo price" />
           <Stat label="Nearest deadline" value="2 d 4 h" />
         </div>
       </Specimen>

@@ -8,8 +8,6 @@
 import { QUOTE_ASSETS, REFERENCE_ASSETS } from './assets'
 import type { AssetFlags } from './assetfacts/assetFacts'
 
-export const RECORDED_ON = '26 Oct 2026'
-
 /** The account that deployed both contracts (`strata-deployer`). It keeps no power over either. */
 export const DEPLOYER = 'GBVPEL6MT4IZ4XL5J7TTMB3GND7TPRS54KOJTUFCUOVFVFPZKE5HDA73'
 
@@ -92,3 +90,18 @@ export const findTokenRecord = (contractId: string): TokenRecord | null => TOKEN
 /** The record for a configured contract id, or null when the build points somewhere this app has no record for. */
 export const coveredRecordFor = (contractId: string | undefined): ContractRecord | null => (contractId === COVERED_CONTRACT.contractId ? COVERED_CONTRACT : null)
 export const marginRecordFor = (contractId: string | undefined): MarginRecord | null => (contractId === MARGIN_CONTRACT.contractId ? MARGIN_CONTRACT : null)
+
+/**
+ * `#[test]` functions in contracts/options, counted on 11 November 2026 with `grep -c '#\[test\]'`: src/test.rs
+ * (unit), tests/invariants.rs (invariants checked against a reference model; two of them run random sequences of
+ * calls with proptest) and tests/negative.rs (calls that must be refused). CI runs them with `cargo test`
+ * (.github/workflows/ci.yml). One home for the figure: the landing's Proof section and Learn both import it.
+ */
+export const CONTRACT_TESTS = { unit: 146, invariant: 18, negative: 86 } as const
+export const CONTRACT_TEST_TOTAL = CONTRACT_TESTS.unit + CONTRACT_TESTS.invariant + CONTRACT_TESTS.negative
+
+/**
+ * Network fees, in stroops, of the put recorded on Testnet on 26 Oct 2026 (option No. 0 of the evidence run:
+ * write, buy, exercise, claim; transactions in features/landing/recorded.ts). The contract itself takes no fee.
+ */
+export const RECORDED_PUT_FEES = { write: 309_366n, buy: 31_976n, exercise: 79_873n, claim: 10_223n } as const

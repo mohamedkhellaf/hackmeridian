@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { MARGIN_BANNED_WORDS, findBannedWords } from '../../../core/disclosures'
 import { PRO_ERRORS } from '../../../core/pro/errors'
-import { DEFAULT_CURSOR, DEFAULT_SCENARIO, FixtureProClient } from '../../../core/pro/FixtureProClient'
+import { FixtureProClient } from '../../../core/pro/FixtureProClient'
 import type { Requirement, SeriesView } from '../../../core/pro/types'
 import * as copy from '../copy'
 import { coverageAt, coverageInputs, coveredUpTo, priceRange } from '../../../core/pro/coverage'
-import { HEALTH_WORD, healthOf, healthSentence, tenthsText } from './health'
-import { lots, perLot, toChartNumber, usdx, usdxExact, usdxInput } from './money'
+import { HEALTH_WORD, healthLead, healthNext, healthOf, tenthsText } from './health'
+import { bpsPercent, lots, perLot, toChartNumber, usdx, usdxExact, usdxInput } from './money'
 import { callName, contractName, contractTitle, isAddress, partyName, scenarioCopy } from './names'
 import { oracleView, snapshotAge, spanText } from './oracle'
-import { seriesSettlements, takeovers, vaultSeriesState } from './settlement'
+import { breakevenPerLot, callPayout } from './payout'
+import { expiredSeries, seriesSettlements, takeovers } from './settlement'
 import { parseLots, parseUsdx, premiumFloor, premiumPerLot, writeDraft } from './write'
 
 const U = 10_000_000n
@@ -48,6 +49,13 @@ describe('money', () => {
     expect(parseUsdx(usdxInput(204_378_473_000n))).toBe(204_378_473_000n)
     expect(usdxInput(5n * U)).toBe('5')
   })
+  it('writes a share in basis points as a percentage, exactly', () => {
+    expect(bpsPercent(1000)).toBe('10 %')
+    expect(bpsPercent(9000)).toBe('90 %')
+    expect(bpsPercent(250)).toBe('2.5 %')
+    expect(bpsPercent(1)).toBe('0.01 %')
+    expect(bpsPercent(0)).toBe('0 %')
+  })
   it('converts to a number for drawings only', () => {
     expect(toChartNumber(235_075_984_000n)).toBeCloseTo(23507.5984, 6)
     expect(toChartNumber(-15n * U)).toBe(-15)
@@ -60,7 +68,8 @@ describe('health', () => {
     expect(h.state).toBe('liquidatable')
     expect(h.distance).toBe(204_378_473_000n)
     expect(h.aboveTenths).toBeNull()
-    expect(healthSentence(h, true)).toBe('20,437.84 USDx below the liquidation level. A deposit of at least 20,437.8473 USDx brings the account value back to it.')
+    expect(healthLead(h, true)).toBe('20,437.84 USDx below the liquidation level')
+    expect(healthNext(h)).toBe('A deposit of at least 20,437.8473 USDx brings the account value back to the liquidation level.')
   })
   it('is restricted between the two levels and says what a new position needs', () => {
     const h = healthOf(req(491_200_000_000n, 439_454_400_000n, 549_318_000_000n))
@@ -69,7 +78,8 @@ describe('health', () => {
     expect(h.toOpen).toBe(58_118_000_000n)
     // (49,120.00 - 43,945.44) / 43,945.44 = 11.775 %, rounded down to a tenth
     expect(tenthsText(h.aboveTenths!)).toBe('11.7 %')
-    expect(healthSentence(h, false)).toBe('5,174.56 USDx above the liquidation level (11.7 %). A new call needs 5,811.80 USDx more.')
+    expect(healthLead(h, false)).toBe('5,174.56 USDx above the liquidation level (11.7 %)')
+    expect(healthNext(h)).toBe('A new call needs 5,811.80 USDx more.')
   })
   it('is open at or above the opening requirement, and exactly at the liquidation level is not liquidatable', () => {
     expect(healthOf(req(684_000_000_000n, 439_454_400_000n, 549_318_000_000n)).state).toBe('open')
@@ -79,13 +89,15 @@ describe('health', () => {
   it('assumes nothing without a requirement', () => {
     const h = healthOf(null)
     expect(h.state).toBe('unknown')
-    expect(healthSentence(h, true)).toContain('Nothing is assumed')
-    expect(healthSentence(h, false)).toContain('could not be read')
+    expect(healthLead(h, true)).toBe('This step of the scenario has no requirement for this account.')
+    expect(healthLead(h, false)).toBe('The margin requirement could not be read.')
+    expect(healthNext(h)).toBeNull()
   })
   it('omits the percentage when the liquidation level is zero', () => {
     const h = healthOf(req(50n * U, 0n, 0n))
     expect(h.aboveTenths).toBeNull()
-    expect(healthSentence(h, false)).toBe('50.00 USDx above the liquidation level.')
+    expect(healthLead(h, false)).toBe('50.00 USDx above the liquidation level')
+    expect(healthNext(h)).toBeNull()
   })
   it('never calls a state healthy', () => {
     for (const word of Object.values(HEALTH_WORD)) expect(findBannedWords(word, MARGIN_BANNED_WORDS)).toEqual([])
@@ -93,10 +105,8 @@ describe('health', () => {
 })
 
 describe('oracle', () => {
-  const sim = new FixtureProClient()
-  it('reads the latest snapshot of the default scenario', () => {
-    expect(sim.scenarioName).toBe(DEFAULT_SCENARIO)
-    expect(sim.position).toBe(DEFAULT_CURSOR)
+  const sim = new FixtureProClient(undefined, 'american_exercise', 22)
+  it('reads the latest snapshot of the early-exercise scenario, just after the price was published', () => {
     const o = oracleView(sim.getModel())
     expect(o.latest?.snapshot.seq).toBe(4)
     expect(o.age).toBe(0)
@@ -134,6 +144,22 @@ describe('oracle', () => {
     expect(spanText(3600)).toBe('1 h')
     expect(spanText(3900)).toBe('1 h 5 min')
     expect(spanText(86400 * 3 + 3600 * 4)).toBe('3 d 4 h')
+  })
+})
+
+describe('payout of a long call', () => {
+  it('pays quantity times the price over the strike, and nothing at or under it', () => {
+    // 1,000 lots, publisher price 140.00, strike 110.00: the 30,000.00 USDx of the early-exercise scenario.
+    expect(callPayout(1000n, 140n * U, 110n * U)).toBe(30_000n * U)
+    expect(callPayout(1000n, 110n * U, 110n * U)).toBe(0n)
+    expect(callPayout(1000n, 90n * U, 110n * U)).toBe(0n)
+  })
+  it('puts the breakeven at the strike plus the premium per lot, truncated', () => {
+    // 619.17009 USDx for 1,000 lots on a 110.00 strike: 110.6191700 per lot.
+    expect(breakevenPerLot(110n * U, 6_191_700_900n, 1000n)).toBe(1_106_191_700n)
+    expect(perLot(breakevenPerLot(110n * U, 6_191_700_900n, 1000n))).toBe('110.6191')
+    expect(breakevenPerLot(110n * U, 1n, 3n)).toBe(110n * U)
+    expect(breakevenPerLot(110n * U, 6_191_700_900n, 0n)).toBeNull()
   })
 })
 
@@ -223,14 +249,27 @@ describe('settlement', () => {
     expect(one.vaultPaid).toBe(10_619_170_090n)
     expect(one.deficit).toBe(238_808_917_160n)
     expect(one.fromOwners + one.vaultPaid + one.deficit!).toBe(one.due)
-    expect(vaultSeriesState(one.series)).toBe('Closed')
   })
   it('owes nothing at settlement before expiry (a book emptied by early exercise counts as settled, with nothing due)', () => {
-    const before = seriesSettlements(new FixtureProClient().getModel())
+    const before = seriesSettlements(new FixtureProClient(undefined, 'american_exercise', 22).getModel())
     expect(before.every((s) => s.due === 0n && s.deficit === null)).toBe(true)
     expect(seriesSettlements({ series: [series()], books: [] })).toEqual([])
-    expect(vaultSeriesState(series())).toBe('Open')
-    expect(vaultSeriesState(series({ settlementPrice: 140n * U }))).toBe('Settling')
+  })
+  it('walks an expired series through its three calls: books, series, claims', () => {
+    const sim = new FixtureProClient(undefined, 'settlement_pro_rata_deficit', 10)
+    const at = (cursor: number) => {
+      sim.moveTo(cursor)
+      return expiredSeries(sim.getModel())[0]
+    }
+    expect(at(10).step).toBe('await-price')
+    const books = at(12)
+    expect(books.step).toBe('settle-books')
+    expect(books.nextBook).not.toBeNull()
+    expect(books.booksSettled).toBeLessThan(books.books.length)
+    const last = sim.stepCount
+    expect(at(last).step).toBe('done')
+    expect(at(last).claimed).toBe(at(last).positions)
+    expect(expiredSeries({ ...sim.getModel(), now: 0 })).toEqual([])
   })
   it('lists takeovers with their price, payment and shortfall, and refusals with their code', () => {
     const sim = new FixtureProClient(undefined, 'gap_to_vault', 12)
@@ -268,7 +307,7 @@ describe('names', () => {
     expect(scenarioCopy('some_new_case')).toEqual({ title: 'Some new case', summary: '' })
   })
   it('names every call the fixtures replay', () => {
-    const sim = new FixtureProClient()
+    const sim = new FixtureProClient(undefined, 'american_exercise', 0)
     const ops = new Set(sim.file.scenarios.flatMap((s) => s.steps.map((step) => step.op)))
     for (const op of ops) expect(callName(op), op).not.toMatch(/_/)
   })

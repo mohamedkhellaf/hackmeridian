@@ -150,6 +150,8 @@
     --hover: color-mix(in srgb, var(--text) 6%, transparent);
     --pressed: color-mix(in srgb, var(--text) 11%, transparent);
     --skeleton: color-mix(in srgb, var(--text) 9%, transparent);
+    /* A table cell set apart (the strike column, in-the-money cells): moves away from the page in both themes. */
+    --cell-tone: color-mix(in srgb, var(--text) 7%, transparent);
     --disabled-fg: #8f897d;
 
     /* Icons: Regular at 16, Light at 20 */
@@ -171,7 +173,8 @@
     --popup-max-h: 22.5rem;
     --toast-w: 22.5rem;
     --sheet-max-h: 40rem;
-    --measure: 68ch;
+    /* About 70 characters of 15 px body text (a `ch` is the wide tabular zero: 68ch ran to 100 characters). */
+    --measure: 32rem;
 
     /* The count inside a badge */
     --badge-size: 0.6875rem;
@@ -199,8 +202,8 @@
       --primary: #efece4;
       --primary-fg: #121210;
       --primary-hover: #ffffff;
-      --marker: #4a4121;
-      --marker-rule: #e8c547;
+      --marker: #52471e;
+      --marker-rule: transparent;
       --gain: #4cc3d0;
       --loss: #f0884f;
       --warn: #e8b45a;
@@ -234,8 +237,8 @@
     --primary: #efece4;
     --primary-fg: #121210;
     --primary-hover: #ffffff;
-    --marker: #4a4121;
-    --marker-rule: #e8c547;
+    --marker: #52471e;
+    --marker-rule: transparent;
     --gain: #4cc3d0;
     --loss: #f0884f;
     --warn: #e8b45a;
@@ -299,6 +302,15 @@
       --row-h: var(--touch);
       --gutter: 1rem;
     }
+    :root[data-density='compact'],
+    [data-density='compact'] {
+      --row-h: var(--touch);
+    }
+  }
+
+  /* Touch screens of any width (a tablet): rows are touch targets too. */
+  @media (pointer: coarse) {
+    :root,
     :root[data-density='compact'],
     [data-density='compact'] {
       --row-h: var(--touch);

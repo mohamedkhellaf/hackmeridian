@@ -1,7 +1,9 @@
 @layer features {
+  /* Three equal columns: the same axis is drawn at the same scale in each. The rule sits in the gap. */
   .list {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--s-56);
     margin: 0;
 
     @media (max-width: 999.98px) {
@@ -9,28 +11,24 @@
     }
   }
 
-  /* Three ruled columns, not three cards: a hairline between them and nothing around. */
   .item {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--s-12);
     min-width: 0;
-    padding-inline: var(--s-32);
-    border-inline-start: 1px solid var(--hairline);
 
-    &:first-child {
-      padding-inline-start: 0;
-      border-inline-start: 0;
-    }
-
-    &:last-child {
-      padding-inline-end: 0;
+    & + &::before {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: calc(var(--s-56) / -2);
+      border-inline-start: 1px solid var(--hairline);
     }
 
     @media (max-width: 999.98px) {
       max-width: 34rem;
-      padding: var(--s-32) 0;
-      border-inline-start: 0;
+      padding-block: var(--s-32);
       border-top: 1px solid var(--hairline);
 
       &:first-child {
@@ -40,6 +38,10 @@
 
       &:last-child {
         padding-bottom: 0;
+      }
+
+      & + &::before {
+        content: none;
       }
     }
   }
@@ -61,9 +63,9 @@
 
   .statement {
     /* Two lines on a wide screen, so the three figures start level. */
-    min-height: calc(var(--body-line) * 2);
-    font-size: var(--body-size);
-    line-height: var(--body-line);
+    min-height: calc(var(--landing-body-line) * 2);
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
     color: var(--text-2);
     text-wrap: pretty;
 
@@ -109,29 +111,24 @@
   /* The action sits on the foot of its column, so the three stay level whatever the text above them needs. */
   .action {
     align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
     margin-top: auto;
     padding-top: var(--s-4);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     font-weight: 500;
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
   }
 
-  .after {
-    max-width: 62ch;
-    margin-top: var(--s-40);
-    font-family: var(--font-serif);
-    font-size: var(--landing-h3-size);
-    line-height: var(--landing-h3-line);
-    font-weight: 500;
-    color: var(--text);
-    text-wrap: pretty;
-  }
-
-  .fourth {
-    max-width: 62ch;
-    margin-top: var(--s-8);
-    font-size: var(--body-size);
-    line-height: var(--body-line);
-    color: var(--text-2);
+  /* The payoff caption, once for the row. */
+  .note {
+    margin-top: var(--s-24);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
   }
 }

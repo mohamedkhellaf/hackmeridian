@@ -52,8 +52,9 @@ describe('direction', () => {
     expect(direction(0)).toBe('even')
   })
   it('counts a value that prints as zero as even', () => {
-    expect(direction(0.004)).toBe('even')
-    expect(direction(-0.004)).toBe('even')
+    expect(direction(0.004)).toBe('gain')
+    expect(direction(-0.004)).toBe('loss')
+    expect(direction(1e-14)).toBe('even')
     expect(direction(0.004, 3)).toBe('gain')
   })
   it('handles an unlimited gain', () => {
@@ -101,10 +102,17 @@ describe('format', () => {
     expect(formatNumber(-1.8)).toBe(`${MINUS}1.80`)
     expect(formatNumber(0.00012, 5)).toBe('0.00012')
   })
-  it('never prints a negative zero', () => {
-    expect(formatNumber(-0.001)).toBe('0.00')
-    expect(formatSigned(-0.004)).toBe('0.00')
-    expect(formatSigned(0.004)).toBe('0.00')
+  it('never prints a negative zero, and says a real sub-cent amount as under the last unit', () => {
+    expect(formatNumber(-1e-14)).toBe('0.00')
+    expect(formatSigned(-1e-14)).toBe('0.00')
+    expect(formatNumber(-0.001)).toBe(`${MINUS}<0.01`)
+    expect(formatSigned(-0.004)).toBe(`${MINUS}<0.01`)
+    expect(formatSigned(0.004)).toBe('+<0.01')
+  })
+  it('truncates toward zero, as amounts are, never rounding up', () => {
+    expect(formatSigned(-2400.999)).toBe(`${MINUS}2,400.99`)
+    expect(formatNumber(32.6666)).toBe('32.66')
+    expect(formatSigned(0.005)).toBe('+<0.01')
   })
   it('signs gains and losses, and leaves zero bare', () => {
     expect(formatSigned(5.7)).toBe('+5.70')

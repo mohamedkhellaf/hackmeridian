@@ -74,8 +74,11 @@ export default function LiveBook({ pick, onChange }: LiveBookProps) {
       choices: {
         assets: assets.map((r) => ({ id: r.asset.contractId, code: r.asset.code, typeLabel: r.typeLabel })),
         assetId,
-        strikes: here.map((c) => ({ value: c.strikePerUnit, perUnit: premiumUnits(c.row) })),
-        expiries: selection.expiries,
+        strikes: here.map((c) => ({ value: c.strikePerUnit, perUnit: premiumUnits(c.row), qty: c.row.underlyingQty })),
+        expiries: selection.expiries.map((e) => ({
+          value: e,
+          qty: e === chosen.expiry ? row.underlyingQty : (selectFloor(choices, { strike: chosen.strikePerUnit, expiry: e }, reference, nowSec).chosen?.row.underlyingQty ?? null),
+        })),
         movedFrom: selection.movedFrom,
       },
     }

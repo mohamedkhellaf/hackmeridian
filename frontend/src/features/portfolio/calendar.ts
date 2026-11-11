@@ -3,21 +3,25 @@
 import { buildDeadlineIcs, deadlineIcsFileName, googleCalendarUrl, ICS_MIME_TYPE } from '../../core/calendar'
 import type { DeadlineEvent } from '../../core/calendar'
 import type { OptionOffer } from '../../core/options/types'
-import { calendarDescription, calendarTitle } from './copy'
+import type { Role } from '../../core/portfolio/positions'
+import { calendarDescription, calendarTitle, makerCalendarDescription, makerCalendarTitle } from './copy'
 
-/** The absolute link back to the position, opening the exercise. Only http and https origins give one. */
-export function positionUrl(id: bigint, origin: string | undefined = typeof window === 'undefined' ? undefined : window.location.origin): string | undefined {
+/**
+ * The absolute link back to the position: for the holder it opens the exercise; for the maker it opens the
+ * position, where the claim or the reclaim waits after the deadline. Only http and https origins give one.
+ */
+export function positionUrl(id: bigint, origin: string | undefined = typeof window === 'undefined' ? undefined : window.location.origin, role: Role = 'holder'): string | undefined {
   if (!origin || !/^https?:\/\//.test(origin)) return undefined
-  return `${origin}/portfolio/${id}?do=exercise`
+  return role === 'holder' ? `${origin}/portfolio/${id}?do=exercise` : `${origin}/portfolio/${id}`
 }
 
-export function deadlineEvent(o: OptionOffer, origin?: string): DeadlineEvent {
+export function deadlineEvent(o: OptionOffer, origin?: string, role: Role = 'holder'): DeadlineEvent {
   return {
-    title: calendarTitle(o),
-    description: calendarDescription(o),
+    title: role === 'holder' ? calendarTitle(o) : makerCalendarTitle(o),
+    description: role === 'holder' ? calendarDescription(o) : makerCalendarDescription(o),
     expiryTs: o.expiry,
-    url: positionUrl(o.id, origin),
-    uid: `option-${o.id}-${o.expiry}`,
+    url: positionUrl(o.id, origin, role),
+    uid: `option-${o.id}-${o.expiry}${role === 'holder' ? '' : '-maker'}`,
   }
 }
 
@@ -28,18 +32,18 @@ export interface CalendarFile {
 }
 
 /** The `.ics` file for an option's deadline, or null when the deadline is not a usable timestamp. */
-export function deadlineFile(o: OptionOffer, origin?: string, nowTs?: number): CalendarFile | null {
+export function deadlineFile(o: OptionOffer, origin?: string, nowTs?: number, role: Role = 'holder'): CalendarFile | null {
   try {
-    return { name: deadlineIcsFileName(o.expiry), text: buildDeadlineIcs({ ...deadlineEvent(o, origin), nowTs }), type: ICS_MIME_TYPE }
+    return { name: deadlineIcsFileName(o.expiry), text: buildDeadlineIcs({ ...deadlineEvent(o, origin, role), nowTs }), type: ICS_MIME_TYPE }
   } catch {
     return null
   }
 }
 
 /** The same event as a Google Calendar link, or null. Opening it sends the title and description to Google. */
-export function googleLink(o: OptionOffer, origin?: string): string | null {
+export function googleLink(o: OptionOffer, origin?: string, role: Role = 'holder'): string | null {
   try {
-    return googleCalendarUrl(deadlineEvent(o, origin))
+    return googleCalendarUrl(deadlineEvent(o, origin, role))
   } catch {
     return null
   }

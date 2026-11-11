@@ -126,21 +126,26 @@ describe('withUnit and formatMoney', () => {
 })
 
 describe('formatNumber (chart figures only)', () => {
-  it('rounds binary floats to the nearest digit', () => {
+  it('truncates like formatUnits, past the error of a binary float', () => {
     expect(formatNumber(9.639999999)).toBe('9.64')
     expect(formatNumber(0.1 + 0.2)).toBe('0.30')
     expect(formatNumber(1080)).toBe('1,080.00')
-    expect(formatNumber(1234567.891, { dp: 1 })).toBe('1,234,567.9')
-    expect(formatNumber(12.5, { dp: 0 })).toBe('13')
+    expect(formatNumber(1234567.891, { dp: 1 })).toBe('1,234,567.8')
+    expect(formatNumber(12.5, { dp: 0 })).toBe('12')
+    // Review finding 46: the read-out and the rows beside it agree to the cent.
+    expect(formatNumber(-2400.999)).toBe(`${MINUS}2,400.99`)
+    expect(formatNumber(32.6799)).toBe('32.67')
   })
 
-  it('signs like the amount formatter and never prints a signed zero', () => {
+  it('signs like the amount formatter and never prints a non-zero figure as zero', () => {
     expect(formatNumber(-1.8)).toBe(`${MINUS}1.80`)
     expect(formatNumber(1.8, { sign: true })).toBe('+1.80')
     expect(formatNumber(0, { sign: true })).toBe('0.00')
     expect(formatNumber(-0)).toBe('0.00')
-    expect(formatNumber(-0.00001)).toBe('0.00')
-    expect(formatNumber(0.00001, { sign: true })).toBe('0.00')
+    expect(formatNumber(0.1 + 0.2 - 0.3)).toBe('0.00') // float noise is zero
+    expect(formatNumber(-0.00001)).toBe(`${MINUS}<0.01`)
+    expect(formatNumber(0.005, { sign: true })).toBe('+<0.01')
+    expect(formatNumber(0.4, { dp: 0 })).toBe('<1')
   })
 
   it('handles values that are not finite', () => {

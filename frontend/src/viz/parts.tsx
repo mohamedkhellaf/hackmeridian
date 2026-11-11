@@ -93,15 +93,6 @@ export function SvgLabel({ label }: { label: PlacedLabel }) {
   return <g data-label={label.id}>{nodes}</g>
 }
 
-/** The inline sign beside a figure in HTML: a triangle up for a gain, down for a loss. */
-export function SignGlyph({ direction }: { direction: 'gain' | 'loss' }) {
-  return (
-    <svg className={css.sign} viewBox="0 0 10 10" aria-hidden="true" focusable="false">
-      <path d={direction === 'gain' ? 'M1 8.5L5 1.5L9 8.5Z' : 'M1 1.5L5 8.5L9 1.5Z'} />
-    </svg>
-  )
-}
-
 export interface TableColumn {
   header: string
   numeric?: boolean

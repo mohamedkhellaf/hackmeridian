@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockOptionsClient } from './mockClient'
 import { bareSeed } from './mockSeed'
+import { OPTIONS_ERRORS } from '../stellar/errors'
 import type { NewOffer } from './types'
 
 const UNIT = 10_000_000n
@@ -42,12 +43,12 @@ describe('MockOptionsClient ABI alignment', () => {
     const { c, offer } = await setup()
     const { id } = await run(c.createOffer(offer(), W))
     await run(c.buy(id, B))
-    await expect(run(c.claimDelivery(id, W))).rejects.toThrow('Nothing to claim')
+    await expect(run(c.claimDelivery(id, W))).rejects.toThrow(OPTIONS_ERRORS[106])
     await run(c.exercise(id, B))
-    await expect(run(c.claimDelivery(id, B))).rejects.toThrow('Only the writer')
+    await expect(run(c.claimDelivery(id, B))).rejects.toThrow(OPTIONS_ERRORS[107])
     await run(c.claimDelivery(id, W))
     expect((await c.getOption(id)).state).toBe('settled')
-    await expect(run(c.claimDelivery(id, W))).rejects.toThrow('Nothing to claim')
+    await expect(run(c.claimDelivery(id, W))).rejects.toThrow(OPTIONS_ERRORS[106])
     await expect(run(c.reclaim(id, W))).rejects.toThrow()
   })
 
@@ -67,7 +68,7 @@ describe('MockOptionsClient ABI alignment', () => {
   it('writer cannot buy their own offer', async () => {
     const { c, offer } = await setup()
     const { id } = await run(c.createOffer(offer(), W))
-    await expect(run(c.buy(id, W))).rejects.toThrow('own offer')
+    await expect(run(c.buy(id, W))).rejects.toThrow(OPTIONS_ERRORS[111])
   })
 
   it('unsold offer can be cancelled after expiry (and reclaimed instead)', async () => {

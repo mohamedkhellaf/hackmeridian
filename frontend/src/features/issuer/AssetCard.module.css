@@ -3,6 +3,12 @@
     container-type: inline-size;
   }
 
+  .blocks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
   .block {
     display: flex;
     flex-direction: column;
@@ -19,84 +25,17 @@
     color: var(--text);
   }
 
-  .note {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    color: var(--text-2);
-    text-wrap: pretty;
-  }
-
-  .flags {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-  }
-
-  /* dl > div > dt + dd. The state word sits on the label's line; the consequence runs under both. */
-  .flag {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'label state'
-      'text text';
-    column-gap: var(--s-16);
-    row-gap: var(--s-2);
-    padding-block: var(--s-8);
-
-    & + & {
-      border-top: 1px solid var(--hairline);
-    }
-  }
-
-  .flagLabel {
-    grid-area: label;
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: 500;
-    color: var(--text);
-  }
-
-  .flagValue {
-    display: contents;
-    margin: 0;
-  }
-
-  .flagState {
-    grid-area: state;
-    font-family: var(--font-serif);
-    font-size: var(--figure-size);
-    line-height: var(--ui-line);
-    font-weight: var(--figure-weight);
-    color: var(--muted);
-    text-align: end;
-
-    &[data-on] {
-      color: var(--text);
-    }
-  }
-
-  .flagText {
-    grid-area: text;
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--text-2);
-    text-wrap: pretty;
-  }
-
-  /* On a wide sheet (the single-column layout of a tablet) the flags take two columns, and a label stays
-     within reach of its value. */
+  /* On a wide sheet (the single-column layout of a tablet) the facts and the trustlines sit side by side. */
   @container (min-width: 40rem) {
-    .facts {
-      max-width: 26rem;
-    }
-
-    .flags {
+    .blocks {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      column-gap: var(--s-32);
+      column-gap: var(--s-40);
+      align-items: start;
     }
 
-    .flag:nth-child(2) {
+    .block {
+      padding-top: 0;
       border-top: 0;
     }
   }

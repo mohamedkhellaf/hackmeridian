@@ -50,8 +50,14 @@ describe('Reserves copy', () => {
     expect(required).toContain('Clawback shortfall on BOND')
   })
 
-  it('says the three Covered facts as the brief words them', () => {
-    expect(copy.COVERED_STATEMENT).toBe('No admin. No upgrades. No oracle.')
+  it('states the Covered facts as rows, none opening with a one-word verdict its sentence repeats', () => {
+    expect(copy.COVERED_FACTS.map((f) => f.label)).toEqual(['Admin', 'Upgrades', 'Oracle', 'Asset listing', 'Audit'])
+    for (const fact of [...copy.COVERED_FACTS, ...copy.MARGIN_FACTS]) expect(fact.text, fact.label).not.toMatch(/^(None|Open)\./)
+    expect(copy.COVERED_FACTS[0].text).toBe('The contract has no admin function and no owner.')
+  })
+
+  it('uses the Covered words: maker and deadline, never writer or expiry as a noun', () => {
+    for (const item of Object.values(copy.ITEM_COPY)) expect(item.meaning, item.meaning).not.toMatch(/\bwriter\b|\bexpiry\b/)
   })
 
   it('names the table columns exactly', () => {

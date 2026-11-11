@@ -4,6 +4,7 @@ import { TX_IDLE, reduce, runMachine } from '../tx/machine'
 import type { TxStage } from '../tx/types'
 import { MOCK_CONTRACT, MOCK_READ_MS, MOCK_TX_MS, MockOptionsClient } from './mockClient'
 import { bareSeed } from './mockSeed'
+import { OPTIONS_ERRORS } from '../stellar/errors'
 import type { NewOffer, TokenInfo } from './types'
 
 const UNIT = 10_000_000n
@@ -157,7 +158,7 @@ describe('MockOptionsClient staged outcomes (failNextWith)', () => {
     const e = (await run(c.buy(id, B)).catch((x: unknown) => x)) as TxError
     expect(e.kind).toBe('unknown')
     await run(c.buy(id, 'GFIRST')) // someone else buys it meanwhile
-    expect(await c.checkTx(e.hash!, e.maxTime)).toEqual({ status: 'failed', message: 'Offer is no longer available' })
+    expect(await c.checkTx(e.hash!, e.maxTime)).toEqual({ status: 'failed', message: OPTIONS_ERRORS[106] })
     expect((await c.getOption(id)).holder).toBe('GFIRST')
   })
 

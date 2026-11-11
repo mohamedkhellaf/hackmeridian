@@ -64,15 +64,24 @@ export { LiveRegions } from './LiveRegions'
 export { announce } from './announce'
 export type { Politeness } from './announce'
 export { Callout } from './Callout'
+export { UnsettledNotice } from './UnsettledNotice'
+export type { UnsettledNoticeProps } from './UnsettledNotice'
 export type { CalloutProps, CalloutVariant } from './Callout'
 export { Skeleton } from './Skeleton'
 export type { SkeletonProps } from './Skeleton'
 export { Spinner } from './Spinner'
 export type { SpinnerProps } from './Spinner'
-export { Stepper, StepTrail, TxStepper } from './Stepper'
-export type { StepItem, StepperProps, StepStatus, StepTrailProps, TrailStep, TxStage, TxStepperProps } from './Stepper'
-export { TX_STATES, TX_STATE_LABEL } from './txStates'
-export type { TxState } from './txStates'
+export { Stepper, TxStepper } from './Stepper'
+export type { StepItem, StepperProps, StepStatus, TxStage, TxStepperProps } from './Stepper'
+export { Term } from './Term'
+export type { TermProps } from './Term'
+export { ClockProvider } from './Clock'
+export type { ClockProviderProps } from './Clock'
+export { useClockOffset } from './clockOffset'
+export { TX_STATES, TX_STATE_LABEL, TX_STATE_TONE } from './txStates'
+export type { TxState, TxStateTone } from './txStates'
+export { TxStateWord } from './TxStateWord'
+export type { TxStateWordProps } from './TxStateWord'
 export { Timeline } from './Timeline'
 export type { TimelineItem, TimelineProps } from './Timeline'
 
@@ -113,7 +122,7 @@ export { VisuallyHidden } from './VisuallyHidden'
 export type { VisuallyHiddenProps } from './VisuallyHidden'
 
 /* Layout helpers */
-export { PHONE_QUERY, WIDE_QUERY, useIsPhone, useIsWide, useMediaQuery } from './useMediaQuery'
+export { PHONE_QUERY, WIDE_QUERY, scrollBehavior, useIsPhone, useIsWide, useMediaQuery } from './useMediaQuery'
 
 /* Pure helpers */
 export {
@@ -123,6 +132,7 @@ export {
   formatLocalTime,
   formatUtcDateTime,
   groupAddress,
+  hasExponent,
   sanitizeDecimalInput,
   shortenAddress,
   shortenHash,

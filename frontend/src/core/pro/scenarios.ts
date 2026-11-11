@@ -84,8 +84,3 @@ export function scenarioCopy(name: string): ScenarioCopy {
   return SCENARIO_COPY[name] ?? { title: sentenceCase(name), summary: '' }
 }
 
-/** The English title of a scenario. */
-export const scenarioTitle = (name: string): string => scenarioCopy(name).title
-
-/** The one-line English summary of a scenario; empty for a scenario without copy. */
-export const scenarioSummary = (name: string): string => scenarioCopy(name).summary

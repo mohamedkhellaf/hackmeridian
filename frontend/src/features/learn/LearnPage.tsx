@@ -2,20 +2,17 @@ import { Link as RouterLink, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { nowSec } from '../../core/time'
-import { Callout, Link, PageHeader } from '../../ui'
+import { ButtonLink, Callout, PageHeader } from '../../ui'
 import { LIFECYCLE_TERMS, deadlineText as deadlineTextOf, exampleDeadline, workedExample, workedExamples } from './examples'
 import {
-  NOTHING_SETTLES_LABEL,
   NOTHING_SETTLES_TEXT,
   NOTHING_SETTLES_TITLE,
-  PAGE_DESCRIPTION,
   PAGE_TITLE,
   REQUESTS_LINK,
   REQUESTS_TEXT,
   REQUESTS_TITLE,
   RESALE_TEXT,
   RESALE_TITLE,
-  RISKS_INTRO,
   RULES,
   RULES_CAPTION,
   RULES_HEAD,
@@ -68,9 +65,9 @@ function Section({ id, children }: { id: SectionId; children: ReactNode }) {
 }
 
 /**
- * How it works: what an option is here, the life of one, the four things a user can do with exact figures,
- * requests and resale, what can go wrong, a glossary and questions. A document, not a dashboard: it reads no
- * chain data, so it has no loading, empty or guest state of its own.
+ * Learn: what an option is here, the life of one, the four things a user can do with exact figures, requests and
+ * resale, what can go wrong, a glossary and questions. A document, not a dashboard: it reads no chain data, so it
+ * has no loading, empty or guest state of its own.
  */
 export function LearnPage() {
   const navigate = useNavigate()
@@ -90,17 +87,21 @@ export function LearnPage() {
     [navigate, setActive],
   )
 
-  // A link straight to a section (`/learn#glossary`): start reading there.
+  // A link straight to a section (`/learn#glossary`): start reading there. A link to a glossary term
+  // (`/learn#term-breakeven`) scrolls the term into view.
   useEffect(() => {
     const id = window.location.hash.slice(1)
-    if (!isSectionId(id)) return
-    const frame = requestAnimationFrame(() => showSection(id))
+    if (!id) return
+    const frame = requestAnimationFrame(() => {
+      if (isSectionId(id)) showSection(id)
+      else document.getElementById(id)?.scrollIntoView({ block: 'start' })
+    })
     return () => cancelAnimationFrame(frame)
   }, [])
 
   return (
     <div className={css.page}>
-      <PageHeader title={PAGE_TITLE} description={PAGE_DESCRIPTION} />
+      <PageHeader title={PAGE_TITLE} />
       <div className={css.layout}>
         <SectionNav sections={SECTIONS} active={active} onJump={jump} />
         <div className={css.article}>
@@ -124,7 +125,7 @@ export function LearnPage() {
           <Section id="lifecycle">
             <p className={css.prose}>{lifecycleIntro(put)}</p>
             <Lifecycle example={put} deadline={deadlineText} />
-            <Callout className={css.callout} variant="warning" label={NOTHING_SETTLES_LABEL} title={NOTHING_SETTLES_TITLE}>
+            <Callout className={css.callout} variant="warning" title={NOTHING_SETTLES_TITLE}>
               {NOTHING_SETTLES_TEXT}
             </Callout>
             <div className={css.block}>
@@ -142,14 +143,7 @@ export function LearnPage() {
             <p className={css.prose}>{intentsIntro(put, deadlineText)}</p>
             <div className={css.examples}>
               {examples.map((example, i) => (
-                <IntentExample
-                  key={example.intent}
-                  example={example}
-                  index={i + 1}
-                  total={examples.length}
-                  deadline={deadline}
-                  deadlineText={deadlineText}
-                />
+                <IntentExample key={example.intent} example={example} deadline={deadline} deadlineText={deadlineText} defaultOpen={i === 0} />
               ))}
             </div>
           </Section>
@@ -158,20 +152,25 @@ export function LearnPage() {
             <div className={css.columns}>
               <div className={css.column}>
                 <h3 className={css.subheading}>{REQUESTS_TITLE}</h3>
-                <p>{REQUESTS_TEXT}</p>
-                <p>
-                  <Link render={<RouterLink to="/requests" />}>{REQUESTS_LINK}</Link>
+                {REQUESTS_TEXT.map((text) => (
+                  <p key={text}>{text}</p>
+                ))}
+                <p className={css.action}>
+                  <ButtonLink variant="secondary" render={<RouterLink to="/requests" />}>
+                    {REQUESTS_LINK}
+                  </ButtonLink>
                 </p>
               </div>
               <div className={css.column}>
                 <h3 className={css.subheading}>{RESALE_TITLE}</h3>
-                <p>{RESALE_TEXT}</p>
+                {RESALE_TEXT.map((text) => (
+                  <p key={text}>{text}</p>
+                ))}
               </div>
             </div>
           </Section>
 
           <Section id="risks">
-            <p className={css.prose}>{RISKS_INTRO}</p>
             <Risks />
           </Section>
 

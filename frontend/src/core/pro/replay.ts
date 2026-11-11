@@ -104,20 +104,22 @@ export function currentRequirement(sc: RawScenario, cursor: number, who: string)
 }
 
 /**
- * The IM-after-fill preview: a scripted order by the same writer on the same series and quantity, followed by its
- * buy and, right after it, a get_requirement of the writer. Searched from the cursor on.
+ * The IM-after-fill preview: a scripted order by the same writer on the same series, quantity and premium, followed
+ * by its buy and, right after it, a get_requirement of the writer. Searched from the cursor on. The premium must
+ * match too: the account value after a fill depends on it, so another order's figures would be wrong for this one.
  */
 export function requirementAfterFill(sc: RawScenario, cursor: number, p: OfferParams): Requirement | null {
-  const offerWriter = new Map<number, { writer: string; series: number; qty: number }>()
+  const offerWriter = new Map<number, { writer: string; series: number; qty: number; premium: number }>()
   for (let i = 0; i < sc.steps.length; i++) {
     const s = sc.steps[i]
     if (s.op === 'create_offer' && isOk(s)) {
-      offerWriter.set(s.result as number, { writer: s.args[0] as string, series: s.args[1] as number, qty: s.args[2] as number })
+      offerWriter.set(s.result as number, { writer: s.args[0] as string, series: s.args[1] as number, qty: s.args[2] as number, premium: s.args[3] as number })
     }
     if (i < cursor || s.op !== 'buy' || !isOk(s)) continue
     const o = offerWriter.get(s.args[1] as number)
     const next = sc.steps[i + 1]
-    if (o && o.writer === p.writer && o.series === p.seriesId && BigInt(o.qty) === p.qty && next?.op === 'get_requirement' && isOk(next) && next.args[0] === p.writer) {
+    const same = o && o.writer === p.writer && o.series === p.seriesId && BigInt(o.qty) === p.qty && BigInt(o.premium) === p.premium
+    if (same && next?.op === 'get_requirement' && isOk(next) && next.args[0] === p.writer) {
       return requirementFrom(next.result)
     }
   }

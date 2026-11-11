@@ -58,6 +58,17 @@ describe('matchGuided: buying intents match funded offers', () => {
     expect([...gaps].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0))).toEqual(gaps)
   })
 
+  it('lists every lot of the series, uncapped, smallest first (guided request 7)', () => {
+    const { ref, best } = busyPut()
+    const all = w.source(null).options.filter((o) => o.state === 'offered' && o.kind === 'put' && o.expiry === ref.expiry && perUnitStrike(o) === ref.strikePerUnit && o.writer !== B)
+    const m = match(B, { intent: 'floor', qty: best.underlyingQty, strikePerUnit: ref.strikePerUnit, expiry: ref.expiry }, 1)
+    expect(m.sameSeries.length).toBeLessThanOrEqual(1)
+    expect(m.lots.length).toBeGreaterThanOrEqual(all.length > 0 ? 1 : 0)
+    expect([...m.lots].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0))).toEqual(m.lots)
+    expect(m.lots).toContain(best.underlyingQty)
+    expect(match(B, { intent: 'floor', qty: null, strikePerUnit: null, expiry: ref.expiry }).lots).toEqual([])
+  })
+
   it('suggests the nearest funded terms when the series is empty', () => {
     const { market } = busyPut()
     // A far month-end nobody quotes.

@@ -1,5 +1,7 @@
 import { contract, rpc } from '@stellar/stellar-sdk'
 import { parseSacName } from '../assetfacts/assetFacts'
+import { QUOTE_ASSETS, REFERENCE_ASSETS } from '../assets'
+import { config } from '../config'
 import { describeError } from '../stellar/errors'
 import { server } from '../stellar/rpc'
 import { baseClientOptions, checkTransaction, clientSigning, signAndSend } from '../stellar/signer'
@@ -138,6 +140,11 @@ const PAGE = 50 // contract MAX_PAGE
 /** The asset registry can grow at runtime (list_asset), but rarely: re-read it at most this often. */
 const ASSETS_TTL_MS = 30_000
 
+/** The Testnet tokens of the app's asset list, as `tokenInfo` would read them (symbol, decimals, issuer). */
+const KNOWN_TOKENS: ReadonlyMap<string, TokenInfo> = new Map(
+  [QUOTE_ASSETS.testnet, ...REFERENCE_ASSETS.testnet].map((a): [string, TokenInfo] => [a.contractId, { contractId: a.contractId, code: a.code, decimals: a.decimals, issuer: a.issuer }]),
+)
+
 export class SorobanOptionsClient implements OptionsClient {
   readonly isMock = false
   private bound: { key: string; p: Promise<Bound> } | null = null
@@ -215,7 +222,7 @@ export class SorobanOptionsClient implements OptionsClient {
       if (e instanceof TxError) throw e
       throw new TxError('refused', describeError(e), { cause: e })
     }
-    return signAndSend(tx, { onStage: opts?.onStage })
+    return signAndSend(tx, { onStage: opts?.onStage, signal: opts?.signal })
   }
 
   private config(): Promise<AbiConfig> {
@@ -228,13 +235,22 @@ export class SorobanOptionsClient implements OptionsClient {
 
   // SAC symbol()/decimals()/name() are immutable, so cache them per token for the session. name() is
   // "CODE:ISSUER" for a classic asset: the issuer tells same-code assets apart and enables trustline checks.
+  // The tokens of the app's asset list are known without a read: a SAC's id is derived from its code and issuer
+  // (checked in core/assets), and a SAC always has 7 decimals. Only a token listed at runtime is read on chain.
   private tokenInfo(contractId: string): Promise<TokenInfo> {
     let p = this.tokenCache.get(contractId)
     if (!p) {
+      const known = KNOWN_TOKENS.get(contractId)
+      if (known) {
+        p = Promise.resolve({ ...known })
+        this.tokenCache.set(contractId, p)
+        return p
+      }
+      const pass = config.networkPassphrase
       p = Promise.all([
-        server.queryContract<string>(contractId, 'symbol'),
-        server.queryContract<number>(contractId, 'decimals'),
-        server.queryContract<string>(contractId, 'name').then(
+        server.queryContract<string>(contractId, 'symbol', undefined, pass),
+        server.queryContract<number>(contractId, 'decimals', undefined, pass),
+        server.queryContract<string>(contractId, 'name', undefined, pass).then(
           (r) => parseSacName(r.result),
           () => null, // the issuer is optional: a failed read must not hide the token
         ),

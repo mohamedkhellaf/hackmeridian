@@ -82,7 +82,9 @@ function SlidingPanel({
             initialFocus={resolveInitialFocus(initialFocus, titleId, bodyId)}
             finalFocus={finalFocus}
           >
-            <BaseDrawer.Content className={styles.content}>
+            {/* A page is closed by its X, its bar and the system Back, never by a swipe: a long swipe must not throw
+                away what was typed in it. */}
+            <BaseDrawer.Content className={styles.content} data-base-ui-swipe-ignore={page ? '' : undefined}>
               <OverlayFrame
                 parts={PARTS}
                 title={title}
@@ -93,6 +95,7 @@ function SlidingPanel({
                 bodyId={bodyId}
                 handle={placement === 'bottom'}
                 bar={page}
+                atTop={placement === 'right'}
               >
                 {children}
               </OverlayFrame>

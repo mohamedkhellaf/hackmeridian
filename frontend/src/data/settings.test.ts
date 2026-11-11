@@ -27,6 +27,10 @@ describe('parseSettings', () => {
     expect(parseSettings(JSON.stringify({ theme: 'dark', density: 'huge', pnl: 7, mode: 'chain', extra: true }))).toEqual({ theme: 'dark', density: 'comfortable', pnl: 'default', mode: 'chain' })
     expect(parseSettings(JSON.stringify({ pnl: 'mono' }))).toEqual({ ...DEFAULT_SETTINGS, pnl: 'mono' })
   })
+
+  it('does not apply a density stored before the control was taken out of the menu (ruling E23)', () => {
+    expect(parseSettings(JSON.stringify({ theme: 'dark', density: 'compact' }))).toEqual({ ...DEFAULT_SETTINGS, theme: 'dark' })
+  })
 })
 
 describe('settings store', () => {
@@ -57,7 +61,8 @@ describe('settings store', () => {
     expect(store.get()).toBe(same)
     expect(calls).toBe(1)
     store.set({ density: 'compact', pnl: 'classic', mode: 'chain' })
-    expect(store.get()).toEqual({ theme: 'dark', density: 'compact', pnl: 'classic', mode: 'chain' })
+    // Density has no control any more (ruling E23) and stays at the default.
+    expect(store.get()).toEqual({ theme: 'dark', density: 'comfortable', pnl: 'classic', mode: 'chain' })
     expect(calls).toBe(2)
   })
 
@@ -151,8 +156,9 @@ describe('initSettings', () => {
     try {
       settingsStore.set({ theme: 'dark', density: 'compact' })
       attrs.clear() // as if the page had been rendered without them
-      expect(initSettings()).toMatchObject({ theme: 'dark', density: 'compact', pnl: 'default' })
-      expect(Object.fromEntries(attrs)).toEqual({ 'data-theme': 'dark', 'data-density': 'compact' })
+      // A stored density is not read back: the menu has no density control any more.
+      expect(initSettings()).toMatchObject({ theme: 'dark', density: 'comfortable', pnl: 'default' })
+      expect(Object.fromEntries(attrs)).toEqual({ 'data-theme': 'dark' })
     } finally {
       settingsStore.reset()
       vi.unstubAllGlobals()

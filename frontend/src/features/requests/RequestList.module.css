@@ -6,6 +6,20 @@
     padding: 0;
     list-style: none;
     border-top: 1px solid var(--rule);
+    container-type: inline-size;
+  }
+
+  /* From 768 px up to the table's 1200 px: two ruled columns, read left to right like the table's rows. */
+  @media (min-width: 768px) {
+    .list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--s-32);
+    }
+
+    .item:nth-last-child(2):nth-child(odd) {
+      border-bottom-color: var(--rule);
+    }
   }
 
   .item {
@@ -17,6 +31,12 @@
 
     &:last-child {
       border-bottom-color: var(--rule);
+    }
+
+    /* Cancelled and returned requests, shown on request: secondary ink. */
+    &[data-closed] .title,
+    &[data-closed] .premium {
+      color: var(--text-2);
     }
 
     /* The request the ticket is showing: the same tint as a selected table row. */
@@ -60,10 +80,30 @@
   }
 
   .terms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-8);
     margin: 0;
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
+  }
+
+  .reference {
+    font-size: var(--caption-size);
+    color: var(--muted);
+  }
+
+  .warn {
+    display: flex;
+    align-items: center;
+    gap: var(--s-4);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--warn);
   }
 
   .aside {
@@ -113,6 +153,19 @@
     gap: var(--s-4);
     font-weight: 500;
     color: var(--warn);
+  }
+
+  /* The one state of "My requests" that asks for an action: in ink, with the warning glyph. */
+  .stranded {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    font-weight: 500;
+    color: var(--text);
+
+    & svg {
+      color: var(--warn);
+    }
   }
 
   .ids {

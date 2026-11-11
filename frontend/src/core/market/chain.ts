@@ -1,5 +1,5 @@
 import type { OptionOffer } from '../options/types'
-import { formatDisplay, strikePerUnit } from '../options/format'
+import { strikePerUnit } from '../options/format'
 import { expiryDay } from '../time'
 import { byId, byPremiumPerUnit, byStrikePerUnit, perUnitText } from '../units'
 
@@ -89,13 +89,6 @@ export function defaultSeries(rows: ChainRow[]): string | null {
       if (s && (!best || s.makers > best.makers)) best = { key: `${kind}:${r.strike}`, makers: s.makers }
     }
   return best?.key ?? null
-}
-
-/** What settles at exercise, in one sentence. */
-export function settlementLine(o: OptionOffer): string {
-  const qty = `${formatDisplay(o.underlyingQty, o.underlying.decimals)} ${o.underlying.code}`
-  const strike = `${formatDisplay(o.totalStrike, o.quote.decimals)} ${o.quote.code}`
-  return o.kind === 'put' ? `At exercise you deliver ${qty} and receive ${strike}.` : `At exercise you pay ${strike} and receive ${qty}.`
 }
 
 /** Premium per one unit of underlying, display only. */

@@ -241,6 +241,21 @@ describe('SorobanProClient against a fake RPC', () => {
     expect(f.calls.filter((x) => x === 'get_offer')).toHaveLength(10)
   })
 
+  it('reads a closed offer once: the next refresh re-reads only the open one and probes one page (performance 6)', async () => {
+    const f = fakeServer(chain)
+    const c = new SorobanProClient(CONTRACT, { server: f.server, now: () => NOW, balanceOf: async () => 0n })
+    c.setWallet(wallet(H))
+    await c.refresh()
+    const offerIds = (calls: string[]) => calls.filter((x) => x === 'get_offer').length
+    expect(offerIds(f.calls)).toBe(10)
+    f.calls.length = 0
+    await c.refresh()
+    // Offer 0 is closed (bought) and is not read again; offer 1 is open; ids 2 and 3 are probed for new ones.
+    expect(offerIds(f.calls)).toBe(1 + 2)
+    expect(c.getModel().offers.map((o) => [o.id, o.status])).toEqual([[1, 'open']])
+    expect(c.getModel().positions.map((p) => p.id)).toEqual([0])
+  })
+
   it('signs and sends a deposit, then re-reads', async () => {
     const f = fakeServer(chain, new Set(['deposit']))
     const sign = vi.fn(async (x: string) => x)

@@ -25,12 +25,21 @@ export interface TooltipProps {
   side?: 'top' | 'bottom' | 'left' | 'right'
   align?: 'start' | 'center' | 'end'
   disabled?: boolean
+  /** Controlled open state, for a tooltip that also opens on a tap (the reason of a disabled button). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /**
+   * Keep the same element tree while the tooltip comes and goes (disabled, or no content): the child is never
+   * remounted, so a focused button keeps its focus when its tooltip appears or leaves.
+   */
+  stable?: boolean
 }
 
-export function Tooltip({ content, children, side = 'top', align = 'center', disabled = false }: TooltipProps) {
-  if (disabled || content === null || content === undefined || content === '') return children
+export function Tooltip({ content, children, side = 'top', align = 'center', disabled = false, open, onOpenChange, stable = false }: TooltipProps) {
+  const off = disabled || content === null || content === undefined || content === ''
+  if (off && !stable) return children
   return (
-    <BaseTooltip.Root>
+    <BaseTooltip.Root disabled={off} open={off ? false : open} onOpenChange={onOpenChange ? (next) => onOpenChange(next) : undefined}>
       <BaseTooltip.Trigger render={children} />
       <BaseTooltip.Portal>
         <BaseTooltip.Positioner className={styles.positioner} side={side} align={align} sideOffset={6}>

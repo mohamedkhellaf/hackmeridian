@@ -1,7 +1,6 @@
-import { useId } from 'react'
 import type { ReactNode } from 'react'
 import type { AssetFlags } from '../../core/assetfacts/assetFacts'
-import { isReferenceAsset } from '../../core/assets'
+import { REFERENCE_ASSETS, isReferenceAsset } from '../../core/assets'
 import { PRO_ENABLED, config } from '../../core/config'
 import { explorerTx } from '../../core/explorer'
 import { NO_VALUE, formatList } from '../../core/format'
@@ -9,11 +8,8 @@ import { useAssetFacts, useAssets, useOptionsClient } from '../../data'
 import { CopyButton, KeyValue, KeyValueItem, RowHeader, Table, TableWrap, TBody, Td, Th, THead, Tr, TxLink, useIsPhone } from '../../ui'
 import { ChainId } from './ChainId'
 import {
-  CANNOT_LABEL,
-  CAN_LABEL,
   COVERED_FACTS,
   COVERED_HEADING,
-  COVERED_STATEMENT,
   FIELD,
   FLAGS_KEY,
   FLAG_NO,
@@ -25,9 +21,9 @@ import {
   MARGIN_HEADING,
   MARGIN_LEDE,
   MARGIN_PUBLISHER,
-  MARGIN_STATEMENT,
+  NEITHER_CAN,
+  NEITHER_LABEL,
   ROLES_HEADING,
-  ROLES_LEDE,
   ROLES_MOCK_NOTE,
   ROLES_SEPARATION,
   ROLE_LABEL,
@@ -38,19 +34,20 @@ import {
   UNRECORDED_NOTE,
   flagsFromRecord,
   flagsUnread,
-  listedLaterNote,
   notImmutableNote,
   otherListedNote,
+  renamedTokenNote,
 } from './copy'
 import type { RoleCopy } from './copy'
-import { COVERED_CONTRACT, MARGIN_CONTRACT, TOKEN_RECORDS, coveredRecordFor, findTokenRecord, marginRecordFor } from '../../core/deployments'
+import { COVERED_CONTRACT, MARGIN_CONTRACT, TOKEN_RECORDS, coveredRecordFor, marginRecordFor, findTokenRecord } from '../../core/deployments'
 import type { ContractRecord } from '../../core/deployments'
 import { FactList } from './FactList'
+import type { Fact } from './FactList'
 import css from './ContractsAndRoles.module.css'
 
 // ---------------------------------------------------------------------------------------------- pieces
 
-/** A 64-digit hash in full, in mono, with a copy button. It wraps rather than being cut. */
+/** A 64-digit hash in full, in mono, with a copy button: a wasm hash has no explorer page, so copy is its use. */
 function Hash({ value, what }: { value: string; what: string }) {
   return (
     <span className={css.hash}>
@@ -60,32 +57,22 @@ function Hash({ value, what }: { value: string; what: string }) {
   )
 }
 
-/** The contract id in full, on a line of its own: it is the thing to check character by character. */
-function ContractIdLine({ contractId, what }: { contractId: string; what: string }) {
-  return (
-    <p className={css.idLine}>
-      <span className={css.idLabel}>{FIELD.contract}</span>
-      <ChainId value={contractId} length="full" what={what} />
-    </p>
-  )
-}
-
-/** Version, wasm hash, deploy transaction and deployer of a recorded contract. */
-function Record({ record, what }: { record: ContractRecord; what: string }) {
-  return (
-    <KeyValue variant="ruled" figures="sans" layout="stacked" className={css.identity}>
-      <KeyValueItem label={FIELD.version}>{record.version}</KeyValueItem>
-      <KeyValueItem label={FIELD.wasm}>
-        <Hash value={record.wasmHash} what={`the wasm hash of ${what}`} />
-      </KeyValueItem>
-      <KeyValueItem label={FIELD.deployTx}>
-        <TxLink hash={record.deployTx} explorerUrl={explorerTx(record.deployTx)} copy />
-      </KeyValueItem>
-      <KeyValueItem label={FIELD.deployer}>
-        <ChainId value={record.deployer} what={`the account that deployed ${what}`} />
-      </KeyValueItem>
-    </KeyValue>
-  )
+/**
+ * One ruled list per contract, in one order: the contract id in full, then version, wasm hash, deploy
+ * transaction and deployer when the app has a record of them, then the facts.
+ */
+function contractRecord(contractId: string, record: ContractRecord | null, what: string, facts: readonly { label: string; text: string }[]): Fact[] {
+  const rows: Fact[] = [{ term: FIELD.contract, text: <ChainId value={contractId} length="full" what={what} /> }]
+  if (record) {
+    rows.push(
+      { term: FIELD.version, text: <span className={css.value}>{record.version}</span> },
+      { term: FIELD.wasm, text: <Hash value={record.wasmHash} what={`the wasm hash of ${what}`} /> },
+      { term: FIELD.deployTx, text: <TxLink hash={record.deployTx} explorerUrl={explorerTx(record.deployTx)} /> },
+      { term: FIELD.deployer, text: <ChainId value={record.deployer} what={`the account that deployed ${what}`} /> },
+    )
+  }
+  for (const fact of facts) rows.push({ term: fact.label, text: fact.text })
+  return rows
 }
 
 // ---------------------------------------------------------------------------------------------- tokens
@@ -104,7 +91,6 @@ interface TokenFacts {
   /** The read failed. */
   unread: boolean
   notImmutable: boolean
-  listedLater: boolean
 }
 
 const yesNo = (flag: boolean | undefined, flags: Flags | null | undefined): string => (flags === undefined ? FLAG_READING : flags === null || flag === undefined ? NO_VALUE : flag ? FLAG_YES : FLAG_NO)
@@ -126,7 +112,6 @@ function useLiveToken(token: { contractId: string; code: string; issuer?: string
     fromRecord: !live && !!record && (failed || !enabled),
     unread: failed && !record,
     notImmutable: noneSet && (live ? facts.data?.issuerInfo?.flags.authImmutable === false : record?.note === 'not-immutable'),
-    listedLater: record?.note === 'listed-later',
   }
 }
 
@@ -145,7 +130,6 @@ function recordedTokens(): TokenFacts[] {
     fromRecord: true,
     unread: false,
     notImmutable: t.note === 'not-immutable',
-    listedLater: t.note === 'listed-later',
   }))
 }
 
@@ -166,6 +150,11 @@ function TokenRow({ token }: { token: TokenFacts }) {
   )
 }
 
+/** A flag answer on a phone: "No" in secondary ink, as in the table. */
+function FlagValue({ flag, flags }: { flag: boolean | undefined; flags: Flags | null | undefined }) {
+  return <span className={flag === false ? css.flagNo : undefined}>{yesNo(flag, flags)}</span>
+}
+
 function TokenBlock({ token }: { token: TokenFacts }) {
   return (
     <li className={css.tokenBlock}>
@@ -177,15 +166,21 @@ function TokenBlock({ token }: { token: TokenFacts }) {
           <ChainId value={token.contractId} length="short" what={`the ${token.code} token contract`} />
         </KeyValueItem>
         <KeyValueItem label={TOKEN_COLUMNS.issuer}>{token.issuer ? <ChainId value={token.issuer} length="short" what={`the ${token.code} issuer`} /> : NO_VALUE}</KeyValueItem>
-        <KeyValueItem label={TOKEN_COLUMNS.required}>{yesNo(token.flags?.authRequired, token.flags)}</KeyValueItem>
-        <KeyValueItem label={TOKEN_COLUMNS.revocable}>{yesNo(token.flags?.authRevocable, token.flags)}</KeyValueItem>
-        <KeyValueItem label={TOKEN_COLUMNS.clawback}>{yesNo(token.flags?.clawback, token.flags)}</KeyValueItem>
+        <KeyValueItem label={TOKEN_COLUMNS.required}>
+          <FlagValue flag={token.flags?.authRequired} flags={token.flags} />
+        </KeyValueItem>
+        <KeyValueItem label={TOKEN_COLUMNS.revocable}>
+          <FlagValue flag={token.flags?.authRevocable} flags={token.flags} />
+        </KeyValueItem>
+        <KeyValueItem label={TOKEN_COLUMNS.clawback}>
+          <FlagValue flag={token.flags?.clawback} flags={token.flags} />
+        </KeyValueItem>
       </KeyValue>
     </li>
   )
 }
 
-/** The footnotes under the token list: what could not be read, and the two facts worth a line. */
+/** The footnotes under the token list: what could not be read, and the one fact worth a line per token. */
 function tokenNotes(tokens: readonly TokenFacts[], recordedBuild: boolean): string[] {
   const notes: string[] = []
   const fallback = tokens.filter((t) => t.fromRecord && !recordedBuild).map((t) => t.code)
@@ -193,7 +188,6 @@ function tokenNotes(tokens: readonly TokenFacts[], recordedBuild: boolean): stri
   const unread = tokens.filter((t) => t.unread).map((t) => t.code)
   if (unread.length) notes.push(flagsUnread(formatList(unread)))
   for (const t of tokens) if (t.notImmutable) notes.push(notImmutableNote(t.code))
-  for (const t of tokens) if (t.listedLater) notes.push(listedLaterNote(t.code))
   return notes
 }
 
@@ -257,11 +251,20 @@ function LiveTokens({ tokens }: { tokens: readonly { token: { contractId: string
   return <>{collect(0, [])}</>
 }
 
+/**
+ * The mock market names some tokens differently from the recorded deployment (FUND there, RWA here): one
+ * sentence per renamed token, matched by asset type.
+ */
+function renamedTokens(): string[] {
+  return REFERENCE_ASSETS.testnet.flatMap((recorded) => {
+    const shown = REFERENCE_ASSETS.mock.find((m) => m.type === recorded.type)
+    return shown && shown.code !== recorded.code ? [renamedTokenNote(recorded.type, recorded.code, shown.code)] : []
+  })
+}
+
 // ---------------------------------------------------------------------------------------------- roles
 
 function Role({ copy, address }: { copy: RoleCopy; address: string | null }) {
-  const canId = useId()
-  const cannotId = useId()
   return (
     <div className={css.role}>
       <div className={css.roleHead}>
@@ -269,22 +272,6 @@ function Role({ copy, address }: { copy: RoleCopy; address: string | null }) {
         {address ? <ChainId value={address} what={`the Margin ${copy.role.toLowerCase()}`} /> : null}
       </div>
       <p className={css.roleSummary}>{copy.summary}</p>
-      <p className={css.listLabel} id={canId}>
-        {CAN_LABEL}
-      </p>
-      <ul className={css.list} aria-labelledby={canId}>
-        {copy.can.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-      <p className={css.listLabel} id={cannotId}>
-        {CANNOT_LABEL}
-      </p>
-      <ul className={css.list} aria-labelledby={cannotId}>
-        {copy.cannot.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
     </div>
   )
 }
@@ -299,20 +286,25 @@ function MarginBlock({ coveredIsMock }: { coveredIsMock: boolean }) {
         <h3 id="roles-margin" className={css.blockTitle}>
           {MARGIN_HEADING}
         </h3>
-        <p className={css.statement}>{MARGIN_STATEMENT}</p>
         <p className={css.lede}>{MARGIN_LEDE}</p>
         {!configured && !coveredIsMock ? <p className={css.note}>{MARGIN_FIXTURE_NOTE}</p> : null}
         {configured && !record ? <p className={css.note}>{UNRECORDED_NOTE}</p> : null}
       </header>
+      <FactList variant="record" facts={contractRecord(contractId, record, 'the Margin contract', MARGIN_FACTS)} />
       <div className={css.roles}>
         <Role copy={MARGIN_ADMIN} address={record?.admin ?? null} />
         <Role copy={MARGIN_PUBLISHER} address={record?.publisher ?? null} />
       </div>
-      <p className={css.separation}>{ROLES_SEPARATION}</p>
-      <ContractIdLine contractId={contractId} what="the Margin contract" />
-      <div className={css.columns} data-single={record ? undefined : true}>
-        {record ? <Record record={record} what="the Margin contract" /> : null}
-        <FactList facts={MARGIN_FACTS.map((f) => ({ term: f.label, text: f.text }))} />
+      <div className={css.neither}>
+        <p className={css.listLabel} id="roles-neither">
+          {NEITHER_LABEL}
+        </p>
+        <ul className={css.list} aria-labelledby="roles-neither">
+          {NEITHER_CAN.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className={css.separation}>{ROLES_SEPARATION}</p>
       </div>
     </section>
   )
@@ -341,8 +333,7 @@ export function ContractsAndRoles() {
     <section className={css.root} aria-labelledby="roles-heading">
       <header className={css.head}>
         <h2 id="roles-heading">{ROLES_HEADING}</h2>
-        <p className={css.lede}>{ROLES_LEDE}</p>
-        {isMock ? <p className={css.note}>{ROLES_MOCK_NOTE}</p> : null}
+        {isMock ? <p className={css.note}>{[ROLES_MOCK_NOTE, ...renamedTokens()].join(' ')}</p> : null}
       </header>
 
       <section className={css.block} aria-labelledby="roles-covered">
@@ -350,14 +341,9 @@ export function ContractsAndRoles() {
           <h3 id="roles-covered" className={css.blockTitle}>
             {COVERED_HEADING}
           </h3>
-          <p className={css.statement}>{COVERED_STATEMENT}</p>
           {!isMock && !record ? <p className={css.note}>{UNRECORDED_NOTE}</p> : null}
         </header>
-        <ContractIdLine contractId={contractId} what="the Covered contract" />
-        <div className={css.columns} data-single={record ? undefined : true}>
-          {record ? <Record record={record} what="the Covered contract" /> : null}
-          <FactList facts={COVERED_FACTS.map((f) => ({ term: f.label, text: f.text }))} />
-        </div>
+        <FactList variant="record" facts={contractRecord(contractId, record, 'the Covered contract', COVERED_FACTS)} />
       </section>
 
       <section className={css.block} aria-labelledby="roles-tokens">

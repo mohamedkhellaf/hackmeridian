@@ -3,10 +3,59 @@
     min-width: 0;
   }
 
-  /* The action column takes what its button needs; the figures sit next to it. */
+  /* Fixed widths: the figures of the offers and the requests share their columns, and a busy button does not
+     push them aside. "From" takes what is left. */
+  .noCol {
+    width: calc(var(--s-72) + var(--s-8));
+  }
+
+  .seriesCol {
+    width: calc(var(--s-72) * 2 - var(--s-8));
+  }
+
+  .qtyCol {
+    width: calc(var(--s-72) + var(--s-24));
+  }
+
+  .perUnitCol {
+    width: calc(var(--s-72) * 2 - var(--s-12));
+  }
+
+  .totalCol {
+    width: calc(var(--s-72) + var(--s-40));
+  }
+
+  .whyCol {
+    width: calc(var(--s-72) * 2);
+  }
+
+  .noteCol {
+    width: calc(var(--s-72) * 2 + var(--s-24));
+  }
+
+  .actionColW {
+    width: calc(var(--s-72) + var(--s-24));
+
+    &[data-wide] {
+      width: calc(var(--s-72) * 2 - var(--s-8));
+    }
+  }
+
   .actionCol {
-    width: 1%;
     white-space: nowrap;
+  }
+
+  .no {
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+  }
+
+  /* The column that gives way: never drawn over its neighbours. */
+  .fromCell {
+    overflow: hidden;
   }
 
   .from {
@@ -30,6 +79,25 @@
     align-items: center;
     gap: var(--s-6);
     font-weight: 500;
+  }
+
+  /* "Your orders": the series is the control that selects it in the chain. */
+  .seriesButton {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    border-radius: var(--r-tag);
+    color: var(--accent);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 0.2em;
+
+    @media (hover: hover) {
+      &:hover {
+        text-decoration-color: currentColor;
+      }
+    }
   }
 
   /* The second line of a cell: a deadline under its series, a total under its per-unit figure. */
@@ -56,25 +124,24 @@
   }
 
   .figure {
-    font-weight: 500;
+    font-weight: 550;
   }
 
-  .totalInline {
-    display: none;
-  }
-
-  .why {
-    min-width: calc(var(--s-72) + var(--s-40));
+  .why,
+  .noteCell {
     color: var(--text-2);
     white-space: normal;
   }
 
-  .noteCell {
-    white-space: normal;
+  .reason {
+    display: block;
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
   }
 
-  .note {
-    display: inline-flex;
+  .warn {
+    display: flex;
     align-items: flex-start;
     gap: var(--s-6);
     color: var(--text-2);
@@ -82,22 +149,47 @@
     line-height: var(--caption-line);
 
     & > svg {
+      flex: none;
       color: var(--warn);
     }
   }
 
-  /* "Other offers": two-line rows, so the total sits under the per-unit figure instead of in a column. */
-  .root[data-layout='series'] {
-    & .totalCol {
-      display: none;
-    }
+  /* ---- Groups of the book: "Offers 2", the gap line, "Requests 1" ---- */
 
-    & .totalInline {
-      display: block;
-    }
+  .group {
+    padding: var(--s-12) 0 var(--s-4);
+    border-bottom: 1px solid var(--hairline);
+    color: var(--text);
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    text-align: start;
+  }
 
-    & .table td {
-      padding-block: var(--s-6);
-    }
+  .groupCount {
+    margin-inline-start: var(--s-4);
+    color: var(--muted);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .gap {
+    padding: var(--s-8) var(--cell-px);
+    border-bottom: 1px solid var(--rule);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .emptyCell {
+    color: var(--muted);
+  }
+
+  /* "Other offers": two-line rows, the total under the per-unit figure. */
+  .root[data-layout='series'] .table td {
+    padding-block: var(--s-6);
   }
 }

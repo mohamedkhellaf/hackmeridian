@@ -1,5 +1,5 @@
 import { Popover as BasePopover } from '@base-ui/react/popover'
-import { useRef, useState } from 'react'
+import { memo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { announce } from './announce'
 import { cx } from './internal/cx'
@@ -13,11 +13,11 @@ export interface AmountProps {
    * with the asset's fixed decimals. For a signed figure pass the magnitude and set `direction`.
    */
   value: string
-  /** The same amount at full precision. When it differs from `value`, focus or a press shows it in a popover. */
+  /** The same amount at full precision. When it differs from `value`, a press (click, Enter or Space) shows it in a popover. */
   exact?: string
   /** Shown once after the figure. Leave out where the column header carries the unit. */
   unit?: string
-  /** Adds the sign (`+`, or the true minus), a triangle and the gain or loss colour. Never colour alone. */
+  /** Adds the sign (`+`, or the true minus) and the gain or loss colour; screen readers hear "gain of" or "loss of". Never colour alone. */
   direction?: 'gain' | 'loss'
   /** `serif` for key figures (term sheets, summaries), `sans` in tables. */
   figure?: 'sans' | 'serif'
@@ -28,12 +28,12 @@ export interface AmountProps {
 }
 
 /**
- * An amount on screen. The exact value is one focus or press away, in a popover; it is never put in a `title`
- * attribute, which keyboard and touch users cannot reach.
+ * An amount on screen. The exact value is one press away, in a popover below the figure; it is never put in a
+ * `title` attribute, which keyboard and touch users cannot reach. Focus alone opens nothing, so Tab moves from
+ * figure to figure without stopping in a popup.
  */
-export function Amount({ value, exact, unit, direction, figure = 'sans', size = 'md', srLabel, className }: AmountProps) {
+export const Amount = memo(function Amount({ value, exact, unit, direction, figure = 'sans', size = 'md', srLabel, className }: AmountProps) {
   const [open, setOpen] = useState(false)
-  const popupRef = useRef<HTMLDivElement | null>(null)
   const sign = direction === 'gain' ? '+' : direction === 'loss' ? MINUS : ''
   const spoken =
     srLabel ?? `${direction ? `${direction} of ` : ''}${value}${unit ? ` ${unit}` : ''}`
@@ -48,7 +48,6 @@ export function Amount({ value, exact, unit, direction, figure = 'sans', size = 
           {value}
         </span>
         {unit ? <span className={styles.unit}>{unit}</span> : null}
-        {direction ? <span className={styles.triangle}>{direction === 'gain' ? '▲' : '▼'}</span> : null}
       </span>
     </>
   )
@@ -74,25 +73,19 @@ export function Amount({ value, exact, unit, direction, figure = 'sans', size = 
         data-direction={direction}
         data-figure={figure}
         data-size={size}
-        onFocus={(event) => {
-          if (!open && event.currentTarget.matches(':focus-visible')) change(true)
-        }}
-        onBlur={(event) => {
-          const next = event.relatedTarget
-          if (next instanceof Node && popupRef.current?.contains(next)) return
-          setOpen(false)
-        }}
       >
         {body}
       </BasePopover.Trigger>
       <BasePopover.Portal>
-        <BasePopover.Positioner className={styles.positioner} side="top" align="end" sideOffset={6} collisionPadding={8}>
-          <BasePopover.Popup ref={popupRef} className={styles.popup} initialFocus={false} finalFocus={false}>
-            <span className={styles.popupLabel}>Exact value</span>
+        <BasePopover.Positioner className={styles.positioner} side="bottom" align="end" sideOffset={6} collisionPadding={8}>
+          <BasePopover.Popup className={styles.popup} initialFocus={false}>
+            <BasePopover.Title render={<span />} className={styles.popupLabel}>
+              Exact value
+            </BasePopover.Title>
             <span className={styles.popupValue}>{exactText}</span>
           </BasePopover.Popup>
         </BasePopover.Positioner>
       </BasePopover.Portal>
     </BasePopover.Root>
   )
-}
+})

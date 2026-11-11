@@ -1,126 +1,215 @@
-// The assets of the Markets index: a ruled table from 768 px, one card per asset below. Both are rendered and
-// CSS shows one, so nothing jumps when the viewport crosses the breakpoint.
+// The assets of the Markets index: a ruled table while it fits its column, one card per asset when it does not.
+// Both are rendered and a container query shows one, so nothing jumps and no figure is ever cut by a pinned cell.
+//
+// A fact that is the same on every row is not a cell: the price source goes in the column header when every row
+// shares it, the tier column only appears when tiers differ, and the issuer is shown only for an asset outside
+// the app's list (a reference asset is identified by the list and shows its issuer on its own page).
+//
+// The row and the card are one target: the action link is stretched over them. With an intent chosen above, the
+// action names the intent and opens the asset in guided mode with it.
 import { Link as RouterLink } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import type { Intent } from '../../../app/search'
 import { assetParam } from '../../../core/assets'
-import { formatCountdown, formatUtcDate } from '../../../core/format'
+import { formatCountdown, formatUnits, formatUtcDate, formatUtcDay } from '../../../core/format'
+import type { BookRow } from '../../../core/market/book'
 import type { TokenInfo } from '../../../core/options/types'
+import { intentInfo } from '../../../core/payoff/strategies'
+import type { TokenBalance } from '../../../core/stellar/tokens'
+import { strikeUnits } from '../../../core/units'
 import type { MarketIndexRow } from '../../../data'
-import { Address, ButtonLink, DateTime, Glyph, Link, RowHeader, Table, TableWrap, TBody, Td, Th, THead, Tr } from '../../../ui'
-import { ASSETS_HEADING, COL, NONE, NO_REFERENCE_VALUE, POST_REQUEST, TRADE, WRITE_FIRST, noOffersOn, similarCodeNote, tradeLabel, typeLine } from '../copy'
+import { Address, ButtonLink, DateTime, IconWarning, Link, RowHeader, Table, TableWrap, TBody, Td, Th, THead, Tr } from '../../../ui'
+import {
+  ASSETS_HEADING,
+  COL,
+  FACT,
+  INTENT_COPY,
+  NONE,
+  NO_REFERENCE_VALUE,
+  POST_REQUEST,
+  TRADE,
+  WRITE_FIRST,
+  cheapestTerms,
+  noOffersOn,
+  perUnitOf,
+  shortRow,
+  similarCodeNote,
+  tradeLabel,
+  typeLine,
+} from '../copy'
+import { guidedSearch } from '../model'
 import { Money } from '../parts'
-import { assetGlyph } from '../values'
-import { ASSET_ROUTE } from '../routing'
+import { ASSET_ROUTE, RESERVES_ROUTE } from '../routing'
 import styles from './AssetsTable.module.css'
 
 export interface AssetsTableProps {
   rows: readonly MarketIndexRow[]
   quote: TokenInfo
   nowSec: number
+  /** The intent chosen above: each action then opens the asset in guided mode with it. */
+  intent?: Intent
+  /** The wallet's balances by contract id, for the "You hold" column of an intent that starts from the asset. */
+  holdings?: Readonly<Record<string, TokenBalance>> | null
+  /** Tokens the contract is short of after a clawback: their row says so instead of offering trades. */
+  short?: ReadonlySet<string>
 }
 
 const paramOf = (row: MarketIndexRow) => ({ asset: assetParam(row.asset) })
-
-/**
- * The asset code as a link to its page. It is not a tab stop: the "Trade" link of the same row goes to the same
- * place, and one stop per row is enough for the keyboard.
- */
-function AssetLink({ row, children, className }: { row: MarketIndexRow; children: ReactNode; className?: string }) {
-  return (
-    <RouterLink className={className} to={ASSET_ROUTE} params={paramOf(row)} tabIndex={-1}>
-      {children}
-    </RouterLink>
-  )
-}
 
 /** "No open offers on BOND. Post a request, or write the first offer.", with the two ways out as links. */
 function ThinMarket({ row }: { row: MarketIndexRow }) {
   return (
     <span className={styles.thin}>
       {noOffersOn(row.asset.code)}{' '}
-      <Link render={<RouterLink to={ASSET_ROUTE} params={paramOf(row)} search={{ tab: 'requests', side: 'bid', kind: 'put' }} />}>{POST_REQUEST}</Link>
+      <Link className={styles.above} render={<RouterLink to={ASSET_ROUTE} params={paramOf(row)} search={{ tab: 'requests', side: 'bid', kind: 'put' }} />}>
+        {POST_REQUEST}
+      </Link>
       {', or '}
-      <Link render={<RouterLink to={ASSET_ROUTE} params={paramOf(row)} search={{ mode: 'chain', side: 'write', kind: 'put' }} />}>{WRITE_FIRST}</Link>.
+      <Link className={styles.above} render={<RouterLink to={ASSET_ROUTE} params={paramOf(row)} search={{ mode: 'chain', side: 'write', kind: 'put' }} />}>
+        {WRITE_FIRST}
+      </Link>
+      .
     </span>
   )
 }
 
+/** The row of a token the contract is short of: one line, with the warning glyph, linked to Reserves. */
+function Short({ row }: { row: MarketIndexRow }) {
+  return (
+    <span className={styles.short}>
+      <IconWarning size={16} />
+      <Link className={styles.above} render={<RouterLink to={RESERVES_ROUTE} />}>
+        {shortRow(row.asset.code)}
+      </Link>
+    </span>
+  )
+}
+
+/** An asset outside the app's list is identified by its issuer; a code that imitates one of the list says so. */
 function Identity({ row }: { row: MarketIndexRow }) {
-  const glyph = assetGlyph(row.asset.contractId)
   return (
     <span className={styles.identity}>
-      {glyph ? <Glyph name={glyph} size={24} className={styles.glyph} /> : <span className={styles.glyph} data-empty />}
-      <span className={styles.idText}>
-        <span className={styles.idLine}>
-          <AssetLink row={row} className={styles.code}>
-            {row.asset.code}
-          </AssetLink>
-          <span className={styles.type}>{typeLine(row.typeLabel)}</span>
+      <span className={styles.idLine}>
+        <span className={styles.code} data-unlisted={row.isReference ? undefined : ''}>
+          {row.asset.code}
         </span>
-        {row.asset.issuer ? (
-          <span className={styles.issuer}>
-            <span>{COL.issuer}</span>
-            <Address value={row.asset.issuer} copyLabel={null} />
-          </span>
-        ) : null}
-        {row.similar ? <span className={styles.similar}>{similarCodeNote(row.similar.reference)}</span> : null}
+        <span className={styles.type}>{typeLine(row.typeLabel)}</span>
       </span>
+      {!row.isReference && row.asset.issuer ? (
+        <span className={styles.issuer}>
+          <span>{FACT.issuer}</span>
+          <Address value={row.asset.issuer} copyLabel={null} />
+        </span>
+      ) : null}
+      {row.similar ? <span className={styles.similar}>{similarCodeNote(row.similar.reference)}</span> : null}
     </span>
   )
 }
 
-function Reference({ row, quote }: { row: MarketIndexRow; quote: TokenInfo }) {
+/** A header with its unit on a second line: the figures under it are bare. */
+function Head({ label, unit }: { label: string; unit: string }) {
+  return (
+    <span className={styles.head}>
+      <span>{label}</span>
+      <span className={styles.unit}>{unit}</span>
+    </span>
+  )
+}
+
+/** The cheapest standard offer of one kind, with the terms it is for: "0.01" over "at 97.00, 13 Nov". */
+function Cheapest({ units, row, quote }: { units: bigint | null; row: BookRow | null; quote: TokenInfo }) {
+  if (units === null || row === null) return <span className={styles.none}>{NONE}</span>
+  const strike = strikeUnits(row)
   return (
     <span className={styles.stack}>
-      {row.reference.perUnit !== null ? (
-        <>
-          <Money units={row.reference.perUnit} token={quote} />
-          <span className={styles.sub}>{row.reference.label}</span>
-        </>
-      ) : (
-        <span className={styles.none}>{NO_REFERENCE_VALUE}</span>
-      )}
+      <Money units={units} token={quote} bare />
+      {strike !== null ? <span className={styles.sub}>{cheapestTerms(formatUnits(strike, quote.decimals), formatUtcDay(row.expiry))}</span> : null}
     </span>
   )
 }
 
-const Lowest = ({ units, quote }: { units: bigint | null; quote: TokenInfo }) => (units === null ? <span className={styles.none}>{NONE}</span> : <Money units={units} token={quote} />)
+function Held({ balance, token }: { balance: TokenBalance | undefined; token: TokenInfo }) {
+  if (!balance || balance.balance === null) return <span className={styles.none}>{NONE}</span>
+  return <Money units={balance.balance} token={token} bare />
+}
 
-export function AssetsTable({ rows, quote, nowSec }: AssetsTableProps) {
+export function AssetsTable({ rows, quote, nowSec, intent, holdings = null, short }: AssetsTableProps) {
+  const showTier = new Set(rows.map((r) => r.tier)).size > 1
+  // The source of the price, once in the header when every priced row has the same one.
+  const labels = new Set(rows.filter((r) => r.reference.perUnit !== null).map((r) => r.reference.label))
+  const sharedLabel = labels.size === 1 ? [...labels][0] : null
+  const showHeld = intent !== undefined && holdings !== null && intentInfo(intent).starts === 'asset'
+  const action = (row: MarketIndexRow) => (intent ? INTENT_COPY[intent].choose(row.asset.code) : tradeLabel(row.asset.code))
+  const actionText = intent ? intentInfo(intent).name : TRADE
+  const link = (row: MarketIndexRow) => <RouterLink to={ASSET_ROUTE} params={paramOf(row)} search={intent ? guidedSearch(intent) : undefined} />
+  const isShort = (row: MarketIndexRow) => short?.has(row.asset.contractId) ?? false
+  const marketCols = 4 + (showHeld ? 1 : 0)
+
   return (
-    <>
+    <div className={styles.root}>
       <TableWrap label={ASSETS_HEADING} className={styles.table}>
         <Table caption={ASSETS_HEADING}>
           <THead>
             <Tr>
               <Th>{COL.asset}</Th>
-              <Th>{COL.tier}</Th>
-              <Th numeric>{COL.reference}</Th>
+              {showTier ? <Th>{COL.tier}</Th> : null}
+              <Th numeric>
+                <Head label={sharedLabel ?? COL.reference} unit={quote.code} />
+              </Th>
+              {showHeld ? <Th numeric>{COL.hold}</Th> : null}
               <Th numeric>{COL.offers}</Th>
               <Th numeric>{COL.expiry}</Th>
-              <Th numeric>{COL.put}</Th>
-              <Th numeric>{COL.call}</Th>
-              <Th pinned>{COL.action}</Th>
+              <Th numeric>
+                <Head label={COL.put} unit={perUnitOf(quote.code)} />
+              </Th>
+              <Th numeric>
+                <Head label={COL.call} unit={perUnitOf(quote.code)} />
+              </Th>
+              <Th>
+                <span className="ui-vh">{COL.action}</span>
+              </Th>
             </Tr>
           </THead>
           <TBody>
             {rows.map((row) => {
               const s = row.summary
               return (
-                <Tr key={row.asset.contractId} interactive>
+                <Tr key={row.asset.contractId} interactive className={styles.row}>
                   <RowHeader className={styles.assetCell}>
                     <Identity row={row} />
                   </RowHeader>
-                  <Td>{row.tier}</Td>
+                  {showTier ? <Td>{row.tier}</Td> : null}
                   <Td numeric>
-                    <Reference row={row} quote={quote} />
+                    {row.reference.perUnit !== null ? (
+                      <span className={styles.stack}>
+                        <Money units={row.reference.perUnit} token={quote} bare />
+                        {sharedLabel === null ? <span className={styles.sub}>{row.reference.label}</span> : null}
+                      </span>
+                    ) : (
+                      <span className={styles.none}>{NO_REFERENCE_VALUE}</span>
+                    )}
                   </Td>
-                  {s.offers === 0 ? (
-                    <Td colSpan={4} className={styles.thinCell}>
-                      <ThinMarket row={row} />
+                  {isShort(row) ? (
+                    <Td colSpan={marketCols} className={styles.wideCell}>
+                      <Short row={row} />
                     </Td>
+                  ) : s.offers === 0 ? (
+                    <>
+                      {showHeld ? (
+                        <Td numeric>
+                          <Held balance={holdings?.[row.asset.contractId]} token={row.asset} />
+                        </Td>
+                      ) : null}
+                      <Td colSpan={4} className={styles.wideCell}>
+                        <ThinMarket row={row} />
+                      </Td>
+                    </>
                   ) : (
                     <>
+                      {showHeld ? (
+                        <Td numeric>
+                          <Held balance={holdings?.[row.asset.contractId]} token={row.asset} />
+                        </Td>
+                      ) : null}
                       <Td numeric>{s.offers}</Td>
                       <Td numeric>
                         {s.nearestExpiry !== null ? (
@@ -133,16 +222,16 @@ export function AssetsTable({ rows, quote, nowSec }: AssetsTableProps) {
                         )}
                       </Td>
                       <Td numeric>
-                        <Lowest units={s.lowestPutPerUnit} quote={quote} />
+                        <Cheapest units={s.lowestPutPerUnit} row={s.lowestPut} quote={quote} />
                       </Td>
                       <Td numeric>
-                        <Lowest units={s.lowestCallPerUnit} quote={quote} />
+                        <Cheapest units={s.lowestCallPerUnit} row={s.lowestCall} quote={quote} />
                       </Td>
                     </>
                   )}
-                  <Td pinned>
-                    <ButtonLink size="sm" aria-label={tradeLabel(row.asset.code)} render={<RouterLink to={ASSET_ROUTE} params={paramOf(row)} />}>
-                      {TRADE}
+                  <Td align="end" className={styles.actionCell}>
+                    <ButtonLink size="sm" className={styles.stretch} aria-label={action(row)} render={link(row)}>
+                      {actionText}
                     </ButtonLink>
                   </Td>
                 </Tr>
@@ -155,65 +244,62 @@ export function AssetsTable({ rows, quote, nowSec }: AssetsTableProps) {
       <ul className={styles.cards} role="list" aria-label={ASSETS_HEADING}>
         {rows.map((row) => {
           const s = row.summary
-          const glyph = assetGlyph(row.asset.contractId)
           return (
             <li key={row.asset.contractId} className={styles.card}>
               <div className={styles.cardHead}>
-                <span className={styles.cardIdentity}>
-                  {glyph ? <Glyph name={glyph} size={24} className={styles.glyph} /> : null}
-                  <span className={styles.idText}>
-                    <AssetLink row={row} className={styles.code}>
-                      {row.asset.code}
-                    </AssetLink>
-                    <span className={styles.type}>{typeLine(row.typeLabel)}</span>
-                  </span>
-                </span>
+                <Identity row={row} />
                 <span className={styles.cardPrice}>
-                  {row.reference.perUnit !== null ? <Money units={row.reference.perUnit} token={quote} figure="serif" /> : null}
-                  <span className={styles.sub}>{row.reference.label}</span>
+                  {row.reference.perUnit !== null ? <Money units={row.reference.perUnit} token={quote} figure="serif" /> : <span className={styles.none}>{NO_REFERENCE_VALUE}</span>}
+                  {row.reference.perUnit !== null ? <span className={styles.sub}>{row.reference.label}</span> : null}
                 </span>
               </div>
-              {row.similar ? <p className={styles.similar}>{similarCodeNote(row.similar.reference)}</p> : null}
-              {s.offers === 0 ? (
-                <p className={styles.cardThin}>
+              {showHeld ? (
+                <p className={styles.cardHeld}>
+                  <span>{COL.hold}</span> <Held balance={holdings?.[row.asset.contractId]} token={row.asset} /> <span>{row.asset.code}</span>
+                </p>
+              ) : null}
+              {isShort(row) ? (
+                <p className={styles.cardWide}>
+                  <Short row={row} />
+                </p>
+              ) : s.offers === 0 ? (
+                <p className={styles.cardWide}>
                   <ThinMarket row={row} />
                 </p>
               ) : (
-                <dl className={styles.cardFacts}>
-                  <div>
-                    <dt>{COL.offers}</dt>
-                    <dd>{s.offers}</dd>
-                  </div>
-                  <div>
-                    <dt>{COL.tier}</dt>
-                    <dd>{row.tier}</dd>
-                  </div>
-                  <div>
-                    <dt>{COL.put}</dt>
-                    <dd>
-                      <Lowest units={s.lowestPutPerUnit} quote={quote} />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{COL.call}</dt>
-                    <dd>
-                      <Lowest units={s.lowestCallPerUnit} quote={quote} />
-                    </dd>
-                  </div>
-                </dl>
+                <div className={styles.cardFacts}>
+                  {/* The unit of both premiums, said once over their two columns. */}
+                  <p className={styles.cardUnit}>{perUnitOf(quote.code)}</p>
+                  <dl>
+                    <div>
+                      <dt>{COL.offers}</dt>
+                      <dd>{s.offers}</dd>
+                    </div>
+                    <div>
+                      <dt>{COL.put}</dt>
+                      <dd>
+                        <Cheapest units={s.lowestPutPerUnit} row={s.lowestPut} quote={quote} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{COL.call}</dt>
+                      <dd>
+                        <Cheapest units={s.lowestCallPerUnit} row={s.lowestCall} quote={quote} />
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               )}
               <div className={styles.cardFoot}>
-                <span className={styles.cardExpiry}>
-                  {s.nearestExpiry !== null ? `${COL.expiry} ${formatUtcDate(s.nearestExpiry)}, in ${formatCountdown(s.nearestExpiry - nowSec)}` : row.tier}
-                </span>
-                <ButtonLink aria-label={tradeLabel(row.asset.code)} render={<RouterLink to={ASSET_ROUTE} params={paramOf(row)} />}>
-                  {TRADE}
+                <span className={styles.cardExpiry}>{s.nearestExpiry !== null && !isShort(row) ? `${COL.expiry} ${formatUtcDate(s.nearestExpiry)}, in ${formatCountdown(s.nearestExpiry - nowSec)}` : null}</span>
+                <ButtonLink className={styles.stretch} aria-label={action(row)} render={link(row)}>
+                  {actionText}
                 </ButtonLink>
               </div>
             </li>
           )
         })}
       </ul>
-    </>
+    </div>
   )
 }

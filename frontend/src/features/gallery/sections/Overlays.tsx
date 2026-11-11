@@ -21,12 +21,14 @@ import {
   MenuSeparator,
   Popover,
   Sheet,
+  Term,
   TextField,
   Tooltip,
   announce,
   toast,
 } from '../../../ui'
 import { Example, Section, Specimen } from '../Specimen'
+import styles from '../Gallery.module.css'
 import { CoachmarkSpecimen } from './CoachmarkSpecimen'
 import { EXPLORER } from './sample'
 
@@ -48,7 +50,7 @@ export function OverlaysSection() {
       title="Overlays"
       lead="Dialogs, the drawer and the sheet trap focus, close on Escape and return focus to what opened them. Each takes a policy for where focus goes on open. Open them with the keyboard to check."
     >
-      <Specimen title="Tooltip" note="A short label for an icon or a disabled control. Never essential: touch users do not get tooltips.">
+      <Specimen title="Tooltip" note="A short label for an icon. Never essential: touch has no hover. The reason of a disabled button also opens on a tap, under the button.">
         <Tooltip content="Read at ledger 58,331,204">
           <Button variant="quiet">Hover or focus</Button>
         </Tooltip>
@@ -59,12 +61,20 @@ export function OverlaysSection() {
 
       <Specimen title="Popover" note="For an explanation or an exact value that someone asks for. Opened by its trigger, so it works with touch and keyboard.">
         <Popover trigger={<Button variant="secondary" iconStart={<IconInfo />}>What is a demo price?</Button>} title="Demo price">
-          A fixed figure used to place strikes and to label options as in or out of the money. It is not a market
-          price. You can always set your own assumed price.
+          A fixed figure chosen by the team, used to place strikes and to label options as in or out of the money.
         </Popover>
         <Popover trigger={<Button variant="quiet">Open on the right</Button>} side="right" align="center">
           Popovers flip and shift to stay in view.
         </Popover>
+      </Specimen>
+
+      <Specimen title="Term" note="A term of the trade explained where it is met: the word is the button, a press opens its one glossary sentence. In place of a caption that defines its label.">
+        <KeyValue className={styles.narrow}>
+          <KeyValueItem label={<Term definition="The price per unit at which exercising pays back exactly what the premium cost.">Breakeven</Term>}>
+            98.32 USDx
+          </KeyValueItem>
+          <KeyValueItem label={<Term definition="The price of the option, paid once to the maker.">Premium</Term>}>1.36 USDx</KeyValueItem>
+        </KeyValue>
       </Specimen>
 
       <CoachmarkSpecimen />
@@ -88,14 +98,14 @@ export function OverlaysSection() {
         <Menu trigger={<IconButton label="Display settings" icon={<IconSettings />} variant="secondary" />}>
           <MenuRadioGroup label="Theme" value={theme} onValueChange={setTheme}>
             <MenuRadioItem value="system">System</MenuRadioItem>
-            <MenuRadioItem value="light">Paper</MenuRadioItem>
-            <MenuRadioItem value="dark">Carbon</MenuRadioItem>
+            <MenuRadioItem value="light">Light</MenuRadioItem>
+            <MenuRadioItem value="dark">Dark</MenuRadioItem>
           </MenuRadioGroup>
           <MenuSeparator />
-          <MenuGroup label="Tables">
-            <MenuItem keepOpen>Comfortable rows</MenuItem>
+          <MenuGroup label="Calendar">
+            <MenuItem keepOpen>Download the deadline</MenuItem>
             <MenuItem keepOpen disabled>
-              Compact rows
+              Add to Google Calendar
             </MenuItem>
           </MenuGroup>
         </Menu>
@@ -106,7 +116,7 @@ export function OverlaysSection() {
         note="One per flow, never stacked. Focus goes to the title by default, so reading starts at the top and nothing destructive is armed."
       >
         <Example label="Focus on the title (default)">
-          <Button onClick={() => setOpen('title')}>Open a notice</Button>
+          <Button onClick={() => setOpen('title')}>Open a short dialog</Button>
         </Example>
         <Example label="Focus on the first control, for forms">
           <Button onClick={() => setOpen('form')}>Open a form</Button>
@@ -168,15 +178,15 @@ export function OverlaysSection() {
         open={open === 'title'}
         onOpenChange={onOpenChange}
         size="sm"
-        title="Nothing settles by itself"
-        description="An option that is in the money at the deadline is not exercised for you. You exercise it before the deadline, or it expires."
+        title="Exercise this put?"
+        description="You deliver 5 BOND and receive 50.00 USDx in one transaction."
         footer={
           <>
             <Button variant="quiet" onClick={close}>
               Cancel
             </Button>
             <Button variant="primary" onClick={close}>
-              Understood
+              Exercise
             </Button>
           </>
         }

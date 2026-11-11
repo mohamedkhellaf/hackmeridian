@@ -26,15 +26,23 @@
     padding-block: var(--s-8);
   }
 
-  /* Margin is fenced off: a well with a dashed rule above it, so it never reads as part of the Covered rules. */
+  /*
+   * Margin is fenced off: a sunken well inside a full rule, so it never reads as part of the Covered rules. The rule
+   * carries the edge in Carbon, where the well and the page are almost the same tone.
+   */
   .margin {
-    border-top: 1px dashed var(--control);
-    border-radius: 0 0 var(--r-card) var(--r-card);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-card);
   }
 
   .marginText {
     max-width: var(--measure);
     color: var(--text);
+  }
+
+  .action {
+    display: flex;
+    margin-top: var(--s-8);
   }
 
   .marginList {

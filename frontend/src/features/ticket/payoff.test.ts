@@ -71,6 +71,26 @@ describe('payoffModel', () => {
     expect(payoffModel({ ...leg('put'), totalStrike: 0n }, 'long', demo)).toBeNull()
   })
 
+  it('sizes the axis from the option, not a fixed share of the price', () => {
+    // A 99.00 put at 0.21 per unit with the demo price at 99.40: a ±40 % axis would put the strike, the breakeven
+    // and the reference on a few pixels.
+    const bond: Leg = { kind: 'put', underlying: BOND, quote: USDX, underlyingQty: u(1), totalStrike: u(99), totalPremium: u(0.21), expiry: 1_800_000_000 }
+    const m = payoffModel(bond, 'long', { ...demo, perUnit: u(99.4) })!
+    expect(m.domain[0]).toBeLessThan(98.79)
+    expect(m.domain[1]).toBeGreaterThan(99.4)
+    expect(m.domain[1] - m.domain[0]).toBeLessThan(10)
+    expect(m.step).toBeGreaterThanOrEqual(0.01)
+    expect(m.step).toBeLessThanOrEqual((m.domain[1] - m.domain[0]) / 100)
+  })
+
+  it('labels the open side of a written call as what it gives up, never as an unlimited loss', () => {
+    const m = payoffModel(leg('call'), 'short', demo)!
+    expect(m.labels).toEqual({ maxLoss: 'Gives up the rise above', unlimited: '10.00' })
+    expect(m.description).toContain('Gives up the rise above 10.00')
+    expect(m.description).not.toMatch(/unlimited|loss/i)
+    expect(payoffModel(leg('put'), 'short', demo)!.labels).toBeUndefined()
+  })
+
   it('converts exact terms to the numbers packages/payoff takes', () => {
     expect(legNumbers(leg('put'))).toEqual({ qty: 5, strikeTotal: 50, premiumTotal: 1.8 })
   })

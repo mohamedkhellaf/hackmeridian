@@ -52,8 +52,8 @@ export function OrderAction({ line, busy, size = 'sm', onTake, onCancel }: Order
       )
     case 'fill':
       return (
-        <Button size={size} loading={working} aria-label={`Sell to this bid: ${termsOf(row)} from ${who}, ${total} escrowed`} onClick={() => onTake(row)}>
-          {COPY.sellToBid}
+        <Button size={size} loading={working} aria-label={`Fill request: ${termsOf(row)} from ${who}, ${total} escrowed`} onClick={() => onTake(row)}>
+          {COPY.fillRequest}
         </Button>
       )
     case 'buy-resale':

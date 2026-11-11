@@ -40,6 +40,24 @@ export function formatUtcTime(ts: number): string {
   return d ? `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC` : NO_VALUE
 }
 
+/** `13:45:12 UTC`, to the second: when a read was made or until when a transaction can still be included. */
+export function formatUtcClock(ts: number): string {
+  const d = utc(ts)
+  return d ? `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())} UTC` : NO_VALUE
+}
+
+/**
+ * A short zone name as the product writes it: an offset from UTC is `UTC+1`, `UTC\u221210` (true minus), never
+ * `GMT-10`; a named zone (`CET`, `BST`) stays as the browser gives it.
+ */
+export function zoneLabel(name: string): string {
+  const m = /^(?:GMT|UTC)(?:([+-\u2212])(\d{1,2})(?::?(\d{2}))?)?$/.exec(name.trim())
+  if (!m) return name
+  if (!m[1]) return 'UTC'
+  const sign = m[1] === '+' ? '+' : '\u2212'
+  return `UTC${sign}${Number(m[2])}${m[3] && m[3] !== '00' ? `:${m[3]}` : ''}`
+}
+
 /** `2026-11-13T08:00:00Z`, the value for `<time dateTime>`. Empty when the timestamp is not a real instant. */
 export function isoUtc(ts: number): string {
   const d = utc(ts)
@@ -47,7 +65,8 @@ export function isoUtc(ts: number): string {
 }
 
 /**
- * Local time in the same shape, with the zone's short name: `13 Nov 2026, 09:00 CET`. `timeZone` is an IANA
+ * Local time in the same shape, with the zone's short name: `13 Nov 2026, 09:00 CET`, `19 Nov 2026, 22:00
+ * UTC\u221210` (an offset is written from UTC with a true minus, `zoneLabel`). `timeZone` is an IANA
  * name and defaults to the browser's zone; it is a parameter so tests and server rendering are deterministic.
  */
 export function formatLocal(ts: number, timeZone?: string): string {
@@ -70,7 +89,7 @@ export function formatLocal(ts: number, timeZone?: string): string {
   }
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? ''
   const month = MONTHS[Number(get('month')) - 1] ?? ''
-  const zone = get('timeZoneName')
+  const zone = zoneLabel(get('timeZoneName'))
   return `${Number(get('day'))} ${month} ${get('year')}, ${get('hour')}:${get('minute')}${zone ? ` ${zone}` : ''}`
 }
 

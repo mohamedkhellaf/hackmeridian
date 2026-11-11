@@ -3,14 +3,16 @@
 // and `useBook`; nothing here prices or ranks anything.
 import type { AssetSearch } from '../../../app/search'
 import { countOf, formatCountdown, formatExact, formatList, formatUnits, formatUtcDay, parseAmount } from '../../../core/format'
-import { cellKey } from '../../../core/market/selection'
+import { bookRowAction, cellKey } from '../../../core/market/selection'
 import type { SeriesRef } from '../../../core/market/selection'
+import type { BookRow } from '../../../core/market/book'
 import type { OptionKind } from '../../../core/options/types'
 import { priceOf } from '../../../core/reference'
 import type { ReferencePrice } from '../../../core/reference'
-import { expiryDayKey, plainDecimal } from '../../../core/series'
+import { expiryDayKey } from '../../../core/series'
 import type { ExpiryColumn, GridCell, MarketView } from '../../../data'
-import { BIDS, COPY, KIND_WORD, LISTINGS, MAKERS, REFERENCE_PHRASE, REFERENCE_TAG } from './copy'
+import { COPY, KIND_WORD, MAKERS, OFFERS, REFERENCE_LABEL, REFERENCE_PHRASE, REFERENCE_TAG, REQUESTS } from './copy'
+import { isMine } from './orders'
 
 // ------------------------------------------------------------------------------------------- figures
 
@@ -31,9 +33,20 @@ export function leftLabel(secondsLeft: number): string {
   return formatCountdown(secondsLeft).split(' ').slice(0, 2).join(' ')
 }
 
-/** `BOND 100 put, 13 Nov`: the heading of a series. */
+/** `BOND 100.00 put, 13 Nov`: the heading of a series, with the strike as the chain prints it. */
 export function seriesTitle(code: string, ref: Pick<SeriesRef, 'kind' | 'strikePerUnit' | 'expiry'>, quoteDecimals: number): string {
-  return `${code} ${plainDecimal(ref.strikePerUnit, quoteDecimals)} ${ref.kind}, ${expiryLabel(ref.expiry)}`
+  return `${code} ${strikeText(ref.strikePerUnit, quoteDecimals)} ${ref.kind}, ${expiryLabel(ref.expiry)}`
+}
+
+/**
+ * The line between the two sides of a series book: how far the best request sits under the best offer, per unit
+ * (`0.03 between the best offer and the best request.`). Null unless both sides have a price.
+ */
+export function gapLine(bestOfferPerUnit: bigint | null, bestRequestPerUnit: bigint | null, quoteDecimals: number): string | null {
+  if (bestOfferPerUnit === null || bestRequestPerUnit === null) return null
+  const spread = bestOfferPerUnit - bestRequestPerUnit
+  if (spread === 0n) return COPY.level
+  return spread > 0n ? COPY.gap(formatUnits(spread, quoteDecimals)) : COPY.crossed(formatUnits(-spread, quoteDecimals))
 }
 
 // ------------------------------------------------------------------------------------------- reference
@@ -41,6 +54,8 @@ export function seriesTitle(code: string, ref: Pick<SeriesRef, 'kind' | 'strikeP
 export interface ReferenceLine {
   /** The tag on the dashed rule: `Demo price 99.40`. */
   tag: string
+  /** The two-word label alone (`Demo price`), under a strike the reference equals. */
+  label: string
   /** `the demo price`, for sentences. */
   phrase: string
   /** The figure alone: `99.40`. */
@@ -52,7 +67,7 @@ export function referenceLine(reference: ReferencePrice, quoteDecimals: number):
   const perUnit = priceOf(reference)
   if (perUnit === null || reference.kind === 'none') return null
   const price = formatUnits(perUnit, quoteDecimals)
-  return { tag: `${REFERENCE_TAG[reference.kind]} ${price}`, phrase: REFERENCE_PHRASE[reference.kind], price }
+  return { tag: `${REFERENCE_TAG[reference.kind]} ${price}`, label: REFERENCE_LABEL[reference.kind], phrase: REFERENCE_PHRASE[reference.kind], price }
 }
 
 // ------------------------------------------------------------------------------------------- selection
@@ -64,6 +79,8 @@ export interface ChainSelection {
   ref: SeriesRef | null
   /** Its cell in the shown column, when it is a grid series of that column. */
   cell: GridCell | null
+  /** The URL's date when the chain does not show it (passed, or no deadline): the day key, else null. */
+  missing: string | null
 }
 
 /** The column a visitor lands on: the first listed date with a standard offer, else with a bid, else the first. */
@@ -72,21 +89,39 @@ export function defaultColumn(columns: readonly ExpiryColumn[]): ExpiryColumn | 
 }
 
 /**
- * What `expiry`, `kind` and `strike` of the URL select. An unknown or missing date falls back to the default
- * column. A date that is not listed but carries an order ("Other dates") still selects that exact series, so a
- * link to it keeps working; the chain then highlights nothing.
+ * What `expiry`, `kind` and `strike` of the URL select. No date lands on the default column. A date that is not
+ * listed but carries an order ("Other dates") still selects that exact series, so a link to it keeps working; the
+ * chain then highlights nothing. A date that is neither (a deadline that has passed, a day that is no deadline)
+ * selects nothing and is returned as `missing`: the page says so and shows the default column, never the same
+ * strike on another date as if it were the series asked for.
  */
 export function resolveSelection(view: MarketView, search: Pick<AssetSearch, 'expiry' | 'kind' | 'strike'>): ChainSelection {
   const listed = search.expiry ? view.columns.find((c) => c.day === search.expiry) : undefined
   const column = listed ?? defaultColumn(view.columns)
-  if (!search.kind || !search.strike) return { column, ref: null, cell: null }
-  const strikePerUnit = parseAmount(search.strike, view.quote.decimals)
-  if (strikePerUnit === null || strikePerUnit <= 0n) return { column, ref: null, cell: null }
   const offDate = !listed && search.expiry ? view.otherExpiries.find((e) => expiryDayKey(e) === search.expiry) : undefined
+  const missing = search.expiry && !listed && offDate === undefined ? search.expiry : null
+  const none: ChainSelection = { column, ref: null, cell: null, missing }
+  if (missing || !search.kind || !search.strike) return none
+  const strikePerUnit = parseAmount(search.strike, view.quote.decimals)
+  if (strikePerUnit === null || strikePerUnit <= 0n) return none
   const expiry = offDate ?? column?.expiry
-  if (expiry === undefined) return { column, ref: null, cell: null }
+  if (expiry === undefined) return none
   const ref: SeriesRef = { underlyingId: view.asset.contractId, expiry, kind: search.kind, strikePerUnit }
-  return { column, ref, cell: offDate === undefined ? (view.cells.get(cellKey(ref)) ?? null) : null }
+  return { column, ref, cell: offDate === undefined ? (view.cells.get(cellKey(ref)) ?? null) : null, missing: null }
+}
+
+/**
+ * The line above the chain when the URL named a date it does not show: `The 13 Nov deadline has passed. Showing
+ * 20 Nov.`, or `14 Nov is not a listed deadline. Showing 13 Nov.` Null for a day key that does not parse.
+ */
+export function missingDeadlineLine(day: string, shown: ExpiryColumn, nowSec: number): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+  if (!m) return null
+  const at = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 8) / 1000
+  if (Number.isNaN(at)) return null
+  const thisYear = new Date(nowSec * 1000).getUTCFullYear()
+  const label = Number(m[1]) === thisYear ? expiryLabel(at) : `${expiryLabel(at)} ${m[1]}`
+  return at <= nowSec ? COPY.deadlinePassed(label, expiryLabel(shown.expiry)) : COPY.notADeadline(label, expiryLabel(shown.expiry))
 }
 
 /** The search params that select a series. */
@@ -96,59 +131,94 @@ export function selectionSearch(ref: Pick<SeriesRef, 'kind' | 'strikePerUnit' | 
 
 // ------------------------------------------------------------------------------------------- cells
 
-export type CellVariant = 'priced' | 'bid-only' | 'empty'
+/** A cell with an offer; one with only a buyer's request; one with neither, which asks for a price. */
+export type CellVariant = 'priced' | 'request-only' | 'empty'
 
 export interface CellText {
   variant: CellVariant
-  /** The figure of the cell: the best premium per unit, or the highest bid for a bid-only cell. */
-  figure: string | null
-  /** `2 makers`, `1 resale listing`, `1 bid` or `No offer`. */
-  count: string
-  /** The wallet holds, wrote or has an order in this series: the figure goes under the highlighter. */
+  /** The best offer per unit (`0.21`), or null. */
+  offer: string | null
+  /** The size of that offer in the underlying (`1.00`), or null. */
+  size: string | null
+  /** The best request per unit, or null. */
+  request: string | null
+  /** The figure shown is the connected wallet's own order: it goes under the highlighter, with the word "yours". */
+  ownOffer: boolean
+  ownRequest: boolean
+  /** Either figure is the wallet's own. */
   yours: boolean
   inTheMoney: boolean
-  /** An empty cell offers "Request" (the contract has requests). */
-  request: boolean
+  /** An empty cell offers "Ask for a price" (the contract has requests). */
+  ask: boolean
   /**
-   * The full accessible name: `Put at 10.00, best premium 0.36, 2 makers`. The visible text of a cell (figure,
-   * count and "yours"; "No offer" and "Request") appears in it in the same order, so what a voice user sees is
-   * what they can say.
+   * The full accessible name: `Put at 10.00, best offer 0.36 for 1.00 FUND, 2 offers, 2 makers`. The button's
+   * visible text (the best offer, else the best request, else "Ask for a price") is a run of words of it, so
+   * what a voice user sees is what they can say; the size, the request beside an offer and "yours" are drawn
+   * over the cell and said here, in the order they are drawn.
    */
   name: string
 }
 
+/** The row is the connected wallet's own order (its offer, listing or request). */
+const ownRow = (row: BookRow | null, me: string | null): boolean => row !== null && me !== null && isMine(bookRowAction(row, me))
+
 /**
  * How one cell reads, visibly and for a screen reader. `phrase` is the reference in words, or null without one.
- * `requests` is false on a contract without buyer requests: an empty cell then offers nothing.
+ * `requests` is false on a contract without buyer requests: an empty cell then offers nothing. `me` is the
+ * connected address: only a figure that is the wallet's own order is marked as its own (DESIGN.md: the
+ * highlighter marks the user's own terms and nothing else).
  */
-export function describeCell(cell: GridCell, quoteDecimals: number, phrase: string | null, requests: boolean = true): CellText {
+export function describeCell(cell: GridCell, quoteDecimals: number, phrase: string | null, requests: boolean = true, me: string | null = null): CellText {
   const strike = strikeText(cell.ref.strikePerUnit, quoteDecimals)
-  const yours = cell.mine || cell.holding || cell.wrote
-  const inTheMoney = cell.moneyness === 'in'
   const head = `${KIND_WORD[cell.ref.kind]} at ${strike}`
-  // "yours" is printed right after the count, so it is read right after it.
-  const mark = yours ? `, ${COPY.yours}` : ''
+  const inTheMoney = cell.moneyness === 'in'
+  const best = cell.empty ? null : cell.best
+  const bestBid = cell.bids > 0 ? cell.bestBid : null
+  const offer = best && cell.bestPerUnit !== null ? premiumText(cell.bestPerUnit, quoteDecimals) : null
+  const size = best ? formatUnits(best.underlyingQty, best.underlying.decimals) : null
+  const request = bestBid && cell.bestBidPerUnit !== null ? premiumText(cell.bestBidPerUnit, quoteDecimals) : null
+  const ownOffer = offer !== null && ownRow(best, me)
+  const ownRequest = request !== null && ownRow(bestBid, me)
+  const yours = ownOffer || ownRequest
+
+  const parts: string[] = []
+  if (offer !== null && best) {
+    parts.push(`best offer ${offer} for ${size} ${best.underlying.code}${best.source === 'resale' ? ', a resale listing' : ''}`)
+    parts.push(cell.makers > 0 ? `${countOf(cell.offers, OFFERS)}, ${countOf(cell.makers, MAKERS)}` : countOf(cell.offers, OFFERS))
+  } else if (request !== null) parts.push('no offer')
+  if (request !== null) parts.push(`best request ${request}`, countOf(cell.bids, REQUESTS))
+  if (yours) parts.push(`${COPY.yours}: ${ownOffer && ownRequest ? 'the best offer and the best request' : ownOffer ? 'the best offer' : 'the best request'}`)
+  const ask = offer === null && request === null && requests
+  if (offer === null && request === null) parts.push(requests ? 'no offer or request' : 'no offer')
+  if (ask) parts.push(COPY.askPrice.toLowerCase())
+
   const tail: string[] = []
   if (phrase !== null && cell.moneyness === 'in') tail.push(`in the money at ${phrase}`)
   if (phrase !== null && cell.moneyness === 'at') tail.push(`at the money at ${phrase}`)
   const own: string[] = []
   if (cell.holding) own.push('you hold an option')
   if (cell.wrote) own.push('you wrote an option')
-  if (cell.mine) own.push('you have an order')
+  if (cell.mine && !yours) own.push('you have an order')
   if (own.length) tail.push(`${formatList(own)} in this series`)
-  const join = (parts: string[]) => [head, ...parts, ...tail].join(', ')
 
-  if (!cell.empty && cell.bestPerUnit !== null) {
-    const figure = premiumText(cell.bestPerUnit, quoteDecimals)
-    const count = cell.makers > 0 ? countOf(cell.makers, MAKERS) : countOf(cell.offers, LISTINGS)
-    return { variant: 'priced', figure, count, yours, inTheMoney, request: false, name: join([`best premium ${figure}`, `${count}${mark}`]) }
+  const variant: CellVariant = offer !== null ? 'priced' : request !== null ? 'request-only' : 'empty'
+  return { variant, offer, size, request, ownOffer, ownRequest, yours, inTheMoney, ask, name: [head, ...parts, ...tail].join(', ') }
+}
+
+/**
+ * What pressing a cell opens from 1200 px, where the ticket is a column beside the chain: the best order the
+ * wallet can take there (the cheapest offer or listing, else the highest request to fill), or null when the
+ * wallet can take neither (its own order is the best, or the cell is empty).
+ */
+export function takeableOf(cell: GridCell, me: string | null): BookRow | null {
+  const takes = (row: BookRow | null): row is BookRow => {
+    if (!row) return false
+    const kind = bookRowAction(row, me).kind
+    return kind === 'buy' || kind === 'buy-resale' || kind === 'fill'
   }
-  if (cell.bids > 0 && cell.bestBidPerUnit !== null) {
-    const figure = premiumText(cell.bestBidPerUnit, quoteDecimals)
-    const count = countOf(cell.bids, BIDS)
-    return { variant: 'bid-only', figure, count, yours, inTheMoney, request: false, name: join(['no offer', `highest bid ${figure}`, `${count}${mark}`]) }
-  }
-  return { variant: 'empty', figure: null, count: COPY.noOffer, yours, inTheMoney, request: requests, name: join(requests ? [`no offer${mark}`, 'request a price'] : [`no offer${mark}`]) }
+  if (!cell.empty && takes(cell.best)) return cell.best
+  if (cell.bids > 0 && takes(cell.bestBid)) return cell.bestBid
+  return null
 }
 
 // ------------------------------------------------------------------------------------------- keyboard

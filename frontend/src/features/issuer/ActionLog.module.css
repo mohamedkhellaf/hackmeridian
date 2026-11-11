@@ -6,10 +6,17 @@
     min-width: 0;
   }
 
-  /* The sentence of the action wraps; the other columns keep to one line. */
+  .header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
   .action {
-    min-width: 14rem;
-    white-space: normal;
     font-weight: 500;
   }
 
@@ -17,7 +24,14 @@
     color: var(--muted);
   }
 
-  /* Phones: one block per action, ruled like the table. */
+  .state {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-8);
+  }
+
+  /* Phones: one entry per action, ruled like the table. */
   .list {
     display: flex;
     flex-direction: column;
@@ -31,7 +45,7 @@
   .item {
     display: flex;
     flex-direction: column;
-    gap: var(--s-8);
+    gap: var(--s-6);
     padding-block: var(--s-12);
 
     & + & {
@@ -39,38 +53,13 @@
     }
   }
 
-  .label {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: 550;
-    color: var(--text);
-    text-wrap: pretty;
-  }
-
-  .facts {
+  .line {
     display: flex;
-    flex-direction: column;
-    gap: var(--s-4);
-    margin: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-16);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
-
-    & > div {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--s-16);
-    }
-
-    & dt {
-      flex: none;
-      color: var(--muted);
-    }
-
-    & dd {
-      margin: 0;
-      min-width: 0;
-      text-align: end;
-    }
   }
 }

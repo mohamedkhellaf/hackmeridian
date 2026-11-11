@@ -155,11 +155,11 @@ export class MockOptionsClient implements OptionsClient {
     } catch (e) {
       throw new TxError('refused', errorMessage(e), { cause: e })
     }
-    if (fail === 'refused') throw new TxError('refused', 'The mock contract refused this call (demo switch). Nothing was sent.')
+    if (fail === 'refused') throw new TxError('refused', 'The mock contract refused this call (demo switch).')
 
     stage({ stage: 'signing' })
     await delay(STAGE_MS.signing)
-    if (fail === 'declined') throw new TxError('declined', 'You rejected the request in your wallet.')
+    if (fail === 'declined') throw new TxError('declined', 'You declined to sign in your wallet.')
 
     stage({ stage: 'submitting' })
     await delay(STAGE_MS.submitting)
@@ -282,8 +282,8 @@ export class MockOptionsClient implements OptionsClient {
 
   async createOffer(offer: NewOffer, writer: string, opts?: TxOptions) {
     const { value: id, ...res } = await this.tx(opts, () => {
-      if (offer.underlyingQty <= 0n || offer.totalStrike <= 0n || offer.totalPremium <= 0n) throw new Error('Amounts must be positive')
-      if (offer.expiry <= now()) throw new Error('Expiry must be in the future')
+      if (offer.underlyingQty <= 0n || offer.totalStrike <= 0n || offer.totalPremium <= 0n) throw new Error(OPTIONS_ERRORS[102])
+      if (offer.expiry <= now()) throw new Error(OPTIONS_ERRORS[102])
       if (offer.expiry > now() + MAX_TENOR_SECONDS) throw new Error(OPTIONS_ERRORS[119])
       if (!this.isListed(offer.underlying)) throw new Error(OPTIONS_ERRORS[103])
       if (this.options.filter((o) => o.writer === writer && o.state === 'offered' && o.expiry > now()).length >= MAX_OPEN_PER_WRITER)
@@ -304,9 +304,9 @@ export class MockOptionsClient implements OptionsClient {
   buy(id: bigint, buyer: string, opts?: TxOptions): Promise<TxResult> {
     return this.simple(opts, () => {
       const o = this.find(id)
-      if (o.state !== 'offered') throw new Error('Offer is no longer available')
-      if (o.expiry <= now()) throw new Error('Offer has expired')
-      if (o.writer === buyer) throw new Error('You cannot buy your own offer')
+      if (o.state !== 'offered') throw new Error(OPTIONS_ERRORS[106])
+      if (o.expiry <= now()) throw new Error(OPTIONS_ERRORS[109])
+      if (o.writer === buyer) throw new Error(OPTIONS_ERRORS[111])
       this.need(buyer, o.quote, o.totalPremium)
       return () => {
         this.move(o.quote, buyer, o.writer, o.totalPremium)
@@ -321,9 +321,9 @@ export class MockOptionsClient implements OptionsClient {
   exercise(id: bigint, holder: string, opts?: TxOptions): Promise<TxResult> {
     return this.simple(opts, () => {
       const o = this.find(id)
-      if (o.holder !== holder) throw new Error('Only the holder can exercise')
-      if (o.state !== 'active') throw new Error('Option is not active')
-      if (o.expiry <= now()) throw new Error('Option has expired')
+      if (o.holder !== holder) throw new Error(OPTIONS_ERRORS[108])
+      if (o.state !== 'active') throw new Error(OPTIONS_ERRORS[106])
+      if (o.expiry <= now()) throw new Error(OPTIONS_ERRORS[109])
       const pays = deliveryAmount(o)
       const receives = requiredCollateral(o)
       this.need(holder, pays.token, pays.amount)
@@ -339,9 +339,9 @@ export class MockOptionsClient implements OptionsClient {
   reclaim(id: bigint, writer: string, opts?: TxOptions): Promise<TxResult> {
     return this.simple(opts, () => {
       const o = this.find(id)
-      if (o.writer !== writer) throw new Error('Only the writer can reclaim')
-      if (o.expiry > now()) throw new Error('Option has not expired yet')
-      if (o.state !== 'offered' && o.state !== 'active') throw new Error('Nothing to reclaim')
+      if (o.writer !== writer) throw new Error(OPTIONS_ERRORS[107])
+      if (o.expiry > now()) throw new Error(OPTIONS_ERRORS[110])
+      if (o.state !== 'offered' && o.state !== 'active') throw new Error(OPTIONS_ERRORS[106])
       const back = requiredCollateral(o)
       return () => {
         this.move(back.token, MOCK_CONTRACT, writer, back.amount)
@@ -354,8 +354,8 @@ export class MockOptionsClient implements OptionsClient {
   claimDelivery(id: bigint, writer: string, opts?: TxOptions): Promise<TxResult> {
     return this.simple(opts, () => {
       const o = this.find(id)
-      if (o.writer !== writer) throw new Error('Only the writer can claim')
-      if (o.state !== 'exercised') throw new Error('Nothing to claim')
+      if (o.writer !== writer) throw new Error(OPTIONS_ERRORS[107])
+      if (o.state !== 'exercised') throw new Error(OPTIONS_ERRORS[106])
       const proceeds = deliveryAmount(o)
       return () => {
         this.move(proceeds.token, MOCK_CONTRACT, writer, proceeds.amount)
@@ -368,8 +368,8 @@ export class MockOptionsClient implements OptionsClient {
   cancelOffer(id: bigint, writer: string, opts?: TxOptions): Promise<TxResult> {
     return this.simple(opts, () => {
       const o = this.find(id)
-      if (o.writer !== writer) throw new Error('Only the writer can cancel')
-      if (o.state !== 'offered') throw new Error('Only open offers can be cancelled')
+      if (o.writer !== writer) throw new Error(OPTIONS_ERRORS[107])
+      if (o.state !== 'offered') throw new Error(OPTIONS_ERRORS[106])
       const back = requiredCollateral(o)
       return () => {
         this.move(back.token, MOCK_CONTRACT, writer, back.amount)

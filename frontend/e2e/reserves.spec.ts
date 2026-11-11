@@ -12,6 +12,7 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { BANNED_TAGLINES, MARGIN_BANNED_WORDS, clawbackShortfallDisclosure, findBannedWords } from '../src/core/disclosures'
+import { PAGE_DESCRIPTION } from '../src/features/reserves/copy'
 import { explorerAccount, explorerContract, explorerTx } from '../src/core/explorer'
 import { COVERED_CONTRACT, MARGIN_CONTRACT, TOKEN_RECORDS } from '../src/core/deployments'
 import { clawBack, expectAnnounced, expectNoAxeViolations, expectNoHorizontalOverflow, goTo, openApp, pageHeading } from './helpers'
@@ -54,11 +55,13 @@ async function refresh(page: Page): Promise<void> {
 }
 
 test.describe('Reserves', () => {
-  test('says what it shows, when it was read, and raises no alert while held covers locked', async ({ page }) => {
+  test('says what it shows, where the figures come from and when, and raises no alert while held covers locked', async ({ page }) => {
     await openReserves(page)
     await expect(pageHeading(page)).toHaveText('Reserves')
-    await expect(page.getByRole('main')).toContainText('It shows what is there now, not what an issuer may do next.')
-    await expect(page.getByTestId('read-at')).toHaveText(/^Read at \d{2}:\d{2}:\d{2} UTC$/)
+    await expect(page.getByRole('main')).toContainText(PAGE_DESCRIPTION)
+    // A mock build says the figures are mock data, and names no contract call they were read from.
+    await expect(page.getByTestId('read-at')).toHaveText(/^Mock data, \d{2}:\d{2}:\d{2} UTC$/)
+    await expect(page.getByRole('main')).not.toContainText('Read from')
     await expect(page.getByTestId('reserves-summary')).toHaveText('Held is at or above locked for all 4 tokens.')
     // No shortfall in the seed: nothing on the page is an alert.
     await expect(pageAlerts(page)).toHaveCount(0)
@@ -82,17 +85,24 @@ test.describe('Reserves', () => {
     await expect(statement(page)).not.toContainText('short')
   })
 
-  test('the bullet rows show the same figures and stay out of the accessibility tree', async ({ page }) => {
+  test('no bar while held equals locked; a bar in the row of a token where they differ, out of the accessibility tree', async ({ page }) => {
     await openReserves(page)
-    const figure = page.getByTestId('reserve-figure')
-    await expect(figure).toHaveAttribute('aria-hidden', 'true')
-    const lockedText = await tokenRow(page, 'USDx').getByTestId('locked').locator('[aria-hidden="true"]').first().innerText()
-    const first = figure.getByRole('listitem', { includeHidden: true }).first()
-    await expect(first).toContainText('USDx')
-    await expect(first).toContainText(`Held ${lockedText}`)
-    await expect(first).toContainText(`Locked ${lockedText}`)
-    await expect(first).toContainText('0.00 equal')
-    await expect(figure).toContainText('A hatched gap is a shortfall.')
+    await expect(page.getByTestId('reserve-figure')).toHaveCount(0)
+    await expect(statement(page).getByTestId('reserve-bar')).toHaveCount(0)
+    await stageShortfall(page, 'C_MOCK_BOND', 65_000_000n)
+    await refresh(page)
+    await expect(tokenRow(page, 'BOND').getByTestId('reserve-bar')).toHaveCount(1)
+    await expect(statement(page).getByTestId('reserve-bar')).toHaveCount(1)
+    await expect(tokenRow(page, 'BOND').getByTestId('reserve-bar').locator('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  test('a click anywhere on a row opens it; the button stays the one tab stop', async ({ page }) => {
+    await openReserves(page)
+    const button = toggle(page, 'FUND')
+    await tokenRow(page, 'FUND').getByTestId('held').click()
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+    await tokenRow(page, 'FUND').getByTestId('difference').click()
+    await expect(button).toHaveAttribute('aria-expanded', 'false')
   })
 
   test('a row opens to the split of what is locked, and the items add up to locked', async ({ page }) => {
@@ -147,8 +157,9 @@ test.describe('Reserves', () => {
     const ticket = page.getByTestId('ticket')
     await expect(ticket).toContainText('95.00 USDx')
     await ticket.getByRole('button', { name: 'Review' }).click()
-    await ticket.getByRole('checkbox').check()
-    await ticket.getByRole('button', { name: /^Write put/ }).click()
+    const write = ticket.getByRole('button', { name: /^Write put/ })
+    await expect(write).toBeVisible()
+    await write.click()
     await expect(ticket.getByText(/Offer No\. \d{6}/).first()).toBeVisible()
     await ticket.getByRole('button', { name: 'Done' }).click()
 
@@ -170,8 +181,9 @@ test.describe('Reserves', () => {
     const alert = pageAlerts(page)
     await expect(alert).toHaveCount(1)
     await expect(alert.getByTestId('shortfall-disclosure')).toHaveText(clawbackShortfallDisclosure('BOND'))
-    await expect(alert).toContainText('short by 6.50.')
-    await expect(page.getByTestId('reserves-summary')).toHaveText('Held is below locked for BOND.')
+    // Said once: the notice carries the sentence, the row right below carries the figures, no summary repeats it.
+    await expect(alert).not.toContainText('6.50')
+    await expect(page.getByTestId('reserves-summary')).toHaveCount(0)
 
     expect(await locked(page, 'BOND')).toBe(before)
     expect(await held(page, 'BOND')).toBe(before - 65_000_000n)
@@ -179,7 +191,7 @@ test.describe('Reserves', () => {
     // A sign and a word, never colour alone.
     await expect(tokenRow(page, 'BOND').getByTestId('difference')).toContainText('−6.50')
     await expect(tokenRow(page, 'BOND').getByTestId('difference')).toContainText('short')
-    await expect(page.getByTestId('reserve-figure').getByRole('listitem', { includeHidden: true }).filter({ hasText: 'BOND' })).toContainText('−6.50 short')
+    await expect(tokenRow(page, 'BOND').getByTestId('reserve-bar')).toBeVisible()
     // The other tokens are untouched.
     expect(await difference(page, 'USDx')).toBe(0n)
 
@@ -187,27 +199,53 @@ test.describe('Reserves', () => {
     await stageShortfall(page, 'C_MOCK_EQTY', 10_000_000n)
     await refresh(page)
     await expect(pageAlerts(page)).toHaveCount(1)
-    await expect(pageAlerts(page).getByTestId('shortfall-disclosure')).toHaveText(clawbackShortfallDisclosure(['BOND', 'EQTY']))
+    await expect(pageAlerts(page).getByTestId('shortfall-disclosure')).toHaveText(clawbackShortfallDisclosure('BOND and EQTY'))
+  })
+
+  test('a difference under a cent is said in words, with the exact value one press away', async ({ page }) => {
+    await openReserves(page)
+    await stageShortfall(page, 'C_MOCK_EQTY', 1n)
+    await refresh(page)
+    const cell = tokenRow(page, 'EQTY').getByTestId('difference')
+    expect(await difference(page, 'EQTY')).toBe(-1n)
+    await expect(cell).toContainText('under 0.01')
+    await expect(cell).toContainText('short')
+    await expect(cell).not.toContainText('<0.01')
   })
 
   test('Refresh reads again and says so', async ({ page }) => {
     await openReserves(page)
     await refresh(page)
     await expectAnnounced(page, /^Reserves read again at \d{2}:\d{2}:\d{2} UTC\.$/)
-    await expect(page.getByTestId('read-at')).toHaveText(/^Read at \d{2}:\d{2}:\d{2} UTC$/)
+    await expect(page.getByTestId('read-at')).toHaveText(/^Mock data, \d{2}:\d{2}:\d{2} UTC$/)
   })
 
-  test('a failed read says so, offers a retry, and still shows contracts and roles', async ({ page }) => {
+  test('a failed read says so in plain words, keeps the raw message behind a disclosure, and still shows contracts and roles', async ({ page }) => {
     // The mock market is a chunk of its own: without it the contract cannot be read.
     await page.route(/mockClient/, (route) => route.abort())
     await page.goto('/reserves')
     await expect(pageHeading(page)).toHaveText('Reserves')
     await expect(page.getByRole('main').getByText('Reserves could not be read', { exact: true })).toBeVisible({ timeout: 25_000 })
-    await expect(page.getByRole('button', { name: 'Read again' })).toBeVisible()
+    await expect(page.getByRole('main').getByRole('button', { name: 'Refresh' })).toBeVisible()
+    await expect(page.getByRole('main')).toContainText('The read of the contract failed, so no figure is shown.')
+    // The raw message is there, closed.
+    await expect(page.getByRole('main').getByText('Technical detail')).toBeVisible()
+    await expect(page.getByRole('main').getByText(/Failed to fetch/)).toBeHidden()
     await expect(statement(page)).toHaveCount(0)
     // Not a live region of its own: the failure went through the shell's assertive region once.
     await expect(pageAlerts(page)).toHaveCount(0)
     await expect(roles(page)).toContainText(COVERED_CONTRACT.contractId)
+  })
+
+  test('Refresh in the error notice reads again and leaves focus on the statement, not on the page body', async ({ page }) => {
+    await page.route(/mockClient/, (route) => route.abort())
+    await page.goto('/reserves')
+    await expect(page.getByRole('main').getByText('Reserves could not be read', { exact: true })).toBeVisible({ timeout: 25_000 })
+    await page.unroute(/mockClient/)
+    await page.getByRole('main').getByRole('button', { name: 'Refresh' }).focus()
+    await page.keyboard.press('Enter')
+    await expect(statement(page)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Held against locked' })).toBeFocused()
   })
 
   test('headings come in order, and the page uses no promise word and no disclaimer tagline', async ({ page }) => {
@@ -237,10 +275,12 @@ test.describe('Reserves', () => {
 })
 
 test.describe('Contracts and roles', () => {
-  test('gives the Covered contract id in full, its wasm hash and the three facts', async ({ page }) => {
+  test('gives the Covered contract id in full, its wasm hash and the facts, in one list', async ({ page }) => {
     await openReserves(page)
     const covered = roles(page).getByRole('region', { name: 'Covered contract' })
-    await expect(covered).toContainText('No admin. No upgrades. No oracle.')
+    await expect(covered).not.toContainText('No admin. No upgrades. No oracle.')
+    await expect(covered.getByRole('term')).toHaveText(['Contract id', 'Version', 'Wasm hash', 'Deploy transaction', 'Deployed by', 'Admin', 'Upgrades', 'Oracle', 'Asset listing', 'Audit'])
+    await expect(covered).toContainText('The contract has no admin function and no owner.')
     await expect(covered).toContainText(COVERED_CONTRACT.contractId)
     await expect(covered).toContainText(COVERED_CONTRACT.wasmHash)
     await expect(covered).toContainText(COVERED_CONTRACT.version)
@@ -248,8 +288,10 @@ test.describe('Contracts and roles', () => {
     await expect(covered.getByRole('link', { name: /^View transaction/ })).toHaveAttribute('href', explorerTx(COVERED_CONTRACT.deployTx))
     for (const term of ['Admin', 'Upgrades', 'Oracle', 'Asset listing', 'Audit']) await expect(covered.getByRole('term').filter({ hasText: new RegExp(`^${term}$`) })).toBeVisible()
     await expect(covered).toContainText('No outside party has reviewed the code.')
-    // A mock build calls no contract and says which deployment this is.
-    await expect(roles(page)).toContainText('This build runs on mock data and calls no contract.')
+    // A mock build says which deployment this is, and which token it shows under another code.
+    await expect(roles(page)).toContainText('The Testnet deployment is listed here as recorded on 26 Oct 2026. Its fund token is RWA, shown above as FUND.')
+    // Copy belongs to an id printed in full and to the wasm hash; a shortened id carries its explorer link only.
+    await expect(covered.getByRole('button', { name: /^Copy/ })).toHaveCount(2)
   })
 
   test('lists the token contracts with their issuers and what each issuer can do', async ({ page }) => {
@@ -276,10 +318,10 @@ test.describe('Contracts and roles', () => {
     await expect(margin.getByRole('link', { name: /View the Margin admin on the explorer/ })).toHaveAttribute('href', explorerAccount(MARGIN_CONTRACT.admin))
     await expect(margin.getByRole('link', { name: /View the Margin publisher on the explorer/ })).toHaveAttribute('href', explorerAccount(MARGIN_CONTRACT.publisher))
     await expect(margin.getByRole('heading', { level: 4 })).toHaveText(['Admin', 'Publisher'])
-    await expect(margin.getByRole('list', { name: 'Can', exact: true })).toHaveCount(2)
-    await expect(margin.getByRole('list', { name: 'Cannot', exact: true })).toHaveCount(2)
-    await expect(margin.getByRole('list', { name: 'Can', exact: true }).first()).toContainText('List a new series')
-    await expect(margin.getByRole('list', { name: 'Cannot', exact: true }).first()).toContainText('Trade, take over a position or deposit into the vault.')
+    await expect(margin).toContainText('Lists the series that can be traded')
+    // What neither role can do is said once, for both.
+    await expect(margin.getByRole('list', { name: 'Neither can', exact: true })).toContainText('Trade, take over a position or deposit into the vault.')
+    await expect(margin.getByRole('term')).toHaveText(['Contract id', 'Version', 'Wasm hash', 'Deploy transaction', 'Deployed by', 'Upgrades', 'Prices', 'Audit'])
     await expect(margin).toContainText('These prices decide every liquidation, early exercise and payout.')
     await expect(margin).toContainText('The admin and the publisher must be different accounts.')
     // The two contracts stay apart: the Covered block names no admin address.

@@ -45,20 +45,41 @@ export type Access =
   | { kind: 'guest' }
   /** A wallet is connected and the asset's issuer is still being read. */
   | { kind: 'checking' }
-  /** A wallet is connected and it is not the issuer. `issuer` is null when the issuer could not be read. */
+  /**
+   * A wallet is connected and it is not the issuer. `issuer` is null when the issuer's address is not known but
+   * the connected account was checked against the asset contract and does not match.
+   */
   | { kind: 'not-issuer'; connected: string; issuer: string | null }
+  /** A wallet is connected and whether it issues the asset could not be checked (the check itself failed). */
+  | { kind: 'unchecked'; connected: string }
   | { kind: 'issuer'; issuer: string }
 
 /**
  * `issuer` is the asset's issuer account: `undefined` while it is being read, `null` when it cannot be known
- * (the asset contract did not answer, or it does not wrap a classic asset).
+ * (the asset contract did not answer, or it does not wrap a classic asset). `checkFailed` is true when, for an
+ * asset whose issuer is not known, the check of the connected account against the asset contract failed.
  */
-export function accessOf(input: { mock: boolean; address: string | null; issuer: string | null | undefined }): Access {
+export function accessOf(input: { mock: boolean; address: string | null; issuer: string | null | undefined; checkFailed?: boolean }): Access {
   if (input.mock) return { kind: 'mock' }
   if (!input.address) return { kind: 'guest' }
   if (input.issuer === undefined) return { kind: 'checking' }
   if (input.issuer !== null && input.issuer === input.address) return { kind: 'issuer', issuer: input.issuer }
+  if (input.issuer === null && input.checkFailed) return { kind: 'unchecked', connected: input.address }
   return { kind: 'not-issuer', connected: input.address, issuer: input.issuer }
+}
+
+/**
+ * Another listed asset that the connected account issues, when it is not the issuer of the one on screen: the
+ * page offers to open it. Null when there is none.
+ */
+export function otherIssuedAsset(assets: readonly IssuerAsset[], current: IssuerAsset | null, address: string | null): IssuerAsset | null {
+  if (!address) return null
+  return assets.find((a) => a.issuer === address && a.contractId !== current?.contractId) ?? null
+}
+
+/** The asset the page opens on: the one picked, else the first the connected account issues, else the first listed. */
+export function pickAsset(assets: readonly IssuerAsset[], picked: string | null, address: string | null): IssuerAsset | null {
+  return assets.find((a) => a.contractId === picked) ?? (address ? assets.find((a) => a.issuer === address) : undefined) ?? assets[0] ?? null
 }
 
 // ---------------------------------------------------------------------------------------------------- holders
@@ -127,22 +148,35 @@ const AUTH_STATE: Record<HolderState, AuthState> = {
 
 // ---------------------------------------------------------------------------------------------------- rows
 
-/** Where a row comes from: the options contract (always listed), an address the issuer typed, or Horizon's holder list. */
+/** Where a row comes from: the Covered contract (always listed), an address the issuer typed, or Horizon's holder list. */
 export type RowSource = 'escrow' | 'added' | 'holder'
 
 export interface AccountRow {
   address: string
   kind: TargetKind
   source: RowSource
-  /** The options contract: the escrow of every option on the asset. */
+  /** The Covered contract: the escrow of every option on the asset. */
   escrow: boolean
   /** Undefined while the first read is running. */
   read: HolderRead | undefined
 }
 
+/** The order of the holder list: the accounts that need a decision first, then the authorized by balance. */
+const RANK: Record<HolderState, number> = { unauthorized: 0, 'maintain-only': 0, unknown: 1, authorized: 2, 'no-trustline': 3, unfunded: 3, issuer: 3 }
+
+function byDecision(a: { address: string; read: HolderRead }, b: { address: string; read: HolderRead }): number {
+  const rank = RANK[a.read.state] - RANK[b.read.state]
+  if (rank !== 0) return rank
+  const x = a.read.balance ?? -1n
+  const y = b.read.balance ?? -1n
+  if (x !== y) return x > y ? -1 : 1
+  return a.address < b.address ? -1 : a.address > b.address ? 1 : 0
+}
+
 /**
- * The table's rows: the options contract first, then the addresses typed in this session (newest first), then
- * the holders Horizon lists. An address appears once, at its first place in that order.
+ * The table's rows: the Covered contract first, then the addresses typed in this session (newest first), then
+ * the holders Horizon lists, sorted so the accounts that need a decision come first (not authorized and
+ * restricted), then the authorized ones by balance, largest first. An address appears once, at its first place.
  */
 export function mergeRows(input: {
   escrow: string | undefined
@@ -161,9 +195,16 @@ export function mergeRows(input: {
   if (input.escrow) push(input.escrow, 'escrow', input.reads[input.escrow])
   for (const address of input.added) push(address, 'added', input.reads[address])
   // A fresh single read (made after an action) wins over the row of the holder list.
-  for (const h of input.holders) push(h.address, 'holder', input.reads[h.address] ?? h.read)
+  const holders = input.holders.map((h) => ({ address: h.address, read: input.reads[h.address] ?? h.read })).sort(byDecision)
+  for (const h of holders) push(h.address, 'holder', h.read)
   return rows
 }
+
+/** Above this many accounts the list offers to show only the ones that need a decision. */
+export const FILTER_ABOVE = 10
+
+/** Not authorized, or restricted: the accounts the issuer has a decision to make about. */
+export const needsDecision = (row: Pick<AccountRow, 'read'>): boolean => row.read?.state === 'unauthorized' || row.read?.state === 'maintain-only'
 
 export type AddResult = { ok: true; address: string } | { ok: false; error: string }
 
@@ -179,71 +220,69 @@ export function checkNewAccount(text: string, listed: readonly string[]): AddRes
 
 export type { IssuerActionKind }
 
-export interface ActionState {
+/** One action a row offers. `reason` says why it cannot run now; present whenever `enabled` is false. */
+export interface RowAction {
+  kind: IssuerActionKind
   enabled: boolean
-  /** Why it is not available, in one sentence. Present whenever `enabled` is false. */
   reason?: string
 }
 
 /**
- * The actions one row offers. An action is `null` when the row's state does not call for it (nobody authorizes an
- * authorized account); an offered action can still be disabled, with its reason. `note` says why a row offers
- * nothing at all.
+ * The actions one row offers: at most one button (`primary`, the action its state calls for) and a menu with the
+ * rest (`more`). Clawback is never the button: it takes the extra step of the menu. `note` says why a row
+ * offers nothing at all.
  */
 export interface RowActions {
-  authorize: ActionState | null
-  freeze: ActionState | null
-  clawback: ActionState | null
+  primary: RowAction | null
+  more: RowAction[]
   note: string | null
 }
 
-const off = (reason: string): ActionState => ({ enabled: false, reason })
-const ON: ActionState = { enabled: true }
-const nothing = (note: string): RowActions => ({ authorize: null, freeze: null, clawback: null, note })
+const nothing = (note: string | null): RowActions => ({ primary: null, more: [], note })
 
 /**
- * Which of the three actions a row offers. The rules, in order:
+ * Which actions a row offers. The rules, in order:
+ *   - nothing until the row's first read lands (a failed read is a read: it keeps every action open);
  *   - the issuing account, an account that does not exist and an account without a trustline have nothing to act on;
  *   - core's `actionsFor` decides authorize and freeze from the authorization state (an unknown state leaves both
  *     open, so a failed read never locks the issuer out);
- *   - freezing needs the issuer's revocable flag, clawback its clawback flag (when the flags were read);
- *   - clawback also needs a balance it applies to;
+ *   - an action the issuer's flags rule out for the whole asset is not offered at all: `flagLimits` says so once,
+ *     above the accounts (flags that were not read rule nothing out);
+ *   - clawback needs a balance it applies to: a trustline opened before clawback was enabled, or a zero balance,
+ *     has nothing to claw back (the row's cells say which);
  *   - one transaction at a time: while one runs (or its outcome is unknown), what is offered stays in place,
  *     disabled, with `busy` as the reason.
  */
 export function rowActions(row: Pick<AccountRow, 'read'>, flags: AssetFlags | null, code: string, busy: string | null = null): RowActions {
   const read = row.read
-  const state: HolderState = read?.state ?? 'unknown'
+  if (!read) return nothing(null)
+  const state = read.state
   if (state === 'issuer') return nothing(COPY.reasons.issuerRow)
   if (state === 'unfunded') return nothing(COPY.reasons.unfunded)
   if (state === 'no-trustline') return nothing(COPY.reasons.noTrustline(code))
   const base = actionsFor(AUTH_STATE[state])
 
-  let authorize: ActionState | null = base.authorize ? ON : null
-  let freeze: ActionState | null = base.freeze ? ON : null
-  if (freeze && flags && !flags.authRevocable) freeze = off(COPY.reasons.notRevocable)
-
-  let clawback: ActionState = ON
-  if (flags && !flags.clawback) clawback = off(COPY.reasons.clawbackOff)
-  else if (read?.clawback === false) clawback = off(COPY.reasons.clawbackNotOnLine)
-  else if (read?.balance === 0n) clawback = off(COPY.reasons.nothingToClaw(code))
-
-  if (busy !== null) {
-    const wait = off(busy)
-    authorize = authorize && wait
-    freeze = freeze && wait
-    clawback = wait
-  }
-  return { authorize, freeze, clawback, note: null }
+  const kinds: IssuerActionKind[] = []
+  if (base.authorize) kinds.push('authorize')
+  if (base.freeze && (!flags || flags.authRevocable)) kinds.push('freeze')
+  const claw = (!flags || flags.clawback) && read.clawback !== false && read.balance !== 0n
+  const act = (kind: IssuerActionKind): RowAction => (busy !== null ? { kind, enabled: false, reason: busy } : { kind, enabled: true })
+  return { primary: kinds.length > 0 ? act(kinds[0]) : null, more: [...kinds.slice(1), ...(claw ? (['clawback'] as const) : [])].map(act), note: null }
 }
 
-/** The actions the issuer's flags rule out for every account, as sentences for the flags card. */
+/** The actions the issuer's flags rule out for every account, as sentences said once above the accounts. */
 export function flagLimits(flags: AssetFlags): string[] {
   const out: string[] = []
-  if (!flags.authRevocable) out.push(COPY.reasons.notRevocable)
-  if (!flags.clawback) out.push(COPY.reasons.clawbackOff)
+  if (!flags.authRevocable) out.push(COPY.limits.freeze)
+  if (!flags.clawback) out.push(COPY.limits.clawback)
   return out
 }
+
+/**
+ * Authorize runs at once, because it takes nothing away, except when the issuer cannot revoke: then it cannot be
+ * undone, and it asks first. Flags that were not read ask nothing.
+ */
+export const authorizeIsFinal = (flags: AssetFlags | null): boolean => flags !== null && !flags.authRevocable
 
 // ---------------------------------------------------------------------------------------------------- clawback
 
@@ -300,7 +339,7 @@ export interface ClawbackImpact {
 }
 
 /**
- * What a clawback of `units` from the options contract does to its reserves: `reserved` is what the contract owes
+ * What a clawback of `units` from the Covered contract does to its reserves: `reserved` is what the contract owes
  * in this token (`open_collateral`), `held` what it holds. Uses the same `shortfall` as the Reserves page.
  */
 export function clawbackImpact(health: { reserved: bigint; held: bigint }, units: bigint): ClawbackImpact {
@@ -357,17 +396,23 @@ export function accountExposure(options: readonly OptionLike[], assetId: string,
   return { holding, written }
 }
 
-/** The exposure of a row as one sentence for the confirmations. Null when the options were not read. */
-export function exposureText(row: Pick<AccountRow, 'address' | 'escrow'>, code: string, escrow: EscrowExposure | null, account: AccountExposure | null): string | null {
+/** What a row has open on the asset, as rows of a confirmation. Null when the options were not read. */
+export interface ExposureRow {
+  label: string
+  value: number
+  hint?: string
+}
+
+export function exposureRows(row: Pick<AccountRow, 'escrow'>, escrow: EscrowExposure | null, account: AccountExposure | null): ExposureRow[] | null {
   if (row.escrow) {
     if (!escrow) return null
-    return escrow.total === 0 ? COPY.exposure.escrowNone(code) : COPY.exposure.escrow(escrow.total, escrow.active, escrow.offered, escrow.awaiting, code)
+    return [{ label: COPY.exposure.open, value: escrow.total, hint: escrow.total > 0 ? COPY.contract.openSplit(escrow.active, escrow.offered, escrow.awaiting) : undefined }]
   }
   if (!account) return null
-  if (account.holding > 0 && account.written > 0) return COPY.exposure.both(account.holding, account.written, code)
-  if (account.holding > 0) return COPY.exposure.holdingOnly(account.holding, code)
-  if (account.written > 0) return COPY.exposure.writtenOnly(account.written, code)
-  return COPY.exposure.none(code)
+  return [
+    { label: COPY.exposure.written, value: account.written },
+    { label: COPY.exposure.held, value: account.holding },
+  ]
 }
 
 // ---------------------------------------------------------------------------------------------------- transactions
@@ -386,6 +431,14 @@ export function actionLabel(input: IssuerActionInput): string {
   if (input.kind === 'authorize') return COPY.labels.authorize(who, input.asset.code)
   if (input.kind === 'freeze') return COPY.labels.freeze(who, input.asset.code)
   return COPY.labels.clawback(formatExact(input.units ?? 0n, input.asset.decimals), input.asset.code, who)
+}
+
+/** A confirmed action in one line: "Frozen GDY2…ZUVN for BOND." */
+export function doneLabel(input: IssuerActionInput): string {
+  const who = shortAddress(input.target)
+  if (input.kind === 'authorize') return COPY.done.authorize(who, input.asset.code)
+  if (input.kind === 'freeze') return COPY.done.freeze(who, input.asset.code)
+  return COPY.done.clawback(formatExact(input.units ?? 0n, input.asset.decimals), input.asset.code, who)
 }
 
 export const ACTION_DONE: Record<IssuerActionKind, string> = { authorize: 'Authorized', freeze: 'Frozen', clawback: 'Clawed back' }
@@ -408,6 +461,9 @@ export interface RecordedTx {
 
 export interface LogRow {
   id: string
+  /** The action without the account it acts on, which has its own column: "Freeze", "Claw back 5.00 BOND". */
+  action: string
+  /** The whole label, for screen readers and as a fallback. */
   label: string
   /** The account or contract acted on, when the record says. */
   target: string | null
@@ -417,13 +473,44 @@ export interface LogRow {
   at: number
 }
 
-/** The issuer's own actions among the recorded transactions, newest first, at most `limit`. */
-export function logRows(entries: readonly RecordedTx[], limit = 20): LogRow[] {
+const KIND_OF: Record<string, IssuerActionKind | undefined> = {
+  [issuerActionName('authorize')]: 'authorize',
+  [issuerActionName('freeze')]: 'freeze',
+  [issuerActionName('clawback')]: 'clawback',
+}
+
+/** "Claw back 5.00 BOND from GAJ2…VC7G" without its account: the verb, and the amount of a clawback. */
+function actionText(action: string, label: string): string {
+  const kind = KIND_OF[action]
+  if (kind === 'authorize') return COPY.log.authorize
+  if (kind === 'freeze') return COPY.log.freeze
+  const m = /^(.*) from \S+$/.exec(label)
+  return m ? m[1] : label
+}
+
+/**
+ * The issuer's own actions among the recorded transactions, newest first, at most `limit`. With `assetId`, only
+ * the actions on that asset.
+ */
+export function logRows(entries: readonly RecordedTx[], assetId: string | null = null, limit = 20): LogRow[] {
   return entries
     .filter((e) => isIssuerAction(e.action))
-    .sort((a, b) => b.startedAt - a.startedAt)
+    .map((e) => ({ e, subject: parseIssuerSubject(e.subject) }))
+    .filter(({ subject }) => assetId === null || subject?.assetId === assetId)
+    .sort((a, b) => b.e.startedAt - a.e.startedAt)
     .slice(0, limit)
-    .map((e) => ({ id: e.id, label: e.label, target: parseIssuerSubject(e.subject)?.target ?? null, phase: e.phase, hash: e.hash, at: e.startedAt }))
+    .map(({ e, subject }) => ({ id: e.id, action: actionText(e.action, e.label), label: e.label, target: subject?.target ?? null, phase: e.phase, hash: e.hash, at: e.startedAt }))
+}
+
+const OPEN_PHASES: ReadonlySet<string> = new Set(['checking', 'signing', 'submitting', 'pending', 'unknown'])
+
+/**
+ * The newest issuer action whose outcome is not final (in flight, or sent and not confirmed), from the persisted
+ * list: it blocks every new action until it is resolved, also after the page was left and opened again.
+ */
+export function openIssuerAction(entries: readonly RecordedTx[]): { id: string; unknown: boolean } | null {
+  const open = entries.filter((e) => isIssuerAction(e.action) && OPEN_PHASES.has(e.phase)).sort((a, b) => b.startedAt - a.startedAt)[0]
+  return open ? { id: open.id, unknown: open.phase === 'unknown' } : null
 }
 
 // ---------------------------------------------------------------------------------------------------- submit errors

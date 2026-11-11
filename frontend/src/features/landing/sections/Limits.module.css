@@ -8,8 +8,8 @@
     width: 50%;
     height: auto;
     padding-block: var(--s-12);
-    font-size: var(--body-size);
-    line-height: var(--body-line);
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
     font-weight: var(--body-weight);
     white-space: normal;
     vertical-align: top;
@@ -36,10 +36,38 @@
     padding-inline-end: 0;
   }
 
-  .more {
-    margin-top: var(--s-16);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: 500;
+  /* Phones: each row is a block, what exists and then what does not. Both are full sentences, so the pair reads
+     without its column heads; the second keeps its heavier ink. */
+  @media (max-width: 599.98px) {
+    .table,
+    .table tbody,
+    .table tr,
+    .table td {
+      display: block;
+    }
+
+    .table thead {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .table tr {
+      padding-block: var(--s-12);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .table td {
+      width: auto;
+      padding: 0;
+      border: 0;
+    }
+
+    .missing {
+      margin-top: var(--s-6);
+    }
   }
 }

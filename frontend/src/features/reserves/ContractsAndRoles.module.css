@@ -47,6 +47,7 @@
     gap: var(--s-4);
   }
 
+  /* The three blocks: one step under the section heading, one above the role names (sans, UI size). */
   .blockTitle {
     font-family: var(--font-serif);
     font-size: var(--h3-size);
@@ -55,44 +56,8 @@
     color: var(--text);
   }
 
-  /* The three facts of a contract, said once in the serif. */
-  .statement {
-    font-family: var(--font-serif);
-    font-size: var(--figure-lg-size);
-    line-height: var(--figure-lg-line);
-    font-weight: 560;
+  .value {
     color: var(--text);
-    text-wrap: balance;
-  }
-
-  .columns {
-    display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    gap: var(--s-24) var(--s-56);
-    align-items: start;
-  }
-
-  .columns[data-single] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .identity {
-    border-top: 1px solid var(--hairline);
-  }
-
-  .idLine {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-2);
-    min-width: 0;
-  }
-
-  .idLabel {
-    font-size: var(--label-size);
-    line-height: var(--label-line);
-    font-weight: var(--label-weight);
-    font-stretch: var(--label-stretch);
-    color: var(--muted);
   }
 
   .hash {
@@ -103,7 +68,7 @@
   }
 
   .hashText {
-    padding-block: var(--s-6);
+    padding-block: var(--s-2);
     font-family: var(--font-mono);
     font-size: var(--mono-size);
     line-height: var(--mono-line);
@@ -151,6 +116,11 @@
     margin: 0;
   }
 
+  .flagNo {
+    color: var(--text-2);
+    font-weight: 420;
+  }
+
   .tokenNotes {
     display: flex;
     flex-direction: column;
@@ -186,7 +156,6 @@
     line-height: var(--ui-line);
   }
 
-  .margin .identity,
   .margin :where(dl) > div,
   .role {
     border-color: var(--rule);
@@ -204,7 +173,7 @@
     flex-direction: column;
     gap: var(--s-8);
     min-width: 0;
-    padding-top: var(--s-16);
+    padding-top: var(--s-12);
     border-top: 1px solid var(--rule);
   }
 
@@ -216,25 +185,32 @@
     gap: var(--s-4) var(--s-16);
   }
 
+  /* A role names the address beside it: a label at the UI size, under the block title. */
   .roleName {
-    font-family: var(--font-serif);
-    font-size: var(--h3-size);
-    line-height: var(--h3-line);
-    font-weight: var(--h3-weight);
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
   }
 
   .roleSummary {
-    max-width: 34rem;
+    max-width: 40rem;
     font-size: var(--ui-size);
     line-height: var(--ui-line);
-    color: var(--text);
+    color: var(--text-2);
     text-wrap: pretty;
   }
 
+  .neither {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
   .listLabel {
-    margin-top: var(--s-8);
-    font-size: var(--label-size);
-    line-height: var(--label-line);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
     font-weight: 600;
     color: var(--text);
   }
@@ -242,8 +218,8 @@
   .list {
     display: flex;
     flex-direction: column;
-    gap: var(--s-6);
-    max-width: 34rem;
+    gap: var(--s-4);
+    max-width: 40rem;
     margin: 0;
     padding-inline-start: var(--s-16);
     font-size: var(--ui-size);
@@ -257,13 +233,13 @@
   }
 
   .separation {
+    margin-top: var(--s-8);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
   }
 
   @media (max-width: 999.98px) {
-    .columns,
     .roles {
       grid-template-columns: minmax(0, 1fr);
     }

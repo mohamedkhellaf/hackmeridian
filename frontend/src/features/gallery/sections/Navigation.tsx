@@ -3,7 +3,6 @@ import {
   Address,
   Button,
   EmptyNote,
-  Glyph,
   IconBack,
   Link,
   NavTab,
@@ -42,9 +41,7 @@ export function NavigationSection() {
           description="A tokenized bond, issued on Stellar."
           meta={
             <>
-              <span className={styles.glyphItem}>
-                <Glyph name="bond" /> Bond
-              </span>
+              <span>Bond</span>
               <Address value={SAMPLE_ADDRESS} name="Issuer" explorerUrl={EXPLORER} />
               <span>Demo price 9.82 USDx</span>
             </>

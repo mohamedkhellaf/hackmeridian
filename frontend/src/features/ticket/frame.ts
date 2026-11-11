@@ -10,6 +10,8 @@ export type Container = 'rail' | 'drawer' | 'page'
 /** The series a ticket is about, for switching between Buy, Write and Bid without losing the terms. */
 export interface SeriesRef {
   assetId: string
+  /** Code of the underlying, for a heading that names the series: "BOND". */
+  code?: string
   kind: OptionKind
   /** Strike for one whole unit, as a plain decimal. */
   strike?: string
@@ -33,6 +35,8 @@ export interface FrameValue {
   /** Moves focus to the ticket's heading (after a step change, and to the receipt). */
   focusTitle: () => void
   close: () => void
+  /** False once the ticket was closed (a drawer still shows it while it slides out): an attempt not yet in the wallet stops. */
+  isOpen: () => boolean
 }
 
 export const FrameContext = createContext<FrameValue | null>(null)

@@ -4,7 +4,6 @@ import type { Intent } from '../../app/search'
 import type { PayoffGlyph } from '../../ui'
 
 export const MARKETS_TITLE = 'Markets'
-export const MARKETS_LEAD = 'Puts and calls on tokenized assets. A maker locks the full collateral in the contract before you pay, and exercise delivers the asset itself.'
 
 export const INTENTS_HEADING = 'What do you want to do?'
 export const ASSETS_HEADING = 'Assets'
@@ -14,71 +13,78 @@ export interface IntentCopy {
   glyph: PayoffGlyph
   /** One line: what the user gets or agrees to. `quote` is the quote token code. */
   consequence: (quote: string) => string
-  /** Who pays the premium: the label and the figure-like phrase after it. */
-  premiumLabel: 'You pay' | 'You are paid'
-  premiumText: string
-  /** The question of the asset choice. */
+  /** Who pays, in two words: the short form of `premium`, for a phone row. */
+  payer: 'You pay' | 'You are paid'
+  /** Who pays the premium, when, and that the premium is the price of the agreement. */
+  premium: string
+  /** The question the Assets section asks once the intent is chosen. */
   question: string
-  /** The link of one asset in the choice: "Set a floor on BOND". */
+  /** The accessible name of an asset's action once the intent is chosen: "Set a floor on BOND". */
   choose: (code: string) => string
 }
+
+const PAY_ONCE = 'You pay for that right once, when you buy: the premium.'
+// True whether a request is filled or an offer posted: nothing is paid until a buyer takes the terms.
+const PAID_WHEN_TAKEN = 'A buyer pays you for that agreement, the premium, when one takes your terms.'
 
 export const INTENT_COPY: Record<Intent, IntentCopy> = {
   floor: {
     glyph: 'long-put',
     consequence: () => 'Keep the right to sell at a price you choose, until a date you choose.',
-    premiumLabel: 'You pay',
-    premiumText: 'a premium, once, now',
+    payer: 'You pay',
+    premium: PAY_ONCE,
     question: 'Set a floor on which asset?',
     choose: (code) => `Set a floor on ${code}`,
   },
   'earn-hold': {
     glyph: 'short-call',
     consequence: () => 'Lock what you hold and agree to sell it at a higher price if a buyer asks before the deadline.',
-    premiumLabel: 'You are paid',
-    premiumText: 'a premium now',
+    payer: 'You are paid',
+    premium: PAID_WHEN_TAKEN,
     question: 'Earn on which asset?',
     choose: (code) => `Earn on ${code}`,
   },
   'earn-buy': {
     glyph: 'short-put',
     consequence: (quote) => `Lock ${quote} and agree to buy at a lower price if a holder asks before the deadline.`,
-    premiumLabel: 'You are paid',
-    premiumText: 'a premium now',
+    payer: 'You are paid',
+    premium: PAID_WHEN_TAKEN,
     question: 'Which asset would you buy at a lower price?',
     choose: (code) => `Earn while waiting to buy ${code}`,
   },
   'lock-buy': {
     glyph: 'long-call',
     consequence: () => 'Keep the right to buy at a price you choose, until a date you choose.',
-    premiumLabel: 'You pay',
-    premiumText: 'a premium, once, now',
+    payer: 'You pay',
+    premium: PAY_ONCE,
     question: 'Lock a buy price on which asset?',
     choose: (code) => `Lock a buy price on ${code}`,
   },
 }
 
-/** The line after the three main cards that leads to the fourth intent. */
-export const LOCK_BUY_LEAD = 'Want to buy later at a price fixed today?'
-/** Follows the link "Lock a buy price" in the same sentence. */
-export const LOCK_BUY_REST = ': keep the right to buy at a price you choose, until a date you choose. You pay a premium, once, now.'
+/** Beside an intent that leads straight to one asset, so the jump is expected. */
+export const onAsset = (code: string): string => `on ${code}`
 
 export const CHOICE_CANCEL = 'Choose something else'
-export const CHOICE_GUEST_HINT = 'You can look at the terms without a wallet. Connect one to trade.'
 
 // ---------------------------------------------------------------------------------------------- assets table
 
 export const COL = {
   asset: 'Asset',
-  issuer: 'Issuer',
   tier: 'Tier',
+  /** The price column when the rows' prices come from different sources; otherwise the source names it. */
   reference: 'Reference price',
   offers: 'Open offers',
-  expiry: 'Nearest expiry',
-  put: 'Lowest put, per unit',
-  call: 'Lowest call, per unit',
+  expiry: 'Nearest deadline',
+  put: 'Cheapest put',
+  call: 'Cheapest call',
+  hold: 'You hold',
   action: 'Action',
 } as const
+/** The unit line of a premium column: the figures below it are bare. */
+export const perUnitOf = (quote: string): string => `${quote} per unit`
+/** Under a cheapest premium: the terms it is for, "at 97.00, 13 Nov". */
+export const cheapestTerms = (strike: string, day: string): string => `at ${strike}, ${day}`
 
 export const NONE = 'None'
 export const TRADE = 'Trade'
@@ -90,17 +96,18 @@ export const tradeLabel = (code: string): string => `Trade ${code}`
  */
 export const typeLine = (typeLabel: string | null): string => typeLabel ?? 'Listed asset'
 
-/** About tab, under the type: what a token of the app's list is. Said once, here. */
+/** About tab, under the facts heading: what a token of the app's list is. Said once, here. */
 export const TEST_TOKEN_NOTE = "A test token issued by this project's issuer account on Stellar Testnet. It represents no real instrument and has no monetary value."
 
 export const noOffersOn = (code: string): string => `No open offers on ${code}.`
 export const POST_REQUEST = 'Post a request'
 export const WRITE_FIRST = 'write the first offer'
+/** The row of a token the contract is short of after a clawback; it links to Reserves, where the figures are. */
+export const shortRow = (code: string): string => `Clawback shortfall: new trades on ${code} are refused.`
 
-export function listCountLine(shown: number, more: number, all: boolean): string {
-  if (all) return shown === 1 ? 'Showing the 1 asset listed in the contract.' : `Showing all ${shown} assets listed in the contract.`
+/** The count line, only when assets are hidden: what is shown and how many more the contract lists. */
+export function listCountLine(shown: number, more: number): string {
   const head = shown === 1 ? 'Showing 1 reference asset.' : `Showing ${shown} reference assets.`
-  if (more === 0) return `${head} No other asset is listed in the contract.`
   return more === 1 ? `${head} 1 more is listed in the contract.` : `${head} ${more} more are listed in the contract.`
 }
 export const SHOW_ALL = 'Show all listed assets'
@@ -108,7 +115,6 @@ export const SHOW_REFERENCE = 'Show reference assets only'
 export const similarCodeNote = (reference: string): string => `Not the reference asset ${reference}: another issuer, same or similar code.`
 
 export const ASSETS_EMPTY = 'No asset is listed in the contract.'
-export const ASSETS_EMPTY_HINT = 'Assets appear here once someone lists them.'
 export const ASSETS_ERROR = 'The markets could not be read.'
 export const REFRESH_FAILED = 'Could not refresh. Showing the last read.'
 export const RETRY = 'Try again'
@@ -116,7 +122,12 @@ export const RETRY = 'Try again'
 // ---------------------------------------------------------------------------------------------- get test funds
 
 export const FUNDS_TITLE = 'Get test funds'
-export const FUNDS_LEAD = 'This wallet holds none of the tokens traded here. Three steps in your wallet, about two minutes, no approval from anyone.'
+/** The lead, from what the wallet holds: nothing at all, no quote token, or enough (the strip was asked for). */
+export const FUNDS_LEAD = {
+  none: 'This wallet holds none of the tokens traded here. Three steps, all in your wallet.',
+  noQuote: (quote: string) => `This wallet holds no ${quote}, the token premiums and strikes are paid in. Three steps, all in your wallet.`,
+  asked: 'Three steps, all in your wallet.',
+} as const
 export const FUNDS_MOCK_NOTE = 'This build runs on mock data, so these steps will not change the balances shown here. They are the steps on Testnet.'
 export const FUNDS_STEPS = {
   fund: {
@@ -134,25 +145,29 @@ export const FUNDS_STEPS = {
   },
 } as const
 export const STEP_DONE = 'Done'
-export const STEP_NEXT = 'Next'
+export const FUNDS_CHECK = 'Check again'
+/** Beside the balances of an asset page when the wallet cannot pay: leads to the strip above. */
+export const FUNDS_LINK = 'Get test funds'
 
 // ---------------------------------------------------------------------------------------------- asset page
 
 export const BACK_TO_MARKETS = 'Markets'
 export const MODE_LABEL = 'Mode'
-export const MODE_NAMES = { guided: 'Guided', chain: 'Chain' } as const
+/** The full name of each mode, and its short form on a phone. The accessible name is always the full one. */
+export const MODE_NAMES = { guided: 'Guided', chain: 'Option chain' } as const
+export const MODE_SHORT = { guided: 'Guided', chain: 'Chain' } as const
 export const TAB_NAMES = { trade: 'Trade', requests: 'Requests', about: 'About' } as const
 export const TABS_LABEL = 'Asset sections'
+/** The menu beside the asset code: the other listed assets. */
+export const SWITCH_LABEL = 'Other assets'
 
 export const FACT = {
-  reference: 'Reference price',
   issuer: 'Issuer',
   tier: 'Tier',
-  holdAsset: (code: string) => `You hold, ${code}`,
   balances: 'You hold',
 } as const
 export const NO_REFERENCE_VALUE = 'None'
-export const BALANCES_GUEST = 'Connect a wallet to see what you hold.'
+/** The word under "You hold" when a balance cannot be shown; the About tab says the same in a sentence. */
 export const BALANCE_WORD: Record<'unfunded' | 'no-trustline' | 'not-authorized' | 'error', string> = {
   unfunded: 'Account not funded',
   'no-trustline': 'No trustline',
@@ -162,14 +177,8 @@ export const BALANCE_WORD: Record<'unfunded' | 'no-trustline' | 'not-authorized'
 
 export const NOT_FOUND_HEADING = 'Asset not found'
 export const NOT_FOUND = {
-  invalid: {
-    title: 'This link does not name an asset.',
-    hint: 'An asset link ends in a code such as bond, a code with its issuer, or an asset contract id. This one may have been cut when it was copied.',
-  },
-  unknown: {
-    title: 'The contract does not list this asset.',
-    hint: 'The link is well formed, but nothing is traded under it. Anyone can list an asset; until then there is nothing to open.',
-  },
+  invalid: 'This link does not name an asset.',
+  unknown: 'The contract does not list this asset.',
 } as const
 export const NOT_FOUND_LISTED = 'Assets you can open'
 export const ALL_MARKETS = 'All markets'
@@ -177,59 +186,45 @@ export const ASSET_ERROR = 'The asset could not be read.'
 export const ASSET_HEADING = 'Asset'
 export const ASSET_LOADING = 'Loading the asset'
 
-// ---------------------------------------------------------------------------------------------- ticket rail, idle
-
 export const RAIL_LABEL = 'Order ticket'
-export const IDLE_TITLE = 'No order yet.'
-export const IDLE_HINT = {
-  guided: 'Choose what you want to do and set your terms on the left. The order then appears here, to review before you sign.',
-  chain: 'Select a price in the chain or a row of the book. The order then appears here, to review before you sign.',
-  requests: 'Choose a request to sell to, or post your own. The order then appears here, to review before you sign.',
-} as const
-export const IDLE_BLANK = ['Kind', 'Strike', 'Deadline', 'Premium'] as const
 
 // ---------------------------------------------------------------------------------------------- requests tab
 
 export const REQUESTS_HEADING = 'Requests'
 export const requestsLead = (code: string): string =>
-  `A request is a buyer's premium already escrowed in the contract, waiting for a seller. Sell to one and you write the option on ${code}: you lock the collateral and receive the premium.`
+  `A request is a buyer's premium already escrowed in the contract, waiting for a maker. Fill one and you write the option on ${code}: you lock the collateral and receive the premium.`
 export const REQ_COL = {
   kind: 'Kind',
   strike: 'Strike',
   qty: 'Quantity',
-  expiry: 'Expiry',
+  expiry: 'Deadline',
   premium: 'Premium escrowed',
   buyer: 'Buyer',
-  state: 'State',
   action: 'Action',
 } as const
 /** Under an escrowed premium: the same amount for one unit of the asset. The unit is the one of the figure above. */
 export const perUnitLine = (figure: string): string => `${figure} per unit`
-export const SELL_TO_BID = 'Sell to this bid'
+/** In the deadline cell of the wallet's own request that lapsed and still holds its premium. */
+export const LAPSED = 'Expired'
+export const SELL_TO_BID = 'Fill request'
 export const CANCEL_REQUEST = 'Cancel'
 export const CANCEL_REFUND = 'Cancelling refunds your escrowed premium.'
 export const YOURS = 'Yours'
 export const requestsEmpty = (code: string): string => `No open requests on ${code}.`
-export const REQUESTS_EMPTY_HINT = 'Post one and your premium waits in the contract for a seller. It is refunded if you cancel or it expires.'
 export const REQUESTS_ERROR = 'The requests could not be read.'
 export const REQUESTS_UNSUPPORTED = 'This contract version has no requests.'
 export const requestsCaption = (code: string): string => `Open requests on ${code}`
-export const KIND_WORD = { put: 'Put', call: 'Call' } as const
+export { KIND_WORD } from '../../core/format/option'
 
 // ---------------------------------------------------------------------------------------------- about tab
 
 export const ABOUT = {
   factsTitle: 'Asset facts',
-  powersTitle: 'What the issuer can do',
   meansTitle: 'What it means for an option',
   accessTitle: 'Your access',
-  contractTitle: 'Contract and roles',
-  linksTitle: 'On the explorer',
 } as const
 
 export const FACT_ROW = {
-  code: 'Code',
-  type: 'Type',
   issuer: 'Issuer',
   contract: 'Asset contract',
   domain: 'Home domain',
@@ -237,6 +232,7 @@ export const FACT_ROW = {
   trustlines: 'Trustlines',
   contracts: 'Contracts holding it',
   signers: 'Issuer keys',
+  options: 'Covered contract',
 } as const
 export const DOMAIN_NOT_SET = 'Not set'
 export const NOT_READ = 'Not read'
@@ -246,60 +242,33 @@ export const trustlinesLine = (authorized: number, restricted: number, unauthori
 export const SIGNERS_LOCKED = 'No key can sign for the issuer. Its settings can no longer change.'
 export const SIGNERS_LIVE = 'The issuer account can still sign.'
 
-export const POWER_COL = { power: 'Power', state: 'State', effect: 'Effect' } as const
-export const POWER_STATE = { on: 'On', off: 'Off' } as const
+// The powers' title, column heads, state words and fourth row are core/assetfacts's, shared with the Issuer page.
 export const POWERS_CAPTION = 'Issuer powers'
-export const POWER_CHANGE = {
-  label: 'Change these settings',
-  fixed: 'Fixed. The issuer can never change them.',
-  open: 'The issuer can turn any of these on or off later.',
-  yes: 'Yes',
-  no: 'No',
-} as const
-export const MOCK_FACTS = 'Mock asset. No on-chain facts.'
-export const MOCK_POWERS_NOTE = 'Mock asset: these flags are settings of the demo, not read from a chain. The effects are what each flag does when it is on.'
 export const FACTS_LOADING = 'Reading the asset from Testnet'
 export const FACTS_ERROR = 'Could not read this asset from Testnet.'
 export const FACTS_PARTIAL = 'Some facts could not be read from Horizon.'
 export const UNKNOWN_POWERS_NOTE = 'The flags could not be read. The effects below are what each flag does when it is on.'
 export const NATIVE_FACTS = 'Native XLM. No issuer and no flags.'
+export const CONTRACTS_LINK = 'Reserves, contracts and roles'
 
 /** The "Risks" block: the limits in our own words (the required sentence itself comes from core/disclosures). */
 export const MEANS = (code: string): readonly string[] => [
-  `A frozen holder cannot exercise. A frozen writer cannot claim delivery or reclaim.`,
-  `If the issuer freezes the options contract, it cannot move ${code}, so no ${code} option can settle until it is unfrozen.`,
+  `A frozen holder cannot exercise. A frozen maker cannot claim delivery or reclaim.`,
+  `If the issuer freezes the Covered contract, it cannot move ${code}, so no ${code} option can settle until it is unfrozen.`,
   `If the issuer claws ${code} back from the contract, open positions are left short: payouts go first come, first served, and new trades on ${code} are refused.`,
-  `The contract cannot stop any of this. It only holds the collateral and applies the terms.`,
 ]
 
+/**
+ * "Your access": whether this wallet can hold the asset, and if not, whose move it is. Decided from the balance
+ * status first (an account or trustline the wallet itself lacks), then from the issuer's authorization.
+ */
 export const ACCESS = {
-  guest: (code: string) => `Connect a wallet to see whether you can hold ${code}.`,
   checking: 'Checking',
+  unfunded: (code: string) => `Account not funded. This account is not on Testnet yet: fund it, then add ${code}.`,
+  noTrustline: (code: string) => `No trustline. Your wallet has no trustline to ${code}: add ${code} in your wallet by its code and issuer.`,
+  issuer: (code: string) => `This account is the ${code} issuer. It can hold and send ${code} without a trustline.`,
+  maintainOnly: (code: string) => `Restricted by the ${code} issuer. You can keep and send back what you hold, but you cannot receive more, so trades that deliver ${code} to you are refused.`,
   yes: (code: string) => `Authorized by the ${code} issuer. You can buy, exercise and receive ${code}.`,
-  no: (code: string) => `Not authorized by the ${code} issuer. You cannot receive ${code}, so trades that deliver it to you are refused.`,
+  no: (code: string) => `Not authorized by the issuer. You cannot receive ${code}, so trades that deliver it to you are refused. Only the ${code} issuer can change this.`,
   error: 'Could not check. The contract checks again when you trade.',
-} as const
-
-export const CONTRACT = {
-  id: 'Options contract',
-  admin: 'Admin',
-  adminValue: 'None. No admin function exists.',
-  upgrades: 'Upgrades',
-  upgradesValue: 'None. No upgrade function exists.',
-  price: 'Price source',
-  priceValue: 'None. Exercise is at the strike; the contract reads no price.',
-  audit: 'Audit',
-  auditValue: 'None. No outside party has reviewed the code.',
-  listing: 'Listing',
-  listingValue: 'Anyone can list a classic asset. Listing is not eligibility: the issuer still decides who may hold it.',
-  reserves: 'Reserves, contracts and roles',
-  mock: 'Mock contract. Nothing here is on a chain.',
-} as const
-
-export const LINKS = {
-  asset: (code: string) => `${code} asset`,
-  issuer: 'Issuer account',
-  contract: 'Asset contract',
-  options: 'Options contract',
-  mock: 'Mock ids have no explorer page.',
 } as const

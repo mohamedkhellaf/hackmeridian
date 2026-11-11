@@ -5,6 +5,11 @@
     gap: var(--s-4);
     min-width: 0;
     vertical-align: middle;
+
+    /* Touch: neighbouring targets (copy, explorer) keep their own room. */
+    @media (pointer: coarse) {
+      gap: var(--s-8);
+    }
   }
 
   .name {
@@ -73,6 +78,7 @@
   }
 
   .txLink {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: var(--s-4);
@@ -92,5 +98,15 @@
 
   .txIcon {
     flex: none;
+  }
+
+  /* Touch: a transaction link keeps its look; its hit area grows to 44 px high. */
+  @media (pointer: coarse) {
+    .txLink::after {
+      content: '';
+      position: absolute;
+      inset-block: min(0px, calc((100% - var(--touch)) / 2));
+      inset-inline: calc(var(--s-2) * -1);
+    }
   }
 }

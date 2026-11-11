@@ -4,7 +4,7 @@ import { BulletRow } from './BulletRow.tsx'
 import { formatNumber, formatSigned } from './format.ts'
 import { samplePiecewise } from './geometry.ts'
 import { HealthBar } from './HealthBar.tsx'
-import { OutcomeCards, ScenarioBar } from './OutcomeCards.tsx'
+import { OutcomeCards } from './OutcomeCards.tsx'
 import { PayoffChart } from './PayoffChart.tsx'
 import { priceDomain } from './scales.ts'
 import { Sparkline } from './Sparkline.tsx'
@@ -15,7 +15,7 @@ import css from './Gallery.module.css'
 
 // Demo figures only. In the app the payoff comes from packages/payoff and every amount from exact integers;
 // here a few closed forms stand in so the gallery has no dependency outside this folder.
-const CAPTION = 'Hypothetical payoff at expiry. Not a quote.'
+const CAPTION = 'Hypothetical payoff at the deadline. Not a quote.'
 const longPut = (qty: number, strike: number, premium: number) => (s: number) => qty * Math.max(strike - s, 0) - premium
 const longCall = (qty: number, strike: number, premium: number) => (s: number) => qty * Math.max(s - strike, 0) - premium
 const shortPut = (qty: number, strike: number, premium: number) => (s: number) => premium - qty * Math.max(strike - s, 0)
@@ -47,7 +47,7 @@ function PutPayoff() {
   const domain = priceDomain({ center: 9.82, include: [10, 9.64] })
   return (
     <PayoffChart
-      title="Payoff at expiry, long put on 5.00 BOND"
+      title="Payoff at the deadline, long put on 5.00 BOND"
       points={samplePiecewise(longPut(5, 10, 1.8), domain, [10])}
       domain={domain}
       strike={{ value: 10, label: '10.00' }}
@@ -67,7 +67,7 @@ function CallPayoff() {
   const domain = priceDomain({ center: 118.4, include: [120, 124.5] })
   return (
     <PayoffChart
-      title="Payoff at expiry, long call on 2.00 EQTY"
+      title="Payoff at the deadline, long call on 2.00 EQTY"
       points={samplePiecewise(longCall(2, 120, 9), domain, [120])}
       domain={domain}
       strike={{ value: 120, label: '120.00' }}
@@ -83,11 +83,11 @@ function CallPayoff() {
   )
 }
 
-function WriterPayoff() {
+function MakerPayoff() {
   const domain = priceDomain({ center: 10, include: [9.5, 9.14] })
   return (
     <PayoffChart
-      title="Payoff at expiry, put written on 5.00 BOND"
+      title="Payoff at the deadline, put written on 5.00 BOND"
       points={samplePiecewise(shortPut(5, 9.5, 1.8), domain, [9.5])}
       domain={domain}
       strike={{ value: 9.5, label: '9.50' }}
@@ -156,7 +156,6 @@ function GuidedOutcome() {
       <OutcomeCards
         label="Three outcomes at the deadline"
         onSelect={(id) => setPrice(scenarios.find((s) => s.id === id)?.price ?? price)}
-        barKey={{ value: 'With the put', compare: 'Without' }}
         outcomes={scenarios.map((s) => {
           const withValue = 5 * Math.max(s.price, 10) - 1.8
           const without = 5 * s.price
@@ -167,7 +166,6 @@ function GuidedOutcome() {
             unit: 'USDx',
             delta: { value: withValue - without, text: `${formatSigned(withValue - without)} against holding alone` },
             sentence: s.sentence,
-            bar: { value: withValue, compare: without },
             current: Math.abs(price - s.price) < 1e-9,
           }
         })}
@@ -182,22 +180,22 @@ const WALK = [10, 10.02, 9.97, 9.91, 9.95, 10.06, 10.11, 10.04, 9.99, 10.08, 10.
 export default function Gallery() {
   return (
     <div className={css.gallery}>
-      <Group title="Payoff at expiry" lede="One position. Ink line, gain tinted, loss hatched, the strike as a dotted rule, the breakeven as an open circle, the reference price as an ink tick. Drag the flag, click the plot, or use the arrow keys.">
+      <Group title="Payoff at the deadline" lede="One position. Ink line, gain tinted, loss hatched, the strike as a dotted rule, the breakeven as an open circle, the reference price as an ink tick. Drag the flag, click the plot, or use the arrow keys.">
         <Specimen title="Long put" note="5.00 BOND, strike 10.00, premium 1.80 USDx. The largest gain is off the chart, and the label says where.">
           <PutPayoff />
         </Specimen>
         <Specimen title="Long call" note="2.00 EQTY, strike 120.00, premium 9.00 USDx. No upper limit to the gain.">
           <CallPayoff />
         </Specimen>
-        <Specimen title="Put written (cash secured)" note="The writer keeps the premium at most and can lose the strike less the premium.">
-          <WriterPayoff />
+        <Specimen title="Put written (cash secured)" note="The maker keeps the premium at most and can lose the strike less the premium.">
+          <MakerPayoff />
         </Specimen>
       </Group>
 
       <Group title="Payoff edge cases" lede="The figure has to stay legible when the numbers are not friendly.">
         <Specimen title="Zero premium" note="The breakeven is the strike: one label for both, no loss area.">
           <PayoffChart
-            title="Payoff at expiry, long put with no premium"
+            title="Payoff at the deadline, long put with no premium"
             points={samplePiecewise(longPut(5, 10, 0), [6, 14], [10])}
             domain={[6, 14]}
             strike={{ value: 10, label: '10.00' }}
@@ -216,7 +214,7 @@ export default function Gallery() {
             const domain = priceDomain({ center: 10, include: [16, 15.2] })
             return (
               <PayoffChart
-                title="Payoff at expiry, put deep in the money"
+                title="Payoff at the deadline, put deep in the money"
                 points={samplePiecewise(longPut(5, 16, 4), domain, [16])}
                 domain={domain}
                 strike={{ value: 16, label: '16.00' }}
@@ -234,7 +232,7 @@ export default function Gallery() {
         </Specimen>
         <Specimen title="Deep out of the money" note="Call at 20.00 with the reference at 10.00: the whole visible line is the premium lost.">
           <PayoffChart
-            title="Payoff at expiry, call far out of the money"
+            title="Payoff at the deadline, call far out of the money"
             points={samplePiecewise(longCall(5, 20, 0.6), [6, 14], [20])}
             domain={[6, 14]}
             strike={{ value: 20, label: '20.00' }}
@@ -253,7 +251,7 @@ export default function Gallery() {
             const domain = priceDomain({ center: 128, include: [110, 114.2] })
             return (
               <PayoffChart
-                title="Payoff at expiry, uncovered call written on 10.00 EQTY"
+                title="Payoff at the deadline, uncovered call written on 10.00 EQTY"
                 points={samplePiecewise(shortCall(10, 110, 42), domain, [110])}
                 domain={domain}
                 strike={{ value: 110, label: '110.00' }}
@@ -271,7 +269,7 @@ export default function Gallery() {
         </Specimen>
         <Specimen title="Very small prices" note="A token quoted at 0.00012 USDx. Decimals follow the range of the axis.">
           <PayoffChart
-            title="Payoff at expiry, put on a low-priced token"
+            title="Payoff at the deadline, put on a low-priced token"
             points={samplePiecewise(longPut(1_000_000, 0.00012, 6), [0.00007, 0.00017], [0.00012])}
             domain={[0.00007, 0.00017]}
             strike={{ value: 0.00012, label: '0.00012' }}
@@ -287,7 +285,7 @@ export default function Gallery() {
         </Specimen>
         <Specimen title="Very large amounts" note="250 units at a strike of 1,250,000. Axis ends are compact; amounts in labels stay exact.">
           <PayoffChart
-            title="Payoff at expiry, call on a high-priced token"
+            title="Payoff at the deadline, call on a high-priced token"
             points={samplePiecewise(longCall(250, 1_250_000, 12_500_000), [750_000, 1_750_000], [1_250_000])}
             domain={[750_000, 1_750_000]}
             strike={{ value: 1_250_000, label: '1,250,000' }}
@@ -303,7 +301,7 @@ export default function Gallery() {
         </Specimen>
         <Specimen title="Closed position" note="Read only: the price at which it was exercised is marked, and there is no handle.">
           <PayoffChart
-            title="Payoff at expiry, put exercised at 8.40"
+            title="Payoff at the deadline, put exercised at 8.40"
             points={samplePiecewise(longPut(5, 10, 1.8), [6, 14], [10])}
             domain={[6, 14]}
             strike={{ value: 10, label: '10.00' }}
@@ -322,7 +320,7 @@ export default function Gallery() {
         </Specimen>
         <Specimen title="With its table shown" note="The same points as text. Hidden visually by default, always present for screen readers.">
           <PayoffChart
-            title="Payoff at expiry, long put on 5.00 BOND"
+            title="Payoff at the deadline, long put on 5.00 BOND"
             points={samplePiecewise(longPut(5, 10, 1.8), [6, 14], [10])}
             domain={[6, 14]}
             strike={{ value: 10, label: '10.00' }}
@@ -351,25 +349,15 @@ export default function Gallery() {
         </Specimen>
       </Group>
 
-      <Group title="Outcome cards and scenario bar" lede="Three scenarios with a serif figure, the difference in words, a sentence and a small bar on a shared scale.">
+      <Group title="Outcome cards" lede="Scenarios side by side, each with a serif figure, the difference in words and a sentence.">
         <Specimen title="Static cards" note="Without a handler the cards are plain text. Three columns when the container allows, stacked otherwise." wide>
           <OutcomeCards
-            barKey={{ value: 'With the call written', compare: 'Without' }}
             outcomes={[
-              { id: 'low', label: 'If BOND falls to 8.00', figure: '42.10', unit: 'USDx', delta: { value: 2.1, text: '+2.10 against holding alone' }, sentence: 'The call expires. You keep 5.00 BOND and the 2.10 USDx premium.', bar: { value: 42.1, compare: 40 } },
-              { id: 'ref', label: 'If BOND stays at 10.00', figure: '52.10', unit: 'USDx', delta: { value: 2.1, text: '+2.10 against holding alone' }, sentence: 'The call expires. You keep 5.00 BOND and the premium.', bar: { value: 52.1, compare: 50 }, current: true },
-              { id: 'high', label: 'If BOND rises to 14.00', figure: '57.10', unit: 'USDx', delta: { value: -12.9, text: `${formatSigned(-12.9)} against holding alone` }, sentence: 'The buyer exercises: you deliver 5.00 BOND for 55.00 USDx and give up the rise above 11.00.', bar: { value: 57.1, compare: 70 } },
+              { id: 'low', label: 'If BOND falls to 8.00', figure: '42.10', unit: 'USDx', delta: { value: 2.1, text: '+2.10 against holding alone' }, sentence: 'The call expires. You keep 5.00 BOND and the 2.10 USDx premium.' },
+              { id: 'ref', label: 'If BOND stays at 10.00', figure: '52.10', unit: 'USDx', delta: { value: 2.1, text: '+2.10 against holding alone' }, sentence: 'The call expires. You keep 5.00 BOND and the premium.', current: true },
+              { id: 'high', label: 'If BOND rises to 14.00', figure: '57.10', unit: 'USDx', delta: { value: -12.9, text: `${formatSigned(-12.9)} against holding alone` }, sentence: 'The buyer exercises: you deliver 5.00 BOND for 55.00 USDx and give up the rise above 11.00.' },
             ]}
           />
-        </Specimen>
-        <Specimen title="Scenario bar alone" note="Bar: with the option. Tick: without. Past the tick is what the option adds; a hatched stretch is what it costs.">
-          <div className={css.stack}>
-            <ScenarioBar value={48.2} compare={40} max={70} label="With the put 48.20 USDx, without 40.00 USDx" />
-            <ScenarioBar value={48.2} compare={49.1} max={70} label="With the put 48.20 USDx, without 49.10 USDx" />
-            <ScenarioBar value={58.2} compare={60} max={70} label="With the put 58.20 USDx, without 60.00 USDx" />
-            <ScenarioBar value={0} compare={12} max={70} label="With 0.00 USDx, without 12.00 USDx" />
-            <ScenarioBar value={36} max={70} label="36.00 USDx, nothing to compare with" />
-          </div>
         </Specimen>
       </Group>
 
@@ -431,44 +419,6 @@ export default function Gallery() {
             imShortLabel="IM 54,931.80"
             status="20,437.85 USDx below the liquidation level."
           />
-        </Specimen>
-        <Specimen title="Compact, in a table" note="A 64 px meter for desk tables. The cell text carries the figures.">
-          <table className={css.table}>
-            <thead>
-              <tr>
-                <th scope="col">Writer</th>
-                <th scope="col">Account value</th>
-                <th scope="col">Health</th>
-                <th scope="col">State</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">GAJ2…VC7G</th>
-                <td>23,507.59</td>
-                <td>
-                  <HealthBar variant="compact" nlv={23_507.59} mm={43_945.44} im={54_931.8} nlvLabel="Account value 23,507.59" mmLabel="Liquidation 43,945.44" imLabel="Opening 54,931.80" />
-                </td>
-                <td>Liquidatable</td>
-              </tr>
-              <tr>
-                <th scope="row">GC7Z…5NAY</th>
-                <td>48,120.00</td>
-                <td>
-                  <HealthBar variant="compact" nlv={48_120} mm={43_945.44} im={54_931.8} nlvLabel="Account value 48,120.00" mmLabel="Liquidation 43,945.44" imLabel="Opening 54,931.80" />
-                </td>
-                <td>Below opening margin</td>
-              </tr>
-              <tr>
-                <th scope="row">GB4D…UUCF</th>
-                <td>56,355.44</td>
-                <td>
-                  <HealthBar variant="compact" nlv={56_355.44} mm={43_945.44} im={54_931.8} nlvLabel="Account value 56,355.44" mmLabel="Liquidation 43,945.44" imLabel="Opening 54,931.80" />
-                </td>
-                <td>Above opening margin</td>
-              </tr>
-            </tbody>
-          </table>
         </Specimen>
       </Group>
 
@@ -567,14 +517,14 @@ export default function Gallery() {
       </Group>
 
       <Group title="Lifecycle dots" lede="Steps on a rule: filled for done, a ringed dot for now, open for what is still to come. In a row when there is room, in a column otherwise.">
-        <Specimen title="Holder of a put" note="Nothing settles by itself: the holder acts before the deadline." wide>
+        <Specimen title="Holder of a put" note="The holder exercises before the deadline, or the option expires." wide>
           <TimelineDots
             label="Lifecycle of this option"
             steps={[
               { id: 'offer', label: 'Offer funded', detail: 'Maker locked 50.00 USDx', state: 'done' },
               { id: 'buy', label: 'Bought', detail: 'You paid 1.80 USDx', state: 'done' },
               { id: 'exercise', label: 'Exercise or let it expire', detail: 'You, before 13 Nov 2026, 08:00 UTC', state: 'current' },
-              { id: 'claim', label: 'Writer claims', detail: 'Delivery or collateral, after the deadline', state: 'upcoming' },
+              { id: 'claim', label: 'Maker claims', detail: 'Delivery or collateral, after the deadline', state: 'upcoming' },
             ]}
           />
         </Specimen>
@@ -586,7 +536,7 @@ export default function Gallery() {
               { id: 'offer', label: 'Offer funded', detail: 'Maker locked 50.00 USDx', state: 'done' },
               { id: 'buy', label: 'Bought', detail: 'You paid 1.80 USDx', state: 'done' },
               { id: 'exercise', label: 'Exercise or let it expire', detail: 'You, before 13 Nov 2026, 08:00 UTC', state: 'current' },
-              { id: 'claim', label: 'Writer claims', detail: 'Delivery or collateral, after the deadline', state: 'upcoming' },
+              { id: 'claim', label: 'Maker claims', detail: 'Delivery or collateral, after the deadline', state: 'upcoming' },
             ]}
           />
         </Specimen>

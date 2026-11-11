@@ -8,10 +8,17 @@ export interface Fact {
   source?: { call: string; on: string }
 }
 
-/** Short facts as a ruled definition list (`dl > div > dt + dd`): the term on the left, one sentence beside it. */
-export function FactList({ facts, className }: { facts: readonly Fact[]; className?: string }) {
+export interface FactListProps {
+  facts: readonly Fact[]
+  /** `record`: a contract's identity and facts in one list, with room for the longer terms and full ids. */
+  variant?: 'notes' | 'record'
+  className?: string
+}
+
+/** Short facts as a ruled definition list (`dl > div > dt + dd`): the term on the left, the value or sentence beside it. */
+export function FactList({ facts, variant = 'notes', className }: FactListProps) {
   return (
-    <dl className={className ? `${css.root} ${className}` : css.root}>
+    <dl className={className ? `${css.root} ${className}` : css.root} data-variant={variant}>
       {facts.map((fact) => (
         <div key={fact.term} className={css.fact}>
           <dt>{fact.term}</dt>

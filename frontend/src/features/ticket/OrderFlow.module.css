@@ -14,9 +14,22 @@
     text-wrap: pretty;
   }
 
-  .custom {
+  .custom,
+  .change {
     border-top: 1px solid var(--hairline);
     border-bottom: 1px solid var(--hairline);
+  }
+
+  /* The pickers of the series, behind "Change terms": the same controls, one level down. */
+  .changeBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding-bottom: var(--s-16);
+  }
+
+  .changeBody > .custom {
+    border-bottom: 0;
   }
 
   .customSummary {
@@ -53,8 +66,10 @@
       }
     }
 
+    /* The transparent outline is what forced colours paints: it drops the box-shadow ring. */
     &:focus-visible {
-      outline: none;
+      outline: 2px solid transparent;
+      outline-offset: 2px;
       box-shadow: var(--focus-ring);
     }
 
@@ -63,7 +78,8 @@
     }
   }
 
-  .custom[open] > .customSummary::before {
+  .custom[open] > .customSummary::before,
+  .change[open] > .customSummary::before {
     background: linear-gradient(currentcolor, currentcolor) center / 100% 1px no-repeat;
   }
 

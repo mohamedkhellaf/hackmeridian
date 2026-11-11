@@ -1,42 +1,45 @@
 // Every required disclosure sentence, in one place (brief section 6.2, AGENTS.md honest-claims rules).
 //
-// The wording is fixed: each string below is copied from the UI it replaces (the snapshot under legacy-ui/, checked
-// by disclosures.test.ts while that snapshot exists), except the footer notice and the Margin banners, which the
-// owner had rewritten on 11 Nov 2026 (see LEGAL_NOTICE). Components and tests import from here and never retype a
-// sentence. Each sentence has one home in the app; `DISCLOSURE_HOMES` is the register.
+// The wording is fixed: each string below was copied from the UI it replaced and is pinned word for word by
+// disclosures.test.ts, except the footer notices and the Margin banners, which the owner had rewritten on 11 Nov
+// 2026 (see LEGAL_NOTICE), and the payoff caption, which says "deadline" since the director's ruling R7 of the same
+// day. The two collateral cards of the old write ticket are gone (ruling E1). Components and tests import from here
+// and never retype a sentence. Each sentence has one home in the app; `DISCLOSURE_HOMES` is the register.
 
 // ---------------------------------------------------------------------------------------------- app-wide
 
 /**
- * App footer, every route: the legal notice.
+ * App footer, every route: the legal notice of a build that reads the Stellar test network.
  *
  * Owner's direction, 11 Nov 2026: no tagline-style disclaimers anywhere in the interface ("Testnet only",
  * "Fictional assets", "No real funds", "Unaudited" as slogans, status rules, chips or banners). The footer carries a
  * conventional legal notice instead, and the network name appears only as a state indicator in the top bar.
  * Disclosures tied to a decision (issuer powers, premium, payoff caption, Margin payout risk) stay, as sentences,
- * where the decision is made.
+ * where the decision is made. The footer picks its notice with `legalNotice(isMock)`.
  */
 export const LEGAL_NOTICE =
   'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.'
 
+/** App footer of a build without a contract (mock data): the same notice, true of what that build does. */
+export const LEGAL_NOTICE_MOCK =
+  'This software is provided as is, without warranty of any kind. This build runs on an in-memory demo market: nothing is read from Stellar or sent to it, and the tokens shown have no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.'
+
+/** The footer's legal notice for the build (ruling E23): one paragraph, never both. */
+export const legalNotice = (isMock: boolean): string => (isMock ? LEGAL_NOTICE_MOCK : LEGAL_NOTICE)
+
 /** App footer, before the legal notice. */
 export const COPYRIGHT_NOTICE = '\u00A9 2026 The StellSec authors.'
 
-/** @deprecated The footer shows `LEGAL_NOTICE`. Kept so imports written before the change still compile. */
-export const TESTNET_DISCLOSURE = LEGAL_NOTICE
-
-/**
- * @deprecated Mock mode is shown by the network indicator in the top bar, not by a footer sentence.
- * Empty on purpose: render nothing for it.
- */
-export const MOCK_DISCLOSURE = ''
+/** Footer of every route, after the legal notice: the lines the Stellar brand policy asks for where the name is used. */
+export const TRADEMARK_NOTICE =
+  '\u201CStellar\u201D is a trademark of the Stellar Development Foundation. All rights reserved. This is independent software, not affiliated with, sponsored or endorsed by the Stellar Development Foundation.'
 
 /** Connect dialog. */
 export const WALLET_DISCLOSURE = 'Set the wallet to Testnet. StellSec never asks for your secret key or recovery phrase.'
 
 // ---------------------------------------------------------------------------------------------- covered trades
 
-/** Ticket review step for buy, fill and resale buy; asset About tab. */
+/** Ticket review of every mode except list (buy, write, request, fill, resale buy); asset About tab (ruling E17). */
 export const ISSUER_DISCLOSURE =
   'The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.'
 
@@ -47,10 +50,10 @@ export const PREMIUM_DISCLOSURE = 'Paid to the maker now. Not refundable.'
 export const RESALE_PRICE_DISCLOSURE = 'Set by the seller. Paid to the seller now.'
 
 /** Caption of every payoff figure. */
-export const PAYOFF_CAPTION = 'Hypothetical payoff at expiry. Not a quote.'
+export const PAYOFF_CAPTION = 'Hypothetical payoff at the deadline. Not a quote.'
 
 /**
- * Bid ticket. `amount` is the premium with its unit, already formatted: `bidEscrowDisclosure('2.00 USDx')` is
+ * Request ticket. `amount` is the premium with its unit, already formatted: `bidEscrowDisclosure('2.00 USDx')` is
  * `You escrow 2.00 USDx now; refunded if you cancel or it expires.`
  */
 export function bidEscrowDisclosure(amount: string): string {
@@ -110,28 +113,6 @@ export const MARGIN_WARNING_BULLETS = [
 /** Label of the checkbox that gates the Margin warning's Continue action. */
 export const MARGIN_WARNING_CONSENT = 'I understand'
 
-export type CollateralChoice = 'full' | 'margin'
-
-export interface CollateralCard {
-  value: CollateralChoice
-  title: string
-  body: string
-}
-
-/** The two collateral cards shown where a writer chooses between the Covered contract and Margin. */
-export const COLLATERAL_CARDS: readonly CollateralCard[] = [
-  {
-    value: 'full',
-    title: 'Full collateral',
-    body: 'You lock the full strike or the full underlying. Settlement is physical. Your only risk is issuer action.',
-  },
-  {
-    value: 'margin',
-    title: 'Margin',
-    body: 'You post partial margin in USDx. Cash settlement at a published price. You can be liquidated, and if the vault runs dry the holder is paid less.',
-  },
-]
-
 // ---------------------------------------------------------------------------------------------- register
 
 export interface DisclosureHome {
@@ -144,21 +125,21 @@ export interface DisclosureHome {
 
 /** One entry per required sentence: what it says and where it lives. Tests walk this list. */
 export const DISCLOSURE_HOMES: readonly DisclosureHome[] = [
-  { id: 'legal', text: LEGAL_NOTICE, home: 'App footer on every route' },
-  { id: 'issuer', text: ISSUER_DISCLOSURE, home: 'Ticket review step for buy, fill and resale buy; asset About tab' },
+  { id: 'legal', text: LEGAL_NOTICE, home: 'App footer on every route, contract builds' },
+  { id: 'legal-mock', text: LEGAL_NOTICE_MOCK, home: 'App footer on every route, mock builds' },
+  { id: 'trademark', text: TRADEMARK_NOTICE, home: 'Footer of every route, after the legal notice' },
+  { id: 'issuer', text: ISSUER_DISCLOSURE, home: 'Ticket review of every mode except list (buy, write, request, fill, resale buy); asset About tab' },
   { id: 'premium', text: PREMIUM_DISCLOSURE, home: 'Next to the premium in the buy review' },
   { id: 'resale-price', text: RESALE_PRICE_DISCLOSURE, home: 'Next to the price in the resale buy review' },
   { id: 'payoff-caption', text: PAYOFF_CAPTION, home: 'Caption of every payoff figure' },
   { id: 'clawback-shortfall', text: clawbackShortfallDisclosure('BOND'), home: 'Reserves, and any ticket for that token' },
-  { id: 'bid-escrow', text: bidEscrowDisclosure('2.00 USDx'), home: 'Bid ticket' },
+  { id: 'bid-escrow', text: bidEscrowDisclosure('2.00 USDx'), home: 'Request ticket' },
   { id: 'wallet', text: WALLET_DISCLOSURE, home: 'Connect dialog' },
   { id: 'margin-banner-simulated', text: MARGIN_BANNER_SIMULATED, home: 'Every Margin screen, fixture builds' },
   { id: 'margin-banner-onchain', text: MARGIN_BANNER_ONCHAIN, home: 'Every Margin screen, contract builds' },
   { id: 'margin-warning-1', text: MARGIN_WARNING_BULLETS[0], home: 'Margin entry warning dialog' },
   { id: 'margin-warning-2', text: MARGIN_WARNING_BULLETS[1], home: 'Margin entry warning dialog' },
   { id: 'margin-warning-3', text: MARGIN_WARNING_BULLETS[2], home: 'Margin entry warning dialog' },
-  { id: 'collateral-card-full', text: COLLATERAL_CARDS[0].body, home: 'Collateral choice when writing an offer' },
-  { id: 'collateral-card-margin', text: COLLATERAL_CARDS[1].body, home: 'Collateral choice when writing an offer' },
 ]
 
 // ---------------------------------------------------------------------------------------------- banned wording

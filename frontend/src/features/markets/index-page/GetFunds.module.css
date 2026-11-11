@@ -1,5 +1,6 @@
 @layer features {
   .root {
+    container-type: inline-size;
     min-width: 0;
   }
 
@@ -108,7 +109,11 @@
     line-height: var(--caption-line);
   }
 
-  @media (max-width: 899.98px) {
+  .check {
+    display: flex;
+  }
+
+  @container (max-width: 47.99rem) {
     .steps {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--s-16);

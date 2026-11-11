@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { formatUnits } from '../../../core/format'
 import { cellKey } from '../../../core/market/selection'
 import { DEMO_WALLETS } from '../../../core/options/demoAccounts'
 import { noReference } from '../../../core/reference'
@@ -6,12 +7,13 @@ import { FIXED_MS, demoWorld } from '../../../data/derived/demoSource.testhelper
 import type { DemoWorld } from '../../../data/derived/demoSource.testhelper'
 import { buildMarket } from '../../../data/derived/market'
 import type { GridCell, MarketView } from '../../../data'
-import { COPY } from './copy'
 import {
   defaultColumn,
   describeCell,
+  gapLine,
   homePosition,
   leftLabel,
+  missingDeadlineLine,
   moveForKey,
   nextPosition,
   premiumText,
@@ -21,6 +23,7 @@ import {
   seriesTitle,
   strikeParam,
   strikeText,
+  takeableOf,
 } from './model'
 
 const units = (n: number) => BigInt(Math.round(n * 100)) * 10n ** 5n // 7 decimals
@@ -29,12 +32,14 @@ let w: DemoWorld
 let fund: MarketView
 let bond: MarketView
 let fundA: MarketView
+let bondA: MarketView
 beforeAll(async () => {
   vi.useFakeTimers({ now: FIXED_MS, toFake: ['Date'] })
   w = await demoWorld()
   fund = buildMarket(w.source(null), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
   bond = buildMarket(w.source(null), w.assets.BOND, w.quote, w.reference(w.assets.BOND))
   fundA = buildMarket(w.source(DEMO_WALLETS.a), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+  bondA = buildMarket(w.source(DEMO_WALLETS.a), w.assets.BOND, w.quote, w.reference(w.assets.BOND))
 })
 afterAll(() => vi.useRealTimers())
 
@@ -68,14 +73,23 @@ describe('figures', () => {
     expect(leftLabel(-1)).toBe('expired')
   })
 
-  it('names a series as the brief does', () => {
-    expect(seriesTitle('BOND', { kind: 'put', strikePerUnit: units(100), expiry: bond.expiries[0] }, 7)).toBe('BOND 100 put, 13 Nov')
-    expect(seriesTitle('FUND', { kind: 'call', strikePerUnit: units(9.8), expiry: fund.expiries[2] }, 7)).toBe('FUND 9.8 call, 27 Nov')
+  it('names a series with the strike as the chain prints it', () => {
+    expect(seriesTitle('BOND', { kind: 'put', strikePerUnit: units(100), expiry: bond.expiries[0] }, 7)).toBe('BOND 100.00 put, 13 Nov')
+    expect(seriesTitle('FUND', { kind: 'call', strikePerUnit: units(9.8), expiry: fund.expiries[2] }, 7)).toBe('FUND 9.80 call, 27 Nov')
   })
 
   it('reads the reference with its label, and has none without a price', () => {
-    expect(referenceLine(bond.reference, 7)).toEqual({ tag: 'Demo price 99.40', phrase: 'the demo price', price: '99.40' })
+    expect(referenceLine(bond.reference, 7)).toEqual({ tag: 'Demo price 99.40', label: 'Demo price', phrase: 'the demo price', price: '99.40' })
     expect(referenceLine(noReference(), 7)).toBeNull()
+  })
+
+  it('states the gap between the best offer and the best request, truncated', () => {
+    expect(gapLine(units(0.21), units(0.18), 7)).toBe('0.03 between the best offer and the best request.')
+    expect(gapLine(2_149_999n, 1_850_001n, 7)).toBe('0.02 between the best offer and the best request.')
+    expect(gapLine(units(0.2), units(0.2), 7)).toBe('The best request equals the best offer.')
+    expect(gapLine(units(0.2), units(0.25), 7)).toBe('The best request is 0.05 above the best offer.')
+    expect(gapLine(null, units(0.2), 7)).toBeNull()
+    expect(gapLine(units(0.2), null, 7)).toBeNull()
   })
 })
 
@@ -113,10 +127,17 @@ describe('selection from the URL', () => {
     }
   })
 
-  it('falls back to the default column for a date that is not listed and has no order', () => {
+  it('shows the default column for a date that is not listed and has no order, selects nothing and says so', () => {
     const s = resolveSelection(fund, { expiry: '2026-11-14', kind: 'put', strike: '10.00' })
     expect(s.column?.day).toBe('2026-11-13')
-    expect(s.ref?.expiry).toBe(fund.expiries[0])
+    expect(s.ref).toBeNull()
+    expect(s.cell).toBeNull()
+    expect(s.missing).toBe('2026-11-14')
+    expect(resolveSelection(fund, { expiry: '2026-11-20' }).missing).toBeNull()
+    const now = Math.floor(FIXED_MS / 1000)
+    expect(missingDeadlineLine('2026-11-14', s.column!, now)).toBe('14 Nov is not a listed deadline. Showing 13 Nov.')
+    expect(missingDeadlineLine('2020-01-03', s.column!, now)).toBe('The 3 Jan 2020 deadline has passed. Showing 13 Nov.')
+    expect(missingDeadlineLine('not a day', s.column!, now)).toBeNull()
   })
 
   it('keeps a series on an unlisted date that carries an order, without a chain cell', () => {
@@ -139,61 +160,98 @@ describe('selection from the URL', () => {
 })
 
 describe('cells', () => {
-  it('names a priced cell with its strike, best premium and makers', () => {
+  it('shows the best offer per unit with its size; the maker count is in the name only', () => {
     const priced = cells(bond).filter((c) => !c.empty)
     expect(priced.length).toBeGreaterThan(20)
     for (const cell of priced) {
       const text = describeCell(cell, 7, 'the demo price')
       const kind = cell.ref.kind === 'put' ? 'Put' : 'Call'
       expect(text.variant).toBe('priced')
-      expect(text.figure).toBe(premiumText(cell.bestPerUnit!, 7))
-      expect(text.name.startsWith(`${kind} at ${strikeText(cell.ref.strikePerUnit, 7)}, best premium ${text.figure}, ${text.count}`)).toBe(true)
-      expect(text.count).toMatch(/^\d+ (maker|makers|resale listing|resale listings)$/)
+      expect(text.offer).toBe(premiumText(cell.bestPerUnit!, 7))
+      expect(text.size).toBe(formatUnits(cell.best!.underlyingQty, 7))
+      expect(text.name.startsWith(`${kind} at ${strikeText(cell.ref.strikePerUnit, 7)}, best offer ${text.offer} for ${text.size} BOND`)).toBe(true)
+      expect(text.name).toMatch(/, \d+ offers?(, \d+ makers?)?(,|$)/)
       expect(text.name.includes('in the money at the demo price')).toBe(cell.moneyness === 'in')
       expect(text.inTheMoney).toBe(cell.moneyness === 'in')
+      expect(text.ask).toBe(false)
     }
-    const one = priced.find((c) => c.makers === 1)!
-    expect(describeCell(one, 7, null).count).toBe('1 maker')
+    const one = priced.find((c) => c.makers === 1 && c.offers === 1)!
+    expect(describeCell(one, 7, null).name).toMatch(/, 1 offer, 1 maker$/)
     const two = priced.find((c) => c.makers === 2)!
-    expect(describeCell(two, 7, null).count).toBe('2 makers')
+    expect(describeCell(two, 7, null).name).toMatch(/, 2 offers, 2 makers$/)
   })
 
   it('says nothing about moneyness without a reference', () => {
     for (const cell of cells(bond)) expect(describeCell(cell, 7, null).name).not.toMatch(/the money/)
   })
 
-  it('offers a request on an empty cell and shows the highest bid on a bid-only cell', () => {
+  it('asks for a price on an empty cell and shows the best request on a cell with only a request', () => {
     const empty = cells(fund).find((c) => c.empty && c.bids === 0)!
     const e = describeCell(empty, 7, null)
     expect(e.variant).toBe('empty')
-    expect(e.figure).toBeNull()
-    expect(e.count).toBe(COPY.noOffer)
-    expect(e.name).toBe(`${empty.ref.kind === 'put' ? 'Put' : 'Call'} at ${strikeText(empty.ref.strikePerUnit, 7)}, no offer, request a price`)
+    expect([e.offer, e.size, e.request]).toEqual([null, null, null])
+    expect(e.ask).toBe(true)
+    expect(e.name).toBe(`${empty.ref.kind === 'put' ? 'Put' : 'Call'} at ${strikeText(empty.ref.strikePerUnit, 7)}, no offer or request, ask for a price`)
+    // A contract without requests offers nothing on an empty cell.
+    expect(describeCell(empty, 7, null, false).ask).toBe(false)
+    expect(describeCell(empty, 7, null, false).name).toMatch(/, no offer$/)
 
     // Seeded: a request on a series nobody quotes (FUND put, second date).
-    const bidOnly = cells(fund).find((c) => c.empty && c.bids > 0)!
-    const b = describeCell(bidOnly, 7, null)
-    expect(b.variant).toBe('bid-only')
-    expect(b.figure).toBe(premiumText(bidOnly.bestBidPerUnit!, 7))
-    expect(b.count).toBe('1 bid')
-    expect(b.name).toBe(`Put at ${strikeText(bidOnly.ref.strikePerUnit, 7)}, no offer, highest bid ${b.figure}, 1 bid`)
-    expect(describeCell(bidOnly, 7, 'the demo price').name).toBe(`${b.name}, in the money at the demo price`)
+    const requestOnly = cells(fund).find((c) => c.empty && c.bids > 0)!
+    const r = describeCell(requestOnly, 7, null)
+    expect(r.variant).toBe('request-only')
+    expect(r.offer).toBeNull()
+    expect(r.request).toBe(premiumText(requestOnly.bestBidPerUnit!, 7))
+    expect(r.ask).toBe(false)
+    expect(r.name).toBe(`Put at ${strikeText(requestOnly.ref.strikePerUnit, 7)}, no offer, best request ${r.request}, 1 request`)
+    expect(describeCell(requestOnly, 7, 'the demo price').name).toBe(`${r.name}, in the money at the demo price`)
   })
 
-  it('marks what belongs to the connected wallet, in words too', () => {
-    const guest = cells(fund).filter((c) => describeCell(c, 7, null).yours)
-    expect(guest).toHaveLength(0)
-    const mine = cells(fundA).filter((c) => c.mine || c.holding || c.wrote)
-    expect(mine.length).toBeGreaterThan(0)
-    for (const cell of mine) {
-      const text = describeCell(cell, 7, null)
-      expect(text.yours).toBe(true)
-      expect(text.name).toMatch(/, yours, (.*, )?you (hold an option|wrote an option|have an order).* in this series$/)
+  it('names a resale listing when it is the best offer', () => {
+    const resale = cells(fund).find((c) => !c.empty && c.best?.source === 'resale')!
+    expect(resale).toBeDefined()
+    expect(describeCell(resale, 7, null).name).toMatch(/, best offer \d+\.\d\d for [\d.,]+ FUND, a resale listing, \d+ offers?/)
+  })
+
+  it("marks only a figure that is the wallet's own order; a holding is said in words", () => {
+    const me = DEMO_WALLETS.a
+    expect(cells(fund).filter((c) => describeCell(c, 7, null, true, null).yours)).toHaveLength(0)
+    let ownSeen = 0
+    for (const cell of [...cells(fundA), ...cells(bondA)]) {
+      const text = describeCell(cell, 7, null, true, me)
+      const ownOffer = !cell.empty && cell.best !== null && cell.best.counterparty === me
+      const ownRequest = cell.bids > 0 && cell.bestBid !== null && cell.bestBid.counterparty === me
+      expect(text.ownOffer).toBe(ownOffer)
+      expect(text.ownRequest).toBe(ownRequest)
+      expect(text.yours).toBe(ownOffer || ownRequest)
+      if (text.yours) {
+        ownSeen++
+        expect(text.name).toMatch(/, yours: the best (offer|request|offer and the best request)(,|$)/)
+      }
+      if (cell.holding) expect(text.name).toMatch(/you hold an option.* in this series$/)
+      if (cell.wrote) expect(text.name).toMatch(/you wrote an option.* in this series$/)
+      if (cell.mine && !text.yours) expect(text.name).toMatch(/you have an order in this series$/)
     }
-    // The default wallet's own open offer: FUND put at the lowest seeded strike, third date.
-    const own = fundA.cells.get(cellKey({ expiry: fundA.expiries[2], kind: 'put', strikePerUnit: units(9.8) }))!
-    expect(own.mine).toBe(true)
-    expect(describeCell(own, 7, null).name).toMatch(/^Put at 9\.80, best premium \d+\.\d\d, 2 makers, yours, you have an order in this series$/)
+    // Seeded: the default wallet's request on BOND put 98, fourth date, under a maker's dearer offer.
+    expect(ownSeen).toBeGreaterThan(0)
+    // An option the wallet holds never puts the highlighter on another maker's price.
+    const held = [...cells(fundA), ...cells(bondA)].filter((c) => c.holding && !c.mine && !c.empty)
+    expect(held.length).toBeGreaterThan(0)
+    for (const cell of held) expect(describeCell(cell, 7, null, true, me).yours).toBe(false)
+  })
+
+  it('takes the best order the wallet can take, never its own', () => {
+    const me = DEMO_WALLETS.a
+    for (const cell of cells(fundA)) {
+      const row = takeableOf(cell, me)
+      if (row === null) continue
+      expect(row.counterparty).not.toBe(me)
+      if (!cell.empty && cell.best && cell.best.counterparty !== me && cell.best.offer?.writer !== me) expect(row).toBe(cell.best)
+    }
+    const empty = cells(fund).find((c) => c.empty && c.bids === 0)!
+    expect(takeableOf(empty, null)).toBeNull()
+    const requestOnly = cells(fund).find((c) => c.empty && c.bids > 0)!
+    expect(takeableOf(requestOnly, null)?.source).toBe('bid')
   })
 })
 

@@ -9,13 +9,27 @@
     color: var(--text);
   }
 
+  /*
+   * Every card has inline padding, so its hover ground and focus ring clear the text; the list takes the same
+   * amount back with a negative margin, so the text keeps the column's edge. The rules are drawn inset by it.
+   */
   .cards {
+    --card-pad: var(--s-8);
+
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    margin: 0;
+    margin: 0 calc(var(--card-pad) * -1);
     padding: 0;
     list-style: none;
-    border-top: 1px solid var(--rule);
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      inset-inline: var(--card-pad);
+      border-top: 1px solid var(--rule);
+    }
   }
 
   .card {
@@ -26,17 +40,20 @@
     gap: var(--s-2);
     min-width: 0;
     margin: 0;
-    padding: var(--s-12) 0;
-    border-bottom: 1px solid var(--hairline);
+    padding: var(--s-12) var(--card-pad);
+    border-radius: var(--r-tag);
+    background-image: linear-gradient(var(--hairline), var(--hairline));
+    background-position: center bottom;
+    background-size: calc(100% - 2 * var(--card-pad)) 1px;
+    background-repeat: no-repeat;
   }
 
   /* The scenario under the price handle: an ink rule over the card, not a colour. */
   .card[data-current='true']::before {
     content: '';
     position: absolute;
-    left: 0;
-    right: 0;
-    top: -1px;
+    inset-inline: var(--card-pad);
+    top: 0;
     height: 2px;
     background: var(--text);
   }
@@ -71,11 +88,10 @@
 
   .card:has(.select:focus-visible) {
     box-shadow: var(--focus-ring);
-    border-radius: var(--r-tag);
   }
 
   .card[data-selectable='true']:hover {
-    background: var(--sunken);
+    background-color: var(--sunken);
   }
 
   .figure {
@@ -96,32 +112,28 @@
     color: var(--text-2);
   }
 
+  /* The signed amount takes the gain or loss colour and stays on one line; the words after it are text-2. */
   .delta {
-    display: flex;
-    align-items: baseline;
-    gap: var(--s-6);
     margin: 0;
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     font-weight: var(--ui-weight);
     font-variant-numeric: tabular-nums lining-nums;
     color: var(--text-2);
+    text-wrap: pretty;
   }
 
-  .delta[data-direction='gain'] {
+  .deltaAmount {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .delta[data-direction='gain'] .deltaAmount {
     color: var(--gain);
   }
 
-  .delta[data-direction='loss'] {
+  .delta[data-direction='loss'] .deltaAmount {
     color: var(--loss);
-  }
-
-  .delta svg {
-    flex: none;
-    align-self: center;
-    width: 0.5em;
-    height: 0.5em;
-    fill: currentColor;
   }
 
   .sentence {
@@ -133,41 +145,21 @@
     text-wrap: pretty;
   }
 
-  .bar {
-    margin-top: auto;
-    padding-top: var(--s-8);
-  }
 
-  .key {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-4) var(--s-6);
-    margin: var(--s-8) 0 0;
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
-  }
-
-  .keyBar {
-    display: inline-block;
-    width: var(--s-16);
-    height: var(--s-6);
-    background: var(--text);
-  }
-
-  .keyTick {
-    display: inline-block;
-    width: 2px;
-    height: var(--s-12);
-    margin-left: var(--s-12);
-    background: var(--text);
-  }
 
   @container (min-width: 30rem) {
     .cards {
+      --card-pad: var(--s-16);
+
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      border-bottom: 1px solid var(--hairline);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        inset-inline: var(--card-pad);
+        border-bottom: 1px solid var(--hairline);
+      }
     }
 
     .cards[data-count='2'] {
@@ -179,20 +171,12 @@
     }
 
     .card {
-      padding: var(--s-12) var(--s-16);
-      border-bottom: 0;
+      background-image: none;
     }
 
     .card + .card {
       border-left: 1px solid var(--hairline);
-    }
-
-    .card:first-child {
-      padding-left: 0;
-    }
-
-    .card:last-child {
-      padding-right: 0;
+      border-radius: 0;
     }
   }
 }

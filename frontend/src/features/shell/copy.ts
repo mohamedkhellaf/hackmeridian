@@ -1,37 +1,42 @@
 // The shell's own words. Required disclosure sentences are not here: they come from core/disclosures.
-import { NETWORK_STATE_LABEL } from '../../data'
 import type { NetworkState } from '../../data'
-import type { DensityChoice, PnlScheme, ThemeChoice } from '../../data'
+import type { PnlScheme, ThemeChoice } from '../../data'
 import type { BalanceStatus } from '../../core/stellar/tokens'
 
+// ---- Network indicator -------------------------------------------------------------------------------------
 
-// ---- Network chip ------------------------------------------------------------------------------------------
+/** The network the wallet must be on. Named once, in the top bar. */
+export const NETWORK_NAME = 'Testnet'
+
+/** A build without a contract says so in place of the network name. */
+export const MOCK_DATA = 'Mock data'
+
+/** The reading while the ledger reads are current: `ledgerReading('58,331,204')`. */
+export const ledgerReading = (ledger: string): string => `Testnet, ledger ${ledger}`
 
 /**
- * The word for the state of the reads (the data layer's, so every screen says the same). The dot never carries
- * the state alone. In a build without a contract the chip reads "Mock data" in place of the network name: that
- * is where a mock build says what it is.
+ * What the indicator says in place of the ledger number when the reads are not current: the full words from
+ * 1200 px, the short ones on narrower bars.
  */
-export const NETWORK_WORD: Record<NetworkState, string> = NETWORK_STATE_LABEL
+export const NETWORK_LATE: Record<Extract<NetworkState, 'delayed' | 'down'>, { full: string; short: string }> = {
+  delayed: { full: 'Testnet, reads are late', short: 'Reads are late' },
+  down: { full: 'Testnet, no connection', short: 'No connection' },
+}
 
-/** What the state means for the figures on screen. */
-export const NETWORK_MEANING: Record<NetworkState, string> = {
-  mock: 'This build runs on an in-memory demo market. Nothing is read from Stellar and nothing is sent to it.',
-  connecting: 'Reading the latest ledger from the Testnet RPC.',
-  ok: 'The last read succeeded. Figures on screen are current to this ledger.',
-  delayed: 'The last read failed or is late. The ledger shown may be behind, and figures on screen may be out of date.',
-  down: 'No ledger could be read. Figures on screen may be out of date. The page keeps trying.',
+/** The banner under the bar when the reads stay late through one more poll, or none could be made at all. */
+export const LATE_READ_TITLE = 'Figures may be out of date'
+export const LATE_READ_TEXT: Record<'delayed' | 'down', string> = {
+  delayed: 'The last ledger read failed or is late. The page keeps trying.',
+  down: 'No ledger could be read. The page keeps trying.',
 }
 
 // ---- Settings ----------------------------------------------------------------------------------------------
 
 export const SETTINGS_TITLE = 'Settings'
 export const THEME_GROUP = 'Theme'
-export const DENSITY_GROUP = 'Table density'
 export const PNL_GROUP = 'Gain and loss colours'
 
 export const THEME_LABEL: Record<ThemeChoice, string> = { system: 'System', light: 'Light', dark: 'Dark' }
-export const DENSITY_LABEL: Record<DensityChoice, string> = { comfortable: 'Comfortable', compact: 'Compact' }
 export const PNL_LABEL: Record<PnlScheme, string> = { default: 'Teal and orange', classic: 'Green and red', mono: 'Ink only' }
 
 // ---- Wallet ------------------------------------------------------------------------------------------------
@@ -46,11 +51,19 @@ export const BALANCE_REASON: Record<Exclude<BalanceStatus, 'ok'>, string> = {
 }
 
 export const CONNECT_TITLE = 'Connect a wallet'
-export const CONNECT_LOADING = 'Looking for wallets'
 export const CONNECT_EMPTY = 'No wallets found.'
 export const CONNECT_EMPTY_HINT = 'Install a Stellar wallet extension, reload this page, then connect again.'
+/** On a touch device extension stores are not offered: what can open there is listed, and this says why. */
+export const CONNECT_TOUCH_NOTE = 'Browser extensions are not offered on this device. To use one, open StellSec in a desktop browser.'
+/** The wallet list could not be loaded: the error is shown above, and this is the way forward. */
+export const CONNECT_RETRY = 'Try again'
+/** While one wallet is asked. `name` is the wallet's own name. */
+export const connectWaiting = (name: string): string => `Approve the connection in ${name}. Nothing is signed by connecting.`
 
 export const WRONG_NETWORK_TITLE = 'Wrong network'
-export const WRONG_NETWORK_FALLBACK = 'Your wallet is not on Testnet. Switch the network in the wallet.'
-export const WRONG_NETWORK_FIX =
-  'Open the wallet, find its network setting and choose Testnet (some wallets call it Test Net). This page checks again when you come back to it. A transaction signed for another network fails here.'
+/** `name` is the connected wallet's name, or null when the wallet layer does not know it. */
+export const wrongNetworkText = (name: string | null): string =>
+  `${name ?? 'Your wallet'} is on another network. Open the wallet, choose Testnet (some wallets call it Test Net), then check again. Until then nothing can be signed here.`
+
+/** Reads the wallet's network again. */
+export const CHECK_AGAIN = 'Check again'

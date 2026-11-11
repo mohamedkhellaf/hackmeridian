@@ -1,14 +1,31 @@
 @layer features {
   .root {
+    --loading-chart-h: 22rem;
     display: flex;
     flex-direction: column;
-    gap: var(--s-32);
+    gap: var(--s-24);
     min-width: 0;
+    container: guided / inline-size;
   }
 
   .loading {
     display: flex;
     flex-direction: column;
+    gap: var(--s-24);
+  }
+
+  .loadingNote {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding: var(--s-20);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+  }
+
+  .loadingFigures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--s-24);
   }
 
@@ -33,7 +50,7 @@
   .section {
     display: flex;
     flex-direction: column;
-    gap: var(--s-16);
+    gap: var(--s-12);
     min-width: 0;
   }
 
@@ -45,13 +62,12 @@
     letter-spacing: var(--h2-track);
   }
 
-  .whenLead {
+  .premiumNote {
     max-width: var(--measure);
-    margin-top: calc(var(--s-8) * -1);
-    font-size: var(--body-size);
-    line-height: var(--body-line);
-    font-weight: var(--body-weight);
-    color: var(--text);
+    margin-top: calc(var(--s-4) * -1);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
     text-wrap: pretty;
   }
 
@@ -61,46 +77,14 @@
     color: var(--muted);
   }
 
-  .action {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-12);
-    padding-top: var(--s-20);
-    border-top: 1px solid var(--rule);
-  }
-
-  .summary {
-    max-width: var(--measure);
-    font-family: var(--font-serif);
-    font-size: var(--h3-size);
-    line-height: var(--h2-line);
-    font-weight: var(--figure-weight);
-    color: var(--text);
-    text-wrap: pretty;
-  }
-
-  .buttons {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-8) var(--s-12);
-  }
-
-  .next {
-    max-width: var(--measure);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
-    text-wrap: pretty;
-  }
-
   @media (max-width: 767.98px) {
     .root {
+      --loading-chart-h: 18rem;
       gap: var(--s-24);
     }
 
-    .buttons > * {
-      flex: 1 1 100%;
+    .loadingFigures {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 }

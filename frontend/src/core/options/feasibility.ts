@@ -1,5 +1,5 @@
 import type { BalanceStatus } from '../stellar/tokens'
-import { formatDisplay } from './format'
+import { formatUnits } from '../format/amount'
 import type { OptionOffer } from './types'
 
 // Pure checks for the buy-dialog warning and the market "Check terms" tag. The contract cannot judge
@@ -27,7 +27,7 @@ export function exerciseFeasibility(o: Terms, underlyingBal: BalanceView | undef
   const need = put ? o.underlyingQty : o.totalStrike
   const bal = put ? underlyingBal : quoteBal
   if (!bal) return { level: 'unknown' }
-  const amount = `${formatDisplay(need, token.decimals)} ${token.code}`
+  const amount = `${formatUnits(need, token.decimals)} ${token.code}`
   const what = put ? `deliver ${amount}` : `pay ${amount}`
   if (bal.status === 'no-trustline')
     return { level: 'warn', message: `To exercise you would need to ${what}, but your account has no ${token.code} trustline.` }
@@ -37,7 +37,7 @@ export function exerciseFeasibility(o: Terms, underlyingBal: BalanceView | undef
   if (bal.balance < need)
     return {
       level: 'warn',
-      message: `To exercise you would need to ${what}, but you hold ${formatDisplay(bal.balance, token.decimals)} ${token.code}. Unless you acquire the difference before expiry, this option cannot be exercised.`,
+      message: `To exercise you would need to ${what}, but you hold ${formatUnits(bal.balance, token.decimals)} ${token.code}. Unless you acquire the difference before the deadline, this option cannot be exercised.`,
     }
   return { level: 'ok' }
 }

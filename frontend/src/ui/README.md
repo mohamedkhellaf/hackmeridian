@@ -33,7 +33,7 @@ No storage in `ui/`: the data layer persists the choices and calls the three `ap
 | `Button` | `variant: 'primary' \| 'secondary' \| 'quiet' \| 'danger'`, `size: 'md' \| 'sm'`, `loading`, `iconStart`, `iconEnd`, `fullWidth`, `disabledReason` (shown as a tooltip, button stays focusable). `type="submit"` must be said |
 | `ButtonLink` | a link that looks like a button: same look props, `href` or `render` (for router links) |
 | `IconButton` | `label` (required: accessible name and tooltip), `icon`, `size`, `variant` |
-| `Link` | `href`, `external` (new tab, icon, announced), `tone: 'accent' \| 'ink' \| 'quiet'`, `render` |
+| `Link` | `href`, `external` (new tab, icon, announced), `tone: 'accent' \| 'ink' \| 'quiet'`, `standalone` (a link on its own line: 44 px hit area on touch), `render` |
 | `Field` | `label`, `hint`, `error`, `aside`, `optional`, `hideLabel`; children is any Base UI control (the wiring is automatic) |
 | `TextField` | `label`, `value`, `onValueChange`, `hint`, `error`, `aside`, `mono`, `prefix`, `suffix`, `hideLabel`, input props |
 | `AmountField` | decimal **strings** only: `value`, `onValueChange`, `unit`, `decimals`, `error`, `validate(value)` (shown after the first blur), `onMax`, `maxLabel`, `aside` (the balance). Never `type=number`; typing is kept to digits and one point by `sanitizeDecimalInput` |
@@ -46,32 +46,36 @@ No storage in `ui/`: the data layer persists the choices and calls the three `ap
 | `Slider` | `label`, `value`, `onValueChange`, `min`, `max`, `step`, `largeStep`, `valueText(value)`, `marks` |
 | `Tabs`, `TabList`, `Tab`, `TabPanel` | panels swap; `Tabs value onValueChange`, `TabList label`, `Tab value count?`, `TabPanel value` |
 | `NavTabs`, `NavTab` | links; `current` sets `aria-current="page"`; `render` for router links; `count` |
-| `Tooltip` | `content`, one focusable child. Never essential information |
+| `Tooltip` | `content`, one focusable child. Never essential information. `stable` keeps the same element tree while the content comes and goes (Button uses it, so a focused button keeps focus when its disabled reason appears) |
 | `Popover` | `trigger`, `title`, children, `side`, `align`, `open`, `onOpenChange`, `openOnHover` |
 | `Coachmark` | a note beside a control it did not create (the welcome guide): `open`, `target` (gets the ruled mark and the note as its description), `anchor?` (where the note sits, default `target`), `title`, children, `counter?`, `foot?`, `actions`, `side`, `align`, `closeLabel`, `onClose('escape' \| 'close' \| 'outside')`, `initialFocus` (ref or `false`), `finalFocus`, `stepKey`. Not modal: no scrim, no scroll lock; a press outside closes it and still lands |
 | `Menu`, `MenuItem`, `MenuLinkItem`, `MenuSeparator`, `MenuGroup`, `MenuRadioGroup`, `MenuRadioItem` | `trigger` on `Menu`; `onSelect`, `icon`, `detail`, `tone="danger"` on items; `MenuLinkItem href` or `render` |
-| `Dialog` | `open`, `onOpenChange`, `title`, `description`, `footer`, `size: 'sm' \| 'md' \| 'lg'`, `role: 'dialog' \| 'alertdialog'`, `initialFocus: 'title' (default) \| 'first-control' \| ref`, `finalFocus`, `dismissible` |
+| `Dialog` | `open`, `onOpenChange`, `title`, `description`, `footer`, `size: 'sm' \| 'md' \| 'lg'`, `role: 'dialog' \| 'alertdialog'`, `initialFocus: 'title' (default) \| 'first-control' \| ref`, `finalFocus`, `dismissible`; a bottom sheet under 768 px |
 | `Drawer` | same as `Dialog`, slides from the right (420 px), swipe to dismiss |
 | `Sheet` | same as `Dialog`, bottom sheet for phones, short confirmations only |
-| `Callout` | `variant: 'info' \| 'warning' \| 'danger'`, `title`, `label` (the word next to the icon), `alert` (true alerts only), `actions` |
-| `Tag` | contract state names only: `<Tag state="Active" />` |
-| `Badge` | `count`, `label` (accessible sentence, for example "2 actions waiting") |
+| `Callout` | `variant: 'info' \| 'warning' \| 'danger'`, `title`, `label` (shown as the heading only when there is no `title`; the variant word is read out, never shown), `alert` (true alerts only), `actions` |
+| `Tag` | contract state names only: `<Tag state="Active" />`; one shape, two tones |
+| `Badge` | `count`, `label` (accessible sentence, for example "2 actions waiting"), `tone: 'solid' \| 'quiet'` (a plain muted numeral after a tab label) |
 | `TableWrap`, `Table`, `THead`, `TBody`, `Tr`, `Th`, `Td`, `RowHeader` | native table; `TableWrap label maxHeight?` (the `.ui-table-wrap`; the header is sticky inside it); `Table density on caption fixed`; `Tr selected interactive`; cells take `numeric`, `align`, `pinned`, `strike`, `sunken`, `muted`; `Th sort onSort` |
 | `KeyValue`, `KeyValueItem` | `dl > div > dt + dd`; `variant: 'ruled' \| 'plain'`, `figures: 'serif' \| 'sans'`, `layout: 'row' \| 'stacked'`; item `label`, `marked`, `hint` |
 | `Stat` | `label`, `value`, `unit`, `hint`, `size: 'md' \| 'lg'` |
 | `Card` | `title`, `headingLevel`, `actions`, `tone: 'surface' \| 'sunken' \| 'plain'`, `padding: 'none' \| 'sm' \| 'md'`, `as` |
-| `ContractNote` | `serial`, `ledger`, `serialLabel`, `glyph`, `kind`, `terms: { label, value, marked?, hint? }[]`, `state`, `aside`, children, `footer`, `printing`, `headingLevel` |
-| `EmptyNote` | `title` (one serif sentence), `hint`, `action` |
+| `ContractNote` | `serial`, `ledger`, `serialLabel`, `glyph`, `kind`, `terms: { label, value, marked?, hint? }[]`, `state`, `aside`, children, `footer`, `printing`, `plain` (a form or an example: no perforation, no serial line), `headingLevel` |
+| `EmptyNote` | `title` (one serif sentence), `hint` (one short line), `action`; plain by default, `slip` for the blank contract note where the missing thing is itself a contract note |
 | `Skeleton` | `variant: 'text' \| 'block' \| 'rows'`, `lines`, `width`, `height` |
 | `Address` | `value`, `length: 'short' \| 'medium' \| 'full'`, `explorerUrl`, `copyLabel`, `you`, `name` |
 | `TxLink` | `hash`, `explorerUrl`, `copy` |
+| `Term` | `definition` (one glossary sentence), children (the word): the word is the button, a press opens the sentence |
+| `ClockProvider` | `offsetMs` (ledger close time minus device clock): every `Countdown` without `now` follows the ledger |
+| `TxStateWord` | `state` (a `TxState`), `word` (overrides the state's own word): glyph and word of a transaction state |
+| `UnsettledNotice` | `children` (the sentence of `useUnsettledTx` in `src/data`), `onCheck`, `checkLabel`: the warning above a confirmation while an earlier transaction of the wallet has an unknown outcome; the action itself takes the same sentence as its `disabledReason` |
 | `CopyButton` | `value`, `label` ("Copy address"), `copiedMessage` |
 | `DateTime` | `value` (Date, ms or ISO), `local: 'below' \| 'inline' \| 'none'`, `format: 'full' \| 'table'` |
 | `Countdown` | `to` (ms), `now` (ms, pass the ledger close time; without it the device clock ticks), `warnBelowMs`, `expiredLabel`, `label` |
-| `Amount` | pre-formatted strings: `value` (the magnitude), `exact`, `unit`, `direction: 'gain' \| 'loss'` (adds sign, triangle and word), `figure: 'sans' \| 'serif'`, `size`, `srLabel` |
-| `Glyph` | `name`: `long-call`, `long-put`, `short-call`, `short-put`, `fund`, `bond`, `equity`, `quote`, `reserve`, `margin`, `issuer`, `expiry` |
+| `Amount` | pre-formatted strings: `value` (the magnitude), `exact`, `unit`, `direction: 'gain' \| 'loss'` (adds the sign, the colour and the spoken word), `figure: 'sans' \| 'serif'`, `size`, `srLabel` |
+| `Glyph` | `name`: `long-call`, `long-put`, `short-call`, `short-put`, `quote`, `reserve`, `margin`, `issuer`, `expiry` |
 | `Mark`, `Wordmark`, `Logo` | `Mark cut: 'two-ink' \| 'hollow' \| 'display'`, `size`, `label`; `Logo size` |
-| `Marker` | highlighter behind the user's own figures only; `band` at display sizes, `flash` for a changed figure |
+| `Marker` | highlighter, one figure per surface: a term the user set or the breakeven on their own term sheet; `flash` for a changed figure |
 | `Stepper`, `TxStepper` | `TxStepper state: 'checking' \| 'signing' \| 'submitting' \| 'pending' \| 'confirmed' \| 'failed' \| 'unknown' \| 'expired' \| 'declined'`, `failedAt: 'check' \| 'submit' \| 'confirm'`, `hash` slot, `children` = what it means and what to do. `TX_STATES`, `TX_STATE_LABEL` |
 | `Timeline` | `items: { title, time?, description?, status: 'done' \| 'current' \| 'upcoming', actor? }[]` |
 | `PageHeader` | `title`, `description`, `actions`, `meta`, `back`, `headingRef` (focus target on route change) |
@@ -104,8 +108,7 @@ Decisions worth knowing:
 
 | Piece | What it is |
 |---|---|
-| `ChoiceChips` | A wrapping radio group of chips with an optional second line. `appearance="control"` (forms: ink when chosen) or `"note"` (serif figures on a contract note; dashed until `marked`, which adds a tick). `value: null` means none is chosen. Used by the ticket and by guided mode. |
-| `StepTrail` | The one-line trail of a short flow ("Terms, Review, Sign, Receipt"): `steps: { label, status: 'done' \| 'current' \| 'upcoming' }[]`. For steps with details use `Stepper`. |
+| `ChoiceChips` | A wrapping radio group of chips with an optional second line. `appearance="control"` (forms: ink when chosen) or `"note"` (serif figures on a contract note; `marked` adds a tick). `value: null` means none is chosen. Used by the ticket and by guided mode. |
 | `useMediaQuery(query)`, `useIsPhone()`, `useIsWide()`, `PHONE_QUERY`, `WIDE_QUERY` | The two breakpoints as hooks, for the few places where the markup itself differs by width (a table that becomes a list, the ticket's container). Layout alone stays in CSS. |
 | `Drawer presentation="page"` | On phones the drawer is a full page and its footer is the 64 px action bar, outside the scroller. |
 | `SwipeIgnore` | An area inside a `Drawer` or `Sheet` where a drag belongs to the content (a chart handle), not to the swipe that dismisses the panel. |
@@ -115,7 +118,7 @@ Decisions worth knowing:
 | `Segmented` | 44 px segments on touch screens at every size (the strip draws its line as an inset outline there). `SegmentedOption.count` / `countLabel` add a count after the label. |
 | `Table prose` | Cells that hold sentences: wrapping, top-aligned, body size, a serif row header. `Table` and `Tr` take a `ref`. |
 | `KeyValueItem size="lg"` | The closing figure of a term sheet ("You pay 1.80 USDx"). |
-| `EmptyNote children`, `size="sm"` | Blank form lines inside the slip; a compact form for a desk screen that stacks several empty tables. |
+| `EmptyNote size="sm"` | A compact form for a desk screen that stacks several empty tables. (`children` is deprecated: no blank form lines.) |
 | `Timeline` | `status` is optional (a walk-through that is nobody's history draws plain ink points); the actor sits beside the time, behind a short rule. |
 | `PageHeader headingLevel` | 1 on a page; a specimen or an embedded header takes the level of its place. |
 | `Button tone="danger"` on `variant="quiet"` | A destructive action in a dense row: danger ink, no border. |

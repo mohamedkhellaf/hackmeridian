@@ -2,9 +2,9 @@ import { cx } from './internal/cx'
 import styles from './Tag.module.css'
 
 /**
- * How a state reads at a glance, by shape rather than hue:
- * `open` waits for a counterparty (outline), `live` is in force (ink outline, heavier),
- * `done` was carried out (filled), `ended` lapsed or was withdrawn (dashed, muted).
+ * How a state reads at a glance. One shape, two tones, never a hue: `open` (waits for a counterparty) and `live`
+ * (in force) are in ink; `done` (carried out) and `ended` (lapsed or withdrawn) are muted with a hairline.
+ * The state's own word says which of the pair it is.
  */
 export type TagAppearance = 'open' | 'live' | 'done' | 'ended'
 

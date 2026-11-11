@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { ME, MAKER, NOW, U, bid, opt } from '../fixtures.testhelper'
-import { cancelBidCheck, simpleCheck } from './checks'
+import { clawbackShortfallDisclosure } from '../../../core/disclosures'
+import { ME, MAKER, NOW, U, USDX, bid, opt } from '../fixtures.testhelper'
+import { cancelBidCheck, checksSentence, readTime, simpleCheck } from './checks'
 
 const written = (over = {}) => opt({ writer: ME, holder: MAKER, ...over })
+
+describe('the checks sentence', () => {
+  it('folds the lines that passed into one sentence with the read time; the rest stay rows', () => {
+    const o = written({ kind: 'call', state: 'exercised' })
+    const c = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o })
+    expect(checksSentence('14:32:16 UTC', c.lines)).toBe('Read from the contract at 14:32:16 UTC: the option is exercised and 50.00 USDx waits in the contract.')
+    expect(checksSentence(null, [{ label: 'Option', status: 'ok', text: 'Active' }, { label: 'FUND balance', status: 'ok', text: '120.00 FUND' }])).toBe(
+      'Read from the contract: the option is active and you hold 120.00 FUND.',
+    )
+    expect(checksSentence(null, [{ label: 'Option', status: 'pending', text: 'Checking' }])).toBeNull()
+    expect(readTime(Date.UTC(2026, 10, 13, 14, 32, 16))).toBe('14:32:16 UTC')
+    expect(readTime(0)).toBeNull()
+  })
+})
 
 describe('simpleCheck', () => {
   it('says "Checking" while the option is being re-read, and does not block', () => {
@@ -22,14 +37,31 @@ describe('simpleCheck', () => {
     const o = written({ kind: 'call', state: 'exercised' })
     const c = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o })
     expect(c).toMatchObject({ blocked: false, pending: false, problem: null })
-    expect(c.lines).toEqual([{ label: 'Option', status: 'ok', text: 'Exercised. 50.00 USDx in the contract' }])
+    expect(c.lines).toMatchObject([{ label: 'Option', status: 'ok', text: 'Exercised. 50.00 USDx in the contract' }])
+  })
+
+  it('during a clawback shortfall stops saying the amount is in the contract, and warns without blocking', () => {
+    const o = written({ kind: 'call', state: 'exercised' })
+    const c = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o, short: USDX })
+    expect(c.blocked).toBe(false)
+    expect(c.lines).toMatchObject([
+      { label: 'Option', status: 'ok', text: 'Exercised' },
+      { label: 'Contract balance', status: 'fail', text: 'Holds less USDx than it owes' },
+    ])
+    expect(c.warning).toBe(clawbackShortfallDisclosure('USDx'))
+    const reclaim = simpleCheck('reclaim', written({ state: 'expired' }), { me: ME, nowSec: NOW, option: written({ state: 'expired' }), short: USDX })
+    expect(reclaim.lines[0].text).toBe('Expired')
+    expect(simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o }).warning).toBeNull()
+    const request = cancelBidCheck({ me: ME, bid: bid(), short: USDX })
+    expect(request).toMatchObject({ blocked: false, warning: clawbackShortfallDisclosure('USDx') })
+    expect(request.lines[0].text).toBe('Open')
   })
 
   it('checks the issuer authorization before a put writer claims the underlying', () => {
     const o = written({ state: 'exercised' })
     const ok = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o, eligible: true })
     expect(ok.blocked).toBe(false)
-    expect(ok.lines[1]).toEqual({ label: 'Your account', status: 'ok', text: 'Authorized by the FUND issuer' })
+    expect(ok.lines[1]).toMatchObject({ label: 'Your account', status: 'ok', text: 'Authorized by the FUND issuer' })
     const no = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o, eligible: false })
     expect(no.blocked).toBe(true)
     expect(no.problem).toContain('The FUND issuer has not authorized your account')
@@ -73,7 +105,7 @@ describe('simpleCheck', () => {
     const o = opt()
     const ok = simpleCheck('unlist', o, { me: ME, nowSec: NOW, option: o, ask: 2n * U })
     expect(ok.blocked).toBe(false)
-    expect(ok.lines).toEqual([
+    expect(ok.lines).toMatchObject([
       { label: 'Option', status: 'ok', text: 'Active, held by you' },
       { label: 'Listing', status: 'ok', text: 'For sale at 2.00 USDx' },
     ])
@@ -93,7 +125,7 @@ describe('simpleCheck', () => {
 
 describe('cancelBidCheck', () => {
   it('lets the buyer take an open or an expired request back, with the escrowed figure', () => {
-    expect(cancelBidCheck({ me: ME, bid: bid() }).lines[0]).toEqual({ label: 'Request', status: 'ok', text: 'Open. 2.00 USDx escrowed' })
+    expect(cancelBidCheck({ me: ME, bid: bid() }).lines[0]).toMatchObject({ label: 'Request', status: 'ok', text: 'Open. 2.00 USDx escrowed' })
     expect(cancelBidCheck({ me: ME, bid: bid({ state: 'expired' }) }).lines[0].text).toBe('Expired. 2.00 USDx escrowed')
   })
 

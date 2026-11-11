@@ -9,9 +9,9 @@ export interface SegmentedOption<V extends string = string> {
   value: V
   label: ReactNode
   icon?: ReactNode
-  /** A second, smaller line inside the segment (days left under an expiry date). */
+  /** A second, smaller line inside the segment (days left under a deadline). */
   detail?: ReactNode
-  /** A count after the label (offers on an expiry), with its meaning for screen readers ("4 offers"). */
+  /** A count after the label (offers on a deadline), with its meaning for screen readers ("4 offers"). */
   count?: number
   countLabel?: string
   disabled?: boolean
@@ -31,7 +31,7 @@ export interface SegmentedProps<V extends string = string> {
 }
 
 /**
- * A choice between a few modes of the same view (Guided or Chain, Put or Call, an expiry).
+ * A choice between a few modes of the same view (Guided or Chain, Put or Call, a deadline).
  * It is a real radio group: one tab stop, arrow keys move and select, the choice is announced as "selected".
  * To move between pages use `NavTabs`; to swap panels use `Tabs`.
  */

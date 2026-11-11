@@ -4,10 +4,9 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import type { RequestsSearch } from '../../app/search'
 
-export const REQUESTS_ROUTE = '/requests'
 export const PORTFOLIO_POSITION_ROUTE = '/portfolio/$id'
 export const RESERVES_ROUTE = '/reserves'
-export const LEARN_ROUTE = '/learn'
+export const MARKETS_ROUTE = '/markets'
 
 export function useRequestsSearch(): RequestsSearch {
   return useSearch({ strict: false }) as RequestsSearch

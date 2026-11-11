@@ -17,11 +17,14 @@ export interface NoteTerm {
 }
 
 export interface ContractNoteProps {
-  /** The option, offer or bid id as printed: "000184". */
+  /** The option, offer or request id as printed: "000184". */
   serial?: string
-  /** The ledger the terms were read at, as printed: "58,331,204". */
+  /**
+   * A ledger number printed beside the serial ("L 58,331,204"), read out as "latest ledger": the ledger of the
+   * read when the caller has it, otherwise the latest ledger the app knows.
+   */
   ledger?: string
-  /** What the number is: "No." (default), "Offer No.", "Bid No.". */
+  /** What the number is: "No." (default), "Offer No.", "Request No.". */
   serialLabel?: string
   /** The payoff shape. Always shown with `kind`, never alone. */
   glyph?: PayoffGlyph
@@ -41,6 +44,11 @@ export interface ContractNoteProps {
   footer?: ReactNode
   /** Plays the "printing" entrance once: the slip rises 6 px and settles, the serial line fades in. For a receipt. */
   printing?: boolean
+  /**
+   * A card that is a form or an example, not a contract object: no perforated edge and no serial line (`serial`
+   * and `ledger` are ignored; the state tag, if any, sits right of the heading).
+   */
+  plain?: boolean
   className?: string
 }
 
@@ -63,13 +71,15 @@ export function ContractNote({
   children,
   footer,
   printing = false,
+  plain = false,
   className,
 }: ContractNoteProps) {
   const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4'
-  const hasSerial = serial !== undefined || ledger !== undefined
+  const hasSerial = !plain && (serial !== undefined || ledger !== undefined)
+  const tag = state ? <Tag state={state} appearance={stateAppearance} /> : null
   return (
-    <article className={cx(styles.root, className)} data-printing={printing || undefined}>
-      {hasSerial || state ? (
+    <article className={cx(styles.root, className)} data-printing={printing || undefined} data-plain={plain || undefined}>
+      {!plain && (hasSerial || state) ? (
         <div className={styles.running}>
           {hasSerial ? (
             <p className={styles.serial}>
@@ -81,13 +91,13 @@ export function ContractNote({
               <span className="ui-vh">
                 {serial !== undefined ? `${serialLabel} ${serial}` : ''}
                 {serial !== undefined && ledger !== undefined ? ', ' : ''}
-                {ledger !== undefined ? `read at ledger ${ledger}` : ''}
+                {ledger !== undefined ? `latest ledger ${ledger}` : ''}
               </span>
             </p>
           ) : (
             <span />
           )}
-          {state ? <Tag state={state} appearance={stateAppearance} /> : null}
+          {tag}
         </div>
       ) : null}
       <header className={styles.header}>
@@ -95,7 +105,12 @@ export function ContractNote({
           {glyph ? <Glyph name={glyph} size={12} className={styles.glyph} /> : null}
           <span>{kind}</span>
         </Heading>
-        {aside ? <div className={styles.aside}>{aside}</div> : null}
+        {aside || (plain && tag) ? (
+          <div className={styles.aside}>
+            {aside}
+            {plain ? tag : null}
+          </div>
+        ) : null}
       </header>
       {terms && terms.length > 0 ? (
         <KeyValue className={styles.terms}>
@@ -115,30 +130,42 @@ export function ContractNote({
 export interface EmptyNoteProps {
   /** One serif sentence: "No positions." */
   title: ReactNode
-  /** One line saying when something will appear here. */
+  /** At most one short line saying when something will appear here. */
   hint?: ReactNode
   /** At most one action. */
   action?: ReactNode
-  /** Inside the slip, under the sentence: the blank lines of the form that will be filled in (never more copy). */
+  /** Deprecated: still rendered under the sentence until the last caller stops passing it. Add nothing new here. */
   children?: ReactNode
-  /** `sm` for a desk screen that stacks several empty tables: no serial line, less room, a smaller sentence. */
+  /** `sm` for a desk screen that stacks several empty tables: less room, a smaller sentence. */
   size?: 'md' | 'sm'
+  /**
+   * The blank contract note: a solid hairline frame, the perforated edge and the "No. ------" serial line. Only
+   * where the missing thing is itself a contract note (the Portfolio with no positions or no wallet, a position
+   * number that does not exist). Never in a dialog, for a wrong address, for an empty table or in the ticket rail.
+   */
+  slip?: boolean
   headingLevel?: 2 | 3 | 4
   className?: string
 }
 
-/** The empty state: a blank, dashed slip with one sentence and at most one action. */
-export function EmptyNote({ title, hint, action, children, size = 'md', headingLevel = 3, className }: EmptyNoteProps) {
+/**
+ * The empty state. Plain by default: one serif sentence, at most one short line and one action, no frame.
+ * With `slip`, the same words on a blank contract note.
+ */
+export function EmptyNote({ title, hint, action, children, size = 'md', slip = false, headingLevel = 3, className }: EmptyNoteProps) {
   const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4'
   return (
-    <div className={cx(styles.root, styles.empty, className)} data-size={size === 'sm' ? 'sm' : undefined}>
-      {size === 'sm' ? null : (
+    <div
+      className={cx(slip ? styles.root : undefined, slip ? styles.slip : styles.plainEmpty, className)}
+      data-size={size === 'sm' ? 'sm' : undefined}
+    >
+      {slip && size !== 'sm' ? (
         <div className={styles.running}>
           <p className={styles.serial} aria-hidden="true">
             No. ------
           </p>
         </div>
-      )}
+      ) : null}
       <div className={styles.emptyBody}>
         <Heading className={styles.emptyTitle}>{title}</Heading>
         {hint ? <p className={styles.emptyHint}>{hint}</p> : null}

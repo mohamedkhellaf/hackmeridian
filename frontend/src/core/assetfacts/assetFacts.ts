@@ -102,7 +102,32 @@ export interface FlagFact {
   consequence: string
 }
 
-/** One line per authorization flag, phrased as what it means for a holder or for the options contract. */
+/** Title of the issuer powers, the same on the asset About tab and the Issuer page. */
+export const ISSUER_POWERS_TITLE = 'What the issuer can do'
+
+/** Column heads of the issuer powers table. */
+export const POWERS_COLUMNS = { power: 'Power', state: 'State', effect: 'Effect' } as const
+
+/** The state word of a power. */
+export const POWER_STATE = { on: 'On', off: 'Off' } as const
+
+/** The fourth row of the powers: whether the issuer can still change the three flags. */
+export interface FlagChangeFact {
+  key: 'change'
+  label: 'Change these settings'
+  on: boolean
+  state: 'Yes' | 'No'
+  consequence: string
+}
+
+/** Whether the flags can still change: no once the issuer set AUTH_IMMUTABLE. */
+export function describeFlagChange(f: AssetFlags): FlagChangeFact {
+  return f.authImmutable
+    ? { key: 'change', label: 'Change these settings', on: false, state: 'No', consequence: 'Fixed. The issuer can never change them.' }
+    : { key: 'change', label: 'Change these settings', on: true, state: 'Yes', consequence: 'The issuer can turn any of these on or off later.' }
+}
+
+/** One line per authorization flag, phrased as what it means for a holder or for the Covered contract. */
 export function describeFlags(f: AssetFlags): FlagFact[] {
   return [
     {
@@ -110,7 +135,7 @@ export function describeFlags(f: AssetFlags): FlagFact[] {
       label: 'Authorization required',
       on: f.authRequired,
       consequence: f.authRequired
-        ? 'Holders need the issuer’s approval before they can hold this token, including the options contract.'
+        ? 'Holders need the issuer’s approval before they can hold this token, including the Covered contract.'
         : 'Anyone can open a trustline and hold this token without approval.',
     },
     {
@@ -126,7 +151,7 @@ export function describeFlags(f: AssetFlags): FlagFact[] {
       label: 'Clawback enabled',
       on: f.clawback,
       consequence: f.clawback
-        ? 'The issuer can take tokens back, including from the options contract.'
+        ? 'The issuer can take tokens back, including from the Covered contract.'
         : 'The issuer cannot take tokens back from holders.',
     },
   ]
@@ -162,7 +187,7 @@ export function mockAssetFacts(code: string, issuer: string | null = null): Asse
 
 async function loadFacts(contractId: string, fallbackCode: string): Promise<AssetFacts> {
   const { server } = await import('../stellar/rpc')
-  const { result } = await server.queryContract<string>(contractId, 'name', {})
+  const { result } = await server.queryContract<string>(contractId, 'name', {}, config.networkPassphrase)
   const sac = parseSacName(result)
   if (!sac) throw new Error('Not a Stellar Asset Contract')
   if (sac.kind === 'native') {

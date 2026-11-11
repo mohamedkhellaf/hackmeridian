@@ -1,0 +1,20 @@
+@layer features {
+  /* The marker keeps the ink of the cell it sits in (a shortfall stays in the loss colour while it flashes). */
+  .mark {
+    color: inherit;
+  }
+
+  .fade {
+    animation: changed-fade var(--dur-fade) var(--ease-enter) both;
+  }
+
+  @keyframes changed-fade {
+    from {
+      opacity: 0.2;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+}

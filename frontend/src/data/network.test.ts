@@ -20,7 +20,7 @@ describe('networkState', () => {
     expect(networkState({ mock: false, hasData: true, isError: false, readAt: at - LEDGER_STALE_MS - 1, nowMs: at })).toBe('delayed')
   })
   it('has a word for every state', () => {
-    expect(NETWORK_STATE_LABEL).toEqual({ mock: 'Mock data', connecting: 'Connecting', ok: 'RPC ok', delayed: 'RPC slow', down: 'RPC down' })
+    expect(NETWORK_STATE_LABEL).toEqual({ mock: 'Mock data', connecting: 'Connecting', ok: 'Up to date', delayed: 'Reads are late', down: 'No connection' })
     // A state word beside the network name, never a slogan.
     for (const word of Object.values(NETWORK_STATE_LABEL)) expect(findBannedWords(word, [...BANNED_WORDS, ...BANNED_TAGLINES])).toEqual([])
   })

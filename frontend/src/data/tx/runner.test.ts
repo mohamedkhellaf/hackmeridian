@@ -5,7 +5,7 @@ import type { TxCheck, TxOptions } from '../../core/tx/types'
 import { createActivityStore } from './activityStore'
 import { TX_BUSY_MESSAGE } from './copy'
 import { createFlights } from './flights'
-import { AUTO_CHECK_ATTEMPTS, AUTO_CHECK_MS, checkEntry, mayHaveChanged, refusedState, runTransaction, sentNothing } from './runner'
+import { AUTO_CHECK_ATTEMPTS, AUTO_CHECK_MS, checkEntry, mayHaveChanged, refusedState, resumeUnknown, runTransaction, sentNothing, signingSince, stopWaiting, unsettledEntry, waitingForSignature } from './runner'
 import type { RunnerDeps, TxMeta } from './runner'
 
 const ME = 'GBE65ZTLRGUEVNDQU65HG6EY36PW5QMJKXVSDVH72HOOIHTZYRZG3ZEG'
@@ -122,7 +122,7 @@ describe('runTransaction', () => {
     expect(settled).toEqual([])
     expect(sentNothing(run.state)).toBe(true)
     // A decline is not an error: it does not interrupt.
-    expect(said.at(-1)).toEqual({ message: 'Buy put on 5.00 BOND: You declined the request in the wallet. Nothing was sent.', politeness: 'polite' })
+    expect(said.at(-1)).toEqual({ message: 'Buy put on 5.00 BOND: You declined to sign in your wallet. Nothing was sent.', politeness: 'polite' })
   })
 
   it('takes a refusal before sending out of Activity too, and says nothing was sent', async () => {
@@ -203,7 +203,7 @@ describe('an unknown outcome', () => {
   it('interrupts the screen reader once, when it becomes unknown', async () => {
     const { deps, said } = setup()
     await runTransaction(deps, META, unknown())
-    expect(said.at(-1)).toEqual({ message: 'Buy put on 5.00 BOND: Outcome unknown. The transaction was sent and is not confirmed yet. Do not send it again: check again first.', politeness: 'assertive' })
+    expect(said.at(-1)).toEqual({ message: 'Buy put on 5.00 BOND: Outcome unknown. The transaction was sent and no ledger has included it yet. It can still go through. Do not send another one: check again first.', politeness: 'assertive' })
   })
 
   it('resolves to expired once a ledger closed after its time bound, without invalidating', async () => {
@@ -291,5 +291,129 @@ describe('what a confirmed transaction created', () => {
     )
     expect(failed.state.phase).toBe('failed')
     expect(activity.get('GME', failed.entryId!)?.created ?? null).toBeNull()
+  })
+})
+
+describe('an unknown outcome blocks the next write of the same account, across components (review finding 19)', () => {
+  // The writes of these tests carry a time bound of 500; the clock says 100, so the first transaction can still land.
+  const unknownWrite = () =>
+    write(new TxError('unknown', 'Not confirmed yet.', { hash: 'h1', maxTime: 500 }))
+
+  it('refuses a second write while the first is still unknown, after looking it up once more', async () => {
+    const checkTx = vi.fn(async (): Promise<TxCheck> => ({ status: 'unknown' }))
+    const { deps } = setup({ checkTx, autoCheck: false, nowSec: () => 100 })
+    const first = await runTransaction(deps, META, unknownWrite())
+    expect(first.state.phase).toBe('unknown')
+    expect(unsettledEntry(deps, META)?.id).toBe(first.entryId)
+
+    const second = vi.fn(write('ok'))
+    const run = await runTransaction(deps, { ...META, label: 'Request put on 2.00 BOND' }, second)
+    expect(second).not.toHaveBeenCalled()
+    expect(checkTx).toHaveBeenCalledTimes(1)
+    expect(run.state).toMatchObject({ phase: 'failed', effect: 'nothing-sent' })
+    expect(run.state.error).toMatch(/^A transaction sent at \d\d:\d\d:\d\d UTC is not confirmed yet and can still go through until 00:08:20 UTC\. Check it in Activity before you send another\.$/)
+    expect(run.entryId).toBeNull()
+  })
+
+  it('lets it through once the first is found confirmed, and records that answer', async () => {
+    const { deps } = setup({ checkTx: async () => ({ status: 'confirmed', ledger: 9 }), autoCheck: false, nowSec: () => 100 })
+    const first = await runTransaction(deps, META, unknownWrite())
+    const run = await runTransaction(deps, META, write('ok'))
+    expect(run.state.phase).toBe('confirmed')
+    expect(deps.activity.get(ME, first.entryId!)).toMatchObject({ phase: 'confirmed', ledger: 9 })
+  })
+
+  it('does not block another account, another product, or a transaction whose time bound passed', async () => {
+    const { deps } = setup({ autoCheck: false, nowSec: () => 100 })
+    await runTransaction(deps, META, unknownWrite())
+    expect(unsettledEntry(deps, { address: 'GOTHER', product: 'covered' })).toBeUndefined()
+    expect(unsettledEntry(deps, { address: ME, product: 'margin' })).toBeUndefined()
+    expect(unsettledEntry({ ...deps, nowSec: () => 600 }, META)).toBeUndefined()
+  })
+
+  it('restarts the timer for unknown entries found in Activity, once per entry', async () => {
+    const { deps, timers } = setup({ nowSec: () => 100 })
+    const first = await runTransaction(deps, META, unknownWrite())
+    timers.length = 0 // the timer of the page that sent it is gone with that page
+    expect(resumeUnknown(deps, ME)).toBe(1)
+    expect(timers).toHaveLength(1)
+    expect(resumeUnknown(deps, ME)).toBe(0)
+    expect(deps.activity.get(ME, first.entryId!)!.phase).toBe('unknown')
+  })
+})
+
+describe('a run that ends after its screen closed (review finding 41)', () => {
+  it('is told in a visible notice instead of only in the live region', async () => {
+    const notices: { title: string; description: string; tone: string }[] = []
+    const { deps, said } = setup({ notify: (n) => notices.push(n) })
+    let open = true
+    const run = runTransaction(deps, META, write('ok'), { isMounted: () => open })
+    open = false
+    await run
+    expect(notices).toEqual([{ title: 'Bought', description: 'Buy put on 5.00 BOND. It is listed in Activity.', tone: 'success' }])
+    expect(said.map((s) => s.message)).not.toContain('Buy put on 5.00 BOND: Bought.')
+  })
+
+  it('says a failure and an unknown outcome with what happened to the fee', async () => {
+    const notices: { title: string; description: string; tone: string }[] = []
+    const { deps } = setup({ notify: (n) => notices.push(n), autoCheck: false })
+    await runTransaction(deps, META, write(new TxError('failed', 'The option changed before your transaction landed.', { hash: 'h1', maxTime: 500 })), { isMounted: () => false })
+    await runTransaction(deps, META, write(new TxError('unknown', 'Not confirmed yet.', { hash: 'h2', maxTime: 500 })), { isMounted: () => false })
+    expect(notices[0]).toMatchObject({ title: 'Failed', tone: 'danger' })
+    expect(notices[0].description).toMatch(/^Buy put on 5\.00 BOND\. The option changed before your transaction landed\. /)
+    expect(notices[1]).toMatchObject({ title: 'Outcome unknown', tone: 'warning' })
+    expect(notices[1].description).toMatch(/Do not send another one: check again first\.$/)
+  })
+
+  it('keeps the in-place result while the screen is open', async () => {
+    const notices: unknown[] = []
+    const { deps, said } = setup({ notify: (n) => notices.push(n) })
+    await runTransaction(deps, META, write('ok'), { isMounted: () => true })
+    expect(notices).toEqual([])
+    expect(said.at(-1)!.message).toBe('Buy put on 5.00 BOND: Bought.')
+  })
+})
+
+describe('stop waiting for a wallet that never answers (review finding 42)', () => {
+  it('ends the run declined, releases the flight and keeps nothing in Activity; a late signature sends nothing', async () => {
+    const { deps } = setup({ autoCheck: false })
+    let entry: string | null = null
+    const hold: { late?: (v: unknown) => void } = {}
+    const sent = vi.fn()
+    // A write that reports `signing`, then waits for the signal like signAndSend does.
+    const hanging = async ({ onStage, signal }: Required<TxOptions>) => {
+      onStage({ stage: 'checking' })
+      onStage({ stage: 'signing' })
+      await new Promise((resolve, reject) => {
+        hold.late = resolve
+        signal.addEventListener('abort', () => reject(new TxError('declined', 'You stopped waiting for the wallet. Nothing was signed, so nothing was sent.')), { once: true })
+      })
+      sent()
+      return { hash: 'h1', ledger: 1 }
+    }
+    const run = runTransaction(deps, META, hanging, { onEntry: (id) => (entry = id) })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(entry).not.toBeNull()
+    expect(deps.flights.count()).toBe(1)
+    expect(signingSince(entry!)).not.toBeNull()
+    expect(waitingForSignature()).toEqual([entry])
+    expect(stopWaiting(entry!)).toBe(true)
+    const done = await run
+    expect(done.state).toMatchObject({ phase: 'declined', effect: 'nothing-sent', error: 'You stopped waiting for the wallet. Nothing was signed, so nothing was sent.' })
+    expect(deps.flights.count()).toBe(0)
+    expect(deps.activity.list(ME)).toEqual([])
+    hold.late?.(null)
+    await Promise.resolve()
+    expect(sent).not.toHaveBeenCalled()
+    expect(stopWaiting(entry!)).toBe(false)
+  })
+
+  it('does nothing once the transaction is signed', async () => {
+    const { deps } = setup({ autoCheck: false })
+    let entry: string | null = null
+    const run = runTransaction(deps, META, write('ok'), { onEntry: (id) => (entry = id) })
+    await run
+    expect(stopWaiting(entry!)).toBe(false)
   })
 })

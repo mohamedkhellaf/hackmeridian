@@ -8,7 +8,7 @@ import type { TokenInfo } from '../../core/options/types'
 import { Address, Amount, Callout, IconChevronLeft, Link } from '../../ui'
 import type { AddressProps, AmountProps } from '../../ui'
 import { BACK_TO_MARKETS } from './copy'
-import { MARKETS_ROUTE, RESERVES_ROUTE } from './routing'
+import { EXACT, MARKETS_ROUTE, RESERVES_ROUTE } from './routing'
 import styles from './parts.module.css'
 
 export interface MoneyProps extends Omit<AmountProps, 'value' | 'exact' | 'unit'> {
@@ -32,10 +32,13 @@ export function ChainId({ value, ...rest }: Omit<AddressProps, 'explorerUrl'>) {
   return <Address {...rest} value={value} explorerUrl={IS_MOCK || isMockId(value) ? undefined : explorerAddress(value)} />
 }
 
-/** The way back to the Markets index, above the head of an asset page. */
+/**
+ * The way back to the Markets index, above the head of an asset page. Matched exactly, so the router never marks
+ * it as the current page (it matches a parent path by default, which is right for the shell's section links).
+ */
 export function BackToMarkets() {
   return (
-    <Link tone="quiet" className={styles.back} render={<RouterLink to={MARKETS_ROUTE} />}>
+    <Link tone="quiet" className={styles.back} render={<RouterLink to={MARKETS_ROUTE} activeOptions={EXACT} />}>
       <IconChevronLeft size={14} />
       {BACK_TO_MARKETS}
     </Link>

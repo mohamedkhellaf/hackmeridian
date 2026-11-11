@@ -3,7 +3,6 @@
 // option before the wallet is asked, then shows the staged transaction and the receipt.
 import { useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
-import { formatExact, formatUnits } from '../../../core/format'
 import type { Fact } from '../../../core/options/preTrade'
 import { requiredCollateral } from '../../../core/options/types'
 import type { Money, OptionOffer } from '../../../core/options/types'
@@ -14,11 +13,14 @@ import { Amount, DateTime, KeyValue, KeyValueItem } from '../../../ui'
 import type { NoteTerm } from '../../../ui'
 import { NOTE_TERMS, RECEIPT, cancelListingCopy, cancelOfferCopy, claimCopy, reclaimCopy } from '../copy'
 import type { ActionCopy } from '../copy'
-import { exactMoney, glyphOf, optionTitle, serialOf, strikeExact, strikeText } from '../model'
+import { isShort, shortOf, useReserveHealth } from '../hooks'
+import { glyphOf, noteKind, optionTitle, serialOf, strikeExact, strikeText } from '../model'
 import { ActionDialog, CheckLines, Issue } from './ActionDialog'
 import type { TxView } from './ActionDialog'
-import { simpleCheck } from './checks'
+import { readTime, simpleCheck } from './checks'
 import type { SimpleAction } from './checks'
+import { MoneyFigure } from './MoneyFigure'
+import { useOpenRef } from './useActionFlow'
 
 export interface SimpleDialogProps {
   open: boolean
@@ -35,8 +37,6 @@ function factOf<T>(q: { data: T | undefined; isError: boolean; isPlaceholderData
   if (q.isPlaceholderData || q.data === undefined) return undefined
   return q.data
 }
-
-const amountValue = (m: Money) => <Amount value={formatUnits(m.amount, m.token.decimals)} exact={formatExact(m.amount, m.token.decimals)} unit={m.token.code} figure="serif" />
 
 interface FrameProps extends SimpleDialogProps {
   action: SimpleAction
@@ -56,7 +56,11 @@ function Frame({ open, onClose, option: o, receiptAction, finalFocus, action, co
   const fresh = useOption(o.id, { enabled: reviewing })
   const ask = useAsk(action === 'unlist' ? o.id : null, { enabled: reviewing })
   const eligible = useEligibility(o.underlying.contractId, me, { enabled: reviewing && action === 'claim' && o.kind === 'put' })
+  const health = useReserveHealth()
   const [checking, setChecking] = useState(false)
+  const stillOpen = useOpenRef(open)
+  // The token this action pays out in, when the contract holds less of it than it owes.
+  const short = isShort(moves.amount.token, shortOf(o, health)) ? moves.amount.token : null
 
   const check = simpleCheck(action, o, {
     me,
@@ -64,6 +68,7 @@ function Frame({ open, onClose, option: o, receiptAction, finalFocus, action, co
     option: factOf(fresh),
     ask: action === 'unlist' ? factOf(ask) : undefined,
     eligible: action === 'claim' && o.kind === 'put' ? (me ? factOf(eligible) : 'unknown') : undefined,
+    short: action === 'unlist' ? null : short,
   })
 
   const start = async () => {
@@ -71,6 +76,8 @@ function Frame({ open, onClose, option: o, receiptAction, finalFocus, action, co
     // One fresh read right before the wallet is asked. A read that fails does not stop the action.
     const [option, liveAsk] = await Promise.all([fresh.refetch(), action === 'unlist' ? ask.refetch() : Promise.resolve(null)])
     setChecking(false)
+    // Dismissed while the re-check ran: nothing is sent.
+    if (!stillOpen.current) return
     const again = simpleCheck(action, o, {
       me,
       nowSec: Math.floor(Date.now() / 1000),
@@ -95,13 +102,14 @@ function Frame({ open, onClose, option: o, receiptAction, finalFocus, action, co
       blockedReason={me && check.blocked ? check.problem : null}
       receiptTerms={receiptTerms}
       receiptState={receiptState}
+      receiptKind={noteKind(o, action === 'unlist' ? 'holder' : 'writer')}
       receiptAction={receiptAction}
       finalFocus={finalFocus}
       size="sm"
     >
       <KeyValue>
         <KeyValueItem label={moves.label} marked>
-          {amountValue(moves.amount)}
+          <MoneyFigure m={moves.amount} />
         </KeyValueItem>
         <KeyValueItem label="Option">{optionTitle(o)}</KeyValueItem>
         <KeyValueItem label={NOTE_TERMS.strike}>
@@ -111,14 +119,15 @@ function Frame({ open, onClose, option: o, receiptAction, finalFocus, action, co
           <DateTime value={o.expiry * 1000} />
         </KeyValueItem>
       </KeyValue>
-      <CheckLines lines={check.lines} />
+      <CheckLines lines={check.lines} at={readTime(fresh.dataUpdatedAt)} />
       {me && check.blocked && check.problem ? <Issue level="block">{check.problem}</Issue> : null}
+      {me && !check.blocked && check.warning ? <Issue level="warn">{check.warning}</Issue> : null}
     </ActionDialog>
   )
 }
 
 export function ClaimDialog(props: SimpleDialogProps) {
-  const tx = useClaimDelivery()
+  const tx = useClaimDelivery({ open: props.open })
   const amount = claimAmount(props.option)
   return (
     <Frame
@@ -128,14 +137,14 @@ export function ClaimDialog(props: SimpleDialogProps) {
       tx={tx}
       run={() => tx.run(props.option)}
       moves={{ label: 'You receive', amount }}
-      receiptTerms={[{ label: RECEIPT.received, value: exactMoney(amount), marked: true }]}
+      receiptTerms={[{ label: RECEIPT.received, value: <MoneyFigure m={amount} />, marked: true }]}
       receiptState="Settled"
     />
   )
 }
 
 export function ReclaimDialog(props: SimpleDialogProps) {
-  const tx = useReclaim()
+  const tx = useReclaim({ open: props.open })
   const amount = requiredCollateral(props.option)
   return (
     <Frame
@@ -145,14 +154,14 @@ export function ReclaimDialog(props: SimpleDialogProps) {
       tx={tx}
       run={() => tx.run(props.option)}
       moves={{ label: 'You get back', amount }}
-      receiptTerms={[{ label: RECEIPT.returned, value: exactMoney(amount), marked: true }]}
+      receiptTerms={[{ label: RECEIPT.returned, value: <MoneyFigure m={amount} />, marked: true }]}
       receiptState="Expired"
     />
   )
 }
 
 export function CancelOfferDialog(props: SimpleDialogProps) {
-  const tx = useCancelOffer()
+  const tx = useCancelOffer({ open: props.open })
   const amount = requiredCollateral(props.option)
   return (
     <Frame
@@ -162,14 +171,14 @@ export function CancelOfferDialog(props: SimpleDialogProps) {
       tx={tx}
       run={() => tx.run(props.option)}
       moves={{ label: 'You get back', amount }}
-      receiptTerms={[{ label: RECEIPT.returned, value: exactMoney(amount), marked: true }]}
+      receiptTerms={[{ label: RECEIPT.returned, value: <MoneyFigure m={amount} />, marked: true }]}
       receiptState="Cancelled"
     />
   )
 }
 
 export function CancelListingDialog(props: SimpleDialogProps & { ask: Money }) {
-  const tx = useCancelSale()
+  const tx = useCancelSale({ open: props.open })
   const { ask, ...rest } = props
   return (
     <Frame
@@ -179,7 +188,7 @@ export function CancelListingDialog(props: SimpleDialogProps & { ask: Money }) {
       tx={tx}
       run={() => tx.run(props.option)}
       moves={{ label: 'Listed at', amount: ask }}
-      receiptTerms={[{ label: 'Was listed at', value: exactMoney(ask) }]}
+      receiptTerms={[{ label: 'Was listed at', value: <MoneyFigure m={ask} /> }]}
       receiptState="Active"
     />
   )

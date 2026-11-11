@@ -44,32 +44,18 @@
     color: var(--muted);
   }
 
-  .titleText {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-8);
-    min-width: 0;
+  /* "or": the word, not a numeral, at the size of the step titles. */
+  .step[data-branch] .number {
+    font-size: var(--landing-h3-size);
   }
 
   .name {
+    min-width: 0;
     font-family: var(--font-serif);
     font-size: var(--landing-h3-size);
     line-height: var(--landing-h3-line);
     font-weight: 600;
     letter-spacing: var(--h2-track);
-  }
-
-  .state {
-    display: flex;
-    align-items: center;
-    gap: var(--s-8);
-  }
-
-  .stateLabel {
-    font-size: var(--label-size);
-    line-height: var(--label-line);
-    font-weight: var(--label-weight);
-    color: var(--muted);
   }
 
   .facts {
@@ -117,20 +103,21 @@
     & + & {
       margin-top: var(--s-12);
     }
+
+    /* A finger-sized row for each transaction link on a touch screen. */
+    @media (pointer: coarse) {
+      & a {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--s-32);
+      }
+    }
   }
 
   .recordedLabel {
     font-size: var(--label-size);
     line-height: var(--label-line);
     font-weight: var(--label-weight);
-    color: var(--muted);
-  }
-
-  .recordedMeta {
-    font-family: var(--font-mono);
-    font-size: var(--mono-size);
-    line-height: var(--mono-line);
-    font-feature-settings: 'zero';
     color: var(--muted);
   }
 

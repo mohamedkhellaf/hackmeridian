@@ -15,10 +15,16 @@ export function parseFixtures(text: string = raw): RawFixtureFile {
   return JSON.parse(text) as RawFixtureFile
 }
 
-/** Scenario shown first: exercise refusals, a healthy exercise, a gap that leaves the writer below maintenance, then vault takeover. */
-export const DEFAULT_SCENARIO = 'american_exercise'
-/** Steps already applied in the default scenario: the writer is below maintenance margin and a holder is waiting. */
-export const DEFAULT_CURSOR = 22
+/**
+ * Scenario shown first (ruling E22): the uncovered sale that expires out of the money, where the main path runs.
+ * "Early exercise" (american_exercise) is one choice away in the Replay box.
+ */
+export const DEFAULT_SCENARIO = 'happy_path_otm'
+/**
+ * Steps already applied in the default scenario: the vault is funded, the series listed and a snapshot published.
+ * Deposit, write, buy, the requirement and withdraw all follow, so no form of the section starts disabled.
+ */
+export const DEFAULT_CURSOR = 3
 
 export const NOT_SCRIPTED = 0
 
@@ -96,7 +102,7 @@ export class FixtureProClient implements ProClient {
     }
     const s: RawStep = this.scenario.steps[i]
     const skipped = i - this.cursor
-    const note = `Simulated: replayed fixture step ${i + 1}${skipped > 0 ? ` (skipped ${skipped} earlier step${skipped === 1 ? '' : 's'})` : ''}. Values come from the script, not from what was typed.`
+    const note = `Step ${i + 1} of the scenario${skipped > 0 ? `, ${skipped} skipped before it` : ''}, with the amounts recorded for it.`
     this.moveTo(i + 1)
     if (s.expect !== 'ok') return { ok: false, code: s.expect.code, name: proErrorName(s.expect.code), note }
     return { ok: true, value: read(s.result), note }

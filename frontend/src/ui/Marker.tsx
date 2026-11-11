@@ -12,8 +12,9 @@ export interface MarkerProps {
 }
 
 /**
- * The highlighter. Only behind figures that are the user's own terms: their strike, their breakeven, their offer,
- * their floor. Never for emphasis, promotion or state. On Carbon it is a dark wash with a yellow underline.
+ * The highlighter: one stroke of wash behind a figure, in both themes. Only behind a term the user set (their
+ * floor, their price) or, on the term sheet of their own order or position, the breakeven. One marked figure per
+ * surface. Never a headline word, a price somebody else set, an example, emphasis, promotion or state.
  */
 export function Marker({ children, flash = false, band = false, className }: MarkerProps) {
   return (

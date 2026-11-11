@@ -6,6 +6,20 @@ import { RouteLink } from './RouteLink'
 import { SECTION_ICON } from './sectionIcons'
 import styles from './TabBar.module.css'
 
+/**
+ * A tap on the tab of the page that is open: back to the top of it, with focus on its heading, as a tab bar does
+ * on a phone. Instant under reduced motion.
+ */
+function returnToTop(): void {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  window.scrollTo({ top: 0, behavior: reduce ? 'instant' : 'smooth' })
+  const heading = document.querySelector<HTMLElement>('main h1')
+  if (heading) {
+    if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1')
+    heading.focus({ preventScroll: true })
+  }
+}
+
 export interface TabBarProps {
   pathname: string
   actionsWaiting: number
@@ -27,7 +41,16 @@ export function TabBar({ pathname, actionsWaiting, moreOpen, onOpenMore }: TabBa
           const count = entry.id === 'portfolio' ? actionsWaiting : 0
           return (
             <li key={entry.id}>
-              <RouteLink to={entry.to} className={styles.tab}>
+              <RouteLink
+                to={entry.to}
+                className={styles.tab}
+                onClick={(event) => {
+                  // Already on this page (not a sub-page of it): the router would do nothing.
+                  if (pathname !== entry.to) return
+                  event.preventDefault()
+                  returnToTop()
+                }}
+              >
                 {/* The label comes first in the markup, so the name starts with the destination ("Portfolio 1 action waiting"), as in the top bar; the icon is drawn above it. */}
                 <span className={styles.label}>{entry.label}</span>
                 <span className={styles.icon}>

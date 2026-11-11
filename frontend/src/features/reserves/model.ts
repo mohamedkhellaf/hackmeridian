@@ -6,7 +6,7 @@
 import { countOf, formatExact, formatList, formatUnits, groupDigits } from '../../core/format'
 import type { CollateralHealth, CollateralLine, SupportedAssets, TokenInfo } from '../../core/options/types'
 import { backingFor, lineTotal } from '../../core/reserves/reserves'
-import { ITEM_COPY, SUMMARY_NONE_SHORT, SUMMARY_SHORT, SUMMARY_UNKNOWN } from './copy'
+import { ITEM_COPY, SUMMARY_NONE_SHORT, SUMMARY_SHORT, SUMMARY_UNKNOWN, UNDER_A_CENT } from './copy'
 
 export type ReserveState = 'equal' | 'over' | 'short' | 'unknown'
 export type TokenRole = 'quote' | 'underlying'
@@ -117,9 +117,22 @@ export const differenceText = (row: Pick<ReserveRow, 'difference' | 'token'>): s
 /** The same with every digit. */
 export const differenceExact = (row: Pick<ReserveRow, 'difference' | 'token'>): string => (row.difference === null ? '' : formatExact(row.difference, row.token.decimals, { sign: true }))
 
-/** The magnitude of a shortfall or an excess without its sign: `20.00`. */
+/** The magnitude of a shortfall or an excess without its sign: `20.00`; `under 0.01` below a cent. */
 export const differenceMagnitude = (row: Pick<ReserveRow, 'difference' | 'token'>): string =>
-  row.difference === null ? '' : formatUnits(row.difference < 0n ? -row.difference : row.difference, row.token.decimals)
+  row.difference === null ? '' : subCent(row) ? UNDER_A_CENT : formatUnits(row.difference < 0n ? -row.difference : row.difference, row.token.decimals)
+
+/** A difference that is not zero but smaller than one cent of the token, which two decimals cannot show. */
+export function subCent(row: Pick<ReserveRow, 'difference' | 'token'>): boolean {
+  if (row.difference === null || row.difference === 0n) return false
+  const cent = row.token.decimals >= 2 ? 10n ** BigInt(row.token.decimals - 2) : 1n
+  return (row.difference < 0n ? -row.difference : row.difference) < cent
+}
+
+/**
+ * The difference as the Difference column shows it: the signed figure, or `under 0.01` (no sign: the word
+ * beside it says short or over) when it is below a cent. The exact value stays one press away.
+ */
+export const differenceShown = (row: Pick<ReserveRow, 'difference' | 'token'>): string => (subCent(row) ? UNDER_A_CENT : differenceText(row))
 
 /**
  * A length for the bullet drawing only. Scaled down first so a very large balance keeps its proportions as a

@@ -20,8 +20,8 @@ import { matchGuided } from './derived/guided'
 import type { GuidedMatch } from './derived/guided'
 import { buildBook, buildMarket, buildMarketIndex } from './derived/market'
 import type { BookView, MarketIndexRow, MarketSource, MarketView } from './derived/market'
-import { buildKpis, buildPositions, buildTodo, countActionsWaiting, positionView } from './derived/positions'
-import type { PositionView, PositionsView, TodoView } from './derived/positions'
+import { buildKpis, buildPositions, buildRequestTodo, buildTodo, countActionsWaiting, positionView } from './derived/positions'
+import type { PositionView, PositionsView, RequestTodoView, TodoView } from './derived/positions'
 import { referenceMode, useAsks, useAssets, useBids, useOption, useOptions, useReference } from './queries'
 import type { Cadence } from './queryClient'
 import { useOptionsClient } from './useOptionsClient'
@@ -320,25 +320,47 @@ export function useTodo(me?: string | null, opts: ViewOptions = {}): Derived<Tod
 }
 
 /**
- * The number for the Portfolio navigation badge: claims, reclaims and in-the-money exercises. Zero while loading
- * or without a wallet. Polls slowly (60 s) because the shell mounts it on every route.
+ * The wallet's expired requests whose premium is still escrowed (review finding 11): each is a real action,
+ * "take back" by cancelling, with no deadline of its own. Oldest deadline first.
+ */
+export function useRequestTodo(me?: string | null, opts: ViewOptions = {}): Derived<RequestTodoView[]> {
+  const client = useOptionsClient()
+  const who = me === undefined ? client.me : me
+  const bids = useBids({ cadence: opts.cadence ?? 'book', enabled: !!who })
+  const list = bids.data
+  const data = useMemo(() => (who ? buildRequestTodo(list ?? [], who) : null), [list, who])
+  const status = combineStatus([bids])
+  return { ...status, data: status.ready ? data : null }
+}
+
+/**
+ * The number for the Portfolio navigation badge: claims, reclaims, in-the-money exercises and expired requests
+ * whose premium waits to be taken back. Zero while loading or without a wallet. Polls slowly (60 s) because the
+ * shell mounts it on every route.
  */
 export function useActionsWaiting(me?: string | null, opts: ViewOptions = {}): number {
   const client = useOptionsClient()
   const who = me === undefined ? client.me : me
   const options = useOptions({ cadence: opts.cadence ?? 'slow', enabled: !!who })
+  const bids = useBids({ cadence: opts.cadence ?? 'slow', enabled: !!who })
   const nowSec = useNowSec(30)
   const list = options.data
-  return useMemo(() => (list && who ? countActionsWaiting(list, who, nowSec, optionReference) : 0), [list, who, nowSec])
+  const bidList = bids.data
+  return useMemo(() => (list && who ? countActionsWaiting(list, who, nowSec, optionReference, bidList ?? []) : 0), [list, bidList, who, nowSec])
 }
 
-/** Portfolio summary figures: positions open, premium paid, premium earned, collateral locked, unclaimed proceeds. Exact sums per token. */
+/**
+ * Portfolio summary figures, exact sums per token: premium paid and earned, collateral locked, unclaimed proceeds,
+ * and with the wallet's requests (read alongside) `escrowed`, `lockedNow` and `readyToTakeBack` (ruling E20).
+ */
 export function usePortfolioKpis(me?: string | null, opts: ViewOptions = {}): Derived<PortfolioSummary> {
   const client = useOptionsClient()
   const who = me === undefined ? client.me : me
   const options = useOptions({ cadence: opts.cadence ?? 'book', enabled: !!who })
+  const bids = useBids({ cadence: opts.cadence ?? 'book', enabled: !!who })
   const list = options.data
-  const data = useMemo(() => (list && who ? buildKpis(list, who) : null), [list, who])
-  const status = combineStatus([options])
+  const bidList = bids.data
+  const data = useMemo(() => (list && who ? buildKpis(list, who, bidList ?? []) : null), [list, bidList, who])
+  const status = combineStatus([options], [bids])
   return { ...status, data: status.ready ? data : null }
 }

@@ -1,0 +1,10 @@
+@layer features {
+  /* A sentence that ends in an address or a button: the parts stay on one line where there is room and wrap as units. */
+  .line {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-8);
+    min-width: 0;
+  }
+}

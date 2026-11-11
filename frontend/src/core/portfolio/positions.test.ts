@@ -6,18 +6,16 @@ import {
   actionLabel,
   actionsWaiting,
   claimAmount,
-  computeKpis,
   counterpartyLine,
-  countdown,
-  filterPositions,
   money,
   portfolioSummary,
   premiumOf,
+  requestTodoItems,
   roleOf,
   statusOf,
   todoItems,
-  waitingActions,
 } from './positions'
+import type { Bid } from '../requests/types'
 import type { RowAction } from './positions'
 
 const U = 10_000_000n
@@ -31,11 +29,11 @@ const opt = (over: Partial<OptionOffer> = {}): OptionOffer => ({
 })
 
 describe('money', () => {
-  it('pads to two decimals and keeps up to four', () => {
+  it('shows two decimals, truncated, like every amount on screen', () => {
     expect(money(5n * U, 7)).toBe('5.00')
     expect(money(1_250n * U, 7)).toBe('1,250.00')
     expect(money((18n * U) / 10n, 7)).toBe('1.80')
-    expect(money(123_456n, 7)).toBe('0.0123')
+    expect(money(123_456n, 7)).toBe('0.01')
     expect(money(5n, 0)).toBe('5')
   })
 })
@@ -78,7 +76,7 @@ describe('actions', () => {
 
 describe('premiumOf', () => {
   it('is signed by role', () => {
-    expect(premiumOf(opt({ writer: OTHER, holder: ME, state: 'active' }), 'holder')).toEqual({ text: '2.00 USDx original premium (paid to the writer)', tone: 'muted' })
+    expect(premiumOf(opt({ writer: OTHER, holder: ME, state: 'active' }), 'holder')).toEqual({ text: '2.00 USDx original premium (paid to the maker)', tone: 'muted' })
     expect(premiumOf(opt({ holder: OTHER, state: 'active' }), 'writer')).toEqual({ text: '+2.00 USDx', tone: 'pos' })
     expect(premiumOf(opt(), 'writer')).toEqual({ text: '2.00 USDx ask', tone: 'ask' })
     expect(premiumOf(opt({ state: 'expired' }), 'writer')).toEqual({ text: '–', tone: 'muted' })
@@ -90,61 +88,6 @@ describe('counterpartyLine', () => {
     expect(counterpartyLine(opt({ writer: 'GMAKERAAAAAAAA', holder: ME }), 'holder')).toBe('Maker GMAK…AAAA')
     expect(counterpartyLine(opt(), 'writer')).toBe('Listed in Markets')
     expect(counterpartyLine(opt({ state: 'expired' }), 'writer')).toBe('No buyer')
-  })
-})
-
-describe('countdown', () => {
-  it('formats', () => {
-    const now = 1_000_000 * 1000
-    expect(countdown(1_000_000 + 2 * 86400 + 23 * 3600 + 59, now)).toBe('in 2d 23h')
-    expect(countdown(1_000_000 + 5 * 3600 + 600, now)).toBe('in 5h 10m')
-    expect(countdown(1_000_000 + 30, now)).toBe('in 1m')
-    expect(countdown(1_000_000 - 1, now)).toBe('expired')
-  })
-})
-
-describe('computeKpis', () => {
-  const rows = [
-    opt({ id: 1n, state: 'offered' }),
-    opt({ id: 2n, state: 'active', holder: OTHER }),
-    opt({ id: 3n, state: 'expired' }),
-    opt({ id: 4n, state: 'exercised', holder: OTHER }),
-    opt({ id: 5n, state: 'settled', holder: OTHER }),
-    opt({ id: 6n, kind: 'call', state: 'offered' }),
-    opt({ id: 7n, writer: OTHER, holder: ME, state: 'active' }),
-    opt({ id: 8n, writer: OTHER, holder: OTHER, state: 'active' }),
-  ]
-  it("counts and sums only the wallet's own positions", () => {
-    const k = computeKpis(rows, ME)
-    expect(k.holding).toBe(1)
-    expect(k.writing).toBe(5) // 1,2,3,4,6; settled is closed
-    // put collateral 3 x 50 USDx (offered, active, expired); call collateral 5 FUND
-    expect(k.locked.find((l) => l.token.code === 'USDx')?.amount).toBe(150n * U)
-    expect(k.locked.find((l) => l.token.code === 'FUND')?.amount).toBe(5n * U)
-    expect(k.premium?.amount).toBe(6n * U) // sold: 2, 4, 5
-  })
-  it('is empty without a wallet', () => {
-    expect(computeKpis(rows, null)).toEqual({ holding: 0, writing: 0, locked: [], premium: null })
-  })
-})
-
-describe('filterPositions / waitingActions', () => {
-  const rows = [
-    opt({ id: 1n, state: 'offered' }),
-    opt({ id: 2n, state: 'cancelled' }),
-    opt({ id: 3n, writer: OTHER, holder: ME, state: 'active' }),
-    opt({ id: 4n, state: 'exercised', holder: OTHER }),
-    opt({ id: 5n, writer: OTHER }),
-  ]
-  it('filters by role and closed', () => {
-    expect(filterPositions(rows, ME, 'all', false).map((o) => o.id)).toEqual([1n, 3n, 4n])
-    expect(filterPositions(rows, ME, 'all', true).map((o) => o.id)).toEqual([1n, 2n, 3n, 4n])
-    expect(filterPositions(rows, ME, 'holding', true).map((o) => o.id)).toEqual([3n])
-    expect(filterPositions(rows, ME, 'writing', false).map((o) => o.id)).toEqual([1n, 4n])
-  })
-  it('lists exercise, claim and reclaim but not cancel', () => {
-    expect(waitingActions(rows, ME, 0)).toEqual(['exercise your put on 5.00 FUND', 'claim 5.00 FUND from an exercised put'])
-    expect(waitingActions([opt({ state: 'expired' })], ME, 0)).toEqual(['reclaim 50.00 USDx from an expired offer'])
   })
 })
 
@@ -167,7 +110,10 @@ describe('claim delivery applies to puts and calls alike', () => {
   })
 
   it('both show up as waiting actions and as unclaimed proceeds', () => {
-    expect(waitingActions([exercisedPut, exercisedCall], ME, 0)).toEqual(['claim 5.00 FUND from an exercised put', 'claim 50.00 USDx from an exercised call'])
+    expect(todoItems([exercisedPut, exercisedCall], ME, 0).map((t) => [t.kind, t.amount])).toEqual([
+      ['claim', { token: FUND, amount: 5n * U }],
+      ['claim', { token: USDX, amount: 50n * U }],
+    ])
     const s = portfolioSummary([exercisedPut, exercisedCall], ME)
     expect(s.unclaimed).toEqual([
       { token: FUND, amount: 5n * U },
@@ -271,5 +217,46 @@ describe('portfolioSummary', () => {
     ])
     expect(s.unclaimed).toEqual([])
     expect(portfolioSummary(options, null).open).toBe(0)
+  })
+})
+
+describe('expired requests: a premium to take back', () => {
+  const bid = (over: Partial<Bid> = {}): Bid => ({
+    id: 1n, buyer: ME, kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: (9n * U) / 10n,
+    expiry: 1_900_000_000, state: 'expired', optionId: null, ...over,
+  })
+
+  it('lists the wallet\'s expired requests whose premium is still escrowed, oldest deadline first', () => {
+    const items = requestTodoItems([bid({ id: 2n, expiry: 1_900_000_100 }), bid({ id: 1n }), bid({ id: 3n, state: 'open' }), bid({ id: 4n, buyer: OTHER }), bid({ id: 5n, state: 'pruned' }), bid({ id: 6n, state: 'cancelled' })], ME)
+    expect(items.map((t) => [t.kind, t.bid.id])).toEqual([['take-back', 1n], ['take-back', 2n]])
+    expect(items[0].amount).toEqual({ token: USDX, amount: 9_000_000n })
+    expect(requestTodoItems([bid()], null)).toEqual([])
+  })
+
+  it('counts them in the actions waiting', () => {
+    const requests = requestTodoItems([bid(), bid({ id: 2n })], ME)
+    expect(actionsWaiting([], requests)).toBe(2)
+    expect(actionsWaiting(todoItems([opt({ state: 'expired' })], ME, 0), requests)).toBe(3)
+  })
+
+  it('splits the totals into locked now and ready to take back (ruling E20)', () => {
+    const options = [
+      opt({ id: 1n, holder: OTHER, state: 'active' }), // 50 USDx locked
+      opt({ id: 2n, kind: 'call', state: 'offered' }), // 5 FUND locked
+      opt({ id: 3n, state: 'expired' }), // 50 USDx to reclaim
+    ]
+    const s = portfolioSummary(options, ME, new Set(), [bid({ id: 1n, state: 'open', totalPremium: 2n * U }), bid({ id: 2n }), bid({ id: 3n, buyer: OTHER, state: 'open' }), bid({ id: 4n, state: 'filled' })])
+    expect(s.escrowed).toEqual([{ token: USDX, amount: 2n * U }])
+    expect(s.lockedNow).toEqual([
+      { token: USDX, amount: 52n * U },
+      { token: FUND, amount: 5n * U },
+    ])
+    expect(s.readyToTakeBack).toEqual([{ token: USDX, amount: 50n * U + 9_000_000n }])
+    // Without requests the older fields keep their meaning.
+    expect(portfolioSummary(options, ME).locked).toEqual([
+      { token: USDX, amount: 100n * U },
+      { token: FUND, amount: 5n * U },
+    ])
+    expect(portfolioSummary(options, ME).readyToTakeBack).toEqual([{ token: USDX, amount: 50n * U }])
   })
 })

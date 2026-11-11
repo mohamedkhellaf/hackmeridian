@@ -17,7 +17,7 @@ export const POLL_MS = {
   book: 10_000,
   /** Assets, reserves, balances, counts: slow to change, and refreshed after each of the user's own transactions. */
   slow: 60_000,
-  /** The network chip. */
+  /** The network indicator. */
   ledger: 30_000,
 } as const
 

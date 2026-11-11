@@ -20,6 +20,19 @@
     list-style: none;
   }
 
+  /* Links between sub-pages never hide one off the edge: in a narrow column they wrap onto a second line. */
+  .navRoot {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 24rem) {
+    .navList {
+      flex-wrap: wrap;
+      column-gap: var(--s-16);
+      overflow-x: visible;
+    }
+  }
+
   .tab {
     position: relative;
     display: inline-flex;
@@ -90,7 +103,8 @@
 
   .panel {
     padding-top: var(--s-16);
-    outline: none;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
 
     &:focus-visible {
       box-shadow: var(--focus-ring);

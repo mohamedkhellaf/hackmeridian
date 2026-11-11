@@ -35,7 +35,12 @@ export type AssetSearch = {
 }
 
 /** /markets */
-export type MarketsSearch = { all?: '1'; intent?: Intent }
+export type MarketsSearch = {
+  all?: '1'
+  intent?: Intent
+  /** Show the "Get test funds" strip to any connected wallet, not only one without the quote token. */
+  funds?: '1'
+}
 
 /** /portfolio */
 export type PortfolioSearch = { tab?: 'holding' | 'written' | 'orders'; closed?: '1' }
@@ -53,7 +58,12 @@ export type RequestsSearch = {
   /** Open the bid ticket. */
   new?: '1'
   mine?: '1'
+  /** Also list closed requests under "My requests". */
+  closed?: '1'
 }
+
+/** /issuer */
+export type IssuerSearch = { asset?: string }
 
 // ---------------------------------------------------------------------------------------------------------
 // Runtime schemas. A field that fails its check falls back to `undefined`: the rest of the link still works.
@@ -113,7 +123,7 @@ export const AssetSearchSchema = v.object({
   step: word(['terms', 'review']),
 })
 
-export const MarketsSearchSchema = v.object({ all: flag, intent: word(INTENTS) })
+export const MarketsSearchSchema = v.object({ all: flag, intent: word(INTENTS), funds: flag })
 
 export const PortfolioSearchSchema = v.object({ tab: word(['holding', 'written', 'orders']), closed: flag })
 
@@ -126,7 +136,10 @@ export const RequestsSearchSchema = v.object({
   bid: id,
   new: flag,
   mine: flag,
+  closed: flag,
 })
+
+export const IssuerSearchSchema = v.object({ asset: text(isAssetParam) })
 
 type AnyObjectSchema = v.ObjectSchema<v.ObjectEntries, undefined>
 
@@ -151,6 +164,7 @@ export const validateMarketsSearch = (raw: Record<string, unknown>): MarketsSear
 export const validatePortfolioSearch = (raw: Record<string, unknown>): PortfolioSearch => validate(PortfolioSearchSchema, raw)
 export const validatePositionSearch = (raw: Record<string, unknown>): PositionSearch => validate(PositionSearchSchema, raw)
 export const validateRequestsSearch = (raw: Record<string, unknown>): RequestsSearch => validate(RequestsSearchSchema, raw)
+export const validateIssuerSearch = (raw: Record<string, unknown>): IssuerSearch => validate(IssuerSearchSchema, raw)
 
 // ---------------------------------------------------------------------------------------------------------
 // The URL form. Plain `key=value` pairs, values kept as strings.

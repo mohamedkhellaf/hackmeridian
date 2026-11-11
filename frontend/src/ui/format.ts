@@ -57,8 +57,8 @@ export function formatLocalTime(value: DateInput, timeZone?: string): string {
     timeZoneName: 'shortOffset',
   }).formatToParts(d)
   const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? ''
-  // "GMT+1" reads "UTC+1"; a zero offset is plain "UTC".
-  const offset = get('timeZoneName').replace('GMT', 'UTC').replace(/^UTC[+-]0(?::00)?$/, 'UTC')
+  // "GMT+1" reads "UTC+1", "GMT-10" reads "UTC−10" with the true minus; a zero offset is plain "UTC".
+  const offset = get('timeZoneName').replace('GMT', 'UTC').replace(/^UTC[+-]0(?::00)?$/, 'UTC').replace('-', '\u2212')
   const localDay = `${get('day')} ${get('month')}`
   const utcDay = `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`
   const time = `${get('hour')}:${get('minute')}`
@@ -84,14 +84,19 @@ export function countdownParts(msLeft: number): CountdownParts {
   }
 }
 
-/** `2 d 4 h`, `5 h 12 min`, `12 min 40 s`, `40 s`. Two units at most; time left is truncated, never rounded up. */
+/**
+ * `2 d 4 h`, `5 h 12 min`, `12 min`, `<1 min`: the rule of core/format's `formatCountdown`, so a deadline reads the
+ * same everywhere. Two units at most, a zero second unit is dropped (`2 d`, `3 h`), hours go from ten days up
+ * (`45 d`). Time left is truncated, never rounded up.
+ */
 export function formatCountdown(msLeft: number): string {
-  const { days, hours, minutes, seconds } = countdownParts(msLeft)
+  const { days, hours, minutes } = countdownParts(msLeft)
   const u = (n: number, unit: string) => `${n}${NBSP}${unit}`
-  if (days > 0) return `${u(days, 'd')} ${u(hours, 'h')}`
-  if (hours > 0) return `${u(hours, 'h')} ${u(minutes, 'min')}`
-  if (minutes > 0) return `${u(minutes, 'min')} ${u(seconds, 's')}`
-  return u(seconds, 's')
+  if (days >= 10) return u(days, 'd')
+  if (days > 0) return hours > 0 ? `${u(days, 'd')} ${u(hours, 'h')}` : u(days, 'd')
+  if (hours > 0) return minutes > 0 ? `${u(hours, 'h')} ${u(minutes, 'min')}` : u(hours, 'h')
+  if (minutes > 0) return u(minutes, 'min')
+  return `<1${NBSP}min`
 }
 
 const plural = new Intl.PluralRules('en')
@@ -106,13 +111,14 @@ function words(n: number, unit: keyof typeof UNIT_WORDS): string {
   return `${n} ${UNIT_WORDS[unit][plural.select(n) === 'one' ? 'one' : 'other']}`
 }
 
-/** The same value in words for screen readers: "2 days 4 hours". */
+/** The same value in words for screen readers: "2 days 4 hours", "less than a minute". */
 export function formatCountdownWords(msLeft: number): string {
-  const { days, hours, minutes, seconds } = countdownParts(msLeft)
-  if (days > 0) return `${words(days, 'day')} ${words(hours, 'hour')}`
-  if (hours > 0) return `${words(hours, 'hour')} ${words(minutes, 'minute')}`
-  if (minutes > 0) return `${words(minutes, 'minute')} ${words(seconds, 'second')}`
-  return words(seconds, 'second')
+  const { days, hours, minutes } = countdownParts(msLeft)
+  if (days >= 10) return words(days, 'day')
+  if (days > 0) return hours > 0 ? `${words(days, 'day')} ${words(hours, 'hour')}` : words(days, 'day')
+  if (hours > 0) return minutes > 0 ? `${words(hours, 'hour')} ${words(minutes, 'minute')}` : words(hours, 'hour')
+  if (minutes > 0) return words(minutes, 'minute')
+  return 'less than a minute'
 }
 
 /** How often a countdown needs to repaint: every second under an hour, every minute above. */
@@ -147,17 +153,31 @@ export function groupAddress(value: string): string[] {
  * Keeps a typed or pasted amount a plain decimal string: digits and one point. No sign, no exponent, at most
  * `decimals` fraction digits. It never converts to a number.
  *
- * Separators: a single comma or point is the decimal point ("1,5" is 1.5). When both kinds appear, the last one
- * is the decimal point and the other is grouping ("1,234.56" and "1.234,56" are both 1234.56). A repeated comma
- * is grouping ("1,234,567" is 1234567). A second point is ignored.
+ * Separators. The interface is English, so a point is the decimal point and a comma groups thousands:
+ * "1,000" is 1000 and "1,234,567" is 1234567, as the app prints them. A single comma that cannot be grouping
+ * (not followed by exactly three digits, or after a zero: "1,5", "0,500") is read as the decimal point, so a
+ * comma typed out of habit does not multiply the amount. When both kinds appear, the last one is the decimal
+ * point and the other is grouping ("1,234.56" and "1.234,56" are both 1234.56). A second point is ignored.
  */
+/** "1,000": a non-zero integer part, then the comma, then exactly three digits and nothing more. */
+function commaGroupsThousands(raw: string): boolean {
+  const digits = raw.replace(/[^0-9,]/g, '')
+  const [int = '', frac = ''] = digits.split(',')
+  return /[1-9]/.test(int) && /^\d{3}$/.test(frac)
+}
+
+/** True when a pasted or typed amount carries an exponent ("1e3"): the field refuses it rather than guess. */
+export function hasExponent(raw: string): boolean {
+  return /\d\s*[eE]\s*[-+]?\s*\d/.test(raw)
+}
+
 export function sanitizeDecimalInput(raw: string, decimals?: number): string {
   const commas = raw.split(',').length - 1
   const points = raw.split('.').length - 1
   let decimalMark: ',' | '.' | null = null
   if (commas > 0 && points > 0) decimalMark = raw.lastIndexOf(',') > raw.lastIndexOf('.') ? ',' : '.'
   else if (points > 0) decimalMark = '.'
-  else if (commas === 1) decimalMark = ','
+  else if (commas === 1 && !commaGroupsThousands(raw)) decimalMark = ','
 
   let out = ''
   let seenPoint = false

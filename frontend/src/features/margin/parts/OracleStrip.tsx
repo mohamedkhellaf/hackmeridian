@@ -1,6 +1,5 @@
 import { usePro } from '../../../data'
 import { IconWarning } from '../../../ui'
-import { PUBLISHER_LINE, PUBLISHER_NOTE } from '../copy'
 import { QUOTE, usdx } from '../model/money'
 import { UNDERLYING } from '../model/names'
 import { oracleView, spanText } from '../model/oracle'
@@ -8,16 +7,17 @@ import css from './OracleStrip.module.css'
 
 /**
  * The publisher's latest snapshot on every Margin screen: price, sequence, age with a word, whether early
- * exercise can use it, and any settlement price still pending. The line under it says who sets these prices.
+ * exercise can use it, and any settlement price still pending. Who sets these prices is said once, under the
+ * page title.
  */
 export function OracleStrip() {
-  const { model, simulated } = usePro()
+  const { model } = usePro()
   const o = oracleView(model)
   const snap = o.latest?.snapshot ?? null
   const limit = spanText(o.exerciseMaxAge)
 
   return (
-    <section className={css.root} aria-label="Oracle">
+    <section className={css.root} aria-label="Publisher prices">
       <dl className={css.facts}>
         <div className={css.fact}>
           <dt>{UNDERLYING}, publisher price</dt>
@@ -73,11 +73,6 @@ export function OracleStrip() {
           </div>
         ) : null}
       </dl>
-      <p className={css.source}>
-        {/* Once per screen: the contract banner already says who sets the prices. */}
-        {simulated ? `${PUBLISHER_LINE} ` : null}
-        <span className={css.note}>{PUBLISHER_NOTE}</span>
-      </p>
     </section>
   )
 }

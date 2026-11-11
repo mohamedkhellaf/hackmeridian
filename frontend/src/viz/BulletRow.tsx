@@ -2,7 +2,6 @@ import { Bullet } from './Bullet.tsx'
 import { reserveState } from './bulletGeometry.ts'
 import type { ReserveState } from './bulletGeometry.ts'
 import { cx } from './cx.ts'
-import { SignGlyph } from './parts.tsx'
 import css from './BulletRow.module.css'
 
 const WORDS: Record<ReserveState, string> = { short: 'short', over: 'over', equal: 'equal' }
@@ -53,7 +52,6 @@ export function BulletRow({ name, locked, held, max, heldLabel, lockedLabel, dif
             {lockedLabel}
           </span>
           <span className={css.difference}>
-            {state === 'short' && <SignGlyph direction="loss" />}
             <span>
               {differenceLabel} {word}
             </span>

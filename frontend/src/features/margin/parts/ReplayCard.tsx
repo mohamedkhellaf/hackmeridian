@@ -4,15 +4,13 @@ import { proErrorName } from '../../../core/pro/errors'
 import type { HistoryEntry } from '../../../core/pro/types'
 import { usePro } from '../../../data'
 import { Button, Card, IconChevronLeft, IconChevronRight, Select, Slider, useIsPhone } from '../../../ui'
-import { REPLAY_NOTE } from '../copy'
 import { callName, partyName, scenarioCopy } from '../model/names'
 import { DeskTable } from './DeskTable'
 import type { DeskColumn } from './DeskTable'
 import css from './ReplayCard.module.css'
 
-/** Steps of the log shown at first, and after "Show more". */
-const RECENT = 4
-const RECENT_MORE = 12
+/** Steps of the log shown once "Show steps" is pressed, latest first. */
+const RECENT = 12
 
 const STEP_COLUMNS: ReadonlyArray<DeskColumn<HistoryEntry>> = [
   { id: 'step', header: 'Step', numeric: true, cell: (h) => h.index + 1 },
@@ -28,14 +26,16 @@ const STEP_COLUMNS: ReadonlyArray<DeskColumn<HistoryEntry>> = [
 
 /**
  * Fixture builds only: which recorded scenario is replayed, at which step, and as which account. It is a tool
- * beside the product, so it sits last on the page, fenced, and starts collapsed on phones.
+ * beside the product, so it sits last on the page, on the sunken ground, and starts collapsed on phones. This is
+ * the one place that says how a replayed action works; a result says which step ran.
  */
 export function ReplayCard() {
   const { sim, model, me, setMe } = usePro()
   const phone = useIsPhone()
   const [chosen, setChosen] = useState<boolean | null>(null)
-  const [more, setMore] = useState(false)
+  const [steps, setSteps] = useState(false)
   const bodyId = useId()
+  const stepsId = useId()
   if (!sim) return null
 
   const open = chosen ?? !phone
@@ -45,12 +45,12 @@ export function ReplayCard() {
   const scenario = sim.file.scenarios.find((s) => s.name === sim.scenarioName)
   const next = scenario?.steps[at]
   const nextActor = next && typeof next.args[0] === 'string' && /^[A-Z][A-Z0-9_]*$/.test(next.args[0]) ? partyName(next.args[0]) : null
-  const recent = model.history.slice(more ? -RECENT_MORE : -RECENT).reverse()
+  const recent = model.history.slice(-RECENT).reverse()
 
   return (
     <Card
       as="section"
-      tone="plain"
+      tone="sunken"
       id="replay"
       className={css.root}
       title="Replay a scenario"
@@ -63,13 +63,11 @@ export function ReplayCard() {
     >
       {open ? null : (
         <p className={css.summary}>
-          <span className={css.scenario}>{copy.title}</span>, step {at} of {total}. You act as {partyName(me)}.
+          <span className={css.scenario}>{copy.title}</span>, step {at} of {total}, as {partyName(me)}.
         </p>
       )}
       <div id={bodyId} className={css.body} hidden={!open}>
-        <p className={css.lead}>
-          These are recorded runs of the margin model, not a market. {REPLAY_NOTE}
-        </p>
+        <p className={css.lead}>A button on the page runs the next recorded step of its kind, with that step's amounts.</p>
         <div className={css.controls}>
           <div className={css.control}>
             <Select
@@ -111,26 +109,27 @@ export function ReplayCard() {
               value={me}
               onValueChange={(party) => setMe(party)}
               options={sim.parties.map((party) => ({ value: party, label: partyName(party) }))}
-              hint="The account whose margin, positions and LP shares are marked as yours."
             />
           </div>
         </div>
         <div className={css.recent}>
           <div className={css.recentHead}>
             <h3 className={css.recentTitle}>Recent steps</h3>
-            {model.history.length > RECENT ? (
-              <Button size="sm" variant="quiet" aria-expanded={more} onClick={() => setMore(!more)}>
-                {more ? 'Show fewer' : 'Show more'}
-              </Button>
+            <Button size="sm" variant="quiet" aria-expanded={steps} aria-controls={stepsId} onClick={() => setSteps(!steps)}>
+              {steps ? 'Hide steps' : 'Show steps'}
+            </Button>
+          </div>
+          <div id={stepsId} hidden={!steps}>
+            {steps ? (
+              <DeskTable
+                caption="Recent steps of the scenario, latest first"
+                columns={STEP_COLUMNS}
+                rows={recent}
+                rowKey={(h) => h.index}
+                empty={<p className={css.none}>No step has run yet. Press Next to start the scenario.</p>}
+              />
             ) : null}
           </div>
-          <DeskTable
-            caption="Recent steps of the scenario, latest first"
-            columns={STEP_COLUMNS}
-            rows={recent}
-            rowKey={(h) => h.index}
-            empty={<p className={css.none}>No step has run yet. Press Next to start the scenario.</p>}
-          />
         </div>
       </div>
     </Card>

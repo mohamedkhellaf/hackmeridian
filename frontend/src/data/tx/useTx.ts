@@ -2,12 +2,13 @@
 // `run` that never rejects; the Activity list, the cache invalidation and the announcements happen in the runner.
 import { useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { OptionsClient } from '../../core/options/client'
 import { TX_IDLE, canCheckAgain, canStart, isWorking, reduce } from '../../core/tx/machine'
 import type { TxState } from '../../core/tx/machine'
 import type { TxCheck, TxOptions, TxReceipt } from '../../core/tx/types'
 import { announce } from '../../ui/announce'
+import { toast } from '../../ui/toastStore'
 import { keys } from '../keys'
 import { useOptionsClient } from '../useOptionsClient'
 import { activityStore, entryState } from './activityStore'
@@ -15,7 +16,7 @@ import type { ActivityProduct } from './activityStore'
 import { TX_NOT_CONNECTED } from './copy'
 import { flights } from './flights'
 import { keysAfterMargin, keysToInvalidate, subjectIds } from './invalidation'
-import { checkEntry, refusedState, runTransaction } from './runner'
+import { STOP_WAITING_AFTER_MS, checkEntry, refusedState, runTransaction, signingSince, stopWaiting } from './runner'
 import type { RunnerDeps, TxMeta, TxRun } from './runner'
 
 /** Looks a hash up on the RPC directly (Margin has no `checkTx` of its own). The SDK loads on demand. */
@@ -39,6 +40,7 @@ export function makeRunnerDeps(queryClient: QueryClient, getClient: () => Promis
     },
     checkTx: async (meta, hash, maxTime) => (meta.product === 'covered' ? (await getClient()).checkTx(hash, maxTime) : meta.mock ? { status: 'unknown' } : checkOnRpc(hash, maxTime)),
     announce,
+    notify: (n) => void toast({ title: n.title, description: n.description, tone: n.tone }),
   }
 }
 
@@ -60,6 +62,12 @@ export interface UseTxOptions {
   announce?: boolean
   /** Set false for a product that needs no wallet (Margin fixtures). Default true: a write without a wallet is refused. */
   needsWallet?: boolean
+  /**
+   * Whether the screen that shows this transaction's progress is open (a dialog that stays mounted while closed
+   * passes its `open`). A run that ends while it is closed, or after the owner unmounted, is told in a toast
+   * (finding 41). Default true.
+   */
+  open?: boolean
 }
 
 /** What a transaction is, for Activity, the announcements and the invalidation. A bare string is the label. */
@@ -98,7 +106,16 @@ export interface TxController {
   subject: string | null
   /** Its Activity entry, once it reached the network. */
   entryId: string | null
+  /**
+   * Epoch ms since which the running transaction waits for the wallet's signature, or null. From
+   * `STOP_WAITING_AFTER_MS` after it, a screen offers "Stop waiting" (review finding 42).
+   */
+  signingSince: number | null
+  /** Stops waiting for a wallet that does not answer: the run ends declined, nothing was signed or sent. */
+  stopWaiting: () => boolean
 }
+
+export { STOP_WAITING_AFTER_MS }
 
 interface Local {
   state: TxState
@@ -121,6 +138,23 @@ export function useTx(options: UseTxOptions = {}): TxController {
   const networkBlock = needsWallet && !mock ? wrongNetwork : null
 
   const [local, setLocal] = useState<Local>(START)
+  // The Activity entry of the run in progress (the local entryId is set only once a run ends): state for the
+  // render, a ref for the callback.
+  const runningEntry = useRef<string | null>(null)
+  const [running, setRunning] = useState<string | null>(null)
+  // Whether the screen that owns this controller is still mounted: a run that ends after it closed is told in a toast.
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const shown = useRef(options.open ?? true)
+  useEffect(() => {
+    shown.current = options.open ?? true
+  }, [options.open])
+  const isMounted = useCallback(() => mounted.current && shown.current, [])
   // The latest values, for callbacks that outlive a render (a run in progress, a timer).
   const latest = useRef<{ local: Local; meta: TxMeta | null }>({ local: START, meta: null })
   const update = useCallback((patch: Partial<Local>) => {
@@ -157,20 +191,31 @@ export function useTx(options: UseTxOptions = {}): TxController {
       }
       latest.current.meta = meta
       update({ state: TX_IDLE, entryId: null, subject: meta.subject ?? null, address })
-      const done = await runTransaction(deps, meta, write, { announce: speak, onState: (s) => update({ state: s }), created })
+      const done = await runTransaction(deps, meta, write, {
+        announce: speak,
+        onState: (s) => update({ state: s }),
+        created,
+        isMounted,
+        onEntry: (id) => {
+          runningEntry.current = id
+          setRunning(id)
+        },
+      })
+      runningEntry.current = null
+      setRunning(null)
       update({ state: done.state, entryId: done.entryId })
       return done
     },
-    [deps, product, address, mock, speak, needsWallet, networkBlock, update, settle],
+    [deps, product, address, mock, speak, needsWallet, networkBlock, update, settle, isMounted],
   )
 
   const checkAgain = useCallback(async (): Promise<TxState> => {
     const current = settle()
     const meta = latest.current.meta
     if (!meta || !current.entryId || !canCheckAgain(current.state)) return current.state
-    const next = await checkEntry(deps, meta, current.entryId, { announce: speak, onState: (s) => update({ state: s }) })
+    const next = await checkEntry(deps, meta, current.entryId, { announce: speak, onState: (s) => update({ state: s }), isMounted })
     return next ?? latest.current.local.state
-  }, [deps, speak, update, settle])
+  }, [deps, speak, update, settle, isMounted])
 
   const reset = useCallback(() => {
     const current = settle()
@@ -178,11 +223,16 @@ export function useTx(options: UseTxOptions = {}): TxController {
     if (next !== current.state) update({ state: next, entryId: null, subject: null })
   }, [update, settle])
 
+  const stop = useCallback(() => (runningEntry.current ? stopWaiting(runningEntry.current) : false), [])
+  const since = state.phase === 'signing' && running ? signingSince(running) : null
+
   return {
     state,
     run,
     checkAgain,
     reset,
+    signingSince: since,
+    stopWaiting: stop,
     working: isWorking(state),
     canStart: canStart(state),
     canCheckAgain: canCheckAgain(state) && local.entryId !== null,

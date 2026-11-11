@@ -297,3 +297,33 @@ describe('activity store: two tabs', () => {
     expect(a.list(ME)).toEqual([])
   })
 })
+
+describe('activity store: restore (an Undo of Clear finished)', () => {
+  it('puts cleared entries back in their place, persisted again, and ignores duplicates and other addresses', () => {
+    const storage = memoryStorage()
+    const h = harness(storage)
+    const first = h.store.begin(live())
+    h.store.apply(ME, first.id, CONFIRMED)
+    h.clock.advance(1_000)
+    const second = h.store.begin(live())
+    h.store.apply(ME, second.id, UNKNOWN)
+    h.clock.advance(1_000)
+    const third = h.store.begin(live())
+    h.store.apply(ME, third.id, CONFIRMED)
+    const before = h.store.list(ME)
+    const cleared = before.filter((e) => e.phase === 'confirmed')
+    h.store.clearSettled(ME)
+    expect(h.store.list(ME).map((e) => e.id)).toEqual([second.id])
+
+    h.store.restore(ME, cleared)
+    expect(h.store.list(ME).map((e) => e.id)).toEqual(before.map((e) => e.id))
+    // A new store reads them back from storage.
+    expect(createActivityStore({ storage }).list(ME).map((e) => e.id)).toEqual(before.map((e) => e.id))
+    // Restoring again, or into another address, changes nothing.
+    const same = h.store.list(ME)
+    h.store.restore(ME, cleared)
+    h.store.restore(OTHER, cleared)
+    expect(h.store.list(ME)).toBe(same)
+    expect(h.store.list(OTHER)).toEqual([])
+  })
+})

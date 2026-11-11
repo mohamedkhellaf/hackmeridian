@@ -14,7 +14,7 @@ export function SignatureSection() {
     >
       <Specimen
         title="Contract note"
-        note="Offers, positions, bids and receipts. A mono serial line (the id and the ledger it was read at), the payoff glyph with the kind in words, the terms as a ruled list, the state as the only tag."
+        note="An offer, a position, a request or a receipt: a contract object with a number in the contract. A mono serial line (the id and the ledger), the payoff glyph with the kind in words, the terms as a ruled list, the state as the only tag. One marked figure per note."
         layout="split"
       >
         <ContractNote
@@ -25,7 +25,7 @@ export function SignatureSection() {
           state="Active"
           aside={<Countdown to={SAMPLE_DEADLINE} now={SAMPLE_NOW} />}
           terms={[
-            { label: 'Strike', value: <Amount value="10.00" unit="USDx" figure="serif" />, marked: true },
+            { label: 'Strike', value: <Amount value="10.00" unit="USDx" figure="serif" /> },
             { label: 'Quantity', value: <Amount value="5" unit="BOND" figure="serif" /> },
             { label: 'Premium paid', value: <Amount value="1.80" exact="1.8000000" unit="USDx" figure="serif" /> },
             { label: 'Breakeven', value: '9.64', marked: true },
@@ -81,7 +81,7 @@ export function SignatureSection() {
           state="Active"
           terms={[
             { label: 'Floor', value: <Amount value="10.00" unit="USDx" figure="serif" />, marked: true },
-            { label: 'You paid', value: <Amount value="1.80" unit="USDx" figure="serif" />, hint: 'A caption can sit under a value.' },
+            { label: 'You paid', value: <Amount value="1.80" unit="USDx" figure="serif" />, hint: '0.36 per BOND' },
             { label: 'Deadline', value: <DateTime value={SAMPLE_DEADLINE} /> },
           ]}
           footer={<TxLink hash={SAMPLE_HASH} explorerUrl="https://stellar.expert/explorer/testnet" />}
@@ -92,29 +92,43 @@ export function SignatureSection() {
       </Specimen>
 
       <Specimen
-        title="Empty note"
-        note="Every empty state: a blank, dashed slip with one serif sentence and at most one action."
+        title="Plain note"
+        note="The same card for a form or an example, not a contract object: plain drops the perforated edge and the serial line."
         layout="split"
       >
+        <ContractNote
+          plain
+          glyph="long-put"
+          kind="A floor on BOND"
+          terms={[
+            { label: 'Floor', value: <Amount value="99.00" unit="USDx" figure="serif" />, marked: true },
+            { label: 'Quantity', value: <Amount value="2" unit="BOND" figure="serif" /> },
+            { label: 'Deadline', value: <DateTime value={SAMPLE_DEADLINE} /> },
+          ]}
+        />
+      </Specimen>
+
+      <Specimen
+        title="Empty note"
+        note="One serif sentence, at most one short line and one action, on the page. With slip, the same words on a blank contract note: only where the missing thing is itself a contract note."
+        layout="split"
+      >
+        <EmptyNote title="No open offers on BOND." hint="Post a request and escrow your premium, or write the first offer." />
         <EmptyNote
+          slip
           title="No positions."
           hint="Terms appear here once you hold or write an option."
           action={<ButtonLink href="#signature">Open Markets</ButtonLink>}
         />
-        <EmptyNote title="No open offers on BOND." hint="Post a request and escrow your premium, or write the first offer." />
       </Specimen>
 
       <Specimen
         title="Highlighter"
-        note="Only behind figures that are the user's own terms: their strike, their breakeven, their offer. Never for emphasis. On Carbon it is a dark wash with a yellow underline."
+        note="One stroke of wash, in both themes, behind one figure per surface: a term the user set (their floor, their price) or, on the term sheet of their own order or position, the breakeven. Never a headline word, a price somebody else set, an example or emphasis."
         layout="stack"
       >
         <p className={styles.prose}>
-          If BOND is at 8.00 at the deadline you still sell at <Marker>10.00</Marker>. Your breakeven is{' '}
-          <Marker>9.64</Marker>, the floor less the 0.36 per unit you paid.
-        </p>
-        <p className="ui-display">
-          Set the <Marker band>lowest price</Marker> you would sell at.
+          If BOND is at 8.00 at the deadline you still sell at <Marker>10.00</Marker>, the floor you chose.
         </p>
         <Example label="A changed figure flashes the marker for 1.2 s, then it is plain again">
           <span className="ui-figure-lg">

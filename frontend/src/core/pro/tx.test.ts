@@ -24,7 +24,7 @@ describe('proReceipt', () => {
   it('keeps where a live transaction stopped, so an unknown outcome is never offered for resend', async () => {
     const e = (await proReceipt(no({ code: -1, name: 'TransactionFailed', note: 'Not confirmed yet.', kind: 'unknown', hash: 'cd' })).catch((x: unknown) => x)) as ProTxError
     expect(e).toMatchObject({ kind: 'unknown', code: null, refusal: null, hash: 'cd', message: 'Not confirmed yet.' })
-    const declined = (await proReceipt(no({ code: -1, name: 'TransactionFailed', note: 'You rejected the request in your wallet.', kind: 'declined' })).catch((x: unknown) => x)) as ProTxError
+    const declined = (await proReceipt(no({ code: -1, name: 'TransactionFailed', note: 'You declined to sign in your wallet.', kind: 'declined' })).catch((x: unknown) => x)) as ProTxError
     expect(declined.kind).toBe('declined')
   })
 

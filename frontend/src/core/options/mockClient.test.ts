@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockOptionsClient } from './mockClient'
 import { bareSeed } from './mockSeed'
+import { OPTIONS_ERRORS } from '../stellar/errors'
 import type { NewOffer } from './types'
 
 const UNIT = 10_000_000n
@@ -63,42 +64,42 @@ describe('MockOptionsClient lifecycle', () => {
 
   it('rejects invalid offers', async () => {
     const { c, offer } = await setup()
-    await expect(run(c.createOffer(offer({ underlyingQty: 0n }), W))).rejects.toThrow('positive')
-    await expect(run(c.createOffer(offer({ totalStrike: 0n }), W))).rejects.toThrow('positive')
-    await expect(run(c.createOffer(offer({ totalPremium: 0n }), W))).rejects.toThrow('positive')
-    await expect(run(c.createOffer(offer({ expiry: Math.floor(Date.now() / 1000) - 1 }), W))).rejects.toThrow('future')
+    await expect(run(c.createOffer(offer({ underlyingQty: 0n }), W))).rejects.toThrow(OPTIONS_ERRORS[102])
+    await expect(run(c.createOffer(offer({ totalStrike: 0n }), W))).rejects.toThrow(OPTIONS_ERRORS[102])
+    await expect(run(c.createOffer(offer({ totalPremium: 0n }), W))).rejects.toThrow(OPTIONS_ERRORS[102])
+    await expect(run(c.createOffer(offer({ expiry: Math.floor(Date.now() / 1000) - 1 }), W))).rejects.toThrow(OPTIONS_ERRORS[102])
   })
 
   it('cancel by writer only, and only while offered', async () => {
     const { c, offer } = await setup()
     const { id } = await run(c.createOffer(offer(), W))
-    await expect(run(c.cancelOffer(id, X))).rejects.toThrow('Only the writer')
+    await expect(run(c.cancelOffer(id, X))).rejects.toThrow(OPTIONS_ERRORS[107])
     await run(c.cancelOffer(id, W))
     expect((await c.getOption(id)).state).toBe('cancelled')
-    await expect(run(c.cancelOffer(id, W))).rejects.toThrow('open offers')
-    await expect(run(c.buy(id, B))).rejects.toThrow('no longer available')
+    await expect(run(c.cancelOffer(id, W))).rejects.toThrow(OPTIONS_ERRORS[106])
+    await expect(run(c.buy(id, B))).rejects.toThrow(OPTIONS_ERRORS[106])
 
     const b = await run(c.createOffer(offer(), W))
     await run(c.buy(b.id, B))
-    await expect(run(c.cancelOffer(b.id, W))).rejects.toThrow('open offers')
+    await expect(run(c.cancelOffer(b.id, W))).rejects.toThrow(OPTIONS_ERRORS[106])
   })
 
   it('cannot buy a non-offered option', async () => {
     const { c, offer } = await setup()
     const { id } = await run(c.createOffer(offer(), W))
     await run(c.buy(id, B))
-    await expect(run(c.buy(id, X))).rejects.toThrow('no longer available')
+    await expect(run(c.buy(id, X))).rejects.toThrow(OPTIONS_ERRORS[106])
   })
 
   it('only the holder can exercise, and only if active', async () => {
     const { c, offer } = await setup()
     const { id } = await run(c.createOffer(offer(), W))
-    await expect(run(c.exercise(id, B))).rejects.toThrow('Only the holder')
+    await expect(run(c.exercise(id, B))).rejects.toThrow(OPTIONS_ERRORS[108])
     await run(c.buy(id, B))
-    await expect(run(c.exercise(id, W))).rejects.toThrow('Only the holder')
-    await expect(run(c.exercise(id, X))).rejects.toThrow('Only the holder')
+    await expect(run(c.exercise(id, W))).rejects.toThrow(OPTIONS_ERRORS[108])
+    await expect(run(c.exercise(id, X))).rejects.toThrow(OPTIONS_ERRORS[108])
     await run(c.exercise(id, B))
-    await expect(run(c.exercise(id, B))).rejects.toThrow('not active')
+    await expect(run(c.exercise(id, B))).rejects.toThrow(OPTIONS_ERRORS[106])
   })
 
   it('cannot exercise after expiry', async () => {
@@ -107,26 +108,26 @@ describe('MockOptionsClient lifecycle', () => {
     await run(c.buy(id, B))
     await advanceDays(1)
     expect((await c.getOption(id)).state).toBe('expired')
-    await expect(run(c.exercise(id, B))).rejects.toThrow('expired')
+    await expect(run(c.exercise(id, B))).rejects.toThrow(OPTIONS_ERRORS[109])
   })
 
   it('cannot buy after expiry', async () => {
     const { c, offer } = await setup()
     const { id } = await run(c.createOffer(offer(), W))
     await advanceDays(1)
-    await expect(run(c.buy(id, B))).rejects.toThrow(/no longer available|expired/)
+    await expect(run(c.buy(id, B))).rejects.toThrow(/changed before your transaction landed|has expired/)
   })
 
   it('reclaim: writer only, only after expiry, only once', async () => {
     const { c, offer } = await setup()
     const { id } = await run(c.createOffer(offer(), W))
     await run(c.buy(id, B))
-    await expect(run(c.reclaim(id, W))).rejects.toThrow('not expired')
+    await expect(run(c.reclaim(id, W))).rejects.toThrow(OPTIONS_ERRORS[110])
     await advanceDays(1)
-    await expect(run(c.reclaim(id, B))).rejects.toThrow('Only the writer')
+    await expect(run(c.reclaim(id, B))).rejects.toThrow(OPTIONS_ERRORS[107])
     await run(c.reclaim(id, W))
     expect((await c.getOption(id)).state).toBe('reclaimed')
-    await expect(run(c.reclaim(id, W))).rejects.toThrow('Nothing to reclaim')
+    await expect(run(c.reclaim(id, W))).rejects.toThrow(OPTIONS_ERRORS[106])
   })
 
   it('reclaim works on an unsold expired offer; cannot reclaim exercised/cancelled', async () => {
@@ -139,8 +140,8 @@ describe('MockOptionsClient lifecycle', () => {
     await run(c.cancelOffer(d.id, W))
     await advanceDays(1)
     await run(c.reclaim(a.id, W))
-    await expect(run(c.reclaim(b.id, W))).rejects.toThrow('Nothing to reclaim')
-    await expect(run(c.reclaim(d.id, W))).rejects.toThrow('Nothing to reclaim')
+    await expect(run(c.reclaim(b.id, W))).rejects.toThrow(OPTIONS_ERRORS[106])
+    await expect(run(c.reclaim(d.id, W))).rejects.toThrow(OPTIONS_ERRORS[106])
   })
 
   it('throws for unknown ids', async () => {

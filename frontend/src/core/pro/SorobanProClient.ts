@@ -138,6 +138,8 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
 const NOT_FOUND = 202
 /** Ids are probed in pages: offers and positions have no count view. */
 const PROBE_PAGE = 10
+/** Ids probed past the known records on a later refresh, before whole pages. */
+const NEXT_PROBE = 2
 /** Stop enumerating after this many ids (a demo deployment stays far below it). */
 const MAX_IDS = 400
 /** Parallel simulations per refresh. */
@@ -198,6 +200,9 @@ export class SorobanProClient implements ProClient {
   private inflight: Promise<void> | null = null
   private again = false
   private quoteId: string | null = null
+  /** Offers and positions read so far, by id: final ones are not read again (see `enumerate`). */
+  private offerCache = new Map<number, AbiOffer>()
+  private positionCache = new Map<number, AbiPosition>()
 
   constructor(contractId: string, deps: SorobanProDeps = {}) {
     this.contractId = contractId
@@ -316,20 +321,33 @@ export class SorobanProClient implements ProClient {
     }
   }
 
-  /** Ids 0.. of a sequentially numbered store, read until the first NotFound. */
-  private async enumerate<T>(get: (id: number) => (c: Bound) => Tx<Res<T>>): Promise<Map<number, T>> {
-    const out = new Map<number, T>()
-    for (let from = 0; from < MAX_IDS; from += PROBE_PAGE) {
-      const ids = Array.from({ length: PROBE_PAGE }, (_, k) => from + k)
-      const rows = await mapLimit(ids, CONCURRENCY, (id) => this.viewOrNull(get(id)))
+  /**
+   * Records of a sequentially numbered store (ids 0..), kept between refreshes (performance finding 6). A record
+   * in a final state (`done`) is never read again; the others are re-read; then ids beyond the highest one seen
+   * are probed until the first NotFound. A refresh costs the live records plus one page, not the whole history.
+   */
+  private async enumerate<T>(cache: Map<number, T>, done: (t: T) => boolean, get: (id: number) => (c: Bound) => Tx<Res<T>>): Promise<Map<number, T>> {
+    const live = [...cache.entries()].filter(([, v]) => !done(v)).map(([id]) => id)
+    const fresh = await mapLimit(live, CONCURRENCY, (id) => this.viewOrNull(get(id)))
+    fresh.forEach((r, k) => {
+      if (r != null) cache.set(live[k], r)
+    })
+    let from = 0
+    while (cache.has(from)) from++
+    // Past known records, a refresh usually finds nothing new: look two ids ahead first, then whole pages.
+    let page = cache.size > 0 ? NEXT_PROBE : PROBE_PAGE
+    for (; from < MAX_IDS; from += page, page = PROBE_PAGE) {
+      const size = page
+      const ids = Array.from({ length: size }, (_, k) => from + k)
+      const rows = await mapLimit(ids, CONCURRENCY, (id) => (cache.has(id) ? Promise.resolve(cache.get(id) ?? null) : this.viewOrNull(get(id))))
       let ended = false
       rows.forEach((r, k) => {
         if (r == null) ended = true
-        else if (!ended) out.set(ids[k], r)
+        else if (!ended) cache.set(ids[k], r)
       })
       if (ended) break
     }
-    return out
+    return new Map([...cache.entries()].sort((a, b) => a[0] - b[0]))
   }
 
   private async load(): Promise<ProModel> {
@@ -347,8 +365,9 @@ export class SorobanProClient implements ProClient {
         const [s, snap] = await Promise.all([this.view((c) => c.get_series({ series_id: u32(id) })), this.viewOrNull((c) => c.get_snapshot({ series_id: u32(id) }))])
         return seriesFromAbi(id, s, snap)
       }),
-      this.enumerate((id) => (c) => c.get_offer({ offer_id: u32(id) })),
-      this.enumerate((id) => (c) => c.get_position({ pos_id: u32(id) })),
+      // A closed offer (taken or cancelled) and a settled position never change again.
+      this.enumerate(this.offerCache, (o) => !o.open, (id) => (c) => c.get_offer({ offer_id: u32(id) })),
+      this.enumerate(this.positionCache, (p) => p.settled, (id) => (c) => c.get_position({ pos_id: u32(id) })),
     ])
 
     // Every book has at least one position, so the books are the ones positions point to.
@@ -448,7 +467,7 @@ export class SorobanProClient implements ProClient {
       const tx = await call(this.signer())
       throwIfSimFailed(tx)
       // Reports signing, submitting and pending (with the hash); rejects with a TxError that says where it stopped.
-      const sent = await signAndSend(tx, { onStage: opts?.onStage, server: this.server })
+      const sent = await signAndSend(tx, { onStage: opts?.onStage, signal: opts?.signal, server: this.server })
       const value = shape(unwrap(sent.result))
       out = { ok: true, value, note: sent.hash ? `Transaction ${sent.hash}` : undefined, hash: sent.hash || undefined }
     } catch (e) {

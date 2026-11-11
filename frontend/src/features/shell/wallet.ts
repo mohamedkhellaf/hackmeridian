@@ -8,13 +8,16 @@ import { BALANCE_REASON } from './copy'
 
 // ---- Connect dialog ----------------------------------------------------------------------------------------
 
-export type WalletRowStatus = 'Waiting' | 'Detected' | 'Web' | 'Install'
+export type WalletRowStatus = 'Waiting' | 'Installed' | 'No install needed' | 'Install'
 
-/** The word at the end of a wallet row: what choosing it does, or that it is being asked now. */
+/**
+ * The words at the end of a wallet row, all on one question (can it be used from here?): an extension that is
+ * there, a wallet that opens without one, an extension still to install, or the wallet being asked now.
+ */
 export function walletStatus(wallet: WalletInfo, busyId: string | null): WalletRowStatus {
   if (wallet.availability === 'missing') return 'Install'
   if (busyId === wallet.id) return 'Waiting'
-  return wallet.availability === 'installed' ? 'Detected' : 'Web'
+  return wallet.availability === 'installed' ? 'Installed' : 'No install needed'
 }
 
 /** The order of the list: installed extensions first, then web wallets and the ones still to install. */

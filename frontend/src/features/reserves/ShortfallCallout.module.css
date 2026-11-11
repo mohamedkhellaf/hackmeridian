@@ -1,8 +1,0 @@
-@layer features {
-  .list {
-    list-style: none;
-    padding: 0;
-    font-variant-numeric: tabular-nums lining-nums;
-    color: var(--text-2);
-  }
-}

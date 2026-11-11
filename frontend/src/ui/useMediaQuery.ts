@@ -31,3 +31,12 @@ export const useIsPhone = (): boolean => useMediaQuery(PHONE_QUERY)
 
 /** True from the 1200 px breakpoint: the ticket rail sits beside the page. */
 export const useIsWide = (): boolean => useMediaQuery(WIDE_QUERY)
+
+/**
+ * `'smooth'`, or `'auto'` when the viewer asked for reduced motion. For `scrollIntoView` and `scrollTo`: a behaviour
+ * passed in script overrides the CSS rule that turns smooth scrolling off.
+ */
+export function scrollBehavior(): ScrollBehavior {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'auto'
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+}

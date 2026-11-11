@@ -45,11 +45,6 @@
     line-height: var(--ui-line);
   }
 
-  .word {
-    font-weight: 600;
-    color: var(--callout-ink);
-  }
-
   .title {
     font-weight: 600;
     color: var(--text);

@@ -1,6 +1,6 @@
 // The lifecycle of the option as a timeline: who acts and by when, with the transaction of each step this
 // wallet made from this browser. The chain keeps no history the app can read yet, so a step made elsewhere has
-// no link; the page says so once.
+// no link.
 import { explorerTx } from '../../core/explorer'
 import type { OptionOffer } from '../../core/options/types'
 import { optionSubject, useActivity } from '../../data'
@@ -9,7 +9,7 @@ import { Card, DateTime, Timeline, TxLink } from '../../ui'
 import type { TimelineItem } from '../../ui'
 import { LIFECYCLE_HEADING } from './copy'
 import { lifecycleSteps } from './lifecycleSteps'
-import type { LifecycleStep } from './lifecycleSteps'
+import type { LifecycleContext, LifecycleStep } from './lifecycleSteps'
 import { ActivityLink } from './links'
 import css from './Lifecycle.module.css'
 
@@ -29,10 +29,15 @@ function entryFor(step: LifecycleStep, entries: readonly ActivityEntry[], subjec
   return null
 }
 
-export function Lifecycle({ option }: { option: OptionOffer }) {
+export interface LifecycleProps extends LifecycleContext {
+  option: OptionOffer
+  className?: string
+}
+
+export function Lifecycle({ option, className, ...ctx }: LifecycleProps) {
   const { entries } = useActivity()
   const subject = optionSubject(option.id)
-  const steps = lifecycleSteps(option)
+  const steps = lifecycleSteps(option, ctx)
   let linked = 0
   const items: TimelineItem[] = steps.map((step) => {
     const entry = entryFor(step, entries, subject)
@@ -44,7 +49,6 @@ export function Lifecycle({ option }: { option: OptionOffer }) {
       description: (
         <>
           <p>{step.text}</p>
-          <p className={css.actor}>{step.actor}</p>
           {entry?.hash ? (
             <p className={css.tx}>
               <span>Transaction</span>
@@ -56,12 +60,15 @@ export function Lifecycle({ option }: { option: OptionOffer }) {
     }
   })
   return (
-    <Card title={LIFECYCLE_HEADING} headingLevel={2}>
+    <Card title={LIFECYCLE_HEADING} headingLevel={2} className={className}>
       <Timeline label="Lifecycle of this option" items={items} />
-      <p className={css.note}>
-        {linked > 0 ? 'Transactions made from this browser are linked. ' : 'Transactions you make from this browser are linked here. '}
-        <ActivityLink tone="quiet">Open Activity</ActivityLink>
-      </p>
+      {linked > 0 ? (
+        <p className={css.note}>
+          Transactions made from this browser are linked. <ActivityLink tone="quiet" className={css.link}>
+            Open Activity
+          </ActivityLink>
+        </p>
+      ) : null}
     </Card>
   )
 }

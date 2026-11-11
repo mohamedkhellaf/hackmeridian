@@ -1,14 +1,19 @@
 // The floor widget: a contract note that answers "what do I get, and what does it cost" with the terms of one
 // real put. It opens on the recorded option (a past Testnet option, labelled as such) and, once the lazy chunk
 // has read the book, shows the best open offer instead. It never needs the data layer itself: `live` is plain data.
+//
+// Nothing moves by itself (DESIGN.md principle 6): the swap from the recorded option to the open offer waits while
+// the visitor points at or works in the note, the chart is never remounted (focus and a dragged price survive a
+// change of terms), and the note does not play the "print" of a confirmed trade.
 import { Link as RouterLink } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import type { FocusEvent } from 'react'
 import { PAYOFF_CAPTION } from '../../../core/disclosures'
 import { explorerAddress, explorerTx, isMockId } from '../../../core/explorer'
 import { formatMoney, formatUnits, formatUtc, formatUtcDay, formatUtcTime, groupDigits, isoUtc, plural } from '../../../core/format'
-import { Address, announce, Button, ButtonLink, ContractNote, Link, useIsPhone } from '../../../ui'
+import { Address, announce, Button, ButtonLink, ContractNote, Link, Marker, useIsPhone } from '../../../ui'
 import { WithWithoutChart } from '../../../viz'
-import { WIDGET } from '../copy'
+import { LOT_SLOT, WIDGET } from '../copy'
 import { RECORDED_PUT, RECORDED_PUT_TX } from '../recorded'
 import type { LivePick, LiveState } from '../live/types'
 import { floorFigure, floorOutcome } from './floor'
@@ -22,9 +27,21 @@ export interface HeroWidgetProps {
   onPick: (pick: LivePick) => void
 }
 
-
-const serialOf = (id: bigint): string => id.toString().padStart(6, '0')
+import { serialOf } from '../../../core/format/option'
 const ledgerText = (ledger: number): string => groupDigits(String(ledger))
+
+/** The window's height, for a chart that keeps the outcomes and the action on a short laptop screen. */
+function subscribeResize(onChange: () => void): () => void {
+  window.addEventListener('resize', onChange)
+  return () => window.removeEventListener('resize', onChange)
+}
+const viewportHeight = (): number => window.innerHeight
+function useViewportHeight(): number {
+  return useSyncExternalStore(subscribeResize, viewportHeight, () => 900)
+}
+
+/** 216 px on a 900 px tall screen, down to 150 px on a 720 px one; a phone scrolls, so it keeps its own height. */
+const chartHeight = (phone: boolean, vh: number): number => (phone ? 208 : Math.round(Math.min(216, Math.max(150, 216 - (900 - vh) * 0.37))))
 
 interface BodyProps {
   figure: FloorFigure
@@ -33,11 +50,15 @@ interface BodyProps {
   height: number
 }
 
-/** The chart and the two outcome figures. Keyed by the option, so a new option starts at its own price. */
+/**
+ * The chart and the two outcome figures. Mounted once: a new offer keeps the price the visitor set when it lies on
+ * the new axis (clamped to it otherwise), and starts at its own price only when the asset changes.
+ */
 function FloorBody({ figure, terms, reference, height }: BodyProps) {
-  const [price, setPrice] = useState(figure.startPrice)
   const code = terms.underlying.code
   const quote = terms.quote.code
+  const [assumed, setAssumed] = useState<{ code: string; price: number } | null>(null)
+  const price = assumed !== null && assumed.code === code ? Math.min(figure.domain[1], Math.max(figure.domain[0], assumed.price)) : figure.startPrice
   const outcome = floorOutcome(figure, price)
   const verdict =
     outcome.direction === 'more' ? WIDGET.more(outcome.differenceText, quote) : outcome.direction === 'less' ? WIDGET.less(outcome.differenceText, quote) : WIDGET.same
@@ -53,17 +74,13 @@ function FloorBody({ figure, terms, reference, height }: BodyProps) {
         withLabel={WIDGET.withLabel}
         withoutLabel={WIDGET.withoutLabel}
         price={price}
-        onPriceChange={setPrice}
+        onPriceChange={(next) => setAssumed({ code, price: next })}
         step={figure.step}
         largeStep={figure.largeStep}
         unit={quote}
         asset={code}
         title={WIDGET.chartTitle(figure.text.qty, code, figure.text.strike)}
-        caption={
-          <>
-            {WIDGET.figure(1)} {PAYOFF_CAPTION}
-          </>
-        }
+        caption={PAYOFF_CAPTION}
         readout={false}
         valueText={(state) => {
           const o = floorOutcome(figure, state.price)
@@ -93,14 +110,8 @@ function FloorBody({ figure, terms, reference, height }: BodyProps) {
           </dd>
           <dd className={css.outcomeNote}>
             <span className={css.verdict} data-direction={outcome.direction}>
-              {outcome.direction === 'same' ? null : (
-                <span className={css.triangle} aria-hidden="true">
-                  {outcome.direction === 'more' ? '▲' : '▼'}
-                </span>
-              )}
               {verdict}
-            </span>{' '}
-            {WIDGET.estimate}
+            </span>
           </dd>
         </div>
       </dl>
@@ -108,9 +119,60 @@ function FloorBody({ figure, terms, reference, height }: BodyProps) {
   )
 }
 
-export function HeroWidget({ live, onPick }: HeroWidgetProps) {
+/**
+ * The lot of the put shown. When the visitor's own change of floor or deadline brings another lot, the figure
+ * fades in and carries the marker flash once (brief 5.3); the first paint and the swap from the example do not.
+ */
+function Lot({ text, group }: { text: string; group: string | null }) {
+  const [last, setLast] = useState({ group, text })
+  const [changes, setChanges] = useState(0)
+  if (group !== last.group || text !== last.text) {
+    setLast({ group, text })
+    if (group !== null && group === last.group) setChanges(changes + 1)
+  }
+  return changes > 0 ? (
+    <Marker flash key={changes} className={css.changed}>
+      {text}
+    </Marker>
+  ) : (
+    <>{text}</>
+  )
+}
+
+/**
+ * True while the visitor works in the element: the pointer has moved or pressed inside it and not left, or focus
+ * is inside it. A pointer that merely rests where the note appears does not count.
+ */
+function useEngaged() {
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  return {
+    engaged: hovered || focused,
+    handlers: {
+      onPointerMove: () => setHovered(true),
+      onPointerDown: () => setHovered(true),
+      onPointerLeave: () => setHovered(false),
+      onFocus: () => setFocused(true),
+      onBlur: (event: FocusEvent<HTMLDivElement>) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false)
+      },
+    },
+  }
+}
+
+export function HeroWidget({ live: reported, onPick }: HeroWidgetProps) {
   const phone = useIsPhone()
+  const vh = useViewportHeight()
+  const { engaged, handlers } = useEngaged()
+
+  // The first open offer replaces the example only once the visitor has left the note; after that, every change
+  // is one the visitor asked for (or a later read of the book) and shows at once.
+  const [swapped, setSwapped] = useState(false)
+  const hold = !swapped && reported?.status === 'open' && engaged
+  const live = hold ? null : reported
   const open = live?.status === 'open' ? live : null
+  if (open && !swapped) setSwapped(true)
+
   const offer = open?.offer ?? null
   const choices = open?.choices ?? null
   const terms: FloorTerms = offer ?? RECORDED_PUT
@@ -137,10 +199,26 @@ export function HeroWidget({ live, onPick }: HeroWidgetProps) {
   const untilRest = offer ? formatUtcTime(terms.expiry) : `${new Date(terms.expiry * 1000).getUTCFullYear()}, ${formatUtcTime(terms.expiry)}`
   const until = <time dateTime={isoUtc(terms.expiry)}>{untilDay}</time>
 
-  const aside = offer ? (offer.source === 'resale' ? WIDGET.resaleAside : live?.mock ? WIDGET.openAsideMock : WIDGET.openAside) : WIDGET.recordedAside
+  // The aside says only what the tag does not: that the example is recorded, a resale, or read from mock data.
+  const aside = offer ? (offer.source === 'resale' ? WIDGET.resaleAside : live?.mock ? WIDGET.openAsideMock : null) : WIDGET.recordedAside
+
+  const lotText = `${figure.text.qty} ${code}`
+  const totalText = `${figure.text.premium} ${q.code}`
+  const lotLine = offer
+    ? (offer.source === 'resale' ? WIDGET.lotResale : WIDGET.lotOpen)(LOT_SLOT, totalText, figure.text.premiumPerUnit)
+    : WIDGET.lotRecorded(LOT_SLOT, totalText, figure.text.premiumPerUnit)
+  const [lotBefore, lotAfter] = lotLine.split(LOT_SLOT)
+  const lotOf = (qty: bigint): string => `${formatUnits(qty, terms.underlying.decimals)} ${code}`
 
   return (
-    <div className={css.root} data-state={offer ? 'open' : 'recorded'} data-testid="hero-widget" aria-busy={live?.status === 'loading' || undefined}>
+    <div
+      className={css.root}
+      data-state={offer ? 'open' : 'recorded'}
+      data-held={hold || undefined}
+      data-testid="hero-widget"
+      aria-busy={reported?.status === 'loading' || undefined}
+      {...handlers}
+    >
       <ContractNote
         className={css.note}
         serialLabel={offer ? WIDGET.serialOffer : WIDGET.serialOption}
@@ -150,8 +228,7 @@ export function HeroWidget({ live, onPick }: HeroWidgetProps) {
         glyph="long-put"
         kind={WIDGET.heading(code)}
         headingLevel={2}
-        aside={<span data-testid="hero-aside">{aside}</span>}
-        printing={offer !== null}
+        aside={aside === null ? undefined : <span data-testid="hero-aside">{aside}</span>}
         footer={<Source live={live} />}
       >
         {offer && choices ? (
@@ -161,8 +238,7 @@ export function HeroWidget({ live, onPick }: HeroWidgetProps) {
               value={choices.assetId}
               onChange={(assetId) => onPick({ assetId })}
               options={choices.assets.map((a) => ({ value: a.id, label: a.typeLabel ? WIDGET.assetOption(a.code, a.typeLabel) : a.code }))}
-              figure={figure.text.qty}
-              unit={code}
+              figure={code}
             />
             <TermSelect
               label={WIDGET.floor}
@@ -172,8 +248,8 @@ export function HeroWidget({ live, onPick }: HeroWidgetProps) {
                 value: s.value.toString(),
                 label:
                   s.perUnit === null
-                    ? formatMoney(s.value, q)
-                    : WIDGET.floorOption(formatMoney(s.value, q), formatUnits(s.perUnit, q.decimals)),
+                    ? WIDGET.floorOptionBare(formatMoney(s.value, q), lotOf(s.qty))
+                    : WIDGET.floorOption(formatMoney(s.value, q), formatUnits(s.perUnit, q.decimals), lotOf(s.qty)),
               }))}
               figure={figure.text.strike}
               unit={q.code}
@@ -183,27 +259,28 @@ export function HeroWidget({ live, onPick }: HeroWidgetProps) {
               label={WIDGET.until}
               value={String(offer.expiry)}
               onChange={(expiry) => onPick({ assetId: choices.assetId, strike: offer.strikePerUnit, expiry: Number(expiry) })}
-              options={choices.expiries.map((e) => ({ value: String(e), label: formatUtc(e) }))}
+              options={choices.expiries.map((e) => ({ value: String(e.value), label: e.qty === null ? formatUtc(e.value) : WIDGET.untilOption(formatUtc(e.value), lotOf(e.qty)) }))}
               figure={until}
               unit={untilRest}
             />
           </div>
         ) : (
           <dl className={css.terms} aria-label={WIDGET.termsLabel}>
-            <TermValue label={WIDGET.hold} figure={figure.text.qty} unit={code} />
+            <TermValue label={WIDGET.hold} figure={code} />
             <TermValue label={WIDGET.floor} figure={figure.text.strike} unit={q.code} marked />
             <TermValue label={WIDGET.until} figure={until} unit={untilRest} />
           </dl>
         )}
         <p className={css.meta} data-testid="hero-meta">
-          {offer ? WIDGET.premiumLine(figure.text.premium, figure.text.premiumPerUnit, q.code) : WIDGET.recordedLot(figure.text.premium, q.code)}
+          {lotBefore}
+          <Lot text={lotText} group={offer ? code : null} />
+          {lotAfter}
           {offer && choices?.movedFrom != null ? (
             <span className={css.moved}> {WIDGET.moved(formatUnits(choices.movedFrom, q.decimals), untilDay, figure.text.strike)}</span>
           ) : null}
         </p>
-        <FloorBody key={offer ? `${offer.source}-${offer.id}` : 'recorded'} figure={figure} terms={terms} reference={reference} height={phone ? 208 : 216} />
+        <FloorBody figure={figure} terms={terms} reference={reference} height={chartHeight(phone, vh)} />
       </ContractNote>
-      <p className={css.under}>{WIDGET.captionExtra}</p>
     </div>
   )
 }
@@ -262,9 +339,7 @@ function Source({ live }: { live: LiveState | null }) {
         <p className={css.source} data-testid="hero-source">
           {WIDGET.error}
         </p>
-        <Button onClick={live.retry}>
-          {WIDGET.retry}
-        </Button>
+        <Button onClick={live.retry}>{WIDGET.retry}</Button>
       </>
     )
   }

@@ -127,15 +127,30 @@
     color: var(--text-2);
   }
 
-  /* Blank slip: dashed outline, no fill, one sentence. */
-  .empty {
-    border-style: dashed;
-    border-color: var(--rule);
-    background: transparent;
+  /* A form or an example on a card: no perforation, no gutter for it. */
+  .root[data-plain] {
+    padding-inline-start: var(--note-pad);
 
-    & .running {
-      border-bottom-style: dashed;
+    &::before {
+      content: none;
     }
+
+    & .aside {
+      display: flex;
+      align-items: baseline;
+      gap: var(--s-8);
+    }
+  }
+
+  /* The blank contract note: the slip with nothing typed on it yet. Solid hairline, no fill. */
+  .slip {
+    background: transparent;
+  }
+
+  /* The plain empty state: words in the page flow, no frame. */
+  .plainEmpty {
+    min-width: 0;
+    color: var(--text);
   }
 
   .emptyBody {
@@ -143,6 +158,10 @@
     flex-direction: column;
     align-items: flex-start;
     gap: var(--s-8);
+    padding-block: var(--s-24) var(--s-16);
+  }
+
+  .slip .emptyBody {
     padding-block: var(--s-32) var(--s-20);
   }
 
@@ -174,7 +193,8 @@
   }
 
   /* Compact: one of several empty tables on a desk screen. */
-  .empty[data-size='sm'] {
+  .plainEmpty[data-size='sm'],
+  .slip[data-size='sm'] {
     & .emptyBody {
       gap: var(--s-4);
       padding-block: var(--s-12);

@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   BANNED_PRICE_TERMS,
@@ -7,11 +5,12 @@ import {
   bidEscrowDisclosure,
   clawbackShortfallDisclosure,
   clawbackShortfallParts,
-  COLLATERAL_CARDS,
   BANNED_TAGLINES,
   COPYRIGHT_NOTICE,
   DISCLOSURE_HOMES,
   LEGAL_NOTICE,
+  LEGAL_NOTICE_MOCK,
+  legalNotice,
   findBannedWords,
   ISSUER_DISCLOSURE,
   MARGIN_BANNED_WORDS,
@@ -21,11 +20,10 @@ import {
   MARGIN_WARNING_CONSENT,
   MARGIN_WARNING_TITLE,
   marginBanner,
-  MOCK_DISCLOSURE,
   PAYOFF_CAPTION,
   PREMIUM_DISCLOSURE,
   RESALE_PRICE_DISCLOSURE,
-  TESTNET_DISCLOSURE,
+  TRADEMARK_NOTICE,
   WALLET_DISCLOSURE,
 } from './disclosures'
 
@@ -35,15 +33,20 @@ describe('required sentences, verbatim (brief section 6.2)', () => {
       'This software is provided as is, without warranty of any kind. It runs on the Stellar test network, and the tokens it handles are test assets with no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.',
     )
     expect(COPYRIGHT_NOTICE).toBe('\u00A9 2026 The StellSec authors.')
-    expect(TESTNET_DISCLOSURE).toBe(LEGAL_NOTICE)
-    expect(MOCK_DISCLOSURE).toBe('')
+    expect(TRADEMARK_NOTICE).toBe(
+      '\u201CStellar\u201D is a trademark of the Stellar Development Foundation. All rights reserved. This is independent software, not affiliated with, sponsored or endorsed by the Stellar Development Foundation.',
+    )
+    expect(LEGAL_NOTICE_MOCK).toBe(
+      'This software is provided as is, without warranty of any kind. This build runs on an in-memory demo market: nothing is read from Stellar or sent to it, and the tokens shown have no monetary value. Nothing here is an offer to sell, a solicitation to buy, or investment advice.',
+    )
     expect(findBannedWords(LEGAL_NOTICE, BANNED_TAGLINES)).toEqual([])
+    expect(findBannedWords(LEGAL_NOTICE_MOCK, BANNED_TAGLINES)).toEqual([])
     expect(ISSUER_DISCLOSURE).toBe(
       'The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.',
     )
     expect(PREMIUM_DISCLOSURE).toBe('Paid to the maker now. Not refundable.')
     expect(RESALE_PRICE_DISCLOSURE).toBe('Set by the seller. Paid to the seller now.')
-    expect(PAYOFF_CAPTION).toBe('Hypothetical payoff at expiry. Not a quote.')
+    expect(PAYOFF_CAPTION).toBe('Hypothetical payoff at the deadline. Not a quote.')
     expect(WALLET_DISCLOSURE).toBe('Set the wallet to Testnet. StellSec never asks for your secret key or recovery phrase.')
   })
 
@@ -89,55 +92,17 @@ describe('required sentences, verbatim (brief section 6.2)', () => {
     ])
   })
 
-  it('keeps the two collateral cards', () => {
-    expect(COLLATERAL_CARDS).toEqual([
-      {
-        value: 'full',
-        title: 'Full collateral',
-        body: 'You lock the full strike or the full underlying. Settlement is physical. Your only risk is issuer action.',
-      },
-      {
-        value: 'margin',
-        title: 'Margin',
-        body: 'You post partial margin in USDx. Cash settlement at a published price. You can be liquidated, and if the vault runs dry the holder is paid less.',
-      },
-    ])
+  it('picks one legal notice per build, never both', () => {
+    expect(legalNotice(false)).toBe(LEGAL_NOTICE)
+    expect(legalNotice(true)).toBe(LEGAL_NOTICE_MOCK)
+    expect(LEGAL_NOTICE_MOCK).not.toContain('test network')
   })
-})
 
-// The old UI is the authority on wording. While its snapshot is still in the repository, every sentence is checked
-// against the file it came from; the block is skipped once legacy-ui/ is deleted at the end of the revamp.
-const LEGACY = fileURLToPath(new URL('../../legacy-ui/', import.meta.url))
-
-describe.skipIf(!existsSync(LEGACY))('wording matches the legacy UI sources', () => {
-  const read = (path: string) => readFileSync(`${LEGACY}${path}`, 'utf8')
-  const sources: [string, string[]][] = [
-    ['src/market/BuyTicket.tsx', [ISSUER_DISCLOSURE, `>${PREMIUM_DISCLOSURE}<`]],
-    ['src/resale/ResaleMarket.tsx', [ISSUER_DISCLOSURE, `>${RESALE_PRICE_DISCLOSURE}<`]],
-    ['src/payoff/PayoffChart.tsx', [`>${PAYOFF_CAPTION}<`]],
-    ['src/wallet/ConnectWalletDialog.tsx', [`>${WALLET_DISCLOSURE}<`]],
-    ['src/requests/RequestDialog.tsx', [bidEscrowDisclosure('{amt(bid.totalPremium, q)}')]],
-    ['src/reserves/ShortfallWarning.tsx', [`'${clawbackShortfallParts('X').rest.replace(' on X', '')}'`, 'Clawback shortfall on {token.code}']],
-    [
-      'src/market/MarginWarning.tsx',
-      [
-        `title="${MARGIN_WARNING_TITLE}"`,
-        ...MARGIN_WARNING_BULLETS.map((b) => `<li>${b}</li>`),
-        `<span>${MARGIN_WARNING_CONSENT}</span>`,
-        ...COLLATERAL_CARDS.flatMap((c) => [`value: '${c.value}'`, `title: '${c.title}'`, `body: '${c.body}'`]),
-      ],
-    ],
-    [
-      'e2e/helpers.ts',
-      [`'${ISSUER_DISCLOSURE}'`, `'${PREMIUM_DISCLOSURE}'`, `'${PAYOFF_CAPTION}'`],
-    ],
-    ['e2e/requests.spec.ts', [`'${bidEscrowDisclosure('2.00 USDx')}'`]],
-    ['e2e/pro.spec.ts', [`'${MARGIN_WARNING_BULLETS[0]}'`, `'${MARGIN_WARNING_BULLETS[1]}'`]],
-  ]
-
-  it.each(sources)('%s', (path, needles) => {
-    const text = read(path)
-    for (const needle of needles) expect(text, needle).toContain(needle)
+  it('no longer carries the collateral cards of the old write ticket (ruling E1)', async () => {
+    const mod: Record<string, unknown> = await import('./disclosures')
+    expect(mod.COLLATERAL_CARDS).toBeUndefined()
+    expect(DISCLOSURE_HOMES.some((d) => d.id.startsWith('collateral-card'))).toBe(false)
+    expect(DISCLOSURE_HOMES.some((d) => /only risk/i.test(d.text))).toBe(false)
   })
 })
 
@@ -153,6 +118,7 @@ describe('register of homes', () => {
     const texts = DISCLOSURE_HOMES.map((d) => d.text)
     for (const required of [
       LEGAL_NOTICE,
+      LEGAL_NOTICE_MOCK,
       ISSUER_DISCLOSURE,
       PREMIUM_DISCLOSURE,
       RESALE_PRICE_DISCLOSURE,
@@ -161,7 +127,6 @@ describe('register of homes', () => {
       MARGIN_BANNER_SIMULATED,
       MARGIN_BANNER_ONCHAIN,
       ...MARGIN_WARNING_BULLETS,
-      ...COLLATERAL_CARDS.map((c) => c.body),
     ]) {
       expect(texts).toContain(required)
     }
@@ -171,7 +136,8 @@ describe('register of homes', () => {
 
   it('follows the copy rules: sentence case, a final full stop, no dashes, arrows or exclamation marks', () => {
     for (const d of DISCLOSURE_HOMES) {
-      expect(d.text, d.id).toMatch(/^[A-Z]/)
+      // Sentence case: a capital first, after an opening quotation mark if the sentence starts with a quoted name.
+      expect(d.text, d.id).toMatch(/^\u201C?[A-Z]/)
       expect(d.text, d.id).toMatch(/\.$/)
       expect(d.text, d.id).not.toMatch(/[—–→←!]/)
       expect(d.text, d.id).toBe(d.text.trim())
@@ -218,6 +184,5 @@ describe('banned wording', () => {
       expect(findBannedWords(d.text, BANNED_PRICE_TERMS), d.id).toEqual([])
     }
     expect(findBannedWords(MARGIN_WARNING_TITLE, MARGIN_BANNED_WORDS)).toEqual([])
-    for (const c of COLLATERAL_CARDS) expect(findBannedWords(c.title, MARGIN_BANNED_WORDS)).toEqual([])
   })
 })

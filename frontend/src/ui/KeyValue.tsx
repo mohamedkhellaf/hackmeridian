@@ -29,7 +29,12 @@ export interface KeyValueItemProps {
   children: ReactNode
   /** The user's own term: the value goes under the highlighter. */
   marked?: boolean
-  /** A caption under the value: a required disclosure next to its figure, or the local time under a deadline. */
+  /**
+   * A caption under the row. Only: a required sentence from core/disclosures next to its figure, a second figure of
+   * the same quantity (per unit against total, local time, time left), or where the money sits. It never defines
+   * its label and never describes the page. It sits right under the value when it fits one line, otherwise it
+   * runs the full width of the row from the left.
+   */
   hint?: ReactNode
   /** `lg` is the closing figure of a term sheet ("You pay 1.80 USDx"): a heavier rule above it and a larger figure. */
   size?: 'md' | 'lg'
@@ -42,7 +47,11 @@ export function KeyValueItem({ label, children, marked = false, hint, size = 'md
       <dt className={styles.label}>{label}</dt>
       <dd className={styles.value}>
         <span className={styles.figure}>{marked ? <Marker>{children}</Marker> : children}</span>
-        {hint ? <span className={styles.hint}>{hint}</span> : null}
+        {hint ? (
+          <span className={styles.hint}>
+            <span className={styles.hintText}>{hint}</span>
+          </span>
+        ) : null}
       </dd>
     </div>
   )

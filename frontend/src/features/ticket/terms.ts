@@ -14,4 +14,4 @@ export const glyphOf = (side: Side, kind: OptionKind): PayoffGlyph => `${side}-$
 export const positionWords = (side: Side, kind: OptionKind): string => `${side === 'long' ? 'Long' : 'Short'} ${kind}`
 
 /** "000184": an id as a serial line prints it. */
-export const serialOf = (id: bigint): string => id.toString().padStart(6, '0')
+export { serialOf } from '../../core/format/option'

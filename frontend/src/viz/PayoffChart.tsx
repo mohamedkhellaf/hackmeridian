@@ -6,7 +6,7 @@ import { autoDecimals, formatAxis, formatNumber, formatSigned, MINUS } from './f
 import { clipLine, crossingsAt, interpolateAt, linePath, polygonPath, sortPoints } from './geometry.ts'
 import type { Point } from './geometry.ts'
 import { cx } from './cx.ts'
-import { DataTable, Grip, Hatch, Knockout, SignGlyph, SvgLabel } from './parts.tsx'
+import { DataTable, Grip, Hatch, Knockout, SvgLabel } from './parts.tsx'
 import type { TableRow } from './parts.tsx'
 import { extremeAnchor, payoffLayout } from './payoffLayout.ts'
 import type { ExtremeSpec } from './payoffLayout.ts'
@@ -64,21 +64,21 @@ export interface PayoffLabels {
 }
 
 const DEFAULT_LABELS: PayoffLabels = {
-  strike: 'K',
-  breakeven: 'BE',
-  maxGain: 'Max gain',
-  maxLoss: 'Max loss',
+  strike: 'Strike',
+  breakeven: 'Breakeven',
+  maxGain: 'Most you can gain',
+  maxLoss: 'Most you can lose',
   unlimited: 'unlimited',
   at: 'at',
   beyond: 'beyond this range',
   gain: 'gain',
   loss: 'loss',
   even: 'break even',
-  slider: 'Assumed price at expiry',
+  slider: 'Assumed price at the deadline',
 }
 
 export interface PayoffChartProps {
-  /** Payoff at expiry against the price of the underlying, sorted or not. Sample the kinks exactly (`samplePiecewise`). */
+  /** Payoff at the deadline against the price of the underlying, sorted or not. Sample the kinks exactly (`samplePiecewise`). */
   points: readonly Point[]
   /** Price range to plot. Defaults to the range of `points`. */
   domain?: readonly [number, number]
@@ -107,7 +107,7 @@ export interface PayoffChartProps {
   decimals?: number
   /** Decimals of prices the chart formats itself. Defaults to what the range needs. */
   priceDecimals?: number
-  /** Accessible name of the drawing, for example "Payoff at expiry, long put on BOND". */
+  /** Accessible name of the drawing, for example "Payoff at the deadline, long put on BOND". */
   title: string
   /** Replaces the generated description. */
   description?: string
@@ -141,7 +141,7 @@ function signedLabel(label: string | undefined, signed: number, decimals: number
   return `${signed > 0 ? '+' : MINUS}${label}`
 }
 
-/** Payoff at expiry for one position, with a draggable assumed price. Hypothetical by construction: the caption says so. */
+/** Payoff at the deadline for one position, with a draggable assumed price. Hypothetical by construction: the caption says so. */
 export function PayoffChart(props: PayoffChartProps) {
   const { points, unit, asset, title, caption, decimals = 2, readOnly = false, tableVisible = false } = props
   const L = { ...DEFAULT_LABELS, ...props.labels }
@@ -184,6 +184,9 @@ export function PayoffChart(props: PayoffChartProps) {
 
   const extremes: ExtremeSpec[] = []
   const describeExtreme: string[] = []
+  // A finite maximum or minimum the plotted range does not reach is not pinned to the end of the line, where it
+  // would read as the value of that point: it is said in a line of text above the plot instead.
+  const offScale: Array<{ id: string; word: string; figure: string; tone: 'gain' | 'loss' | 'even'; where: string }> = []
   const addExtreme = (kind: 'max' | 'min', extreme: PayoffExtreme | undefined) => {
     if (!extreme) return
     const anchor = extremeAnchor(visible, [d0, d1], kind, extreme)
@@ -195,13 +198,17 @@ export function PayoffChart(props: PayoffChartProps) {
     const zero = !unlimited && direction(signed, decimals) === 'even'
     const figure = unlimited ? L.unlimited : signedLabel(extreme.label, zero ? 0 : signed, decimals)
     const suffix = unlimited || !anchor.offScale ? '' : extreme.at !== undefined ? `${L.at} ${fmtPrice(extreme.at)}` : L.beyond
+    const amount = unlimited ? L.unlimited : `${extreme.label ?? formatNumber(Math.abs(extreme.value), decimals)} ${unit}`
+    describeExtreme.push(`${kind === 'max' ? 'Maximum gain' : 'Maximum loss'} ${amount}${suffix ? ` ${suffix}` : ''}`)
+    if (anchor.offScale && !unlimited) {
+      const where = extreme.at !== undefined ? (asset ? `if ${asset} is at ${fmtPrice(extreme.at)}` : `${L.at} ${fmtPrice(extreme.at)}`) : L.beyond
+      offScale.push({ id: kind, word, figure, tone: zero ? 'even' : tone, where })
+      return
+    }
     const core: Span[] = [{ text: figure, tone: zero ? 'ink' : tone, strong: true }]
-    if (!zero) core.push({ triangle: kind === 'max' ? 'up' : 'down', tone })
     if (suffix) core.push({ text: suffix, tone: 'muted' })
     const variants: RichLabel[] = [{ spans: [{ text: word, tone: 'muted' }, ...core] }, { spans: core }]
     extremes.push({ id: kind === 'max' ? 'max-gain' : 'max-loss', kind, anchor, variants })
-    const amount = unlimited ? L.unlimited : `${extreme.label ?? formatNumber(Math.abs(extreme.value), decimals)} ${unit}`
-    describeExtreme.push(`${kind === 'max' ? 'Maximum gain' : 'Maximum loss'} ${amount}${suffix ? ` ${suffix}` : ''}`)
   }
   addExtreme('max', props.maxGain)
   addExtreme('min', props.maxLoss)
@@ -257,9 +264,8 @@ export function PayoffChart(props: PayoffChartProps) {
       props.readout
     ) : showHandle ? (
       <div className={css.readout}>
-        <p className={css.readoutLabel}>{asset ? `If ${asset} is at ${priceText} at expiry` : `At ${priceText} at expiry`}</p>
+        <p className={css.readoutLabel}>{asset ? `If ${asset} is at ${priceText} at the deadline` : `At ${priceText} at the deadline`}</p>
         <p className={css.readoutValue} data-direction={side}>
-          {side !== 'even' && <SignGlyph direction={side} />}
           <span>{valueLabel}</span>
           <span className={css.readoutUnit}>{unit}</span>
           <span className={css.readoutWord}>{side === 'gain' ? L.gain : side === 'loss' ? L.loss : L.even}</span>
@@ -287,6 +293,15 @@ export function PayoffChart(props: PayoffChartProps) {
   return (
     <figure className={cx(css.figure, props.className)} data-viz="payoff">
       {readout}
+      {offScale.map((o) => (
+        <p key={o.id} className={css.offScale} aria-hidden="true">
+          {o.word}{' '}
+          <span className={css.offScaleFigure} data-direction={o.tone}>
+            {o.figure} {unit}
+          </span>
+          , {o.where}
+        </p>
+      ))}
       <div
         className={css.plot}
         ref={wrapRef}
@@ -329,7 +344,10 @@ export function PayoffChart(props: PayoffChartProps) {
           {beCircles.map((c, i) => (
             <circle key={`be${i}`} cx={c.x} cy={c.y} r={3.5} className={css.openDot} />
           ))}
-          {layout.reference && <line x1={layout.reference.x} x2={layout.reference.x} y1={layout.zeroY - 6} y2={layout.zeroY + 6} className={css.tick} />}
+          {/* The reference tick steps aside while the handle sits on it: one mark, not two fused glyphs. */}
+          {layout.reference && !(handle && Math.abs(handle.x - layout.reference.x) < 3) && (
+            <line x1={layout.reference.x} x2={layout.reference.x} y1={layout.zeroY - 6} y2={layout.zeroY + 6} className={css.tick} />
+          )}
           {handle && <circle cx={handle.x} cy={handle.y} r={4} className={css.dot} />}
           <text x={layout.zeroLabel.x} y={layout.zeroLabel.y} textAnchor="end" className={cx(css.t, css.muted)}>
             {layout.zeroLabel.text}
@@ -369,7 +387,7 @@ export function PayoffChart(props: PayoffChartProps) {
             </div>
           ))}
       </div>
-      <p className={css.axisTitle}>{props.xLabel ?? (asset ? `${asset} price at expiry, ${unit} per unit` : `Price at expiry, ${unit}`)}</p>
+      <p className={css.axisTitle}>{props.xLabel ?? (asset ? `${asset} price at the deadline, ${unit} per unit` : `Price at the deadline, ${unit}`)}</p>
       <figcaption className={css.caption}>{caption}</figcaption>
       <p className={css.vh} id={descId}>
         {description}

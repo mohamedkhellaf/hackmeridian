@@ -8,6 +8,7 @@ import { BackToMarkets } from '../parts'
 import { ASSET_ROUTE, MARKETS_ROUTE } from '../routing'
 import styles from './AssetStates.module.css'
 
+/** Before the asset is known: the lines of the header and the rows of the page, in their places. */
 export function AssetPageSkeleton() {
   return (
     <div className={styles.skeleton} aria-busy="true">
@@ -15,13 +16,9 @@ export function AssetPageSkeleton() {
         {ASSET_LOADING}
       </h1>
       <Skeleton width="5rem" />
-      <Skeleton variant="block" width="12rem" height="2.25rem" />
-      <Skeleton variant="block" height="5rem" />
-      <Skeleton variant="block" height="2.25rem" />
-      <div className={styles.skeletonBody}>
-        <Skeleton variant="block" height="26rem" />
-        <Skeleton variant="block" height="18rem" className={styles.skeletonRail} />
-      </div>
+      <Skeleton width="8rem" />
+      <Skeleton width="16rem" />
+      <Skeleton variant="rows" lines={6} className={styles.skeletonRows} />
     </div>
   )
 }
@@ -53,8 +50,7 @@ export function AssetNotFound({ reason, listed }: AssetNotFoundProps) {
       <PageHeader title={NOT_FOUND_HEADING} back={<BackToMarkets />} />
       <EmptyNote
         headingLevel={2}
-        title={NOT_FOUND[reason].title}
-        hint={NOT_FOUND[reason].hint}
+        title={NOT_FOUND[reason]}
         action={
           <ButtonLink variant="primary" render={<RouterLink to={MARKETS_ROUTE} />}>
             {ALL_MARKETS}

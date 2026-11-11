@@ -55,8 +55,14 @@ export interface GuidedMatch {
    */
   exact: BookRow | null
   exactPerUnit: bigint | null
-  /** Other orders of the same series (same strike and expiry, another quantity), nearest quantity first. */
+  /** Other orders of the same series (same strike and expiry, another quantity), nearest quantity first, at most `limit`. */
   sameSeries: GuidedAlternative[]
+  /**
+   * Every quantity on the takeable side of the series asked for, smallest first, one entry per order (so two lots
+   * of 2.00 appear twice). Not capped, unlike `sameSeries`: for "comes in lots of" and for adding lots up.
+   * Empty while strike or expiry is missing.
+   */
+  lots: bigint[]
   /** Orders on the nearest other strikes and dates, nearest first, at most `limit`. */
   nearby: GuidedAlternative[]
   /** Series (`cellKey`) with at least one order the wallet can take, for marking the strike and expiry chips. */
@@ -170,6 +176,7 @@ export function matchGuided(
     exact,
     exactPerUnit: exact ? premiumUnits(exact) : null,
     sameSeries,
+    lots: inSeries.map((c) => c.row.underlyingQty).sort(cmpBig),
     nearby,
     funded,
     fundedStrikes,

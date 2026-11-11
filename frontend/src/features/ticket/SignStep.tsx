@@ -5,16 +5,17 @@ import { useState } from 'react'
 import { explorerTx } from '../../core/explorer'
 import { hasHash, stoppedStage } from '../../core/tx/machine'
 import type { TxState } from '../../core/tx/machine'
-import { useOptionsClient } from '../../data'
+import { txEffectText, useOptionsClient } from '../../data'
 import { Button, TxLink, TxStepper } from '../../ui'
 import type { TxState as StepperState } from '../../ui'
-import { BACK_TO_REVIEW, CHECK_AGAIN, RECHECK_HELP, SIGN_AGAIN, WORKING_LABEL, signHelp } from './copy'
+import { BACK_TO_REVIEW, CHECK_AGAIN, FAILED_NEXT, RECHECK_HELP, SIGN_AGAIN, WORKING_LABEL, signHelp } from './copy'
 import { Actions } from './Actions'
 import { utcClock } from './fmt'
 import { useFrame } from './frame'
 import styles from './SignStep.module.css'
 
 export function SignStep(props: {
+  /** What was sent, as it was when the wallet was asked. */
   summary: string
   state: TxState
   /** The fresh re-check before the wallet is asked is still running. */
@@ -30,9 +31,10 @@ export function SignStep(props: {
   const [looking, setLooking] = useState(false)
 
   const phase: StepperState = rechecking || state.phase === 'idle' ? 'checking' : state.phase
-  const inFlight = phase === 'checking' || phase === 'signing' || phase === 'submitting' || phase === 'pending'
+  const beforeLedger = phase === 'checking' || phase === 'signing' || phase === 'submitting'
   const until = state.maxTime ? utcClock(state.maxTime) : null
-  const help = rechecking || state.phase === 'idle' ? RECHECK_HELP : signHelp(state.phase, state.effect, until)
+  // A failure says what happened to the fee in the data layer's words (a refusal on send was sent, yet charged nothing).
+  const help = rechecking || state.phase === 'idle' ? RECHECK_HELP : state.phase === 'failed' ? `${txEffectText(state)} ${FAILED_NEXT}` : signHelp(state.phase, until)
   const hash = !rechecking && hasHash(state) ? <TxLink hash={state.hash} explorerUrl={isMock ? undefined : explorerTx(state.hash)} copy /> : undefined
 
   const checkAgain = async () => {
@@ -52,17 +54,15 @@ export function SignStep(props: {
         <p>{help}</p>
       </TxStepper>
       <Actions>
-        {inFlight ? (
-          <>
-            {phase === 'pending' ? (
-              <Button variant="quiet" onClick={frame.close}>
-                Close
-              </Button>
-            ) : null}
-            <Button variant="primary" fullWidth className={styles.primary} loading>
-              {WORKING_LABEL[rechecking || state.phase === 'idle' ? 'recheck' : (phase as 'checking' | 'signing' | 'submitting' | 'pending')]}
-            </Button>
-          </>
+        {beforeLedger ? (
+          <Button variant="primary" fullWidth className={styles.primary} loading>
+            {WORKING_LABEL[rechecking || state.phase === 'idle' ? 'recheck' : (phase as 'checking' | 'signing' | 'submitting')]}
+          </Button>
+        ) : phase === 'pending' ? (
+          // The network has it: the stepper is the status, and closing is the one thing left to do.
+          <Button variant="secondary" fullWidth className={styles.primary} onClick={frame.close}>
+            Close
+          </Button>
         ) : phase === 'unknown' ? (
           <>
             <Button variant="quiet" onClick={frame.close}>

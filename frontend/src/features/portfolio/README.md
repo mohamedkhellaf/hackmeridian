@@ -24,11 +24,11 @@ The router (`src/app/router.tsx`) lazy-loads two named exports of `index.tsx`:
 
 | File | What it is |
 |---|---|
-| `PortfolioPage.tsx` | The page: guest, loading, error and empty states; to-do strip, summary, three tabs. |
-| `TodoStrip.tsx` | One card per to-do item of `useTodo()`: what, by when, why, one action. |
-| `Summary.tsx` | Premium paid, premium earned, collateral locked, positions open (exact sums per token). |
-| `PositionTables.tsx` | Holding, Written, Offers, Requests and Resale listings: a ruled table from 768 px, a two-line list below. |
-| `PositionPage.tsx` | One option: header with the actions that apply, contract note, payoff figure, lifecycle. |
+| `PortfolioPage.tsx` | The page: guest, loading, error and empty states; to-do strip, totals, three tabs. |
+| `TodoStrip.tsx` | One card per thing the wallet can do now (and a quiet card for a held option in its last 48 hours): what, by when, why, one action. |
+| `Summary.tsx`, `totals.ts` | Original premiums, premium earned, locked, ready to take back (exact sums per token). |
+| `PositionTables.tsx` | Holding, Written, Offers, Requests and Resale listings: a ruled table when the list is at least 52rem wide (a container query), a three-line list below. |
+| `PositionPage.tsx` | One option: header with the deadline and the actions that apply, contract note, lifecycle, and the payoff figure while it is live. |
 | `PositionNote.tsx`, `PositionPayoff.tsx`, `Lifecycle.tsx`, `CalendarMenu.tsx` | The four blocks of the position page. |
 | `actions/ActionDialog.tsx` | The one dialog shape of every action: review, staged transaction, receipt. |
 | `actions/ExerciseDialog.tsx` | Exercise: delivery sentence, feasibility from `usePreTrade`, consent when out of the money. |
@@ -36,16 +36,20 @@ The router (`src/app/router.tsx`) lazy-loads two named exports of `index.tsx`:
 | `actions/CancelRequestDialog.tsx` | Withdraw a request (bid) and get the escrow back. |
 | `actions/ActionFlow.tsx`, `actions/useActionFlow.ts` | Which action is open on which option, and where focus returns. |
 | `model.ts`, `copy.ts`, `lifecycleSteps.ts`, `payoff.ts`, `calendar.ts`, `actions/checks.ts` | Pure modules, unit-tested: names and figures, every sentence, the lifecycle steps, the payoff figure, the calendar file, the re-checks before signing. |
-| `links.tsx`, `route.ts` | Router links and the two route handles. |
+| `links.tsx`, `listReturn.ts`, `route.ts` | Router links (the back link returns to the list in history), and the two route handles. |
+| `hooks.ts` | Resale bought in this browser, an option made by filling a request, the clawback shortfall, offers sold since the last visit. |
 
 ## Decisions
 
 - **One primary button per page.** The first actionable to-do card carries the ink button; every other action is
   outlined. On the position page the contract call (exercise, claim, reclaim, cancel) is the ink button; selling
   is a choice and stays outlined.
-- **An exercise is urgent only when the reference says it is in the money** and the deadline is within 48 hours
-  (`TodoView.tone` from the data layer). Out of the money it is a "Reminder" (or "Expires soon") with a link to
-  the position, never a button. The reference price is always named with its source.
+- **A to-do card is something the wallet can do now.** An exercise asks for action only when the reference says it
+  is in the money; the urgent one (48 hours or less) carries the ink rule. A held option that is not in the money
+  gets a quiet card with a link (no button) only in its last 48 hours or when there is no reference price. An
+  option that lapsed in the last week is one plain line above the tabs. An expired request is a card: its premium
+  stays in the contract until it is cancelled. Cards carry no eyebrow labels and no icons.
+- **The State column is gone.** "Where it stands" says it, with the demo price and the strike in one line.
 - **Every action is a dialog with the same three stages.** The review states what moves in a serif sentence and
   lists what was re-read from the chain; signing shows the transaction stepper with what each state means; the
   receipt is a contract note that prints, and focus moves to it. An unknown outcome offers "Check again", never
@@ -54,15 +58,24 @@ The router (`src/app/router.tsx`) lazy-loads two named exports of `index.tsx`:
   shown after the row has changed state or left the list.
 - **Focus on close** returns to the button that opened the dialog, or to the page heading when that button is
   gone (a confirmed action often removes its own card).
-- **Selling goes through the order ticket** (`TicketHost`, mode `list`, placement `overlay`), loaded only when
-  "Sell" is opened. Re-pricing is the same ticket; withdrawing a listing is a dialog here.
-- **Writers see the option leg alone** in the payoff figure, premium included, with a sentence that says what the
-  locked collateral means. A written call prints no "max loss": the writer delivers what is locked and gives up
-  the rise beyond the strike, and the note says so.
-- **Phones get lists, not squeezed tables.** Each row is a link of at least 44 px that opens the position page,
-  where all terms and actions are. A request has no page of its own, so its row keeps the cancel button.
-- **Calendar, not reminders.** The holder of a live option can download an `.ics` built in the page or open a
-  Google Calendar link. The copy says the entry is static and the deadline stays with the holder.
+- **Listing goes through the order ticket** (`TicketHost`, mode `list`, placement `overlay`), loaded only when
+  "List for sale" is opened, from a Holding row or the position page. Re-pricing is the same ticket; withdrawing a
+  listing is a dialog here. A row whose exercise is out of the money leads with "List for sale".
+- **A premium the wallet did not pay is never called paid.** The total is "Original premiums"; for an option this
+  browser bought from a holder the position shows no breakeven and draws the leg without the premium.
+- **A clawback shortfall is said where money waits:** the sentence once on the page, a line on affected rows and
+  cards, and a failing (not blocking) "Contract balance" line plus the sentence in the claim, reclaim and cancel
+  reviews.
+- **The payoff figure is for a live option only.** A holder sees the leg, the readout leading with what exercising
+  pays and then the net after the original premium. A maker sees what it holds with the agreement and without it
+  (`guidedOutcome`, earn-hold or earn-buy), as the guided page showed when it wrote the option. An ended option has
+  no figure: the lifecycle takes its column.
+- **Narrow lists get lists, not squeezed tables.** Each row is a link of at least 44 px with a chevron that opens the
+  position page, and carries every figure of the table row (premium and date included). A request has no page of
+  its own, so its row keeps the cancel button. On a phone a live position keeps its actions in a bar above the tab
+  bar.
+- **Calendar, not reminders.** The holder of a live option (and its maker, for the claim or the reclaim after the
+  deadline) can download an `.ics` built in the page or open a Google Calendar link.
 
 ## Tests
 

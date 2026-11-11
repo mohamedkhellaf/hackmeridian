@@ -5,7 +5,7 @@
 // an oracle price or a live price, and it never reaches a transaction.
 
 /**
- * - `demo`: mock mode. A fixed figure chosen for the demo data.
+ * - `demo`: mock mode. A fixed figure chosen by the team for the mock data.
  * - `fixed`: live mode today. The rate of the Testnet faucet's standing offers; it does not move.
  * - `desk`: the target state (a team-run desk on the Testnet DEX). No provider exists yet.
  * - `none`: nothing to show. The user can still set an assumed price.
@@ -34,7 +34,7 @@ export const REFERENCE_LABEL: Record<ReferenceKind, string> = {
 }
 
 export const REFERENCE_NOTE: Record<ReferenceKind, string> = {
-  demo: 'Chosen by the team for this demo. Not a market.',
+  demo: 'A fixed figure chosen by the team.',
   fixed: "Fixed by the team's faucet. Not a market.",
   desk: "Set by the team's standing offers on the Stellar test network exchange. Not a market.",
   none: 'Set an assumed price to see what an option would pay.',

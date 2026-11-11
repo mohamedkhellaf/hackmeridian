@@ -43,9 +43,4 @@
       margin: 0;
     }
   }
-
-  .count {
-    color: var(--muted);
-    font-weight: 450;
-  }
 }

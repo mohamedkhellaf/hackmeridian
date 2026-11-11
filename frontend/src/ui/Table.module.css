@@ -63,13 +63,10 @@
       text-align: center;
     }
 
-    /* The strike column: serif figures on the sunken tone. */
-    &[data-strike] {
-      background: var(--sunken);
-    }
-
+    /* The strike column and in-the-money cells: the cell tone over the table's ground (opaque under a sticky header). */
+    &[data-strike],
     &[data-sunken] {
-      background: var(--sunken);
+      background: linear-gradient(var(--cell-tone), var(--cell-tone)), var(--table-bg);
     }
 
     /* The action column stays in view while the rest scrolls under it. */

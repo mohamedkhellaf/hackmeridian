@@ -27,13 +27,39 @@
     text-wrap: pretty;
   }
 
+  .warn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    color: var(--warn);
+  }
+
+  /* The phrase to type, in mono at the size of the field it is typed into. */
   .phrase {
     font-family: var(--font-mono);
-    font-size: var(--mono-size);
+    font-size: var(--ui-size);
     font-stretch: normal;
     font-feature-settings: 'zero';
     font-weight: 500;
     color: var(--text);
     white-space: nowrap;
+
+    @media (max-width: 767.98px) {
+      font-size: 1rem;
+    }
+  }
+
+  /* Once sent: what is being signed, in one line, over its progress. */
+  .progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+  }
+
+  .summary {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 550;
+    color: var(--text);
   }
 }

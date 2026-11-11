@@ -6,51 +6,28 @@
     min-width: 0;
   }
 
-  /* One column up to 1200 px: who must connect, then what the visitor came for. The issuer came for the
-     accounts; everyone else for the asset's flags. */
+  /* One column up to 1200 px: what the visitor came for, then the asset's facts. */
   .layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'notice'
-      'side'
-      'main';
-    gap: var(--s-32);
+    gap: var(--s-40);
     align-items: start;
-
-    &[data-issuer] {
-      grid-template-areas:
-        'notice'
-        'main'
-        'side';
-    }
-  }
-
-  .notice {
-    grid-area: notice;
-    min-width: 0;
   }
 
   .main {
-    grid-area: main;
     display: flex;
     flex-direction: column;
-    gap: var(--s-32);
+    gap: var(--s-40);
     min-width: 0;
   }
 
   .side {
-    grid-area: side;
     min-width: 0;
   }
 
   @media (min-width: 1200px) {
-    .layout,
-    .layout[data-issuer] {
+    .layout {
       grid-template-columns: minmax(0, 1fr) calc(var(--rail-w) - var(--s-40));
-      grid-template-areas:
-        'notice notice'
-        'main side';
       column-gap: var(--s-40);
     }
   }

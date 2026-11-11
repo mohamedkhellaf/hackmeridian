@@ -44,13 +44,13 @@ export const APP_ROUTES: readonly RouteInfo[] = [
   { path: '/reserves', title: 'Reserves', shell: true },
   { path: '/activity', title: 'Activity', shell: true },
   { path: '/issuer', title: 'Issuer', shell: true },
-  { path: '/learn', title: 'How it works', shell: true },
+  { path: '/learn', title: 'Learn', shell: true },
   { path: '/design', title: 'Design system', shell: true },
 ]
 
 /** Mounted only when the build sets VITE_ENABLE_PRO=1 (the Playwright web server does). */
 export const MARGIN_ROUTES: readonly RouteInfo[] = [
-  { path: '/margin', title: 'Margin', shell: true },
+  { path: '/margin', title: 'Account · Margin', shell: true },
   { path: '/margin/trade', title: 'Trade · Margin', shell: true },
   { path: '/margin/positions', title: 'Positions · Margin', shell: true },
   { path: '/margin/liquidations', title: 'Liquidations · Margin', shell: true },

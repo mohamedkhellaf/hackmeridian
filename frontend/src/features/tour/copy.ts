@@ -7,7 +7,7 @@
 
 export const INTENTS_NOTE = {
   title: 'What do you want to do?',
-  body: 'Each card is one thing you can do here, and says whether you pay or are paid. Pick one and it takes you to an asset, with the terms laid out.',
+  body: 'Each row is one thing you can do here, and says whether you pay or are paid. Pick one, then choose the asset in the Assets list.',
 } as const
 
 export const ASSETS_NOTE = {
@@ -17,14 +17,14 @@ export const ASSETS_NOTE = {
 
 export const MODE_NOTE = {
   title: 'Guided and Chain',
-  body: 'Guided asks what you want and shows the best offer for it. Chain lists every strike price and deadline with its best premium. Your choice is remembered.',
+  body: 'Guided asks what you want and shows the best offer for it. Chain lists every strike and deadline with its best offer and request. Your choice is remembered.',
 } as const
 
 export const NAV_NOTE = {
   title: 'Where things are',
   terms: [
     { term: 'Portfolio', text: 'Your options, each with its deadline and what it needs from you.' },
-    { term: 'Requests', text: 'Buyers whose payment is locked in, waiting for a seller.' },
+    { term: 'Requests', text: 'Buyers whose payment is locked in, waiting for a maker.' },
     { term: 'Reserves', text: 'The collateral the contract holds, token by token.' },
     // The fifth tab exists on phones only.
     { term: 'More', text: 'Learn, Activity, Settings and this guide.', phoneOnly: true },

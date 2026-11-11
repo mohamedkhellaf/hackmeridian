@@ -7,14 +7,16 @@ import type { ActionKind, Role } from '../../core/portfolio/positions'
 import { priceOf } from '../../core/reference'
 import type { Moneyness, ReferencePrice } from '../../core/reference'
 import { canList } from '../../core/resale/resale'
-import { strikeUnits } from '../../core/units'
-import type { PositionView } from '../../data'
+import { premiumUnits, strikeUnits } from '../../core/units'
+import { lowestOpenInSeries } from '../../core/maker/lowestOffer'
+import type { PositionView, TodoView } from '../../data'
 import type { PayoffGlyph } from '../../ui'
 
 /** What the URL can ask the position page to open (`?do=`), plus `unlist`, which only a button opens. */
 export type PositionAction = 'exercise' | 'claim' | 'reclaim' | 'cancel' | 'sell' | 'unlist'
 
-export const KIND_WORD: Record<OptionKind, string> = { put: 'Put', call: 'Call' }
+import { KIND_WORD } from '../../core/format/option'
+export { KIND_WORD }
 
 /** The payoff shape of a position: long for the holder, short for the writer. A viewer with no side sees the long shape. */
 export function glyphOf(kind: OptionKind, role: Role | null): PayoffGlyph {
@@ -60,7 +62,7 @@ export function noteKind(o: Pick<OptionOffer, 'kind' | 'underlying'>, role: Role
 }
 
 /** The option id as the contract note prints it: `000184`. */
-export const serialOf = (id: bigint): string => id.toString().padStart(6, '0')
+export { serialOf } from '../../core/format/option'
 
 /**
  * The contract's own state name for the tag. An option past its deadline reads `Expired` whether or not the
@@ -126,7 +128,7 @@ export const ACTION_NAME: Record<PositionAction, string> = {
   claim: 'Claim delivery',
   reclaim: 'Reclaim',
   cancel: 'Cancel offer',
-  sell: 'Sell',
+  sell: 'List for sale',
   unlist: 'Cancel listing',
 }
 
@@ -151,4 +153,44 @@ export const allows = (actions: readonly PositionAction[], action: PositionActio
   !!action && actions.includes(action)
 
 /** The label of the resale action: a listed option is re-priced, not sold again. */
-export const sellLabel = (listing: Ask | null): string => (listing ? 'Change price' : 'Sell')
+export const sellLabel = (listing: Ask | null): string => (listing ? 'Change price' : ACTION_NAME.sell)
+
+/** A to-do item that earns a card: a real action, or a held option in its last 48 hours or with no reference price. */
+export function showsCard(t: TodoView): boolean {
+  if (t.kind === 'expired-unexercised') return false
+  if (t.actionable) return true
+  return t.kind === 'exercise' && ((t.urgency !== null && t.urgency !== 'far') || t.moneyness === 'unknown')
+}
+
+/** The premium per whole unit of underlying as text (`0.43 per FUND`), or null when the quantity is zero. */
+export function premiumPerUnitLine(o: Pick<OptionOffer, 'underlying' | 'quote' | 'underlyingQty' | 'totalPremium'>): string | null {
+  const unit = premiumUnits(o)
+  return unit === null ? null : `${formatUnits(unit, o.quote.decimals)} per ${o.underlying.code}`
+}
+
+/**
+ * Where the wallet's open offer ranks in its series, per unit of underlying: the lowest, or how far above the
+ * lowest. Null when the offer is no longer open or the series cannot be read.
+ */
+export function rankInSeries(mine: OptionOffer, offers: OptionOffer[]): string | null {
+  if (mine.state !== 'offered') return null
+  const best = lowestOpenInSeries(offers, mine, mine.quote)
+  if (!best) return null
+  if (best.id === mine.id) return 'Lowest in its series'
+  const a = premiumUnits(mine)
+  const b = premiumUnits(best)
+  if (a === null || b === null) return null
+  if (a <= b) return 'Lowest in its series'
+  return `${formatUnits(a - b, mine.quote.decimals)} above the lowest`
+}
+
+/**
+ * What exercising takes from the holder's wallet (a put delivers the underlying, a call pays the strike) when the
+ * wallet holds less of it, with what it holds. Null when it is covered or the balance is not known.
+ */
+export function exerciseShortOf(o: OptionOffer, balances: Readonly<Record<string, { balance: bigint | null }>> | undefined): { have: Money; need: Money } | null {
+  const need = o.kind === 'put' ? qtyOf(o) : strikeOf(o)
+  const balance = balances?.[need.token.contractId]?.balance
+  if (balance === null || balance === undefined || balance >= need.amount) return null
+  return { have: { token: need.token, amount: balance }, need }
+}

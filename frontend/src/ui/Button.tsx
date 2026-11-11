@@ -1,7 +1,7 @@
 import { Button as BaseButton } from '@base-ui/react/button'
 import { mergeProps } from '@base-ui/react/merge-props'
 import { useRender } from '@base-ui/react/use-render'
-import { useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactElement, ReactNode, Ref } from 'react'
 import { cx } from './internal/cx'
 import { Spinner } from './Spinner'
@@ -29,7 +29,10 @@ export interface ButtonProps extends ButtonLook, Omit<ButtonHTMLAttributes<HTMLB
   tone?: 'default' | 'danger'
   /** Shows a spinner, sets `aria-busy` and blocks activation while keeping focus on the button. */
   loading?: boolean
-  /** Why the button is disabled. Shown as a tooltip and read by screen readers; the button stays focusable. */
+  /**
+   * Why the button is disabled. Read by screen readers (the button stays focusable), shown under the button on
+   * hover or focus, and on a tap on touch screens, which have no hover.
+   */
   disabledReason?: string
   className?: string
   ref?: Ref<HTMLButtonElement>
@@ -58,6 +61,25 @@ export function Button({
   const reasonId = useId()
   const blocked = disabled || loading
   const reason = disabled && disabledReason ? disabledReason : undefined
+  const [reasonOpen, setReasonOpen] = useState(false)
+  const [tapped, setTapped] = useState(false)
+
+  // A reason opened by a tap closes by itself, or on the next press anywhere else.
+  useEffect(() => {
+    if (!tapped) return
+    const close = () => {
+      setTapped(false)
+      setReasonOpen(false)
+    }
+    const timer = window.setTimeout(close, 5000)
+    const away = () => close()
+    const frame = window.requestAnimationFrame(() => document.addEventListener('pointerdown', away, { once: true }))
+    return () => {
+      window.clearTimeout(timer)
+      window.cancelAnimationFrame(frame)
+      document.removeEventListener('pointerdown', away)
+    }
+  }, [tapped])
 
   const button = (
     <BaseButton
@@ -74,17 +96,49 @@ export function Button({
       data-size={size}
       data-full-width={fullWidth || undefined}
       data-loading={loading || undefined}
+      onPointerUp={(event) => {
+        rest.onPointerUp?.(event)
+        if (reason && event.pointerType !== 'mouse') {
+          setReasonOpen(true)
+          setTapped(true)
+        }
+      }}
     >
-      {loading ? <Spinner /> : iconStart ? <span className={styles.icon}>{iconStart}</span> : null}
-      <span className={styles.label}>{children}</span>
+      {loading && iconStart ? (
+        <span className={cx(styles.icon, styles.spinnerSlot)}>
+          <Spinner />
+        </span>
+      ) : iconStart ? (
+        <span className={styles.icon}>{iconStart}</span>
+      ) : null}
+      <span className={styles.label} data-covered={loading && !iconStart ? true : undefined}>
+        {children}
+      </span>
+      {loading && !iconStart ? (
+        <span className={styles.spinnerOver}>
+          <Spinner />
+        </span>
+      ) : null}
       {iconEnd ? <span className={styles.icon}>{iconEnd}</span> : null}
     </BaseButton>
   )
 
-  if (!reason) return button
+  // One tree whether or not there is a reason: the <button> is never remounted, so a focused button keeps its
+  // focus when it becomes disabled with a reason, and again when the reason goes.
   return (
     <>
-      <Tooltip content={reason}>{button}</Tooltip>
+      <Tooltip
+        stable
+        content={reason}
+        side="bottom"
+        open={reasonOpen}
+        onOpenChange={(next) => {
+          if (!next && tapped) return
+          setReasonOpen(next)
+        }}
+      >
+        {button}
+      </Tooltip>
       <span id={reasonId} hidden>
         {reason}
       </span>

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AmountField, ChoiceChips, Marker } from '../../../ui'
+import { AmountField, ChoiceChips, IconCheck, Marker } from '../../../ui'
 
 import styles from './Terms.module.css'
 import type { ChoiceChip } from '../../../ui'
@@ -45,7 +45,10 @@ export interface TermsProps {
     value: string | null
     onChange: (value: string) => void
   }
-  legend: string
+  /** The key to the tick on the chips, or null when no chip carries one. */
+  fundedKey: string | null
+  /** Said once above the chips when the link named a price or a date that is not on the list. */
+  notice?: string | null
 }
 
 /**
@@ -53,7 +56,7 @@ export interface TermsProps {
  * row states them as three figures, as on the landing note; the two rows of chips under it change the price and
  * the date.
  */
-export function Terms({ qty, strike, expiry, legend }: TermsProps) {
+export function Terms({ qty, strike, expiry, fundedKey, notice }: TermsProps) {
   return (
     <div className={styles.root}>
       <div className={styles.header}>
@@ -84,16 +87,25 @@ export function Terms({ qty, strike, expiry, legend }: TermsProps) {
             <dt>{expiry.label}</dt>
             <dd>
               <time className={styles.value} dateTime={expiry.iso} data-testid="guided-expiry">
-                {expiry.day} <span className={styles.unit}>{expiry.time}</span>
+                <span className={styles.day}>{expiry.day}</span> <span className={styles.unit}>{expiry.time}</span>
               </time>
               {expiry.hint ? <span className={styles.hint}>{expiry.hint}</span> : null}
             </dd>
           </div>
         </dl>
       </div>
+      {notice ? (
+        <p className={styles.notice} data-testid="guided-off-grid">
+          {notice}
+        </p>
+      ) : null}
       <ChoiceChips appearance="note" label={strike.chipsLabel} aside={strike.reference} chips={strike.chips} value={strike.value} onValueChange={strike.onChange} columns={Math.max(strike.chips.length, 1)} />
       <ChoiceChips appearance="note" width="fixed" label={expiry.chipsLabel} chips={expiry.chips} value={expiry.value} onValueChange={expiry.onChange} columns={Math.max(expiry.chips.length, 1)} />
-      <p className={styles.legend}>{legend}</p>
+      {fundedKey ? (
+        <p className={styles.legend} aria-hidden="true">
+          <IconCheck size={12} className={styles.tick} /> {fundedKey}
+        </p>
+      ) : null}
     </div>
   )
 }

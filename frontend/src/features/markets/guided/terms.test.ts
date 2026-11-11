@@ -7,8 +7,13 @@ import {
   MIN_DEFAULT_LEAD_SECONDS,
   defaultSeries,
   distanceWords,
+  coverWith,
   expiryPreference,
+  inSeries,
   inputAmount,
+  intentOf,
+  lotsOf,
+  offGrid,
   maxQuantity,
   normalizeDecimal,
   ownIntent,
@@ -42,6 +47,66 @@ describe('pinnedSeries', () => {
     expect(pinnedSeries({ strike: '98.5', expiry: '2026-11-21' }, grid, D)).toEqual({ strike: null, expiry: null })
     expect(pinnedSeries({}, grid, D)).toEqual({ strike: null, expiry: null })
     expect(pinnedSeries({ strike: 'abc', expiry: 'soon' }, grid, D)).toEqual({ strike: null, expiry: null })
+  })
+})
+
+describe('intentOf', () => {
+  it('keeps the intent a link names', () => {
+    expect(intentOf({ intent: 'earn-buy', kind: 'call' })).toBe('earn-buy')
+  })
+
+  it('reads the intent from the option kind of a chain selection', () => {
+    expect(intentOf({ kind: 'call' })).toBe('lock-buy')
+    expect(intentOf({ kind: 'put' })).toBe('floor')
+    expect(intentOf({ kind: 'call', side: 'write' })).toBe('earn-hold')
+    expect(intentOf({ kind: 'put', side: 'write' })).toBe('earn-buy')
+    expect(intentOf({ kind: 'put', side: 'bid' })).toBe('floor')
+    expect(intentOf({})).toBe('floor')
+  })
+})
+
+describe('pinned terms of another option kind', () => {
+  it('are dropped, so a call never becomes a floor at the same price', () => {
+    expect(pinnedSeries({ strike: '101', expiry: '2026-11-13', kind: 'call' }, grid, D, 'put')).toEqual({ strike: null, expiry: null })
+    expect(pinnedSeries({ strike: '101', expiry: '2026-11-13', kind: 'call' }, grid, D, 'call')).toEqual({ strike: q(101), expiry: FRI_13 })
+  })
+
+  it('are not reported as off the list', () => {
+    expect(offGrid({ strike: '97.5', expiry: '2026-11-21', kind: 'call' }, grid, D, 'put')).toEqual({ strike: null, expiry: null })
+  })
+})
+
+describe('offGrid', () => {
+  it('reports a price or a date that is not on the list', () => {
+    expect(offGrid({ strike: '97.5', expiry: '2026-11-21' }, grid, D, 'put')).toEqual({ strike: q(97.5), expiry: Date.UTC(2026, 10, 21, 8, 0, 0) / 1000 })
+    expect(offGrid({ strike: '99', expiry: '2026-11-20' }, grid, D, 'put')).toEqual({ strike: null, expiry: null })
+    expect(offGrid({}, grid, D, 'put')).toEqual({ strike: null, expiry: null })
+  })
+})
+
+describe('lots', () => {
+  const lot = (qty: number, premium: number) => ({ underlyingQty: BigInt(qty) * 10n ** 7n, totalPremium: q(premium) })
+
+  it('lists each quantity once, smallest first', () => {
+    expect(lotsOf([lot(5, 5.3), lot(2, 1.36), lot(2, 1.42)])).toEqual([2n * 10n ** 7n, 5n * 10n ** 7n])
+  })
+
+  it('covers a quantity with smaller lots, the best price first, never more than asked', () => {
+    const rows = [lot(2, 1.42), lot(2, 1.36), lot(5, 5.3), lot(2, 0.9)]
+    const cover = coverWith(rows, 5n * 10n ** 7n, 'buy')
+    expect(cover.total).toBe(4n * 10n ** 7n)
+    expect(cover.rows.map((r) => r.totalPremium)).toEqual([q(0.9), q(1.36)])
+    expect(coverWith(rows, 1n * 10n ** 7n, 'buy')).toEqual({ rows: [], total: 0n })
+  })
+})
+
+describe('inSeries', () => {
+  const token = { contractId: 'CBOND', code: 'BOND', decimals: D, issuer: 'G' }
+  it('matches an order of exactly the series', () => {
+    const order = { kind: 'put' as const, underlying: token, underlyingQty: 2n * 10n ** 7n, totalStrike: q(198), expiry: FRI_20 }
+    expect(inSeries(order, { underlyingId: 'CBOND', expiry: FRI_20, kind: 'put', strikePerUnit: q(99) })).toBe(true)
+    expect(inSeries(order, { underlyingId: 'CBOND', expiry: FRI_20, kind: 'put', strikePerUnit: q(98) })).toBe(false)
+    expect(inSeries(order, { underlyingId: 'CBOND', expiry: FRI_27, kind: 'put', strikePerUnit: q(99) })).toBe(false)
   })
 })
 

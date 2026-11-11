@@ -12,6 +12,7 @@ export {
   TICK_DP,
   NON_STANDARD_REASONS,
   standardExpiries,
+  chainExpiries,
   isStandardExpiry,
   isMonthlyExpiry,
   lastFridayOfMonth,

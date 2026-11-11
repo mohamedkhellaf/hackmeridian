@@ -1,18 +1,18 @@
 import { deliveryAmount } from '../options/abi'
-import { formatDisplay, shortAddress } from '../options/format'
+import { formatUnits } from '../format/amount'
+import { shortAddress } from '../options/format'
 import { requiredCollateral } from '../options/types'
 import type { Money, OptionOffer, TokenInfo } from '../options/types'
 import { optionMoneyness } from '../reference/moneyness'
 import type { Moneyness, PriceInput } from '../reference/moneyness'
-import { compactCountdown } from '../time'
+import type { Bid } from '../requests/types'
 
 export type Role = 'holder' | 'writer'
 export type StatusTone = 'info' | 'warn' | 'ok' | 'neutral'
-export type PositionFilter = 'all' | 'holding' | 'writing'
 
-/** Amount with at least two decimals (5 -> "5.00"), at most four, thousands separators. */
+/** Amount with two decimals (5 -> "5.00"), truncated, thousands separators (core/format `formatUnits`). */
 export function money(units: bigint, decimals: number): string {
-  return formatDisplay(units, decimals)
+  return formatUnits(units, decimals)
 }
 
 export const moneyWith = (units: bigint, t: TokenInfo) => `${money(units, t.decimals)} ${t.code}`
@@ -125,7 +125,7 @@ export interface PremiumCell {
  */
 export function premiumOf(o: OptionOffer, role: Role): PremiumCell {
   const amt = moneyWith(o.totalPremium, o.quote)
-  if (role === 'holder') return { text: `${amt} original premium (paid to the writer)`, tone: 'muted' }
+  if (role === 'holder') return { text: `${amt} original premium (paid to the maker)`, tone: 'muted' }
   if (o.holder) return { text: `+${amt}`, tone: 'pos' }
   if (o.state === 'offered') return { text: `${amt} ask`, tone: 'ask' }
   return { text: '–', tone: 'muted' }
@@ -137,80 +137,6 @@ export function counterpartyLine(o: OptionOffer, role: Role): string {
   if (o.holder) return `Buyer ${shortAddress(o.holder)}`
   if (o.state === 'offered') return 'Listed in Markets'
   return 'No buyer'
-}
-
-/** "in 2d 23h", "in 5h 10m", "in 12m"; "expired" once the expiry has passed. */
-export function countdown(expiry: number, nowMs: number): string {
-  const left = compactCountdown(expiry, nowMs)
-  return left === 'expired' ? left : `in ${left}`
-}
-
-/** Second line under the expiry: countdown while live, else the state word. */
-export function expirySub(o: OptionOffer, nowMs: number): string {
-  if (o.state === 'offered' || o.state === 'active') return countdown(o.expiry, nowMs)
-  if (o.state === 'expired') return 'expired'
-  return o.state
-}
-
-export interface Kpis {
-  holding: number
-  writing: number
-  /** Collateral the connected wallet still has locked in the contract, per token. */
-  locked: { token: TokenInfo; amount: bigint }[]
-  /** Premium earned on sold options, in the quote token. Null when the wallet has not written anything. */
-  premium: { token: TokenInfo; amount: bigint } | null
-}
-
-export function computeKpis(options: OptionOffer[], me: string | null): Kpis {
-  let holding = 0
-  let writing = 0
-  const locked = new Map<string, { token: TokenInfo; amount: bigint }>()
-  let premiumToken: TokenInfo | null = null
-  let premiumSum = 0n
-  for (const o of options) {
-    const role = roleOf(o, me)
-    if (role === 'holder' && o.state === 'active') holding++
-    if (role !== 'writer') continue
-    if (!statusOf(o, 'writer').closed) writing++
-    if (o.state === 'offered' || o.state === 'active' || o.state === 'expired') {
-      const c = requiredCollateral(o)
-      const cur = locked.get(c.token.contractId)
-      locked.set(c.token.contractId, { token: c.token, amount: (cur?.amount ?? 0n) + c.amount })
-    }
-    premiumToken ??= o.quote
-    if (o.holder) premiumSum += o.totalPremium
-  }
-  return { holding, writing, locked: [...locked.values()], premium: premiumToken ? { token: premiumToken, amount: premiumSum } : null }
-}
-
-export function filterPositions(options: OptionOffer[], me: string | null, filter: PositionFilter, showClosed: boolean): OptionOffer[] {
-  return options.filter((o) => {
-    const role = roleOf(o, me)
-    if (!role) return false
-    if (filter === 'holding' && role !== 'holder') return false
-    if (filter === 'writing' && role !== 'writer') return false
-    return showClosed || !statusOf(o, role).closed
-  })
-}
-
-/** Phrases for the "N actions waiting" banner: exercise, claim and reclaim (not cancel). */
-export function waitingActions(options: OptionOffer[], me: string | null, nowMs: number): string[] {
-  const out: string[] = []
-  for (const o of options) {
-    const role = roleOf(o, me)
-    if (!role) continue
-    const kind = actionKindOf(o, role)
-    if (kind === 'exercise' && nowMs / 1000 < o.expiry) {
-      out.push(`exercise your ${o.kind} on ${moneyWith(o.underlyingQty, o.underlying)}`)
-    } else if (kind === 'claim') {
-      const c = claimAmount(o)
-      out.push(`claim ${moneyWith(c.amount, c.token)} from an exercised ${o.kind}`)
-    } else if (kind === 'reclaim') {
-      const c = requiredCollateral(o)
-      out.push(`reclaim ${moneyWith(c.amount, c.token)} from an expired ${o.holder ? 'option' : 'offer'}`)
-    }
-  }
-  return out
 }
 
 // ------------------------------------------------------------------------------------------- to-do strip
@@ -280,8 +206,29 @@ export function todoItems(
   return out.sort((a, b) => rank(a) - rank(b) || (a.deadline ?? 0) - (b.deadline ?? 0) || (a.option.id < b.option.id ? -1 : a.option.id > b.option.id ? 1 : 0))
 }
 
-/** The count for the navigation badge: actions that are real (see `TodoItem.actionable`). */
-export const actionsWaiting = (items: TodoItem[]): number => items.filter((t) => t.actionable).length
+/** The count for the navigation badge: actions that are real (see `TodoItem.actionable`), plus `requests` to take back. */
+export const actionsWaiting = (items: TodoItem[], requests: readonly RequestTodo[] = []): number => items.filter((t) => t.actionable).length + requests.length
+
+/**
+ * A request of this wallet whose deadline passed with nobody filling it: the premium stays escrowed in the contract
+ * until the buyer cancels it (contract v1.5: nothing returns it by itself). A real action, ranked with a reclaim,
+ * with no deadline of its own.
+ */
+export interface RequestTodo {
+  kind: 'take-back'
+  bid: Bid
+  /** The escrowed premium that cancelling returns. */
+  amount: Money
+}
+
+/** The wallet's expired requests that still hold its premium, oldest deadline first. */
+export function requestTodoItems(bids: readonly Bid[], me: string | null): RequestTodo[] {
+  if (!me) return []
+  return bids
+    .filter((b) => b.buyer === me && b.state === 'expired')
+    .sort((a, b) => a.expiry - b.expiry || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((bid) => ({ kind: 'take-back', bid, amount: { token: bid.quote, amount: bid.totalPremium } }))
+}
 
 /** Portfolio summary figures (brief 4.5), exact, per token. Only what the chain states: no valuation. */
 export interface PortfolioSummary {
@@ -295,15 +242,33 @@ export interface PortfolioSummary {
   locked: Money[]
   /** Proceeds of exercised options the wallet wrote and has not claimed yet, by token. */
   unclaimed: Money[]
+  /** Premiums the wallet escrowed in open requests (deadline not passed), by token. Empty without `bids`. */
+  escrowed: Money[]
+  /**
+   * What is locked in the contract for the wallet and cannot be taken back yet, by token: collateral of offered and
+   * active options it wrote, and premiums of its open requests (ruling E20, "Locked").
+   */
+  lockedNow: Money[]
+  /**
+   * What the wallet can take back now, by token: collateral of expired options it wrote (reclaim) and premiums of
+   * its expired requests (cancel). Empty when there is nothing (ruling E20, "Ready to take back").
+   */
+  readyToTakeBack: Money[]
 }
 
 /**
  * `premiumPaid` is the original premium of each option, which a wallet that bought on resale did not pay itself;
  * the chain does not record resale prices. Pass `boughtOnResale` (option ids) to leave those out.
  */
-export function portfolioSummary(options: OptionOffer[], me: string | null, boughtOnResale: ReadonlySet<bigint> = new Set()): PortfolioSummary {
-  const sums = { paid: new Map<string, Money>(), earned: new Map<string, Money>(), locked: new Map<string, Money>(), unclaimed: new Map<string, Money>() }
-  const addTo = (m: Map<string, Money>, x: Money) => m.set(x.token.contractId, { token: x.token, amount: (m.get(x.token.contractId)?.amount ?? 0n) + x.amount })
+export function portfolioSummary(
+  options: OptionOffer[],
+  me: string | null,
+  boughtOnResale: ReadonlySet<bigint> = new Set(),
+  bids: readonly Bid[] = [],
+): PortfolioSummary {
+  const m = () => new Map<string, Money>()
+  const sums = { paid: m(), earned: m(), locked: m(), unclaimed: m(), escrowed: m(), lockedNow: m(), takeBack: m() }
+  const addTo = (map: Map<string, Money>, x: Money) => map.set(x.token.contractId, { token: x.token, amount: (map.get(x.token.contractId)?.amount ?? 0n) + x.amount })
   let open = 0
   for (const o of options) {
     const role = roleOf(o, me)
@@ -315,7 +280,29 @@ export function portfolioSummary(options: OptionOffer[], me: string | null, boug
     }
     if (o.holder) addTo(sums.earned, { token: o.quote, amount: o.totalPremium })
     if (o.state === 'offered' || o.state === 'active' || o.state === 'expired') addTo(sums.locked, requiredCollateral(o))
+    if (o.state === 'offered' || o.state === 'active') addTo(sums.lockedNow, requiredCollateral(o))
+    if (o.state === 'expired') addTo(sums.takeBack, requiredCollateral(o))
     if (o.state === 'exercised') addTo(sums.unclaimed, claimAmount(o))
   }
-  return { open, premiumPaid: [...sums.paid.values()], premiumEarned: [...sums.earned.values()], locked: [...sums.locked.values()], unclaimed: [...sums.unclaimed.values()] }
+  if (me) {
+    for (const b of bids) {
+      if (b.buyer !== me) continue
+      const premium = { token: b.quote, amount: b.totalPremium }
+      if (b.state === 'open') {
+        addTo(sums.escrowed, premium)
+        addTo(sums.lockedNow, premium)
+      } else if (b.state === 'expired') addTo(sums.takeBack, premium)
+    }
+  }
+  const list = (map: Map<string, Money>) => [...map.values()]
+  return {
+    open,
+    premiumPaid: list(sums.paid),
+    premiumEarned: list(sums.earned),
+    locked: list(sums.locked),
+    unclaimed: list(sums.unclaimed),
+    escrowed: list(sums.escrowed),
+    lockedNow: list(sums.lockedNow),
+    readyToTakeBack: list(sums.takeBack),
+  }
 }

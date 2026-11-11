@@ -1,28 +1,105 @@
 @layer features {
   .root {
+    container-type: inline-size;
+    min-width: 0;
+  }
+
+  /* Equal columns between two rules on a desktop; label left and figure right, one ruled row each, on a phone. */
+  .list {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--s-16) var(--s-32);
+    margin: 0;
     padding-block: var(--s-16);
     border-block: 1px solid var(--rule);
 
-    @media (max-width: 767.98px) {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: var(--s-16);
+    &[data-count='4'] {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    @container (max-width: 40rem) {
+      &,
+      &[data-count='4'] {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+        padding-block: 0;
+      }
     }
   }
 
-  .sums {
+  .item {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    gap: var(--s-2);
     min-width: 0;
+
+    @container (max-width: 40rem) {
+      display: grid;
+      grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+      align-items: baseline;
+      gap: var(--s-12);
+      padding-block: var(--s-12);
+      border-bottom: 1px solid var(--hairline);
+
+      &:last-child {
+        border-bottom: 0;
+      }
+    }
+  }
+
+  .label {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .value {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+    margin: 0;
+
+    @container (max-width: 40rem) {
+      align-items: flex-end;
+      text-align: end;
+    }
+  }
+
+  /* Several tokens of one sum stay on one baseline and wrap only when they do not fit. */
+  .sums {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--s-6);
+    min-width: 0;
+
+    @container (max-width: 40rem) {
+      justify-content: flex-end;
+    }
   }
 
   .sum {
     display: inline-flex;
     align-items: baseline;
-    gap: var(--s-6);
+    gap: var(--s-4);
+    white-space: nowrap;
+  }
+
+  .and {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  .figure {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   /* The unit once, small, after the figure: the same rank as the unit of a Stat. */
@@ -32,5 +109,12 @@
     line-height: var(--label-line);
     font-weight: 500;
     color: var(--muted);
+  }
+
+  .hint {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
   }
 }

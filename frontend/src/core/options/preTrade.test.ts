@@ -36,7 +36,7 @@ describe('preTrade: buy an offer', () => {
     expect(r.issues).toEqual([])
     expect(r.state).toEqual({ label: 'Offer', status: 'ok', text: 'Open' })
     expect(r.account).toEqual({ label: 'Your account', status: 'ok', text: 'Authorized by the FUND issuer' })
-    expect(r.funds).toEqual({ label: 'USDx balance', status: 'ok', text: '1,000.00 USDx, enough' })
+    expect(r.funds).toEqual({ label: 'USDx balance', status: 'ok', text: '1,000.00 USDx' })
     expect(r.pays).toEqual({ token: USDX, amount: (18n * U) / 10n })
     expect(r.locks).toBeNull()
   })
@@ -325,6 +325,38 @@ describe('preTrade: list for sale', () => {
     expect(preTrade({ type: 'list-for-sale', option: held, askTotal: 0n }, facts({ option: held })).blocked).toBe(true)
     expect(preTrade({ type: 'list-for-sale', option: held, askTotal: U }, facts({ option: { ...held, holder: 'GX' } })).issues[0]).toMatchObject({ code: 'not-holder' })
     expect(preTrade({ type: 'list-for-sale', option: held, askTotal: U }, facts({ option: { ...held, expiry: NOW } })).issues[0]).toMatchObject({ code: 'gone' })
+  })
+})
+
+describe('preTrade: giving away exercise value (review finding 16)', () => {
+  // A put on 5 FUND struck at 10.00; at 9.20 it is in the money by 0.80 per FUND, 4.00 USDx for the lot.
+  const at = (price: string) => facts({ reference: { ...demoReference('FUND'), perUnit: BigInt(Math.round(Number(price) * 100)) * (U / 100n) } })
+
+  it('warns a maker whose premium is below what the holder could exercise for at once (write and fill)', () => {
+    const draft: NewOffer = { kind: 'put', underlying: FUND, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: (21n * U) / 100n, expiry: NOW + 3 * 86400 }
+    const w = preTrade({ type: 'write-offer', offer: draft, quote: USDX }, at('9.20'))
+    const issue = w.issues.find((i) => i.code === 'below-exercise-value')
+    expect(issue).toMatchObject({ level: 'warn', value: { token: USDX, amount: 4n * U }, paid: { token: USDX, amount: (21n * U) / 100n } })
+    expect(issue?.message).toBe('At the demo price of 9.20 USDx per FUND, the holder could exercise at once for 4.00 USDx. You are paid 0.21 USDx.')
+    expect(w.blocked).toBe(false)
+
+    const bid: Bid = { id: 2n, buyer: 'GBUYER', kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: U, expiry: NOW + 86400, state: 'open', optionId: null }
+    const f = preTrade({ type: 'fill-bid', bid }, { ...at('9.20'), bid })
+    expect(f.issues.find((i) => i.code === 'below-exercise-value')?.message).toBe('At the demo price of 9.20 USDx per FUND, the holder could exercise at once for 4.00 USDx. You are paid 1.00 USDx.')
+  })
+
+  it('warns a holder listing below what exercising now is worth', () => {
+    const held = offer({ id: 3n, state: 'active', holder: ME })
+    const r = preTrade({ type: 'list-for-sale', option: held, askTotal: U / 2n }, { ...at('9.20'), option: held })
+    expect(r.issues.find((i) => i.code === 'below-exercise-value')?.message).toBe('At the demo price of 9.20 USDx per FUND, exercising now is worth 4.00 USDx. You list for 0.50 USDx.')
+  })
+
+  it('says nothing out of the money, at a fair price, or without a price', () => {
+    const draft: NewOffer = { kind: 'put', underlying: FUND, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: 5n * U, expiry: NOW + 3 * 86400 }
+    const write = (f: PreTradeFacts) => codes(preTrade({ type: 'write-offer', offer: draft, quote: USDX }, f).issues)
+    expect(write(at('10.20'))).not.toContain('warn:below-exercise-value')
+    expect(write(at('9.20'))).not.toContain('warn:below-exercise-value') // paid 5.00, worth 4.00
+    expect(write(facts({ reference: null }))).not.toContain('warn:below-exercise-value')
   })
 })
 

@@ -6,19 +6,24 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f4f2ec" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#121210" media="(prefers-color-scheme: dark)" />
+    <!-- The order of the cascade layers, before any stylesheet: the build splits the CSS into chunks, and the first
+         chunk to load would otherwise fix the order (a shared ui chunk first put "base" above "ui", and the link
+         colour above the button's). The same statement opens src/ui/index.css. -->
+    <style>
+      @layer tokens, base, ui, features;
+    </style>
     <title>StellSec: options on tokenized assets, on Stellar</title>
     <meta
       name="description"
-      content="Puts and calls on tokenized assets, on Stellar. The maker locks the full collateral in the contract before you pay, and exercise swaps the asset for payment in one transaction. Runs on the Stellar test network."
+      content="Puts and calls on tokenized assets. The maker locks the full collateral in the contract before you pay, and exercise swaps the asset for payment in one transaction."
     />
     <!-- The stored display settings, applied before the first paint so a forced theme never flashes. The key and
-         the three attributes mirror src/data/settings.ts (src/app/indexHtml.test.ts holds them in step). -->
+         the two attributes mirror src/data/settings.ts (src/app/indexHtml.test.ts holds them in step). -->
     <script>
       try {
         var s = JSON.parse(localStorage.getItem('stellsec.settings.v1') || '{}')
         var d = document.documentElement
         if (s.theme === 'light' || s.theme === 'dark') d.setAttribute('data-theme', s.theme)
-        if (s.density === 'compact') d.setAttribute('data-density', 'compact')
         if (s.pnl === 'classic' || s.pnl === 'mono') d.setAttribute('data-pnl', s.pnl)
       } catch (e) {}
     </script>

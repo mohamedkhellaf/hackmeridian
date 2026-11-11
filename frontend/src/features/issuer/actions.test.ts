@@ -144,7 +144,7 @@ describe('an account (classic operations through Horizon)', () => {
 
   it('refuses when the issuer account does not exist or cannot be read', async () => {
     const missing = harness({ loadSequence: async () => null })
-    expect((await rejection(sendIssuerAction(request({}), signWith(issuer), missing.opts, missing.deps))).message).toBe(COPY.flags.missing)
+    expect((await rejection(sendIssuerAction(request({}), signWith(issuer), missing.opts, missing.deps))).message).toBe(COPY.powers.missing)
     const down = harness({ loadSequence: async () => Promise.reject(new Error('Horizon 503')) })
     const e = await rejection(sendIssuerAction(request({}), signWith(issuer), down.opts, down.deps))
     expect(e.kind).toBe('refused')

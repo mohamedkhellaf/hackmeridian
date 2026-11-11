@@ -91,8 +91,11 @@ function pageHeading(): HTMLElement | null {
 
 let focusAttempt = 0
 
-/** Moves focus to the page heading once it exists. A lazy page may render a frame or two after the route resolves. */
-function focusPageHeading(): void {
+/**
+ * Moves focus to the page heading once it exists. A lazy page may render a frame or two after the route resolves.
+ * Also used by the error page after a "Try again" that worked.
+ */
+export function focusPageHeading(): void {
   const attempt = ++focusAttempt
   const started = performance.now()
   const tryFocus = () => {

@@ -1,20 +1,19 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import { PRO_ENABLED } from '../../../core/config'
-import { Glyph, Link } from '../../../ui'
+import { Link } from '../../../ui'
 import { DOC_LINKS, MARGIN, SECTION } from '../copy'
 import css from './MarginBlock.module.css'
 
 /**
- * Margin, fenced off from everything else on the page: its own ground, a dashed edge, its own wording. None of
- * the covered contract's facts appear inside it, and nothing in it is called fully collateralized. The fence is
- * the separation; there is no "experimental" tag on it (brief 0.1).
+ * Margin, fenced off from everything else on the page: a panel on the sunken ground with its own wording. None of
+ * the Covered contract's facts appear inside it, and nothing in it is called fully collateralized. The fence is
+ * the separation; there is no tag on it (brief 0.1).
  */
 export function MarginBlock() {
   return (
     <section id={SECTION.margin} className={css.section} aria-labelledby="margin-heading">
       <div className={css.fence} data-testid="margin-block">
         <h2 id="margin-heading" className={css.heading}>
-          <Glyph name="margin" size={24} className={css.glyph} />
           {MARGIN.heading}
         </h2>
         <div className={css.text}>

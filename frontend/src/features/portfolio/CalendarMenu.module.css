@@ -3,15 +3,26 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--s-6);
     min-width: 0;
+    max-width: 100%;
   }
 
-  .note {
-    max-width: var(--measure);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
-    text-wrap: pretty;
+  .trigger {
+    max-width: 100%;
+  }
+
+  .short {
+    display: none;
+  }
+
+  /* On the narrowest phones the long label would leave the slip. */
+  @media (max-width: 359.98px) {
+    .long {
+      display: none;
+    }
+
+    .short {
+      display: inline;
+    }
   }
 }

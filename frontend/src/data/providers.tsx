@@ -11,13 +11,17 @@ import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } f
 import type { ReactNode } from 'react'
 import type { OptionsClient } from '../core/options/client'
 import { createOptionsClient, isMockMode } from '../core/options/createClient'
+import { ClockProvider } from '../ui/Clock'
 import { useWallet } from '../wallet'
+import { useLedgerOffsetMs } from './clock'
 import { bindSigner, createClientSource } from './clientSource'
 import type { ClientSource } from './clientSource'
 import { GUIDE_STORAGE_KEY, guideStore } from './guide'
 import { queryClient as appQueryClient } from './queryClient'
 import { SETTINGS_STORAGE_KEY, settingsStore } from './settings'
 import { ACTIVITY_KEY_PREFIX, activityStore } from './tx/activityStore'
+import { resumeUnknown } from './tx/runner'
+import { useRunnerDeps } from './tx/useTx'
 import { OptionsClientContext } from './useOptionsClient'
 import type { OptionsClientHandle } from './useOptionsClient'
 
@@ -62,6 +66,25 @@ function useStorageSync(): void {
   }, [])
 }
 
+/**
+ * Looks up again, on a timer, the transactions of the connected wallet whose outcome was unknown when the page that
+ * sent them closed (review finding 19): the runner refuses a new write while one of them can still land, so it
+ * must not wait for someone to press Check again in Activity.
+ */
+function ResumeUnknown(): null {
+  const deps = useRunnerDeps()
+  const { address } = useWallet()
+  useEffect(() => {
+    if (address) resumeUnknown(deps, address)
+  }, [deps, address])
+  return null
+}
+
+/** Countdowns of the kit follow ledger time: the offset the ledger query measures. */
+function LedgerClock({ children }: { children: ReactNode }) {
+  return <ClockProvider offsetMs={useLedgerOffsetMs()}>{children}</ClockProvider>
+}
+
 export interface DataProviderProps {
   children: ReactNode
   /** A cache of your own (tests, the component gallery). Default: the app's. */
@@ -79,7 +102,10 @@ export function DataProvider({ children, client = appQueryClient, source }: Data
   useStorageSync()
   return (
     <QueryClientProvider client={client}>
-      <OptionsClientProvider source={source}>{children}</OptionsClientProvider>
+      <OptionsClientProvider source={source}>
+        <ResumeUnknown />
+        <LedgerClock>{children}</LedgerClock>
+      </OptionsClientProvider>
     </QueryClientProvider>
   )
 }

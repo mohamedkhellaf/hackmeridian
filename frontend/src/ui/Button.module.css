@@ -142,6 +142,13 @@
         color: var(--text);
       }
     }
+
+    /* Touch: a small icon button (copy, open) is a 44 by 44 target around its 28 px mark. */
+    @media (pointer: coarse) {
+      &[data-size='sm']::after {
+        inset: calc(var(--s-8) * -1 - 1px);
+      }
+    }
   }
 
   .label {
@@ -153,5 +160,29 @@
   .icon {
     display: inline-flex;
     flex: none;
+  }
+
+  /*
+   * A button keeps its width while it works, so nothing beside it moves: the spinner takes the icon's 16 px slot,
+   * or, on a button without an icon, sits over the label, which keeps its room (and is still read out).
+   */
+  .label[data-covered] {
+    opacity: 0;
+  }
+
+  .spinnerOver {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .spinnerSlot {
+    align-items: center;
+    justify-content: center;
+    width: var(--s-16);
+    height: var(--s-16);
   }
 }

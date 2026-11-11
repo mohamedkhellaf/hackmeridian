@@ -1,4 +1,60 @@
 @layer features {
+  .groups {
+    display: grid;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .group {
+    display: grid;
+    gap: var(--s-4);
+  }
+
+  .groupTitle {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+  }
+
+  .groupCount {
+    color: var(--muted);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .gap,
+  .empty {
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .empty {
+    color: var(--muted);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .no {
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+  }
+
+  .reason {
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
   .root {
     margin: 0;
     padding: 0;
@@ -47,6 +103,18 @@
     font-weight: 600;
   }
 
+  .seriesButton {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    min-height: var(--touch);
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 0.2em;
+  }
+
   .sub {
     color: var(--muted);
     font-size: var(--caption-size);
@@ -55,8 +123,9 @@
 
   .from {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--s-8);
+    gap: var(--s-2) var(--s-8);
   }
 
   .source {

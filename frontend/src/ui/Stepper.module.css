@@ -81,7 +81,6 @@
 
   .step[data-status='upcoming'] .mark {
     border-color: var(--rule);
-    border-style: dashed;
   }
 
   .step[data-status='failed'] .mark {
@@ -139,60 +138,5 @@
   .hash {
     display: flex;
     align-items: center;
-  }
-  /* The horizontal trail of a short flow. */
-  .trail {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s-4) var(--s-16);
-    margin: 0;
-    padding: 0 0 var(--s-12);
-    border-bottom: 1px solid var(--rule);
-    list-style: none;
-  }
-
-  .trailStep {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s-6);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: 500;
-    color: var(--muted);
-
-    &[data-status='done'] {
-      color: var(--text-2);
-    }
-
-    &[data-status='current'] {
-      color: var(--text);
-    }
-  }
-
-  .trailMark {
-    flex: none;
-    overflow: visible;
-  }
-
-  .trailRing {
-    fill: none;
-    stroke: currentcolor;
-    stroke-width: 1.25;
-  }
-
-  .trailMark[data-status='upcoming'] .trailRing {
-    stroke-dasharray: 2 2.2;
-  }
-
-  .trailTick {
-    fill: none;
-    stroke: currentcolor;
-    stroke-width: 1.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .trailDot {
-    fill: currentcolor;
   }
 }

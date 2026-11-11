@@ -67,10 +67,26 @@
     }
   }
 
+  /*
+   * Phones: the dialog is a bottom sheet, the frame of `Sheet`: full width, anchored to the bottom edge over the
+   * tab bar, actions at the thumb. The footer and the body carry the bottom safe area.
+   */
   @media (max-width: 767.98px) {
     .viewport {
-      padding: var(--s-16);
-      padding-bottom: max(var(--s-16), env(safe-area-inset-bottom, 0px));
+      place-items: end stretch;
+      padding: max(var(--s-32), env(safe-area-inset-top, 0px)) 0 0;
+    }
+
+    .popup {
+      width: 100%;
+      max-height: min(92dvh, 100%);
+      border-radius: var(--r-card) var(--r-card) 0 0;
+
+      &[data-starting-style],
+      &[data-ending-style] {
+        opacity: 1;
+        transform: translateY(100%);
+      }
     }
   }
 }

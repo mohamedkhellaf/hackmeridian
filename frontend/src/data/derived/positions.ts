@@ -7,8 +7,8 @@ import { deadlineUrgency } from '../../core/format'
 import type { DeadlineUrgency } from '../../core/format'
 import { requiredCollateral } from '../../core/options/types'
 import type { Ask, Money, OptionOffer } from '../../core/options/types'
-import { actionKindOf, actionsWaiting, claimAmount, counterpartyLine, portfolioSummary, premiumOf, roleOf, statusOf, todoItems } from '../../core/portfolio/positions'
-import type { ActionKind, PortfolioSummary, PositionStatus, PremiumCell, Role, TodoItem } from '../../core/portfolio/positions'
+import { actionKindOf, actionsWaiting, claimAmount, counterpartyLine, portfolioSummary, premiumOf, requestTodoItems, roleOf, statusOf, todoItems } from '../../core/portfolio/positions'
+import type { ActionKind, PortfolioSummary, PositionStatus, PremiumCell, RequestTodo, Role, TodoItem } from '../../core/portfolio/positions'
 import { exerciseValue, optionMoneyness } from '../../core/reference'
 import type { Moneyness, ReferencePrice } from '../../core/reference'
 import { myOpenBids } from '../../core/requests/requests'
@@ -187,12 +187,28 @@ export function buildTodo(options: OptionOffer[], me: string | null, nowSec: num
   })
 }
 
-/** The number for the navigation badge: real actions only (claims, reclaims, in-the-money exercises). */
-export function countActionsWaiting(options: OptionOffer[], me: string | null, nowSec: number, referenceOf: ReferenceOf = () => null): number {
-  return actionsWaiting(todoItems(options, me, nowSec, referenceOf))
+/**
+ * The number for the navigation badge: real actions only (claims, reclaims, in-the-money exercises), and the
+ * wallet's expired requests whose premium waits to be taken back when `bids` is given.
+ */
+export function countActionsWaiting(options: OptionOffer[], me: string | null, nowSec: number, referenceOf: ReferenceOf = () => null, bids: readonly Bid[] = []): number {
+  return actionsWaiting(todoItems(options, me, nowSec, referenceOf), requestTodoItems(bids, me))
 }
 
-/** Summary figures of the portfolio: exact sums per token, no valuation. */
-export function buildKpis(options: OptionOffer[], me: string | null): PortfolioSummary {
-  return portfolioSummary(options, me)
+/** A request to take back on the to-do strip, with a stable React key (`take-back:bidId`). */
+export interface RequestTodoView extends RequestTodo {
+  key: string
+}
+
+/** The wallet's expired requests whose premium is still escrowed: cancelling returns it. Oldest deadline first. */
+export function buildRequestTodo(bids: readonly Bid[], me: string | null): RequestTodoView[] {
+  return requestTodoItems(bids, me).map((t) => ({ ...t, key: `take-back:${t.bid.id}` }))
+}
+
+/**
+ * Summary figures of the portfolio: exact sums per token, no valuation. With `bids`, the escrowed premiums of the
+ * wallet's requests count in `lockedNow` (open) and `readyToTakeBack` (expired).
+ */
+export function buildKpis(options: OptionOffer[], me: string | null, bids: readonly Bid[] = []): PortfolioSummary {
+  return portfolioSummary(options, me, new Set(), bids)
 }

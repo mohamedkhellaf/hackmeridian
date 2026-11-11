@@ -5,6 +5,27 @@
     gap: var(--s-16);
   }
 
+  .stage {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
+  /*
+   * A centred dialog holds the stepper's height in every phase, so it keeps its size and its title and actions
+   * stay put. On phones the dialog is a bottom sheet: its actions stay at the thumb, so it takes only the room it needs.
+   */
+  @media (min-width: 768px) {
+    .stage {
+      min-height: var(--cancel-stage-h);
+    }
+  }
+
+  /* Four stages with a two-line note and the hash line beneath: the tallest the stage area gets. */
+  .body {
+    --cancel-stage-h: calc(var(--s-40) * 5);
+  }
+
   .note {
     margin: 0;
     font-size: var(--ui-size);
@@ -17,15 +38,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-8);
-  }
-
-  .done {
-    margin: 0;
-    font-family: var(--font-serif);
-    font-size: var(--figure-size);
-    line-height: var(--figure-line);
-    font-weight: 600;
-    color: var(--text);
   }
 
   .tx {

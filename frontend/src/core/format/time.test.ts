@@ -3,6 +3,8 @@ import {
   deadlineUrgency,
   formatCountdown,
   formatLocal,
+  formatUtcClock,
+  zoneLabel,
   formatUtc,
   formatUtcDate,
   formatUtcDay,
@@ -144,5 +146,20 @@ describe('secondsUntil', () => {
     expect(secondsUntil(FRI_13_NOV_0800, FRI_13_NOV_0800 - 90)).toBe(90)
     expect(secondsUntil(FRI_13_NOV_0800, FRI_13_NOV_0800 + 90)).toBe(-90)
     expect(secondsUntil(FRI_13_NOV_0800, FRI_13_NOV_0800 - 90.6)).toBe(90)
+  })
+})
+
+describe('zone names and the clock to the second', () => {
+  it('writes an offset from UTC with a true minus, never GMT', () => {
+    expect(zoneLabel('GMT-10')).toBe('UTC\u221210')
+    expect(zoneLabel('GMT+1')).toBe('UTC+1')
+    expect(zoneLabel('GMT+5:30')).toBe('UTC+5:30')
+    expect(zoneLabel('GMT')).toBe('UTC')
+    expect(zoneLabel('UTC')).toBe('UTC')
+    expect(zoneLabel('CET')).toBe('CET')
+    expect(formatLocal(Date.UTC(2026, 10, 20, 8, 0) / 1000, 'Pacific/Honolulu')).toBe('19 Nov 2026, 22:00 UTC\u221210')
+  })
+  it('gives hours, minutes and seconds in UTC', () => {
+    expect(formatUtcClock(Date.UTC(2026, 10, 13, 13, 45, 12) / 1000)).toBe('13:45:12 UTC')
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ME, MAKER, NO_REFERENCE, NOW, USDX, opt, reference, view } from './fixtures.testhelper'
+import { DAY, ME, MAKER, NO_REFERENCE, NOW, U, USDX, opt, reference, todo, view } from './fixtures.testhelper'
 import {
   actionsFor,
   allows,
@@ -9,10 +9,14 @@ import {
   noteKind,
   optionPhrase,
   optionTitle,
+  exerciseShortOf,
+  premiumPerUnitLine,
+  rankInSeries,
   referenceName,
   referencePhrase,
   sellLabel,
   serialOf,
+  showsCard,
   stateName,
   strikeExact,
   strikeText,
@@ -95,7 +99,7 @@ describe('actionsFor', () => {
     const listed = view(o, reference(982), ME, NOW, [{ id: o.id, holder: ME, askTotal: 2n * 10_000_000n }])
     expect(actionsFor(listed, ME, NOW, true)).toEqual(['exercise', 'sell', 'unlist'])
     expect(sellLabel(listed.listing)).toBe('Change price')
-    expect(sellLabel(null)).toBe('Sell')
+    expect(sellLabel(null)).toBe('List for sale')
   })
 
   it('offers no resale on a contract without it', () => {
@@ -124,5 +128,48 @@ describe('actionsFor', () => {
     expect(allows(['exercise', 'sell'], 'claim')).toBe(false)
     expect(allows(['exercise'], null)).toBe(false)
     expect(allows([], undefined)).toBe(false)
+  })
+})
+
+describe('showsCard', () => {
+  it('gives a card to what the wallet can do now, and a quiet one to a held option near its deadline or with no price', () => {
+    // In the money: an action, at any distance.
+    expect(showsCard(todo(opt(), reference(982)))).toBe(true)
+    // Out of the money, 8 days out: no card. Inside 48 hours: a quiet card.
+    expect(showsCard(todo(opt(), reference(1040)))).toBe(false)
+    expect(showsCard(todo(opt({ expiry: NOW + DAY }), reference(1040)))).toBe(true)
+    // No reference price: the deadline is real, the moneyness unknown.
+    expect(showsCard(todo(opt(), NO_REFERENCE))).toBe(true)
+    // A claim and a reclaim always; an option that lapsed never (it is one line above the tabs).
+    expect(showsCard(todo(opt({ writer: ME, holder: MAKER, state: 'exercised' })))).toBe(true)
+    expect(showsCard(todo(opt({ state: 'expired', expiry: NOW - DAY })))).toBe(false)
+  })
+})
+
+describe('premium per unit and the rank of an open offer', () => {
+  it('prints the premium per unit of underlying', () => {
+    expect(premiumPerUnitLine(opt())).toBe('0.36 per FUND')
+    expect(premiumPerUnitLine(opt({ underlyingQty: 0n }))).toBeNull()
+  })
+
+  it('says whether an open offer is the lowest of its series, or by how much it is above', () => {
+    const mine = opt({ id: 1n, writer: ME, holder: null, state: 'offered' })
+    const cheaper = opt({ id: 2n, writer: MAKER, holder: null, state: 'offered', totalPremium: (15n * U) / 10n })
+    const other = opt({ id: 3n, writer: MAKER, holder: null, state: 'offered', expiry: NOW + 9 * DAY, totalPremium: U })
+    expect(rankInSeries(mine, [mine, other])).toBe('Lowest in its series')
+    expect(rankInSeries(mine, [mine, cheaper, other])).toBe('0.06 above the lowest')
+    expect(rankInSeries(opt(), [mine])).toBeNull()
+  })
+})
+
+describe('exerciseShortOf', () => {
+  it('says what an exercise takes that the wallet does not hold, and nothing when it is covered or unknown', () => {
+    const put = opt()
+    expect(exerciseShortOf(put, { C_F: { balance: U } })).toEqual({ have: { token: put.underlying, amount: U }, need: { token: put.underlying, amount: 5n * U } })
+    expect(exerciseShortOf(put, { C_F: { balance: 5n * U } })).toBeNull()
+    expect(exerciseShortOf(put, { C_F: { balance: null } })).toBeNull()
+    expect(exerciseShortOf(put, undefined)).toBeNull()
+    const call = opt({ kind: 'call' })
+    expect(exerciseShortOf(call, { C_Q: { balance: 40n * U } })?.need).toEqual({ token: USDX, amount: 50n * U })
   })
 })

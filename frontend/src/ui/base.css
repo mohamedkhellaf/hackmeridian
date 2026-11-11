@@ -187,12 +187,21 @@
 
   /* ---- Global helpers ------------------------------------------------------------------------------------ */
 
-  /* Horizontal scroll stays inside the table, never on the page. The wrapper is focusable when it scrolls. */
+  /*
+   * Horizontal scroll stays inside the table, never on the page. The wrapper is a scroll container only while the
+   * table really overflows (TableWrap sets data-scrolls, and the wrapper is then focusable): otherwise it clips,
+   * which is not a scroll container, so the sticky header sticks to the page as it scrolls.
+   */
   .ui-table-wrap {
+    position: relative;
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
+  .ui-table-wrap[data-scrolls] {
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
-    max-width: 100%;
   }
 
   .ui-table-wrap:focus-visible {

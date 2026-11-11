@@ -1,24 +1,29 @@
 // List a held option for sale at a price the holder sets, or change the price of a listing. A buyer pays the
 // holder and becomes the holder; the collateral stays locked in the contract.
+//
+// The chain records the premium the option was first bought for, not what this holder paid for it (a resale
+// price is not recorded): the ticket names it "Original premium" and derives no loss or breakeven from it.
 import { useMemo, useState } from 'react'
 import { formatUtc } from '../../core/format'
 import { parseAmount } from '../../core/options/format'
 import type { PreTradeAction } from '../../core/options/preTrade'
 import { requiredCollateral } from '../../core/options/types'
 import type { OptionOffer } from '../../core/options/types'
+import { lowestOpenInSeriesOf } from '../../core/maker/lowestOffer'
+import { exerciseValue } from '../../core/reference/moneyness'
 import { perUnit, plainAmount } from '../../core/units'
-import { isNotFoundMessage, useAsk, useListForSale, useMe, useOption, useReference } from '../../data'
+import { isNotFoundMessage, useAsk, useListForSale, useMe, useNowSec, useOption, useOptions, useReference } from '../../data'
+import type { NoteTerm } from '../../ui'
 import { AmountField } from '../../ui'
-import { CONSENT, LOADING_TITLE, listingNote, receiptReminder, receiptTitle, signSummary, ticketTitle } from './copy'
+import { COMMITMENT, LOADING_TITLE, ORIGINAL_PREMIUM_HINT, SAME_PRICE, listingNote, receiptReminder, receiptTitle, reviewTitle, signSummary, ticketTitle } from './copy'
 import { Flow } from './Flow'
 import type { Deal } from './Flow'
-import { errorText, moneyText, priceText, readAtText } from './fmt'
+import { errorText, moneyText, priceText } from './fmt'
 import type { TicketIntent } from './intent'
-import { Party } from './parts'
 import type { ReceiptView } from './ReceiptStep'
-import { deadlineRow, kindRow, moneyRow, nothingRow, perUnitPhrase, quantityRow, strikeRow } from './rows'
+import { deadlineRow, kindRow, leadRow, moneyRow, partyRow, perUnitPhrase, quantityRow, strikeRow } from './rows'
 import { FlowError, FlowGone, FlowLoading } from './states'
-import { glyphOf, positionWords, serialOf, strikePerUnit } from './terms'
+import { glyphOf, positionWords, premiumPerUnit, serialOf, strikePerUnit } from './terms'
 import { TermsList } from './TermsList'
 import styles from './ListFlow.module.css'
 
@@ -49,7 +54,7 @@ export function ListFlow({ intent, startAt }: { intent: Extract<TicketIntent, { 
     }
     return <FlowLoading title={title} />
   }
-  if (o.state === 'offered' || o.holder === null) return <FlowGone title={title} sentence="Only a bought option can be sold on." hint="This one is still an open offer of its writer." />
+  if (o.state === 'offered' || o.holder === null) return <FlowGone title={title} sentence="Only a bought option can be sold on." hint="This one is still an open offer of its maker." />
   return <ListTicket option={o} current={opened.current} readAt={option.isPlaceholderData ? 0 : option.dataUpdatedAt} startAt={startAt} />
 }
 
@@ -64,33 +69,47 @@ function ListTicket({ option: o, current, readAt, startAt }: { option: OptionOff
 
   const parsed = parseAmount(text, q.decimals)
   const askTotal = parsed !== null && parsed > 0n ? parsed : null
-  const invalid = text.trim() === '' ? `Enter the price you ask, in ${q.code}.` : parsed === null ? `Enter an amount with at most ${q.decimals} decimals.` : parsed <= 0n ? 'The price must be above zero.' : null
+  const invalid =
+    text.trim() === ''
+      ? `Enter the price you ask, in ${q.code}.`
+      : parsed === null
+        ? `Enter an amount with at most ${q.decimals} decimals.`
+        : parsed <= 0n
+          ? 'The price must be above zero.'
+          : current !== null && parsed === current
+            ? SAME_PRICE
+            : null
   const action = useMemo<PreTradeAction>(() => ({ type: 'list-for-sale', option: o, askTotal }), [o, askTotal])
 
   const price = askTotal === null ? null : { token: q, amount: askTotal }
   const collateral = requiredCollateral(o)
   const strike = strikePerUnit(o)
   const priceLabel = price ? moneyText(price) : ''
+  const original = moneyRow('Original premium', { token: q, amount: o.totalPremium }, ORIGINAL_PREMIUM_HINT)
+
+  // What helps set a price: what exercising is worth at the reference, and the cheapest offer of the same series.
+  const options = useOptions()
+  const nowSec = useNowSec(60)
+  const worth = exerciseValue(o, reference)
+  const worthRow: NoteTerm[] =
+    worth !== null && reference.perUnit !== null
+      ? [moneyRow('Exercise value', { token: q, amount: worth > 0n ? worth : 0n }, `At the ${reference.label.toLowerCase()} ${priceText(reference.perUnit, q)}.`)]
+      : []
+  const ofSeries = useMemo(() => (options.data ?? []).filter((x) => x.state === 'offered' && x.expiry > nowSec && x.underlying.contractId === u.contractId), [options.data, nowSec, u.contractId])
+  const lowest = strike !== null ? lowestOpenInSeriesOf(ofSeries, { kind: o.kind, underlying: u, strikePerUnit: strike, expiry: o.expiry }, q) : null
+  const lowestRow: NoteTerm[] = lowest ? [{ label: 'Lowest open offer in this series', value: priceText(premiumPerUnit(lowest), q), hint: `Per ${u.code}. Offer No. ${serialOf(lowest.id)}, for ${moneyText({ token: u, amount: lowest.underlyingQty })}.` }] : []
 
   const deal: Deal = {
     mode: 'list',
     title: ticketTitle('list', o.kind, u.code, repricing),
+    reviewTitle: reviewTitle('list', repricing),
     summary: signSummary('list', `your ${o.kind} on ${moneyText({ token: u, amount: o.underlyingQty })}`, { receives: priceLabel }),
-    // The payoff figure shows what is being sold: the option as its holder has it.
-    leg: askTotal === null ? null : o,
+    // The terms being sold; the review draws no payoff figure (keeping and selling are different questions).
+    leg: askTotal === null || invalid !== null ? null : o,
     side: 'long',
     action,
     terms: (
-      <TermsList
-        rows={[
-          kindRow(o.kind),
-          strikeRow(o),
-          deadlineRow(o.expiry),
-          quantityRow(o),
-          moneyRow('Premium you paid', { token: q, amount: o.totalPremium }, 'Paid to the writer when the option was bought.'),
-          ...(current !== null ? [moneyRow('Listed now', { token: q, amount: current })] : []),
-        ]}
-      >
+      <TermsList rows={[kindRow(o.kind), strikeRow(o), deadlineRow(o.expiry), quantityRow(o), original, ...worthRow, ...lowestRow, ...(current !== null ? [moneyRow('Listed now', { token: q, amount: current })] : [])]}>
         <div className={styles.price}>
           <AmountField
             label={`Your price, ${q.code} in total`}
@@ -106,21 +125,14 @@ function ListTicket({ option: o, current, readAt, startAt }: { option: OptionOff
       </TermsList>
     ),
     termsError: invalid,
-    impact: price
-      ? [
-          moneyRow('You receive', price, 'From the buyer, when someone takes the listing. Nothing until then.', true),
-          nothingRow('You lock', 'The option stays yours until it is bought: you can still exercise it or cancel the listing.'),
-          moneyRow('Premium you paid', { token: q, amount: o.totalPremium }),
-          deadlineRow(o.expiry, true),
-          { label: 'Counterparty', value: 'None yet', hint: 'Any account the issuer has authorized can take the listing.' },
-          { label: 'Writer', value: <Party role="Writer" address={o.writer} me={me} named={false} />, hint: `${moneyText(collateral)} stays locked in the contract` },
-        ]
-      : [],
-    readAt: readAtText(readAt),
+    serial: `Option No. ${serialOf(o.id)}`,
+    money: price ? [leadRow('You receive', price)] : [],
+    details: [strikeRow(o), quantityRow(o), deadlineRow(o.expiry), original, partyRow('Maker', o.writer, me)],
+    readAt,
+    commitment: COMMITMENT.list,
     issuerDisclosure: false,
-    consent: CONSENT.list,
     actionLabel: `List for ${priceLabel}`,
-    chartTitle: `Payoff at expiry of the ${o.kind} you are selling, on ${moneyText({ token: u, amount: o.underlyingQty })}`,
+    chartTitle: null,
     series: null,
     reference,
   }
@@ -132,7 +144,7 @@ function ListTicket({ option: o, current, readAt, startAt }: { option: OptionOff
     kind: `${positionWords('long', o.kind)}, ${u.code}, for sale`,
     terms: [
       { label: 'Your price', value: priceLabel, marked: true },
-      { label: 'Strike', value: priceText(strike, q) },
+      { label: 'Strike', value: `${priceText(strike, q)} per ${u.code}` },
       { label: 'Quantity', value: moneyText({ token: u, amount: o.underlyingQty }) },
       { label: 'Deadline', value: formatUtc(o.expiry) },
       { label: 'Collateral', value: `${moneyText(collateral)} in the contract` },

@@ -45,15 +45,9 @@
     color: inherit;
   }
 
-  .triangle {
-    margin-inline-start: var(--s-4);
-    font-family: var(--font-sans);
-    font-size: 0.62em;
-    transform: translateY(-0.12em);
-  }
-
   /* With an exact value behind it the figure is a button. It looks like the figure until hovered or focused. */
   .trigger {
+    position: relative;
     padding: 0;
     border: 0;
     border-radius: var(--r-tag);
@@ -75,6 +69,16 @@
     &[data-popup-open],
     &:focus-visible {
       text-decoration-color: var(--control);
+    }
+
+    /* Touch: the figure keeps its look; its hit area is 44 px high. */
+    @media (pointer: coarse) {
+      &::after {
+        content: '';
+        position: absolute;
+        inset-block: min(0px, calc((100% - var(--touch)) / 2));
+        inset-inline: calc(var(--s-4) * -1);
+      }
     }
   }
 

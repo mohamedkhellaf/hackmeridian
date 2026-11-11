@@ -10,12 +10,18 @@ export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>,
   external?: boolean
   /** `accent` is the default link ink. `ink` is body-coloured and underlined. `quiet` is muted until hovered. */
   tone?: 'accent' | 'ink' | 'quiet'
+  /**
+   * A link that stands on its own line or in a row of actions, not inside a sentence ("Open Activity", "Back to
+   * your portfolio"). On touch screens its hit area grows to 44 px high without changing its look. Leave it off
+   * for a link inside running text, where a taller hit area would reach into the lines around it.
+   */
+  standalone?: boolean
   /** Replace the anchor, for example with a router link: `render={<RouterLink to="/learn" />}`. */
   render?: ReactElement<Record<string, unknown>>
   className?: string
 }
 
-export function Link({ external = false, tone = 'accent', render, className, children, ...rest }: LinkProps) {
+export function Link({ external = false, tone = 'accent', standalone = false, render, className, children, ...rest }: LinkProps) {
   const externalProps = external ? { target: '_blank', rel: 'noopener noreferrer' } : {}
   return useRender({
     defaultTagName: 'a',
@@ -35,7 +41,7 @@ export function Link({ external = false, tone = 'accent', render, className, chi
           </>
         ),
       },
-      { 'data-tone': tone } as Record<string, unknown>,
+      { 'data-tone': tone, 'data-standalone': standalone || undefined } as Record<string, unknown>,
       externalProps,
       rest,
     ),

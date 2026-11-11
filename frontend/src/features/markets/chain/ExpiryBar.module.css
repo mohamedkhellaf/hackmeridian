@@ -7,6 +7,15 @@
     min-width: 0;
   }
 
+  /* A date with no order: quieter than the others, until it is the one chosen. */
+  .date[data-quiet] {
+    color: var(--muted);
+  }
+
+  :where([data-checked]) .date[data-quiet] {
+    color: inherit;
+  }
+
   .other {
     display: inline-flex;
     align-items: center;

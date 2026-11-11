@@ -24,7 +24,16 @@ export type TxStageName = TxStage['stage']
 /** Optional last argument of every client write. */
 export interface TxOptions {
   onStage?: (stage: TxStage) => void
+  /**
+   * Aborted when the user stops waiting for a wallet that never answers (review finding 42). Honoured only while
+   * the write waits for the signature: it then rejects as `declined` and nothing is sent, even if the wallet
+   * answers later. Once signed, the transaction goes on and the signal is ignored.
+   */
+  signal?: AbortSignal
 }
+
+/** What a write rejects with when the user stopped waiting for the wallet. */
+export const STOPPED_WAITING = 'You stopped waiting for the wallet. Nothing was signed, so nothing was sent.'
 
 /** What a confirmed write resolves with. `ledger` is the ledger that included it, when the client knows it. */
 export interface TxReceipt {
@@ -32,7 +41,7 @@ export interface TxReceipt {
   ledger?: number | null
 }
 
-/** Outcome of `runTx`: decided by the transaction alone, never by the reads that follow it. */
+/** Outcome of a transaction run: decided by the transaction alone, never by the reads that follow it. */
 export type TxOutcome = { ok: true; hash: string; mock: boolean } | { ok: false; error: string }
 
 /** Result of a transaction as a one-line notice. */

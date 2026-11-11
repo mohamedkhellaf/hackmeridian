@@ -56,16 +56,26 @@
     color: var(--text);
   }
 
-  .caption {
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
+  /* The drawing keeps the height of its tallest state (three key rows and the paid line), so the dialog does not
+     move while the slider does. */
+  .figure {
+    min-height: 7.5rem;
   }
 
-  .consent {
-    margin-top: var(--s-20);
-    padding-top: var(--s-12);
-    border-top: 1px solid var(--hairline);
+  /* What is agreed to, directly above the action. Last in the footer's markup: the phone footer stacks in
+     reverse, which puts it on top; wide, it is moved to a line of its own above the buttons. */
+  .line {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  @media (min-width: 768px) {
+    .line {
+      flex-basis: 100%;
+      order: -1;
+    }
   }
 
   @media (max-width: 767.98px) {

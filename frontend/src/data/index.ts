@@ -9,7 +9,7 @@ export type { OptionsClientHandle } from './useOptionsClient'
 export { queryClient, createQueryClient, POLL_MS, STALE_MS } from './queryClient'
 export type { Cadence } from './queryClient'
 export { keys, makeKeys, idKey } from './keys'
-export { useNowSec } from './clock'
+export { useNowSec, useLedgerNowMs, useLedgerOffsetMs } from './clock'
 
 // Reads
 export {
@@ -38,15 +38,17 @@ export { useNetworkStatus, NETWORK_STATE_LABEL } from './network'
 export type { NetworkState, NetworkStatus } from './network'
 
 // Derived views
-export { useAsset, useMarket, useMarketsIndex, useBook, useGuidedMatch, usePositions, usePosition, useTodo, useActionsWaiting, usePortfolioKpis, optionReference, isNotFoundMessage } from './derived'
+export { useAsset, useMarket, useMarketsIndex, useBook, useGuidedMatch, usePositions, usePosition, useTodo, useRequestTodo, useActionsWaiting, usePortfolioKpis, optionReference, isNotFoundMessage } from './derived'
 export type { Derived, ViewOptions, PortfolioOptions, PositionDetail, AssetRoute } from './derived'
 export { LADDER_ROWS } from './derived/market'
 export type { MarketView, ExpiryColumn, GridRow, GridCell, OtherOrder, MarketSummary, BookView, BookEntry, MarketIndexRow, MarketSource } from './derived/market'
-export type { PositionView, PositionsView, TodoView, TodoTone } from './derived/positions'
+export type { PositionView, PositionsView, TodoView, TodoTone, RequestTodoView } from './derived/positions'
 export type { GuidedMatch, GuidedAlternative, GuidedTermsInput } from './derived/guided'
 
 // Transactions
-export { useTx, useTxBusy, useSubjectBusy } from './tx/useTx'
+export { useTx, useTxBusy, useSubjectBusy, STOP_WAITING_AFTER_MS } from './tx/useTx'
+export { useUnsettledTx } from './tx/useUnsettledTx'
+export type { UnsettledTx } from './tx/useUnsettledTx'
 export type { TxController, TxDescription, UseTxOptions } from './tx/useTx'
 export type { TxRun, TxMeta } from './tx/runner'
 export { useActivity } from './tx/useActivity'

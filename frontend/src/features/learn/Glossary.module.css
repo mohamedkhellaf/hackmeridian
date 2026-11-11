@@ -7,6 +7,8 @@
   }
 
   .entry {
+    /* A link to a term lands under the section select, which stays at the top below 1200 px. */
+    scroll-margin-top: var(--s-72);
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--s-2);
@@ -26,15 +28,16 @@
     }
   }
 
+  /* A term is a label of the list, in the interface's voice: sans, medium. Serif is for the headings. */
   .term {
-    font-family: var(--font-serif);
-    font-size: var(--figure-size);
-    line-height: var(--figure-line);
-    font-weight: 600;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 550;
     color: var(--text);
   }
 
   .definition {
+    max-width: var(--measure);
     margin: 0;
     color: var(--text-2);
     text-wrap: pretty;

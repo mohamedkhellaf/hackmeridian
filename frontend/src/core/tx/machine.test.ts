@@ -52,7 +52,7 @@ describe('transaction machine: where it can stop', () => {
   })
 
   it('a wallet rejection is declined, not failed, with nothing sent', () => {
-    const s = play([{ type: 'start' }, stage('signing'), { type: 'error', error: new TxError('declined', 'You rejected the request in your wallet.') }])
+    const s = play([{ type: 'start' }, stage('signing'), { type: 'error', error: new TxError('declined', 'You declined to sign in your wallet.') }])
     expect(s).toMatchObject({ phase: 'declined', hash: null, effect: 'nothing-sent' })
     expect(canStart(s)).toBe(true)
   })
@@ -169,7 +169,7 @@ describe('runMachine', () => {
     const { state, result } = await runMachine<{ hash: string }>(
       async ({ onStage }) => {
         onStage({ stage: 'signing' })
-        throw new TxError('declined', 'You rejected the request in your wallet.')
+        throw new TxError('declined', 'You declined to sign in your wallet.')
       },
       (s) => seen.push(s.phase),
     )

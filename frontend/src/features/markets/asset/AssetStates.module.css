@@ -6,25 +6,8 @@
     min-width: 0;
   }
 
-  .skeletonBody {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--s-32);
-    margin-top: var(--s-8);
-  }
-
-  .skeletonRail {
-    display: none;
-  }
-
-  @media (min-width: 1200px) {
-    .skeletonBody {
-      grid-template-columns: minmax(0, 1fr) var(--rail-w);
-    }
-
-    .skeletonRail {
-      display: block;
-    }
+  .skeletonRows {
+    margin-top: var(--s-24);
   }
 
   .state {

@@ -15,7 +15,7 @@ import {
   SECTIONS,
   STATIC_COPY,
   WHAT_THIS_IS,
-  exampleSerial,
+  breakevenLabel,
   intentsIntro,
   lifecycleBranches,
   lifecycleIntro,
@@ -34,11 +34,12 @@ function renderedCopy(): string[] {
   const out: string[] = []
   const put = workedExample(LIFECYCLE_TERMS)
   out.push(lifecycleIntro(put), intentsIntro(put, DEADLINE))
-  for (const step of [...lifecycleSpine(put, DEADLINE), ...lifecycleBranches(put).flatMap((b) => [{ when: b.title, who: b.label, title: '', text: '' }, ...b.steps])]) {
-    out.push(step.when, step.who, step.title, step.text, step.state ?? '')
+  for (const step of [...lifecycleSpine(put, DEADLINE), ...lifecycleBranches(put).flatMap((b) => b.steps)]) {
+    out.push(step.when, step.title, step.text, step.state ?? '')
   }
+  out.push(...lifecycleBranches(put).map((b) => b.label))
   const examples = workedExamples()
-  examples.forEach((x, i) => {
+  for (const x of examples) {
     const copy = INTENT_COPY[x.intent]
     out.push(
       x.name,
@@ -49,21 +50,23 @@ function renderedCopy(): string[] {
       copy.trade(x),
       copy.strikeLabel(x),
       copy.premiumLabel,
-      copy.breakevenLabel(x),
-      copy.breakevenHint,
+      breakevenLabel(x),
       copy.collateralLabel,
-      copy.maxLossHint(x),
-      copy.maxGainHint(x),
+      copy.maxLossHint?.(x) ?? '',
+      copy.maxGainHint?.(x) ?? '',
+      copy.givesUp?.value(x) ?? '',
+      copy.givesUp?.hint(x) ?? '',
       copy.chartTitle(x),
       copy.withLabel,
       copy.withoutLabel,
-      copy.levelLabel?.(x) ?? '',
+      copy.comparedWith,
+      copy.sameAs,
+      copy.levelLabel(x),
       copy.action,
-      exampleSerial(i + 1, examples.length),
       premiumPerUnit(x),
     )
     for (const s of x.scenarios) out.push(scenarioLabel(x, s), scenarioDelta(x, s), copy.outcome(x, s))
-  })
+  }
   return out.filter((text) => text !== '')
 }
 
@@ -85,11 +88,15 @@ describe('the structure of the Learn page', () => {
     expect(Object.keys(INTENT_COPY).sort()).toEqual(GUIDED_INTENTS.map((i) => i.id).sort())
   })
 
-  it('defines the vocabulary of the brief, in alphabetical order, one sentence per term', () => {
+  it('defines the vocabulary of the interface, in alphabetical order, one sentence per term', () => {
     const terms = GLOSSARY.map((g) => g.term)
-    for (const required of ['Offer', 'Bid', 'Request', 'Maker', 'Holder', 'Writer', 'Collateral', 'Strike', 'Premium', 'Expiry', 'Exercise', 'Claim delivery', 'Reclaim', 'Deadline', 'Reserves', 'Resale listing', 'Covered', 'Margin']) {
+    for (const required of ['Offer', 'Request', 'Maker', 'Holder', 'Writer', 'Collateral', 'Strike', 'Premium', 'Exercise', 'Claim delivery', 'Reclaim', 'Deadline', 'Reserves', 'Resale listing', 'Covered', 'Margin', 'Breakeven', 'In the money']) {
       expect(terms).toContain(required)
     }
+    // One word per thing: no entry exists only to say that a second name exists.
+    for (const alias of ['Bid', 'Expiry']) expect(terms).not.toContain(alias)
+    expect(GLOSSARY.find((g) => g.term === 'Writer')!.definition).toMatch(/^In Margin,/)
+    expect(GLOSSARY.find((g) => g.term === 'Request')!.definition).toContain('the contract calls it a bid')
     expect(terms).toEqual([...terms].sort((a, b) => a.localeCompare(b, 'en')))
     expect(new Set(terms).size).toBe(terms.length)
     for (const entry of GLOSSARY) {
@@ -100,6 +107,8 @@ describe('the structure of the Learn page', () => {
 
   it('lists the limits, the questions and the rules without duplicates', () => {
     expect(RISKS.map((r) => r.id)).toEqual(['deadline', 'thin', 'testnet', 'unaudited'])
+    // A question is here only when no section above answers it.
+    expect(QUESTIONS.map((q) => q.id)).toEqual(['real-money', 'start', 'who-sells', 'premium-back', 'leave-early', 'price', 'fees'])
     expect(new Set(QUESTIONS.map((q) => q.id)).size).toBe(QUESTIONS.length)
     expect(new Set(RULES.map((r) => r.rule)).size).toBe(RULES.length)
   })
@@ -118,8 +127,16 @@ describe('the wording of the Learn page', () => {
 
   it('never calls Margin fully collateralized', () => {
     for (const text of [MARGIN_TITLE, MARGIN_INTRO, MARGIN_LINK, ...MARGIN_POINTS]) expect(findBannedWords(text, MARGIN_BANNED_WORDS), text).toEqual([])
-    const margin = QUESTIONS.find((q) => q.id === 'covered-margin')!
-    expect(findBannedWords(margin.answer.join(' '), MARGIN_BANNED_WORDS)).toEqual([])
+    for (const g of GLOSSARY.filter((entry) => /margin/i.test(entry.definition))) expect(findBannedWords(g.definition, MARGIN_BANNED_WORDS), g.term).toEqual([])
+  })
+
+  it('carries no hedge word as a caption: not "experimental", not "fictional"', () => {
+    for (const text of ALL_COPY) expect(text, text).not.toMatch(/\b(experimental|fictional)\b/i)
+  })
+
+  it('prints the recorded fees exactly, never rounded up', () => {
+    const fees = QUESTIONS.find((q) => q.id === 'fees')!.answer.join(' ')
+    for (const fee of ['0.0309366', '0.0031976', '0.0079873', '0.0010223']) expect(fees).toContain(fee)
   })
 
   it('has no dashes used as punctuation, arrows, exclamation marks or emoji', () => {
@@ -170,7 +187,18 @@ describe('the wording of the Learn page', () => {
       'You exercise: pay 50.00 USDx and receive 5.00 BOND worth 60.00 USDx, less the 1.90 USDx you paid.',
     )
     expect(plain(premiumPerUnit(floor))).toBe('0.36 USDx per BOND')
-    expect(plain(scenarioDelta(floor, floor.scenarios[0]))).toBe('+8.20 USDx more than without')
-    expect(plain(scenarioDelta(floor, floor.scenarios[1]))).toBe('−1.80 USDx less than without')
+    // The sign carries the direction; the words stay neutral, so a loss never reads as a double negative.
+    expect(plain(scenarioDelta(floor, floor.scenarios[0]))).toBe('+8.20 USDx compared with no floor')
+    expect(plain(scenarioDelta(floor, floor.scenarios[1]))).toBe('−1.80 USDx compared with no floor')
+    expect(plain(scenarioDelta(earnBuy, earnBuy.scenarios[0]))).toBe('−6.30 USDx compared with keeping the cash')
+    expect(plain(scenarioDelta(earnHold, earnHold.scenarios[2]))).toBe('−6.55 USDx compared with just holding')
+  })
+
+  it('gives a written call no loss figure: it states what is given up', () => {
+    const earnHold = workedExamples()[1]
+    const givesUp = INTENT_COPY['earn-hold'].givesUp!
+    expect(plain(givesUp.value(earnHold))).toBe('Every rise above 10.50 USDx per BOND')
+    expect(plain(givesUp.hint(earnHold))).toBe('You cannot owe more than the 5.00 BOND you lock; it can still fall in price.')
+    for (const intent of ['floor', 'earn-buy', 'lock-buy'] as const) expect(INTENT_COPY[intent].givesUp).toBeUndefined()
   })
 })

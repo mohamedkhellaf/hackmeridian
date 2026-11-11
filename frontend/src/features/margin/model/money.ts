@@ -32,3 +32,14 @@ export function usdxInput(v: bigint): string {
 
 /** For drawings only (health bar, waterfall). Never for a figure that is printed or signed. */
 export { toChartNumber } from '../../../core/pro/coverage'
+
+/**
+ * A share in basis points as a percentage: `1000` is `10 %`, `250` is `2.5 %`. Exact: 1 bp is 0.01 %, so two
+ * decimals hold every value; trailing zeros are dropped.
+ */
+export function bpsPercent(bps: number): string {
+  const b = Math.max(0, Math.trunc(bps))
+  const whole = Math.floor(b / 100)
+  const frac = (b % 100).toString().padStart(2, '0').replace(/0+$/, '')
+  return `${whole}${frac ? `.${frac}` : ''} %`
+}

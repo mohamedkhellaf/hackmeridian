@@ -3,7 +3,7 @@
 // applied to <html> as data attributes that `ui/tokens/tokens.css` reads. The ui kit holds no storage; this
 // module owns it and calls the kit's three `apply*` functions.
 import { useSyncExternalStore } from 'react'
-import { DENSITY_CHOICES, PNL_SCHEMES, THEME_CHOICES, applyDensity, applyPnlScheme, applyTheme } from '../ui/theme'
+import { PNL_SCHEMES, THEME_CHOICES, applyDensity, applyPnlScheme, applyTheme } from '../ui/theme'
 import type { DensityChoice, PnlScheme, ThemeChoice } from '../ui/theme'
 
 export type { DensityChoice, PnlScheme, ThemeChoice } from '../ui/theme'
@@ -37,7 +37,9 @@ export function parseSettings(text: string | null | undefined): Settings {
     const r = raw as Record<string, unknown>
     return {
       theme: pick(r.theme, THEME_CHOICES, DEFAULT_SETTINGS.theme),
-      density: pick(r.density, DENSITY_CHOICES, DEFAULT_SETTINGS.density),
+      // The density control was taken out of the menu (ruling E23): a value stored before that is not applied
+      // again, or a browser would stay compact with no control left to change it. Kept in the type for callers.
+      density: DEFAULT_SETTINGS.density,
       pnl: pick(r.pnl, PNL_SCHEMES, DEFAULT_SETTINGS.pnl),
       mode: pick(r.mode, MODE_CHOICES, DEFAULT_SETTINGS.mode),
     }

@@ -1,7 +1,8 @@
 @layer features {
+  /* A tool beside the product: the sunken ground with a solid hairline (no dashed fence). */
   .root {
     scroll-margin-top: var(--s-72);
-    border-style: dashed;
+    border-color: var(--hairline);
   }
 
   .summary {

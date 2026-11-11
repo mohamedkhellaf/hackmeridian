@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { BANNED_WORDS, findBannedWords } from '../../core/disclosures'
+import { BANNED_TAGLINES, BANNED_WORDS, findBannedWords } from '../../core/disclosures'
 import type { TokenInfo } from '../../core/options/types'
 import type { Bid } from '../../core/requests/types'
 import {
   DEFAULT_SORT,
+  asOf,
   boardRequests,
   boardTotals,
   filterRequests,
   holdsEscrow,
+  isClosed,
   lockShortfall,
   myRequests,
   openRequests,
@@ -128,12 +130,22 @@ describe('my requests', () => {
     expect(myRequests(bids, null)).toEqual([])
   })
 
-  it('shows what still holds the premium first, then filled, then closed, newest first', () => {
-    expect(myRequests(bids, ME).map((b) => b.id)).toEqual([5n, 4n, 3n, 6n, 2n, 7n, 1n])
+  it('puts the expired request whose premium waits first, then open by deadline, then filled, then closed, newest first', () => {
+    expect(myRequests(bids, ME).map((b) => b.id)).toEqual([3n, 5n, 4n, 6n, 2n, 7n, 1n])
   })
 
-  it('knows which requests still hold the premium', () => {
+  it('knows which requests still hold the premium, and which are closed for good', () => {
     expect(bids.filter(holdsEscrow).map((b) => b.id)).toEqual([3n, 4n, 5n, 8n])
+    expect(bids.filter(isClosed).map((b) => b.id)).toEqual([1n, 7n])
+  })
+})
+
+describe('the state as of now', () => {
+  it('reads an open request whose deadline has passed since the last read as expired, and leaves the rest', () => {
+    const bids = [bid({ id: 1n, expiry: NOW - 1 }), bid({ id: 2n, expiry: NOW }), bid({ id: 3n, expiry: NOW + 1 }), bid({ id: 4n, state: 'filled', expiry: NOW - 1 })]
+    expect(asOf(bids, NOW).map((b) => b.state)).toEqual(['expired', 'expired', 'open', 'filled'])
+    // The input is not changed.
+    expect(bids[0].state).toBe('open')
   })
 })
 
@@ -178,6 +190,15 @@ describe('a row', () => {
     expect(row.optionId).toBe(44n)
     expect(row.stateName).toBe('Filled')
     expect(row.escrow).toBe('paid')
+  })
+
+  it('carries the reference price with its two-word label, and none when asked for none', () => {
+    expect(toRow(bid(), null).reference).toBeNull()
+    const demo = toRow(bid(), null, 'mock').reference
+    expect(demo?.label).toBe('Demo price')
+    expect(demo?.text).toMatch(/^\d[\d,]*\.\d{2}$/)
+    // The faucet price exists only for the assets listed on Testnet; a mock asset has none there.
+    expect(toRow(bid(), null, 'testnet').reference).toBeNull()
   })
 
   it('names each state as the contract does and says where the premium is', () => {
@@ -238,29 +259,43 @@ describe('copy', () => {
     copy.boardSummary(4, 4, '5.99 USDx'),
     copy.boardSummary(2, 4, '3.00 USDx'),
     copy.boardSummary(0, 0, null),
-    copy.sellLabel(row),
+    copy.fillLabel(row),
     copy.cancelLabel(row),
+    copy.takeBackLabel(row),
     copy.positionLabel(row),
     copy.cancelTitle(row.serial),
+    copy.takeBackTitle(row.serial),
+    copy.takeBack(row.premium),
     copy.strikePerUnitOf(row),
+    copy.inTotal(row),
     copy.confirmedInLedger(58_331_204),
-    copy.cancelDone(row.premium),
-    copy.chooserOpenCount(0),
-    copy.chooserOpenCount(1),
-    copy.chooserOpenCount(3),
     copy.youLock(row.lock),
     copy.listTitle(row),
     copy.strikeLine(row),
+    copy.refreshFailed('14:26:32 UTC'),
+    copy.noFunds(['USDx']),
+    copy.noFunds(['USDx', 'EQTY']),
+    copy.showMore(25),
+    copy.sortMenuLabel('Soonest deadline'),
   )
 
   it('collected the strings of the page', () => {
     expect(strings.length).toBeGreaterThan(60)
   })
 
-  it('uses no banned word, no em dash, no arrow, no exclamation mark', () => {
+  it('uses no banned word, no tagline, no em dash, no arrow, no exclamation mark', () => {
     for (const text of strings) {
       expect(findBannedWords(text, BANNED_WORDS), text).toEqual([])
+      expect(findBannedWords(text, BANNED_TAGLINES), text).toEqual([])
       expect(text, text).not.toMatch(/[—→←!]|->/)
+    }
+  })
+
+  it('says request, deadline and maker, one word per thing (rulings R7 and E7)', () => {
+    for (const text of strings) {
+      expect(text, text).not.toMatch(/\bbids?\b/i)
+      expect(text, text).not.toMatch(/\bexpiry\b/i)
+      expect(text, text).not.toMatch(/\b(writer|seller|counterparty)\b/i)
     }
   })
 
@@ -272,14 +307,17 @@ describe('copy', () => {
     expect(copy.boardSummary(1, 1, '2.00 USDx')).toBe('1 open request. 2.00 USDx of premium is escrowed in the contract.')
     expect(copy.boardSummary(4, 4, '5.99 USDx')).toBe('4 open requests. 5.99 USDx of premium is escrowed in the contract.')
     expect(copy.boardSummary(2, 4, '3.00 USDx')).toBe('2 of 4 open requests shown, with 3.00 USDx of premium escrowed in the contract.')
-    expect(copy.chooserOpenCount(0)).toBe('No open requests')
-    expect(copy.chooserOpenCount(1)).toBe('1 open request')
+    expect(copy.noFunds(['USDx'])).toBe('Your wallet holds no USDx.')
+    expect(copy.noFunds(['USDx', 'EQTY'])).toBe('Your wallet holds no USDx or EQTY.')
   })
 
   it('starts each accessible name with the visible label', () => {
-    expect(copy.sellLabel(row).startsWith(copy.SELL_TO_BID)).toBe(true)
+    expect(copy.fillLabel(row).startsWith(copy.FILL_REQUEST)).toBe(true)
     expect(copy.cancelLabel(row).startsWith(copy.CANCEL_REQUEST)).toBe(true)
+    expect(copy.takeBackLabel(row).startsWith(copy.takeBack(row.premium))).toBe(true)
     expect(copy.positionLabel(row).startsWith(copy.VIEW_POSITION)).toBe(true)
-    expect(copy.sellLabel(row)).toBe('Sell to this bid: put on 5.00 FUND at 10.00 USDx, until 16 Jan 2027, 08:00 UTC, premium 2.00 USDx, you lock 50.00 USDx')
+    expect(copy.sortMenuLabel('Soonest deadline').startsWith(copy.SORT_SHORT)).toBe(true)
+    expect(copy.fillLabel(row)).toBe('Fill request: put on 5.00 FUND at 10.00 USDx, until 16 Jan 2027, 08:00 UTC, premium 2.00 USDx, you lock 50.00 USDx')
+    expect(copy.takeBack(row.premium)).toBe('Take back 2.00 USDx')
   })
 })

@@ -599,3 +599,20 @@ describe('series names', () => {
     }
   })
 })
+
+describe('chainExpiries: the closing deadline keeps its tab (late finding errors-edge 3)', () => {
+  const FRI = Date.UTC(2026, 10, 13, 8, 0, 0) / 1000 // Friday 13 Nov 2026, 08:00 UTC
+
+  it('in the last hour before a Friday deadline, shows it first while new orders can no longer pick it', async () => {
+    const { chainExpiries, standardExpiries } = await import('./standard')
+    const at = FRI - 10 * 60 // 07:50
+    expect(standardExpiries(at)).not.toContain(FRI)
+    expect(chainExpiries(at)[0]).toBe(FRI)
+    expect(chainExpiries(at).slice(1)).toEqual(standardExpiries(at))
+  })
+
+  it('is the listed set at any other time, and after the deadline', async () => {
+    const { chainExpiries, standardExpiries } = await import('./standard')
+    for (const at of [FRI - 2 * 3_600, FRI - 3_600, FRI, FRI + 60, FRI - 3 * 86_400]) expect(chainExpiries(at)).toEqual(standardExpiries(at))
+  })
+})

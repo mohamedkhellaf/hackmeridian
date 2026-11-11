@@ -5,13 +5,13 @@ import { usePro } from '../../../data'
 import type { ProCall } from '../../../data'
 import { useWallet } from '../../../wallet'
 import { MarginUiCtx } from './marginUi'
-import type { MarginUi, ResultFact } from './marginUi'
+import type { MarginUi, ResultView } from './marginUi'
 
 /** Wraps the Margin screens: one way to run a call, one place where its result is shown. */
 export function MarginUiProvider({ children }: { children: ReactNode }) {
   const { run, simulated, me } = usePro()
   const wallet = useWallet()
-  const [facts, setFacts] = useState<ResultFact[] | null>(null)
+  const [result, setResult] = useState<ResultView | null>(null)
   const resultRef = useRef<HTMLElement | null>(null)
 
   // Focus goes to the result region when a call starts: progress shows there, and the button that was pressed
@@ -42,21 +42,21 @@ export function MarginUiProvider({ children }: { children: ReactNode }) {
   )
 
   const act = useCallback(
-    async <T,>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T) => ResultFact[]): Promise<CallResult<T>> => {
-      setFacts(null)
+    async <T,>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T) => ResultView): Promise<CallResult<T>> => {
+      setResult(null)
       sendFocus(true)
-      const result = await run(what.label, call, what.done)
-      setFacts(result.ok && describe ? describe(result.value) : null)
+      const out = await run(what.label, call, what.done)
+      setResult(out.ok && describe ? describe(out.value) : null)
       sendFocus(false)
-      return result
+      return out
     },
     [run, sendFocus],
   )
 
   const connect = wallet.connect
   const value = useMemo<MarginUi>(
-    () => ({ act, facts, resultRef, canAct: simulated || me !== '', connect: () => void connect() }),
-    [act, facts, simulated, me, connect],
+    () => ({ act, result, resultRef, canAct: simulated || me !== '', connect: () => void connect() }),
+    [act, result, simulated, me, connect],
   )
   return <MarginUiCtx.Provider value={value}>{children}</MarginUiCtx.Provider>
 }

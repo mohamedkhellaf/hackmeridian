@@ -10,16 +10,34 @@ export interface ResultFact {
   value: bigint | string
   /** A shortfall, debt or deficit above zero. */
   loss?: boolean
+  /** A second figure of the same thing (the time left under an expiry). */
+  hint?: string
+}
+
+/** Who paid a holder, from the amounts a settle or claim call returned. Drawn as the payout waterfall. */
+export interface ResultSplit {
+  /** "Owed 30,000.00 USDx" is built from it. */
+  due: bigint
+  /** In payment order. A `deficit` part is what nobody paid: hatched. */
+  parts: { id: string; label: string; value: bigint; kind?: 'deficit' }[]
+}
+
+/** What the result region shows after a call that went through: a receipt. */
+export interface ResultView {
+  facts: ResultFact[]
+  split?: ResultSplit
+  /** The way on: the screen where what the call made can be followed. */
+  next?: { label: string; to: string }
 }
 
 export interface MarginUi {
   /**
    * Runs a Margin call through the shared transaction layer, keeps what it returned for the result region and
-   * moves focus there. `describe` turns the call's value into the lines shown under the confirmation.
+   * moves focus there. `describe` turns the call's value into the receipt shown under the confirmation.
    */
-  act: <T>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T) => ResultFact[]) => Promise<CallResult<T>>
+  act: <T>(what: { label: string; done: string }, call: ProCall<T>, describe?: (value: T) => ResultView) => Promise<CallResult<T>>
   /** What the last call returned, when it has more to say than "done". */
-  facts: ResultFact[] | null
+  result: ResultView | null
   /** The result region: focus is sent here when a call starts and when it ends. */
   resultRef: RefObject<HTMLElement | null>
   /** False on the Testnet contract without a wallet: writes are replaced by "Connect wallet". */

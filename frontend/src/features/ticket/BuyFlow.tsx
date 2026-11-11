@@ -1,29 +1,37 @@
-// Buy a maker's funded offer: the buyer pays the premium and becomes the holder. One offer is one lot.
-import { useMemo } from 'react'
+// Buy a maker's funded offer: the buyer pays the premium and becomes the holder. One offer is one lot. There is
+// nothing to set, so the ticket opens on its review.
+import { useMemo, useState } from 'react'
 import { PREMIUM_DISCLOSURE } from '../../core/disclosures'
 import { formatUtc } from '../../core/format'
 import type { PreTradeAction } from '../../core/options/preTrade'
 import { requiredCollateral } from '../../core/options/types'
 import type { OptionOffer } from '../../core/options/types'
 import { plainDecimal } from '../../core/series'
-import { isNotFoundMessage, useBalancesById, useBuy, useMe, useOption, useReference } from '../../data'
-import { CONSENT, LOADING_TITLE, optionPhrase, receiptReminder, receiptTitle, settlementSentence, signSummary, ticketTitle } from './copy'
+import { lowestOpenInSeriesOf } from '../../core/maker/lowestOffer'
+import { isNotFoundMessage, useBuy, useMe, useNowSec, useOption, useOptions, useReference } from '../../data'
+import { Button } from '../../ui'
+import { COMMITMENT, LOADING_TITLE, optionPhrase, receiptReminder, receiptTitle, signSummary, ticketTitle } from './copy'
 import { Flow } from './Flow'
 import type { Deal } from './Flow'
-import { errorText, moneyText, priceText, readAtText } from './fmt'
+import { errorText, moneyText, priceText } from './fmt'
 import type { TicketIntent } from './intent'
-import { Party } from './parts'
 import { calendarFor } from './calendar'
 import type { ReceiptView } from './ReceiptStep'
-import { breakevenRow, deadlineRow, kindRow, moneyRow, mostYouCanLoseRow, nothingRow, quantityRow, receiptTerms, strikeRow } from './rows'
+import { breakevenRow, deadlineRow, leadRow, moneyRow, mostYouCanLoseRow, partyRow, quantityRow, receiptTerms, strikeRow } from './rows'
 import { FlowError, FlowGone, FlowLoading } from './states'
-import { exerciseGives, exerciseReceives, glyphOf, positionWords, premiumPerUnit, serialOf, strikePerUnit } from './terms'
-import { TermsList } from './TermsList'
+import { glyphOf, positionWords, premiumPerUnit, serialOf, strikePerUnit } from './terms'
+import { holderWords, outcomeFor } from './words'
 
-export function BuyFlow({ intent, startAt }: { intent: Extract<TicketIntent, { mode: 'buy' }>; startAt?: 'terms' | 'review' }) {
+export function BuyFlow({ intent, onIntentChange }: { intent: Extract<TicketIntent, { mode: 'buy' }>; onIntentChange?: (next: TicketIntent) => void }) {
   // Kept fresh while the ticket is open: the offer can be bought, cancelled or expire under the reader.
   const query = useOption(intent.offerId, { cadence: 'book' })
+  const nowSec = useNowSec(30)
   const offer = query.data
+  // Once the ticket has shown the offer open it stays the ticket (a purchase, this one included, changes the state
+  // under it; the re-check says so). Opened on an offer that is no longer open, it says that instead.
+  const [shownOpen, setShownOpen] = useState(false)
+  const open = offer !== undefined && offer.state === 'offered' && offer.expiry > nowSec
+  if (open && !shownOpen) setShownOpen(true)
   if (!offer) {
     if (query.isError) {
       // An id the contract does not have is not a failed read: there is nothing to try again.
@@ -32,28 +40,72 @@ export function BuyFlow({ intent, startAt }: { intent: Extract<TicketIntent, { m
     }
     return <FlowLoading title={LOADING_TITLE.buy} />
   }
-  if (offer.state === 'cancelled' || offer.state === 'reclaimed' || offer.state === 'settled') {
-    return <FlowGone title={LOADING_TITLE.buy} sentence="This offer is closed." hint="It was cancelled or has run its course. Pick another offer in the chain." />
+  if (!open && !shownOpen) {
+    // A bought or ended offer is not a term sheet to pay: one sentence, and a request for the same terms.
+    const ask = onIntentChange
+      ? () => onIntentChange({ mode: 'bid', assetId: offer.underlying.contractId, kind: offer.kind, strike: strikeText(offer), expiry: offer.expiry })
+      : undefined
+    const sentence =
+      offer.state === 'active' || offer.state === 'exercised' || offer.state === 'settled'
+        ? 'This offer was bought.'
+        : offer.state === 'cancelled'
+          ? 'This offer was cancelled.'
+          : 'This offer has expired.'
+    return (
+      <FlowGone
+        title={LOADING_TITLE.buy}
+        sentence={sentence}
+        action={
+          ask && offer.expiry > nowSec ? (
+            <Button variant="secondary" onClick={ask}>
+              Post a request on these terms
+            </Button>
+          ) : undefined
+        }
+      />
+    )
   }
-  return <BuyTicket offer={offer} readAt={query.isPlaceholderData ? 0 : query.dataUpdatedAt} startAt={startAt} />
+  return <BuyTicket offer={offer} readAt={query.isPlaceholderData ? 0 : query.dataUpdatedAt} nowSec={nowSec} onIntentChange={onIntentChange} />
 }
 
-function BuyTicket({ offer, readAt, startAt }: { offer: OptionOffer; readAt: number; startAt?: 'terms' | 'review' }) {
+const strikeText = (o: OptionOffer): string | undefined => {
+  const k = strikePerUnit(o)
+  return k === null ? undefined : plainDecimal(k, o.quote.decimals)
+}
+
+/** Why an offer that was open when the ticket showed it can no longer be bought, in words. Null while it is open. */
+function goneReason(offer: OptionOffer, me: string | null, nowSec: number): string | null {
+  if (offer.state === 'offered' && offer.expiry > nowSec) return null
+  if (offer.state === 'cancelled') return 'The maker cancelled this offer.'
+  if (offer.state === 'offered' || offer.state === 'expired' || offer.expiry <= nowSec) return `Its deadline passed at ${formatUtc(offer.expiry)}.`
+  return offer.holder === me ? 'You bought this offer.' : 'Another account bought this offer.'
+}
+
+function BuyTicket({ offer, readAt, nowSec, onIntentChange }: { offer: OptionOffer; readAt: number; nowSec: number; onIntentChange?: (next: TicketIntent) => void }) {
   const me = useMe()
+  const options = useOptions()
   const buy = useBuy()
   const reference = useReference(offer.underlying)
   const u = offer.underlying
   const q = offer.quote
-  const tokens = useMemo(() => [u, q], [u, q])
-  const balances = useBalancesById(me, tokens)
   const action = useMemo<PreTradeAction>(() => ({ type: 'buy', offer }), [offer])
 
   const premium = { token: q, amount: offer.totalPremium }
   const collateral = requiredCollateral(offer)
   const strike = strikePerUnit(offer)
-  const held = balances.data?.[u.contractId]
-  const holding = held?.status === 'ok' && held.balance !== null ? ` You hold ${moneyText({ token: u, amount: held.balance })}.` : ''
   const option = optionPhrase(offer.kind, moneyText({ token: u, amount: offer.underlyingQty }), priceText(strike, q), formatUtc(offer.expiry))
+
+  // Taken or ended under the reader: the way on is the next offer of the same series, else a request on these terms.
+  const gone = goneReason(offer, me, nowSec)
+  const same = gone && strike !== null ? (options.data ?? []).filter((o) => o.id !== offer.id && o.state === 'offered' && o.expiry > nowSec && o.writer !== me && o.underlying.contractId === u.contractId) : []
+  const next = gone && strike !== null ? lowestOpenInSeriesOf(same, { kind: offer.kind, underlying: u, strikePerUnit: strike, expiry: offer.expiry }, q) : null
+  const fix = !gone || !onIntentChange
+    ? undefined
+    : next
+      ? { label: `Next offer: ${priceText(premiumPerUnit(next), q)} per ${u.code}, ${moneyText({ token: u, amount: next.underlyingQty })}`, onClick: () => onIntentChange({ mode: 'buy', offerId: next.id }) }
+      : offer.expiry > nowSec
+        ? { label: 'Post a request on these terms', onClick: () => onIntentChange({ mode: 'bid', assetId: u.contractId, kind: offer.kind, strike: strikeText(offer), expiry: offer.expiry }) }
+        : undefined
 
   const deal: Deal = {
     mode: 'buy',
@@ -62,36 +114,20 @@ function BuyTicket({ offer, readAt, startAt }: { offer: OptionOffer; readAt: num
     leg: offer,
     side: 'long',
     action,
-    terms: (
-      <TermsList
-        rows={[
-          kindRow(offer.kind),
-          strikeRow(offer),
-          deadlineRow(offer.expiry),
-          { label: 'Offer', value: `No. ${serialOf(offer.id)}`, hint: <Party role="Maker" address={offer.writer} me={me} /> },
-          { label: 'Collateral', value: moneyText(collateral), hint: 'Locked in the contract by the maker before you pay.' },
-          { label: 'Premium per unit', value: priceText(premiumPerUnit(offer), q) },
-          quantityRow(offer, `The whole offer: it is bought in one piece.${holding}`),
-        ]}
-        total={{ label: 'You pay', value: moneyText(premium) }}
-      />
-    ),
+    terms: null,
     termsError: null,
-    impact: [
-      moneyRow('You pay', premium, PREMIUM_DISCLOSURE),
-      nothingRow('You lock'),
-      breakevenRow(offer, 'long'),
-      mostYouCanLoseRow(offer, 'long'),
-      deadlineRow(offer.expiry, true),
-      { label: 'Counterparty', value: <Party role="Maker" address={offer.writer} me={me} />, hint: `${moneyText(collateral)} locked in the contract` },
-    ],
-    readAt: readAtText(readAt),
-    settlement: settlementSentence('long', offer.kind, moneyText(exerciseGives(offer)), moneyText(exerciseReceives(offer))),
+    gone: gone ?? undefined,
+    fix,
+    serial: `Offer No. ${serialOf(offer.id)}`,
+    money: [leadRow('You pay', premium, PREMIUM_DISCLOSURE), moneyRow('Collateral locked', collateral)],
+    details: [strikeRow(offer), quantityRow(offer), deadlineRow(offer.expiry), breakevenRow(offer), mostYouCanLoseRow(offer, 'long'), partyRow('Maker', offer.writer, me)],
+    readAt,
+    outcome: outcomeFor(offer, 'long'),
+    commitment: COMMITMENT.buy,
     issuerDisclosure: true,
-    consent: CONSENT.buy,
     actionLabel: `Pay ${moneyText(premium)}`,
-    chartTitle: `Payoff at expiry, long ${offer.kind} on ${moneyText({ token: u, amount: offer.underlyingQty })}`,
-    series: { assetId: u.contractId, kind: offer.kind, strike: strike === null ? undefined : plainDecimal(strike, q.decimals), expiry: offer.expiry },
+    chartTitle: `Payoff at the deadline, long ${offer.kind} on ${moneyText({ token: u, amount: offer.underlyingQty })}`,
+    series: { assetId: u.contractId, code: u.code, kind: offer.kind, strike: strikeText(offer), expiry: offer.expiry },
     bestOfferId: offer.id,
     reference,
   }
@@ -103,10 +139,10 @@ function BuyTicket({ offer, readAt, startAt }: { offer: OptionOffer; readAt: num
     kind: `${positionWords('long', offer.kind)}, ${u.code}`,
     terms: receiptTerms(offer, 'Premium paid', collateral),
     state: 'Active',
-    reminder: receiptReminder('buy', offer.kind),
+    reminder: receiptReminder('buy', offer.kind, holderWords(offer)),
     calendar: calendarFor(offer, offer.id),
     link: { label: 'View position', to: '/portfolio/$id', params: { id: offer.id.toString() } },
   })
 
-  return <Flow deal={deal} tx={buy} start={() => buy.run(offer)} receipt={receipt} startAt={startAt} />
+  return <Flow deal={deal} tx={buy} start={() => buy.run(offer)} receipt={receipt} />
 }

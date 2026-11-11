@@ -1,11 +1,13 @@
 /**
  * Markets: the index (intents, assets, reference prices) and the asset page frame (header, tabs, mode switch,
- * Requests and About tabs, the idle ticket rail). The guided flow, the chain and the ticket have their own specs.
+ * Requests and About tabs, the rail and the ticket's history). The guided flow, the chain and the ticket have their
+ * own specs.
  */
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { ISSUER_DISCLOSURE } from '../src/core/disclosures'
-import { ADDR_A, connect, currentPath, expectNoAxeViolations, expectNoHorizontalOverflow, openApp, pageHeading, switchAccount } from './helpers'
+import { REFERENCE_LABEL, REFERENCE_NOTE } from '../src/core/reference'
+import { ADDR_A, connect, currentPath, expectNoAxeViolations, expectNoHorizontalOverflow, openApp, pageHeading, routeTo, switchAccount } from './helpers'
 import { DEMO_WALLETS } from '../src/core/options/demoAccounts'
 
 const assetsTable = (page: Page) => page.getByRole('table', { name: 'Assets' })
@@ -14,7 +16,7 @@ const tabs = (page: Page) => page.getByRole('navigation', { name: 'Asset section
 const modeSwitch = (page: Page) => page.getByRole('radiogroup', { name: 'Mode' })
 
 test.describe('markets index', () => {
-  test('lists the reference assets with their reference price and its label', async ({ page }) => {
+  test('lists the reference assets with their reference price and its source', async ({ page }) => {
     await openApp(page, '/markets')
     await expect(pageHeading(page)).toHaveText('Markets')
     const table = assetsTable(page)
@@ -22,43 +24,60 @@ test.describe('markets index', () => {
 
     const bond = table.getByRole('row', { name: /BOND/ })
     // The type is the label alone: no hedge word in a caption (what the token is, is said on its About tab).
-    await expect(bond.getByRole('rowheader')).toContainText('Bond')
-    await expect(bond.getByRole('rowheader')).not.toContainText(/fictional/i)
-    await expect(bond.getByRole('rowheader')).toContainText('Issuer')
-    await expect(bond).toContainText('Reference')
-    // The reference figure never stands alone: it carries its label, and nothing calls it a market price.
+    await expect(bond.getByRole('rowheader')).toHaveText(/^BOND\s*Bond$/)
+    // A fact that is the same on every row is not a cell: no tier column, no issuer line for a reference asset,
+    // and the price source named once, in the header, because every row shares it.
+    await expect(table.getByRole('columnheader', { name: 'Tier' })).toHaveCount(0)
+    await expect(table.getByRole('columnheader', { name: /^Demo price/ })).toContainText('USDx')
     await expect(bond).toContainText('99.40')
-    await expect(bond).toContainText('Demo price')
     await expect(table.getByRole('row', { name: /FUND/ })).toContainText('10.20')
     await expect(table.getByRole('row', { name: /EQTY/ })).toContainText('24.60')
     await expect(page.getByRole('main')).not.toContainText(/market price|oracle price|live price/i)
 
-    // Open offers, the nearest expiry and the lowest premiums are read from the mock market.
-    await expect(bond.getByRole('cell').nth(2)).toHaveText(/^\d+$/)
+    // Open offers, the nearest deadline and the cheapest premiums are read from the mock market; a cheapest
+    // premium names the strike and the day it is for.
+    await expect(bond.getByRole('cell').nth(1)).toHaveText(/^\d+$/)
+    await expect(bond.getByRole('cell').nth(3)).toContainText(/at [\d,.]+, \d+ [A-Z][a-z]{2}/)
     await expect(bond.getByRole('link', { name: 'Trade BOND' })).toHaveAttribute('href', /\/markets\/bond$/)
 
-    await expect(page.getByText('Showing 3 reference assets. No other asset is listed in the contract.')).toBeVisible()
-    // The tier word is explained under the table that uses it.
-    await expect(page.getByText("Issued by this project's test issuer and kept in the app's asset list.")).toBeVisible()
+    // Nothing is hidden, so there is no count line, no tier legend and no note about the list.
+    await expect(page.getByText(/reference assets?\./)).toHaveCount(0)
+    await expect(page.getByText("Issued by this project's test issuer and kept in the app's asset list.")).toHaveCount(0)
   })
 
-  test('an intent card asks for the asset, then opens it in guided mode with the intent in the URL', async ({ page }) => {
+  test('the whole row is the target of its one action', async ({ page }) => {
     await openApp(page, '/markets')
-    const cards = page.getByRole('region', { name: 'What do you want to do?' })
-    await expect(cards.getByRole('link', { name: /^Set a floor/ })).toContainText('You pay')
-    await expect(cards.getByRole('link', { name: /^Earn on what you hold/ })).toContainText('You are paid')
-    await expect(cards.getByRole('link', { name: /^Earn while waiting to buy/ })).toContainText('You are paid')
+    const bond = assetsTable(page).getByRole('row', { name: /BOND/ })
+    // One tab stop per row: the action. A click anywhere on the row follows it.
+    await expect(bond.getByRole('link')).toHaveCount(1)
+    // A click on a figure, far from the action, opens the asset: the action covers the row.
+    const cell = await bond.getByRole('cell').nth(1).boundingBox()
+    if (!cell) throw new Error('The row has no box')
+    await page.mouse.click(cell.x + cell.width / 2, cell.y + cell.height / 2)
+    await expect(page).toHaveURL(/\/markets\/bond$/)
+  })
 
-    await cards.getByRole('link', { name: /^Set a floor/ }).click()
+  test('an intent asks for the asset in the Assets section, then opens it in guided mode with the intent', async ({ page }) => {
+    await openApp(page, '/markets')
+    const intents = page.getByRole('region', { name: 'What do you want to do?' })
+    // Four equal rows, each with who pays and when.
+    await expect(intents.getByRole('listitem')).toHaveCount(4)
+    await expect(intents.getByRole('link', { name: /^Set a floor/ })).toContainText('You pay for that right once, when you buy: the premium.')
+    await expect(intents.getByRole('link', { name: /^Earn on what you hold/ })).toContainText('A buyer pays you for that agreement, the premium, when one takes your terms.')
+    await expect(intents.getByRole('link', { name: /^Earn while waiting to buy/ })).toContainText('A buyer pays you')
+    await expect(intents.getByRole('link', { name: /^Lock a buy price/ })).toContainText('You pay for that right once')
+
+    await intents.getByRole('link', { name: /^Set a floor/ }).click()
     await expect(page).toHaveURL(/\/markets\?intent=floor$/)
-    const choice = page.getByRole('region', { name: 'Set a floor on which asset?' })
-    await expect(choice.getByRole('heading')).toBeFocused()
-    // The card whose choice is open is the link to the current address, and only that one.
-    await expect(cards.getByRole('link', { name: /^Set a floor/ })).toHaveAttribute('aria-current', 'page')
-    await expect(cards.locator('[aria-current]')).toHaveCount(1)
-    await expect(choice.getByRole('link')).toHaveCount(4) // three assets and "Choose something else"
+    // The Assets section asks the question and takes focus; there is no second list of the same assets.
+    const question = page.getByRole('heading', { name: 'Set a floor on which asset?' })
+    await expect(question).toBeFocused()
+    await expect(page.getByRole('region', { name: 'Set a floor on which asset?' }).getByRole('table')).toHaveCount(1)
+    // The row whose question is open is the link to the current address, and only that one.
+    await expect(intents.getByRole('link', { name: /^Set a floor/ })).toHaveAttribute('aria-current', 'page')
+    await expect(intents.locator('[aria-current]')).toHaveCount(1)
 
-    await choice.getByRole('link', { name: /Set a floor on BOND/ }).click()
+    await assetsTable(page).getByRole('link', { name: 'Set a floor on BOND' }).click()
     await expect(page).toHaveURL(/\/markets\/bond\?/)
     const url = new URL(page.url())
     expect(url.searchParams.get('mode')).toBe('guided')
@@ -67,50 +86,59 @@ test.describe('markets index', () => {
     await expect(modeSwitch(page).getByRole('radio', { name: 'Guided' })).toBeChecked()
   })
 
-  test('the choice survives a reload, shows what a connected wallet holds, and can be dropped', async ({ page }) => {
+  test('the question survives a reload, shows what a connected wallet holds, and can be dropped', async ({ page }) => {
     await openApp(page, '/markets?intent=earn-hold', { connect: true })
-    const choice = page.getByRole('region', { name: 'Earn on which asset?' })
-    await expect(choice.getByRole('link', { name: /FUND/ })).toContainText('You hold 120.00 FUND')
-    await expect(choice.getByRole('link', { name: /BOND/ })).toContainText('You hold 12.00 BOND')
-    await choice.getByRole('link', { name: 'Choose something else' }).click()
+    const table = assetsTable(page)
+    await expect(table.getByRole('columnheader', { name: 'You hold' })).toBeVisible()
+    await expect(table.getByRole('row', { name: /FUND/ })).toContainText('120.00')
+    await expect(table.getByRole('row', { name: /BOND/ })).toContainText('12.00')
+    await page.getByRole('main').getByRole('link', { name: 'Choose something else' }).click()
     await expect(page).toHaveURL(/\/markets$/)
-    await expect(choice).toBeHidden()
+    await expect(page.getByRole('heading', { name: 'Assets', level: 2 })).toBeVisible()
+    await expect(table.getByRole('columnheader', { name: 'You hold' })).toHaveCount(0)
   })
 
-  test('the secondary intent is one line under the cards', async ({ page }) => {
+  test('the fourth intent is a row like the others', async ({ page }) => {
     await openApp(page, '/markets')
-    await page.getByRole('link', { name: 'Lock a buy price' }).click()
+    await page.getByRole('region', { name: 'What do you want to do?' }).getByRole('link', { name: /^Lock a buy price/ }).click()
     await expect(page).toHaveURL(/intent=lock-buy/)
-    await page.getByRole('region', { name: 'Lock a buy price on which asset?' }).getByRole('link', { name: /EQTY/ }).click()
+    await assetsTable(page).getByRole('link', { name: 'Lock a buy price on EQTY' }).click()
     expect(await currentPath(page)).toBe('/markets/eqty?mode=guided&intent=lock-buy')
   })
 
-  test('a funded wallet gets no "Get test funds" strip', async ({ page }) => {
+  test('a funded wallet gets no "Get test funds" strip unless it asks for one', async ({ page }) => {
     await openApp(page, '/markets', { connect: true })
     await expect(assetsTable(page)).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Get test funds' })).toHaveCount(0)
+    await routeTo(page, '/markets?funds=1')
+    await expect(page.getByRole('region', { name: 'Get test funds' })).toContainText('Three steps, all in your wallet.')
   })
 })
 
 test.describe('asset page', () => {
-  test('the header names the asset, its issuer, its tier and the source of its reference price', async ({ page }) => {
+  test('the header names the asset, its issuer and the source of its reference price', async ({ page }) => {
     await openApp(page, '/markets/bond')
     await expect(page).toHaveTitle('BOND · Markets · StellSec')
     const header = page.getByRole('main').locator('header').first()
     await expect(header.getByRole('heading', { level: 1 })).toHaveText('BOND')
     await expect(header).toContainText('Bond')
     await expect(header).not.toContainText(/fictional/i)
-    await expect(header).toContainText('Reference price')
     await expect(header).toContainText('99.40')
-    await expect(header).toContainText('Demo price. Chosen by the team for this demo. Not a market.')
+    // The asset header is the one home of the sentence that explains the price's label.
+    await expect(header).toContainText(`${REFERENCE_LABEL.demo}. ${REFERENCE_NOTE.demo}`)
     await expect(header).toContainText('Issuer')
-    await expect(header).toContainText('Reference')
-    // A guest sees where the balances will be, not an empty cell.
-    await expect(header).toContainText('Connect a wallet to see what you hold.')
+    // Every asset of the app's list is "Reference": the tier word is only shown when it is not.
+    await expect(header).not.toContainText('Tier')
+    // A guest sees only what is known: no holdings slot and no invitation to connect beside the one in the bar.
+    await expect(header).not.toContainText('You hold')
+    // The back link is not the current page.
+    await expect(header.getByRole('link', { name: 'Markets' })).not.toHaveAttribute('aria-current', 'page')
 
     await connect(page)
+    await expect(header).toContainText('You hold')
     await expect(header).toContainText('12.00')
     await expect(header).toContainText('2,500.00')
+    await expect(header.getByRole('link', { name: 'Get test funds' })).toHaveCount(0)
   })
 
   test('the mode switch is remembered across a reload and across assets', async ({ page }) => {
@@ -193,31 +221,54 @@ test.describe('asset page', () => {
     await expect(page.getByRole('heading', { name: 'This link does not name an asset.' })).toBeVisible()
   })
 
-  test('the ticket rail is a blank note until something is picked', async ({ page }) => {
-    await openApp(page, '/markets/bond?tab=requests')
+  test('the rail holds no idle text: chain mode leaves it empty, the Requests tab spans the width until a ticket opens', async ({ page }) => {
+    await openApp(page, '/markets/bond?mode=chain')
+    // The column is kept so the chain does not jump when a ticket opens, but it is not a landmark while empty.
+    await expect(page.getByRole('main')).not.toContainText('No order yet')
+    await expect(page.getByRole('complementary', { name: 'Order ticket' })).toHaveCount(0)
+    await page.getByRole('radio', { name: 'Guided' }).click()
+    await expect(page.getByRole('complementary', { name: 'Order ticket' })).toContainText('You pay')
+
+    await tabs(page).getByRole('link', { name: /^Requests/ }).click()
+    await expect(page.getByRole('complementary', { name: 'Order ticket' })).toHaveCount(0)
+    await page.getByRole('main').getByRole('link', { name: 'Post a request' }).click()
+    await expect(page.getByRole('complementary', { name: 'Order ticket' })).toBeVisible()
+  })
+
+  test('closing the ticket never leaves an entry that reopens it', async ({ page }) => {
+    await openApp(page, '/markets')
+    await assetsTable(page).getByRole('link', { name: 'Trade FUND' }).click()
+    await expect(pageHeading(page)).toHaveText('FUND')
+    await tabs(page).getByRole('link', { name: /^Requests/ }).click()
+    await requestsTable(page).locator('tbody tr').first().getByRole('link', { name: /^Fill request/ }).click()
+    await expect(page).toHaveURL(/[?&]bid=\d+/)
     const rail = page.getByRole('complementary', { name: 'Order ticket' })
-    await expect(rail.getByRole('heading', { name: 'No order yet.' })).toBeVisible()
-    await expect(rail).toContainText('Choose a request to sell to, or post your own.')
+    await rail.getByRole('button', { name: /^Close/ }).click()
+    await expect(page).not.toHaveURL(/[?&]bid=/)
+    // Back goes to where the user was before the ticket, never to the ticket again.
+    await page.goBack()
+    await expect(page).not.toHaveURL(/[?&]bid=/)
+    await expect(page.getByRole('complementary', { name: 'Order ticket' })).toHaveCount(0)
   })
 })
 
 test.describe('requests tab', () => {
-  test('lists the funded bids of the asset with what a seller needs to decide', async ({ page }) => {
+  test('lists the funded requests of the asset with what a maker needs to decide', async ({ page }) => {
     await openApp(page, '/markets/fund?tab=requests')
-    await expect(page.getByRole('heading', { name: 'Requests', level: 2 })).toBeVisible()
-    await expect(page.getByRole('main')).toContainText("A request is a buyer's premium already escrowed in the contract, waiting for a seller.")
+    // The tab says "Requests": the heading is for screen readers, the definition leads.
+    await expect(page.getByRole('heading', { name: 'Requests', level: 2 })).toBeAttached()
+    await expect(page.getByRole('main')).toContainText("A request is a buyer's premium already escrowed in the contract, waiting for a maker.")
     await expect(tabs(page).getByRole('link', { name: /^Requests/ })).toContainText('2')
 
     const table = requestsTable(page)
-    await expect(table.getByRole('columnheader')).toHaveText(['Kind', 'Strike', 'Quantity', 'Expiry', 'Premium escrowed', 'Buyer', 'State', 'Action'])
+    await expect(table.getByRole('columnheader')).toHaveText(['Kind', 'Strike', 'Quantity', 'Deadline', 'Premium escrowed', 'Buyer', 'Action'])
     const rows = table.locator('tbody tr')
     await expect(rows).toHaveCount(2)
     for (const row of await rows.all()) {
       await expect(row).toContainText('Put')
       await expect(row).toContainText('FUND')
       await expect(row).toContainText('USDx')
-      await expect(row).toContainText('Open')
-      await expect(row.getByRole('link', { name: /^Sell to this bid/ })).toBeVisible()
+      await expect(row.getByRole('link', { name: /^Fill request/ })).toBeVisible()
     }
     // Every column is on screen at 1440 px: the table does not scroll inside its frame.
     await expect(page.locator('.ui-table-wrap[data-scrolls]')).toHaveCount(0)
@@ -228,10 +279,10 @@ test.describe('requests tab', () => {
     expect(figures[0]).toBeGreaterThanOrEqual(figures[1])
   })
 
-  test('"Sell to this bid" and "Post a request" open the ticket through the URL', async ({ page }) => {
+  test('"Fill request" and "Post a request" open the ticket through the URL', async ({ page }) => {
     await openApp(page, '/markets/fund?tab=requests')
     const first = requestsTable(page).locator('tbody tr').first()
-    await first.getByRole('link', { name: /^Sell to this bid/ }).click()
+    await first.getByRole('link', { name: /^Fill request/ }).click()
     await expect(page).toHaveURL(/[?&]bid=\d+/)
     await expect(page).toHaveURL(/tab=requests/)
 
@@ -241,45 +292,54 @@ test.describe('requests tab', () => {
     await expect(page).toHaveURL(/side=bid/)
   })
 
-  test('your own request is marked and can be cancelled, which refunds the premium', async ({ page }) => {
+  test('your own request is marked and is cancelled in a dialog that says what comes back', async ({ page }) => {
     await openApp(page, '/markets/bond?tab=requests', { connect: true })
     const row = requestsTable(page).locator('tbody tr')
     await expect(row).toHaveCount(1)
     await expect(row).toContainText('Yours')
     await expect(row.locator('mark')).toContainText('USDx') // the escrowed premium is the wallet's own figure
     await row.getByRole('button', { name: /^Cancel your request/ }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Cancel request' }).click()
+    await expect(dialog.getByRole('button', { name: /^(Done|Close)$/ }).first()).toBeVisible()
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('heading', { name: 'No open requests on BOND.' })).toBeVisible()
     await expect(page.getByRole('main').getByRole('link', { name: 'Post a request' })).toBeVisible()
   })
 })
 
 test.describe('about tab', () => {
-  test('says what the asset is, what its issuer can do and which contract holds the collateral', async ({ page }) => {
+  test('says what the token is, what its issuer can do and where the contract is described', async ({ page }) => {
     await openApp(page, '/markets/bond?tab=about')
     const main = page.getByRole('main')
     await expect(main.getByRole('heading', { name: 'Asset facts' })).toBeVisible()
-    await expect(main).toContainText('Mock asset. No on-chain facts.')
+    // What a token of the app's list is: said once, here, in a sentence.
+    await expect(main.getByText("A test token issued by this project's issuer account on Stellar Testnet.")).toHaveCount(1)
+    // The top bar says "Mock data"; no panel repeats it.
+    await expect(main).not.toContainText(/Mock (asset|contract|ids)/)
 
     const powers = page.getByRole('table', { name: 'Issuer powers' })
-    // A mock asset answers with fixture flags (marked as such), so each power reads On or Off and the table has
-    // its fourth row: whether the issuer can still change them.
+    // A mock asset answers with the flags of the regulated asset it plays, so each power reads On or Off and the
+    // table has its fourth row: whether the issuer can still change them.
     await expect(powers.getByRole('rowheader')).toHaveText(['Authorization required', 'Authorization revocable', 'Clawback enabled', 'Change these settings'])
     await expect(powers).not.toContainText('Not read')
     await expect(powers.getByRole('row', { name: /^Clawback enabled/ })).toContainText('On')
-    await expect(main).toContainText('Mock asset: these flags are settings of the demo, not read from a chain.')
-    await expect(powers).toContainText('The issuer can take tokens back, including from the options contract.')
+    await expect(powers).toContainText('The issuer can take tokens back, including from the Covered contract.')
     // The required sentence has its home here, verbatim and once.
     await expect(main.getByText(ISSUER_DISCLOSURE)).toHaveCount(1)
 
     await expect(main.getByRole('heading', { name: 'What it means for an option' })).toBeVisible()
     await expect(main).toContainText('A frozen holder cannot exercise.')
-    await expect(main.getByRole('heading', { name: 'Contract and roles' })).toBeVisible()
-    await expect(main).toContainText('None. No admin function exists.')
-    await expect(main).toContainText('None. No outside party has reviewed the code.')
+    // The contract's own facts are on Reserves, not repeated on every asset.
+    await expect(main.getByRole('heading', { name: 'Contract and roles' })).toHaveCount(0)
+    await expect(main.getByRole('heading', { name: 'On the explorer' })).toHaveCount(0)
     await expect(main.getByRole('link', { name: 'Reserves, contracts and roles' })).toHaveAttribute('href', /\/reserves$/)
 
-    await expect(main).toContainText('Connect a wallet to see whether you can hold BOND.')
+    // A guest gets no access card; a connected wallet is told whether it can hold the asset.
+    await expect(main.getByRole('heading', { name: 'Your access' })).toHaveCount(0)
     await connect(page)
+    await expect(main.getByRole('heading', { name: 'Your access' })).toBeVisible()
     await expect(main).toContainText('Authorized by the BOND issuer.')
   })
 })
@@ -301,7 +361,7 @@ test.describe('accessibility and layout', () => {
     })
   }
 
-  test('on a phone the assets are cards and every action is a 44 px target @phone', async ({ page }) => {
+  test('on a phone the assets are cards, every action is a 44 px target, and the first asset is on the first screen @phone', async ({ page }) => {
     await openApp(page, '/markets')
     await expect(assetsTable(page)).toBeHidden()
     const cards = page.getByRole('list', { name: 'Assets' }).getByRole('listitem')
@@ -315,22 +375,28 @@ test.describe('accessibility and layout', () => {
     }
     const intent = await page.getByRole('link', { name: /^Set a floor/ }).boundingBox()
     expect(intent?.height ?? 0).toBeGreaterThanOrEqual(44)
+    // A returning visitor sees the first asset's code and price above the tab bar.
+    const first = await cards.first().locator('[class*="cardHead"]').boundingBox()
+    const bar = await page.locator('[data-tour="nav"]').filter({ visible: true }).first().boundingBox()
+    expect(first && bar && first.y + first.height <= bar.y).toBe(true)
   })
 
-  test('on a phone the requests are a list, and the mode switch sits under the tabs @phone', async ({ page }) => {
+  test('on a phone the requests are a list, and the mode switch sits on the tab row @phone', async ({ page }) => {
     await openApp(page, '/markets/fund?tab=requests')
     await expect(requestsTable(page)).toBeHidden()
     const items = page.getByRole('list', { name: 'Open requests on FUND' }).getByRole('listitem')
     await expect(items).toHaveCount(2)
-    const sell = await items.first().getByRole('link', { name: /^Sell to this bid/ }).boundingBox()
+    const sell = await items.first().getByRole('link', { name: /^Fill request/ }).boundingBox()
     expect(sell?.height ?? 0).toBeGreaterThanOrEqual(44)
 
     await tabs(page).getByRole('link', { name: 'Trade' }).click()
     const nav = await tabs(page).boundingBox()
     const mode = await modeSwitch(page).boundingBox()
-    expect(mode && nav && mode.y >= nav.y + nav.height - 1).toBe(true)
+    // One row: the switch at the right end of the tabs, so the flow starts high on the screen.
+    expect(mode && nav && mode.y < nav.y + nav.height && mode.x > nav.x + 150).toBe(true)
     // The control is 44 px tall on a touch screen (its two segments sit inside a 1 px border).
     expect(mode?.height ?? 0).toBeGreaterThanOrEqual(44)
+    expect((nav?.y ?? 999) + (nav?.height ?? 0)).toBeLessThanOrEqual(300)
   })
 })
 
@@ -352,10 +418,12 @@ test.describe('first run: a wallet that holds none of the tokens', () => {
     await expect(page.getByRole('heading', { name: 'Get test funds' })).toHaveCount(0)
   })
 
-  test('the asset page shows the empty balances as they are', async ({ page }) => {
+  test('the asset page shows the empty balances as they are, with the way to test tokens', async ({ page }) => {
     await openApp(page, '/markets/bond', { connect: DEMO_WALLETS.c })
     const header = page.getByRole('main').locator('header').first()
     await expect(header).toContainText('0.00')
+    await header.getByRole('link', { name: 'Get test funds' }).click()
+    await expect(page.getByRole('region', { name: 'Get test funds' })).toBeVisible()
   })
 })
 

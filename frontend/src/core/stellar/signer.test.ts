@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { TxError } from '../tx/errors'
 import type { TxStage } from '../tx/types'
-import { checkTransaction, failureText, signAndSend } from './signer'
+import { checkTransaction, failureText, sendAndWait, signAndSend } from './signer'
 import type { TxServer } from './signer'
 
 // signAndSend against a fake AssembledTransaction and a fake RPC: no SDK object, no network, no real waiting.
@@ -71,12 +71,27 @@ describe('signAndSend', () => {
 
   it('a wallet rejection is declined: nothing is sent', async () => {
     const server = fakeServer([{ status: 'PENDING' }], [{ status: 'SUCCESS' }])
-    const tx = fakeTx({ sign: async () => Promise.reject(new Error('You rejected the request in Freighter.')) })
+    const tx = fakeTx({ sign: async () => Promise.reject(new Error('You declined to sign in Freighter.')) })
     const { p, stages } = await run(tx, server)
     const e = await p.catch((x: unknown) => x)
     expect(e).toBeInstanceOf(TxError)
-    expect(e).toMatchObject({ kind: 'declined', hash: null, message: 'You rejected the request in Freighter.' })
+    expect(e).toMatchObject({ kind: 'declined', hash: null, message: 'You declined to sign in Freighter.' })
     expect(stages).toEqual([{ stage: 'signing' }])
+    expect(server.sendTransaction).not.toHaveBeenCalled()
+  })
+
+  it('stopping the wait for a wallet that never answers ends declined, and a late signature sends nothing (finding 42)', async () => {
+    const server = fakeServer([{ status: 'PENDING' }], [{ status: 'SUCCESS' }])
+    let answer!: () => void
+    const tx = fakeTx({ sign: () => new Promise<void>((resolve) => (answer = resolve)) })
+    const control = new AbortController()
+    const p = signAndSend(tx, { server, signal: control.signal, sleep: async () => {}, now: () => 0 })
+    await Promise.resolve()
+    control.abort()
+    const e = await p.catch((x: unknown) => x)
+    expect(e).toMatchObject({ kind: 'declined', hash: null, message: 'You stopped waiting for the wallet. Nothing was signed, so nothing was sent.' })
+    answer()
+    await new Promise((r) => setTimeout(r, 0))
     expect(server.sendTransaction).not.toHaveBeenCalled()
   })
 
@@ -198,3 +213,22 @@ describe('failureText', () => {
     expect(failureText({ diagnosticEventsXdr: [{ n: 5n }] })).toMatch(/contract refused it/)
   })
 })
+
+describe('sendAndWait: the send and poll loop for a transaction signed elsewhere (finding 50)', () => {
+  const signed = { hash: () => HASH_BYTES, timeBounds: { minTime: '0', maxTime: String(MAX_TIME) } } as unknown as Parameters<typeof sendAndWait>[0]
+
+  it('resends while the node is busy, then waits for a ledger, reporting the same stages', async () => {
+    const server = fakeServer([{ status: 'TRY_AGAIN_LATER' }, { status: 'PENDING', hash: 'h-rpc' }], [{ status: 'NOT_FOUND', latestLedgerCloseTime: 0 }, { status: 'SUCCESS', ledger: 9 }])
+    const stages: TxStage[] = []
+    const r = await sendAndWait(signed, server, () => undefined, { onStage: (st) => stages.push(st), sleep: async () => {}, now: () => 0 })
+    expect(r).toEqual({ hash: 'h-rpc', result: undefined, ledger: 9 })
+    expect(server.sendTransaction).toHaveBeenCalledTimes(2)
+    expect(stages).toEqual([{ stage: 'submitting' }, { stage: 'pending', hash: 'h-rpc', maxTime: MAX_TIME }])
+  })
+
+  it('says a failed send reached nobody, and a lost answer is unknown', async () => {
+    const lost = fakeServer([new Error('socket hang up')], [{ status: 'SUCCESS' }])
+    await expect(sendAndWait(signed, lost, () => undefined, { sleep: async () => {}, now: () => 0 })).rejects.toMatchObject({ kind: 'unknown', hash: LOCAL_HASH })
+  })
+})
+

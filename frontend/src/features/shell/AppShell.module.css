@@ -1,13 +1,31 @@
 @layer features {
   /*
    * Facts about the chrome that pages may need, published on the root while the shell is mounted:
+   *   --shell-topbar-h   the height of the top bar, safe area included (it scrolls with the page)
    *   --shell-tabbar-h   the height the phone tab bar takes at the bottom of the viewport (0 from 768 px up)
-   *   --toast-bottom     lifts the ui kit's toast region above the tab bar
+   *   --toast-bottom     lifts the ui kit's toast region above the tab bar and a page's own action bar
+   * A page with a sticky action bar at the bottom publishes its height as --page-bar-h while the bar is shown.
    * From 768 px the scrollbar gutter is reserved, so a short page and a long page have the same width and the
    * centred text block does not move between routes. (Phones draw their scrollbar over the page.)
    */
   :root:has(.shell) {
+    --shell-topbar-h: calc(var(--s-56) + env(safe-area-inset-top, 0px));
     --shell-tabbar-h: 0px;
+    --toast-bottom: calc(var(--page-bar-h, 0px) + var(--s-24));
+  }
+
+  @media (pointer: coarse) and (min-width: 768px) {
+    :root:has(.shell) {
+      --shell-topbar-h: calc(var(--s-56) + var(--s-8) + env(safe-area-inset-top, 0px));
+    }
+  }
+
+  /*
+   * Keyboard focus and in-page links never land under a bar fixed to the bottom (WCAG 2.4.11): the phone tab bar,
+   * and a page's own sticky action bar while it publishes --page-bar-h.
+   */
+  :root:has(.shell) {
+    scroll-padding-bottom: calc(var(--shell-tabbar-h, 0px) + var(--page-bar-h, 0px) + var(--s-8));
   }
 
   @media (min-width: 768px) {
@@ -18,8 +36,9 @@
 
   @media (max-width: 767.98px) {
     :root:has(.shell) {
+      --shell-topbar-h: calc(var(--s-56) + 1px + env(safe-area-inset-top, 0px));
       --shell-tabbar-h: calc(var(--s-56) + 1px + env(safe-area-inset-bottom, 0px));
-      --toast-bottom: calc(var(--s-56) + var(--s-12));
+      --toast-bottom: calc(var(--s-56) + var(--s-12) + var(--page-bar-h, 0px));
     }
   }
 
@@ -30,9 +49,14 @@
     padding-bottom: var(--shell-tabbar-h, 0px);
   }
 
-  /* The page: at most --page-max wide, with the gutter. It grows so the footer rests at the bottom of a short page. */
+  /*
+   * The page: at most --page-max wide, with the gutter. It fills the screen between the bars at least, so the
+   * footer always starts below the fold: while a page is still a skeleton, the footer is never in view (it was
+   * the largest paint, and it jumped away when the content arrived).
+   */
   .main {
     flex: 1 0 auto;
+    min-height: calc(100dvh - var(--shell-topbar-h) - var(--shell-tabbar-h, 0px));
     width: 100%;
     max-width: var(--page-max);
     margin-inline: auto;

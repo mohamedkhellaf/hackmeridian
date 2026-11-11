@@ -5,6 +5,7 @@
     gap: var(--s-20);
     min-width: 0;
     padding-block: var(--s-8) var(--s-20);
+    container: terms / inline-size;
   }
 
   .header {
@@ -34,11 +35,13 @@
     gap: var(--s-6);
     min-width: 0;
 
+    /* The same label style as the quantity field beside it: three terms, one row. */
     & dt {
-      font-size: var(--ui-size);
-      line-height: var(--ui-line);
-      font-weight: var(--ui-weight);
-      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      color: var(--text-2);
     }
 
     & dd {
@@ -49,11 +52,12 @@
     }
   }
 
-  /* The figure sits on the same line as the amount field beside it. */
+  /* The figure sits on the same line as the amount field beside it. It may wrap: the time drops under the day. */
   .value {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--s-6);
+    gap: 0 var(--s-6);
     min-height: var(--control-h);
     font-family: var(--font-serif);
     font-size: var(--figure-lg-size);
@@ -61,6 +65,9 @@
     font-weight: var(--figure-weight);
     font-variant-numeric: tabular-nums lining-nums;
     color: var(--text);
+  }
+
+  .day {
     white-space: nowrap;
   }
 
@@ -69,6 +76,7 @@
     font-size: var(--ui-size);
     font-weight: var(--ui-weight);
     color: var(--muted);
+    white-space: nowrap;
   }
 
   .hint {
@@ -78,16 +86,39 @@
     text-wrap: pretty;
   }
 
-  .legend {
+  .notice {
     max-width: var(--measure);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--muted);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
     text-wrap: pretty;
   }
 
-  @container (max-width: 43.99rem) {
+  /* The key to the tick: the same 12 px mark the chips carry, then three words. */
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+    margin-top: calc(var(--s-8) * -1);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .tick {
+    flex: none;
+    color: var(--text);
+  }
+
+  @container terms (max-width: 43.99rem) {
     .header {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* A narrow note: the price and the date one under the other. */
+  @container terms (max-width: 17.99rem) {
+    .figures {
       grid-template-columns: minmax(0, 1fr);
     }
   }

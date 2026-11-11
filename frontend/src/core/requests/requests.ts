@@ -15,14 +15,6 @@ export function perUnit(total: bigint, b: Pick<Bid, 'underlyingQty' | 'underlyin
 /** What a maker locks to fill: PUT -> total strike in the quote token; CALL -> the underlying quantity. */
 export const fillCollateral = (b: Bid) => requiredCollateral(b)
 
-export const STATUS_LABEL: Record<BidState, string> = {
-  open: 'Open',
-  expired: 'Expired',
-  filled: 'Filled',
-  cancelled: 'Cancelled',
-  pruned: 'Expired, refunded',
-}
-
 /** Requests shown on Markets: open ones first (soonest expiry first), then expired-but-unrefunded and filled. */
 export function marketBids(bids: Bid[]): Bid[] {
   const rank: Record<BidState, number> = { open: 0, expired: 1, filled: 2, cancelled: 3, pruned: 3 }

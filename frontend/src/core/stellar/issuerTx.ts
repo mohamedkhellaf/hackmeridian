@@ -4,7 +4,6 @@ import type { Transaction, xdr } from '@stellar/stellar-sdk'
 // Pure transaction builders for the issuer console. No network access here: callers pass in
 // a loaded source Account and the network passphrase, so everything is unit-testable.
 
-export const STROOPS_DECIMALS = 7 // classic assets and their SACs always use 7 decimals
 const TIMEOUT = 180
 
 export const isAccountId = (s: string) => StrKey.isValidEd25519PublicKey(s)

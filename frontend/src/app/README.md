@@ -11,7 +11,7 @@ except the types of `search.ts`.
 | `search.ts` | The search-param types (the contract with the features), their valibot schemas, and the plain `key=value` URL form. |
 | `navigation.ts` | Document title, focus on the page heading, scroll keys. |
 | `RootLayout.tsx` | `/` renders bare; every other route renders inside `AppShell`, which stays mounted between app routes. |
-| `RouteError.tsx`, `routeErrors.ts`, `NotFoundPage.tsx`, `RoutePending.tsx`, `StatusPage.tsx` | The pages the router shows itself: a page that failed, an unknown address, slow code. |
+| `RouteError.tsx`, `RootError.tsx`, `routeErrors.ts`, `NotFoundPage.tsx`, `RoutePending.tsx`, `StatusPage.tsx` | The pages the router shows itself: a page that failed, the frame that failed, an unknown address, slow code. |
 | `MarginRoute.tsx` | The component of `/margin`: one `MarginPage` for the five screens. |
 | `shellChunk.ts` | The one dynamic import of the app shell, and its warm-up. |
 | `GuideMount.tsx` | The welcome guide beside the shell: loads `features/tour` the first time a guide is asked for (`useGuide().run`). No feature imports the tour. |
@@ -35,8 +35,8 @@ here; that is the string to give `getRouteApi`.
 | `/requests` | `requests` | `RequestsPage` | Requests | `RequestsSearch` |
 | `/reserves` | `reserves` | `ReservesPage` | Reserves | none |
 | `/activity` | `activity` | `ActivityPage` | Activity | none |
-| `/issuer` | `issuer` | `IssuerPage` | Issuer | none |
-| `/learn` | `learn` | `LearnPage` | How it works | none |
+| `/issuer` | `issuer` | `IssuerPage` | Issuer | `IssuerSearch` |
+| `/learn` | `learn` | `LearnPage` | Learn | none |
 | `/design` | `gallery`, `viz` | (mounted by `DesignPage`) | Design system | none |
 | `/margin`, `/margin/trade`, `/margin/positions`, `/margin/liquidations`, `/margin/vault` | `margin` | `MarginPage` with `screen` | `Trade · Margin` | none |
 
@@ -97,11 +97,16 @@ export function AssetPage() {
   only the search params leaves the page where it is: no `resetScroll: false` needed. A link with a hash scrolls
   to that id.
 - **Errors.** Each route has an error boundary. A page that throws while rendering is replaced by "This page
-  could not be shown" with a retry; the shell, the wallet and the other pages keep working. A failed fetch of a
-  page's code (a new version was published) offers a reload.
-- **Slow code.** After 300 ms without the page's code, a skeleton is shown in its place. Before the shell's own
-  code has arrived, the same skeleton is drawn in a frame with the shell's measures, so nothing moves when the
-  chrome appears.
+  could not be shown" with a retry; the shell, the wallet and the other pages keep working. A retry that fails
+  again says so ("Tried again at 14:36 UTC. The same error came back.") and keeps focus on its button; one that
+  works moves focus to the page heading. A failed fetch of a page's code (a new version was published) offers a
+  reload. When the frame itself fails (the shell, or the layout around it), the root route shows its own page
+  (`RootError`): its own `main` and gutters, the logo as a plain link home, "Reload the page", and no link that
+  needs the shell.
+- **Slow code.** After 300 ms without the page's code, a skeleton is shown in its place: a title, a description
+  and rows for the app's pages, a title and lines of text for Learn (`DocumentPending`). Before the shell's own
+  code has arrived, the same skeleton is drawn in a frame with the shell's measures and the logo, so nothing moves
+  when the chrome appears.
 
 ## Providers
 

@@ -32,6 +32,21 @@
     }
   }
 
+  /* Touch: a link that stands alone keeps its look and gets a 44 px high hit area. */
+  @media (pointer: coarse) {
+    .root[data-standalone] {
+      position: relative;
+      display: inline-block;
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset-block: min(0px, calc((100% - var(--touch)) / 2));
+        inset-inline: calc(var(--s-4) * -1);
+      }
+    }
+  }
+
   .icon {
     display: inline-block;
     margin-inline-start: var(--s-4);

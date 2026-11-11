@@ -1,7 +1,6 @@
 import { Asset, Networks, StrKey } from '@stellar/stellar-sdk'
 import { describe, expect, it } from 'vitest'
 import {
-  ASSET_LIST_NOTE,
   ASSET_TIERS,
   ASSET_TYPE_LABEL,
   assetKey,
@@ -169,7 +168,6 @@ describe('tiers', () => {
       expect(findBannedWords(TIER_MEANING[t])).toEqual([])
       expect(TIER_MEANING[t].toLowerCase()).not.toContain('verified')
     }
-    expect(findBannedWords(ASSET_LIST_NOTE)).toEqual([])
     expect(BANNED_WORDS.length).toBeGreaterThan(0)
   })
 

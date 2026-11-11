@@ -1,7 +1,7 @@
 @layer features {
   /*
    * On the page ground with a hairline under it. It scrolls with the page: the document is the product, not the
-   * chrome. From 768 px the hairline spans the text block, like the rule of a letterhead; the root reserves a
+   * chrome (the phone tab bar is the one fixed bar). From 768 px the hairline spans the text block, like the rule of a letterhead; the root reserves a
    * scrollbar gutter (see AppShell.module.css) and a full-width rule would stop short of it on a page that does
    * not scroll.
    */
@@ -114,7 +114,14 @@
     margin-inline-start: auto;
   }
 
-  /* Tablet widths: tighter rhythm so the bar holds from 768 px without wrapping. */
+  /* Touch screens from 768 px: the controls grow to 44 px, so the bar grows with them to keep air above and below. */
+  @media (pointer: coarse) and (min-width: 768px) {
+    .inner {
+      height: calc(var(--s-56) + var(--s-8));
+    }
+  }
+
+  /* Up to 1199 px: tighter rhythm so the bar holds in one line. */
   @media (max-width: 1199.98px) {
     .inner {
       gap: var(--s-20);
@@ -129,8 +136,8 @@
     }
   }
 
-  /* Below 900 px the mark stands for the name (the link keeps its name for assistive technology). */
-  @media (max-width: 899.98px) {
+  /* From 768 to 899 px the mark stands for the name (the link keeps its name for assistive technology). */
+  @media (min-width: 768px) and (max-width: 899.98px) {
     .inner {
       gap: var(--s-12);
     }
@@ -144,7 +151,10 @@
     }
   }
 
-  /* Phones: the mark, the name of the section, the short chip, the wallet. The hairline runs edge to edge. */
+  /*
+   * Phones: the logo, the network and the wallet. The tab bar at the bottom names the section, so the bar does not
+   * repeat it. The hairline runs edge to edge.
+   */
   @media (max-width: 767.98px) {
     .bar {
       border-bottom: 1px solid var(--hairline);
@@ -159,35 +169,22 @@
     }
 
     .brand {
-      justify-content: center;
-      width: var(--touch);
-      height: var(--touch);
-      margin-inline-start: calc((var(--touch) - var(--s-24)) / -2);
-      padding: 0;
-    }
-
-    .tools {
-      gap: var(--s-8);
-    }
-
-    .pageTitle {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      font-family: var(--font-serif);
-      font-size: var(--h3-size);
-      line-height: var(--h3-line);
-      font-weight: var(--h3-weight);
-      color: var(--text);
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      min-height: var(--touch);
+      padding-block: 0;
     }
   }
 
-  /* The narrowest phones: the tab bar already names the section, so the chip and the wallet keep the room. */
+  /* The narrowest phones: the mark alone, so the network and the wallet keep their room. */
   @media (max-width: 359.98px) {
-    .pageTitle {
-      visibility: hidden;
+    .wordmark {
+      display: none;
+    }
+
+    .brand {
+      justify-content: center;
+      width: var(--touch);
+      margin-inline-start: calc((var(--touch) - var(--s-24)) / -2);
+      padding: 0;
     }
   }
 }

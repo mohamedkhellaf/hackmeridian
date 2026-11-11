@@ -7,6 +7,7 @@ import {
   formatLocalTime,
   formatUtcDateTime,
   groupAddress,
+  hasExponent,
   sanitizeDecimalInput,
   shortenAddress,
   shortenHash,
@@ -48,7 +49,7 @@ describe('formatLocalTime', () => {
   it('adds the local date when it differs from the UTC date', () => {
     expect(formatLocalTime(DEADLINE, 'Pacific/Auckland')).toBe('21:00 your time (UTC+13)')
     expect(formatLocalTime(Date.UTC(2026, 10, 13, 20, 0), 'Pacific/Auckland')).toBe('14 Nov, 09:00 your time (UTC+13)')
-    expect(formatLocalTime(Date.UTC(2026, 10, 13, 2, 0), 'America/Los_Angeles')).toBe('12 Nov, 18:00 your time (UTC-8)')
+    expect(formatLocalTime(Date.UTC(2026, 10, 13, 2, 0), 'America/Los_Angeles')).toBe('12 Nov, 18:00 your time (UTC\u22128)')
   })
 })
 
@@ -56,20 +57,24 @@ describe('countdown', () => {
   it('shows two units at most', () => {
     expect(formatCountdown(52 * HOUR)).toBe(`2${NBSP}d 4${NBSP}h`)
     expect(formatCountdown(5 * HOUR + 12 * 60_000)).toBe(`5${NBSP}h 12${NBSP}min`)
-    expect(formatCountdown(12 * 60_000 + 40_000)).toBe(`12${NBSP}min 40${NBSP}s`)
-    expect(formatCountdown(40_000)).toBe(`40${NBSP}s`)
+    expect(formatCountdown(12 * 60_000 + 40_000)).toBe(`12${NBSP}min`)
+    expect(formatCountdown(40_000)).toBe(`<1${NBSP}min`)
+    expect(formatCountdown(48 * HOUR)).toBe(`2${NBSP}d`)
+    expect(formatCountdown(3 * HOUR)).toBe(`3${NBSP}h`)
+    expect(formatCountdown(15 * 24 * HOUR + 17 * HOUR)).toBe(`15${NBSP}d`)
   })
 
   it('truncates time left and never rounds it up', () => {
     expect(formatCountdown(52 * HOUR - 1)).toBe(`2${NBSP}d 3${NBSP}h`)
-    expect(formatCountdown(59_999)).toBe(`59${NBSP}s`)
-    expect(formatCountdown(-5)).toBe(`0${NBSP}s`)
+    expect(formatCountdown(59_999)).toBe(`<1${NBSP}min`)
+    expect(formatCountdown(-5)).toBe(`<1${NBSP}min`)
   })
 
   it('reads in words with plural forms', () => {
     expect(formatCountdownWords(52 * HOUR)).toBe('2 days 4 hours')
     expect(formatCountdownWords(25 * HOUR)).toBe('1 day 1 hour')
-    expect(formatCountdownWords(61_000)).toBe('1 minute 1 second')
+    expect(formatCountdownWords(61_000)).toBe('1 minute')
+    expect(formatCountdownWords(30_000)).toBe('less than a minute')
   })
 
   it('knows when it has expired and how often to repaint', () => {
@@ -116,14 +121,34 @@ describe('sanitizeDecimalInput', () => {
     expect(sanitizeDecimalInput('12 USDx')).toBe('12')
   })
 
-  it('reads a single comma as the decimal point', () => {
+  it('reads a single comma as the decimal point when it cannot be grouping', () => {
     expect(sanitizeDecimalInput('1,5')).toBe('1.5')
+    expect(sanitizeDecimalInput('1,50')).toBe('1.50')
+    expect(sanitizeDecimalInput('0,5')).toBe('0.5')
+    expect(sanitizeDecimalInput('0,500')).toBe('0.500')
+    expect(sanitizeDecimalInput('1,')).toBe('1.')
+    expect(sanitizeDecimalInput('1,0005')).toBe('1.0005')
+  })
+
+  it('reads a comma before exactly three digits as grouping, as the app prints amounts', () => {
+    expect(sanitizeDecimalInput('1,000')).toBe('1000')
+    expect(sanitizeDecimalInput('12,500')).toBe('12500')
+    expect(sanitizeDecimalInput('1,000', 0)).toBe('1000')
+    expect(sanitizeDecimalInput('1,000,000')).toBe('1000000')
+    expect(sanitizeDecimalInput('1,000.50')).toBe('1000.50')
   })
 
   it('treats the other separator as grouping when both appear', () => {
     expect(sanitizeDecimalInput('1,234.56')).toBe('1234.56')
     expect(sanitizeDecimalInput('1.234,56')).toBe('1234.56')
     expect(sanitizeDecimalInput('1,234,567')).toBe('1234567')
+  })
+
+  it('spots an exponent, which the amount field refuses', () => {
+    expect(hasExponent('1e3')).toBe(true)
+    expect(hasExponent('2.5E-4')).toBe(true)
+    expect(hasExponent('12 USDx')).toBe(false)
+    expect(hasExponent('1,000')).toBe(false)
   })
 
   it('ignores a second point', () => {

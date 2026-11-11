@@ -6,7 +6,6 @@ import { crisp, trianglePath } from './geometry.ts'
 import { ROW_H, healthLayout, healthState } from './healthLayout.ts'
 import type { HealthState } from './healthLayout.ts'
 import { Hatch } from './parts.tsx'
-import { clamp, linearScale } from './scales.ts'
 import { useChartWidth } from './useChartWidth.ts'
 import { useTextMeasure } from './measure.ts'
 import shared from './viz.module.css'
@@ -39,8 +38,6 @@ export interface HealthBarProps {
   stateLabel?: string
   /** The sentence that states the distance to liquidation in exact figures. */
   status?: ReactNode
-  /** `compact` is a 64 px meter for table cells: no labels, the name carries the figures. */
-  variant?: 'full' | 'compact'
   /** Accessible name of the drawing. Defaults to the three labels and the state. */
   label?: string
   className?: string
@@ -51,45 +48,15 @@ export interface HealthBarProps {
  * The liquidation zone is hatched and every state has a word. There is no "healthy" zone on purpose.
  */
 export function HealthBar(props: HealthBarProps) {
-  const { nlv, mm, im, nlvLabel, mmLabel, imLabel, variant = 'full' } = props
+  const { nlv, mm, im, nlvLabel, mmLabel, imLabel } = props
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
-  const [ref, width] = useChartWidth<HTMLDivElement>(variant === 'compact' ? 64 : 420, variant === 'compact' ? 40 : 160)
+  const [ref, width] = useChartWidth<HTMLDivElement>(420, 160)
   const measureText = useTextMeasure()
   const measure = (text: string, strong = false) => measureText(text, strong ? shared.tStrong : shared.t)
   const state = healthState(nlv, mm, im)
   const word = props.stateLabel ?? STATE_WORDS[state]
   const name = props.label ?? sentences(nlvLabel, mmLabel, imLabel, word)
   const hatchId = `${uid}-hatch`
-
-  if (variant === 'compact') {
-    const h = 12
-    const w = width
-    const max = Math.max(1.5 * im, 1.1 * nlv, mm, 1e-9)
-    const s = linearScale([0, max], [1, w - 1])
-    const known = state !== 'unknown'
-    const xm = known ? clamp(s(mm), 1, w - 1) : 1
-    const xi = known ? clamp(s(im), 1, w - 1) : 1
-    const xn = known ? clamp(s(Math.max(0, nlv)), 1, w - 1) : 1
-    return (
-      <span className={cx(css.compact, props.className)} ref={ref} data-state={state}>
-        <svg className={shared.svg} width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={name}>
-          <defs>
-            <Hatch id={hatchId} period={4} />
-          </defs>
-          <rect x={1.5} y={3.5} width={Math.max(0, w - 3)} height={5} className={css.trackBox} />
-          {known && (
-            <>
-              <rect x={1} y={3} width={Math.max(0, xm - 1)} height={6} fill={`url(#${hatchId})`} />
-              <rect x={xm} y={3} width={Math.max(0, xi - xm)} height={6} className={css.zoneWarn} />
-              <line x1={crisp(xm)} x2={crisp(xm)} y1={2} y2={10} className={css.threshold} />
-              <line x1={crisp(xi)} x2={crisp(xi)} y1={2} y2={10} className={css.threshold} />
-              <line x1={xn} x2={xn} y1={0} y2={h} className={css.marker} />
-            </>
-          )}
-        </svg>
-      </span>
-    )
-  }
 
   const known = state !== 'unknown'
   const layout = healthLayout({
@@ -125,7 +92,6 @@ export function HealthBar(props: HealthBarProps) {
             <>
               <line x1={crisp(x.mm)} x2={crisp(x.mm)} y1={track.top - 2} y2={trackBottom + 5} className={css.threshold} />
               <line x1={crisp(x.im)} x2={crisp(x.im)} y1={track.top - 2} y2={trackBottom + 5} className={css.threshold} />
-              {mm > 0 && Math.abs(x.nlv - x.mm) > 6 && <line x1={x.nlv} x2={x.mm} y1={track.top + track.height / 2} y2={track.top + track.height / 2} className={css.distance} />}
               <line x1={x.nlv} x2={x.nlv} y1={track.top - 4} y2={trackBottom + 2} className={css.marker} />
               <path d={trianglePath(x.nlv, track.top - 7, 7, 'down')} className={shared.inkMark} />
               <text x={layout.nlvLabel.x} y={12} className={cx(shared.tStrong, shared.ink)}>

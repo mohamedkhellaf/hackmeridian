@@ -23,14 +23,14 @@ describe('walletRows', () => {
 
 describe('walletStatus', () => {
   it('says what choosing a wallet does', () => {
-    expect(walletStatus(wallet('freighter', 'installed'), null)).toBe('Detected')
-    expect(walletStatus(wallet('albedo', 'web'), null)).toBe('Web')
+    expect(walletStatus(wallet('freighter', 'installed'), null)).toBe('Installed')
+    expect(walletStatus(wallet('albedo', 'web'), null)).toBe('No install needed')
     expect(walletStatus(wallet('lobstr', 'missing'), null)).toBe('Install')
   })
 
   it('says Waiting only on the wallet that is being asked', () => {
     expect(walletStatus(wallet('freighter', 'installed'), 'freighter')).toBe('Waiting')
-    expect(walletStatus(wallet('albedo', 'web'), 'freighter')).toBe('Web')
+    expect(walletStatus(wallet('albedo', 'web'), 'freighter')).toBe('No install needed')
   })
 
   it('never says a missing extension is waiting', () => {

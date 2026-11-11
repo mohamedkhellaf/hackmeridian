@@ -45,7 +45,7 @@ export const bid = (over: Partial<Bid> = {}): Bid => ({
 })
 
 /** A demo reference at `price` USDx per FUND (two decimals: 982 is 9.82). */
-export const reference = (cents: number): ReferencePrice => ({ kind: 'demo', perUnit: (BigInt(cents) * U) / 100n, label: 'Demo price', note: 'Chosen by the team for this demo. Not a market.', asOf: null })
+export const reference = (cents: number): ReferencePrice => ({ kind: 'demo', perUnit: (BigInt(cents) * U) / 100n, label: 'Demo price', note: 'A fixed figure chosen by the team.', asOf: null })
 
 export const NO_REFERENCE: ReferencePrice = { kind: 'none', perUnit: null, label: 'No reference price', note: 'Set an assumed price to see what an option would pay.', asOf: null }
 

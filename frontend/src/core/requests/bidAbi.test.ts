@@ -196,9 +196,9 @@ describe('v1.5 Bid decoding', () => {
   })
 
   it('bid error codes 122-125 decode', () => {
-    expect(describeError(new Error('Error(Contract, #122)'))).toBe('This request is no longer open (filled, withdrawn or expired).')
+    expect(describeError(new Error('Error(Contract, #122)'))).toBe('This request is no longer open (filled, cancelled or expired).')
     expect(describeError(new Error('Error(Contract, #123)'))).toMatch(/Only the buyer/)
     expect(describeError(new Error('Error(Contract, #124)'))).toMatch(/request book is full/)
-    expect(describeError(new Error('Error(Contract, #125)'))).toBe('You already have 50 open requests on this asset.')
+    expect(describeError(new Error('Error(Contract, #125)'))).toBe('You already have 50 open requests, the most one account can have. Cancel one, or wait for one to be filled or to expire.')
   })
 })

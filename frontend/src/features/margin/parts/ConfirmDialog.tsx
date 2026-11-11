@@ -2,8 +2,8 @@ import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePro } from '../../../data'
 import { Button, Dialog } from '../../../ui'
-import { REPLAY_NOTE } from '../copy'
 import { useMarginUi } from './marginUi'
+import { UNSETTLED_REASON, UnsettledNote } from './UnsettledNote'
 import css from './ConfirmDialog.module.css'
 
 export interface ConfirmDialogProps {
@@ -22,6 +22,11 @@ export interface ConfirmDialogProps {
   destructive?: boolean
   /** Blocks the action with its reason. */
   blocked?: string | null
+  /**
+   * The model already expects the contract to refuse this call (the dialog says why): the action is no longer the
+   * primary one and reads "Try anyway". Nothing is taken away: the call can still be made.
+   */
+  expectRefusal?: boolean
 }
 
 /**
@@ -29,8 +34,8 @@ export interface ConfirmDialogProps {
  * Never stacked: it closes before the call runs. Cancel returns focus to the button that opened it; going
  * ahead sends focus to the result (see MarginUiProvider).
  */
-export function ConfirmDialog({ open, onClose, title, description, children, confirmLabel, onConfirm, destructive = false, blocked }: ConfirmDialogProps) {
-  const { simulated, busy } = usePro()
+export function ConfirmDialog({ open, onClose, title, description, children, confirmLabel, onConfirm, destructive = false, blocked, expectRefusal = false }: ConfirmDialogProps) {
+  const { busy, canCheckAgain } = usePro()
   const { canAct, connect } = useMarginUi()
   const cancelRef = useRef<HTMLButtonElement | null>(null)
   // Going ahead hands focus to the result region (MarginUiProvider), so the dialog must not send it back to the
@@ -55,16 +60,16 @@ export function ConfirmDialog({ open, onClose, title, description, children, con
           </Button>
           {canAct ? (
             <Button
-              variant="primary"
-              disabled={busy || !!blocked}
-              disabledReason={blocked ?? (busy ? 'Another call is in progress.' : undefined)}
+              variant={expectRefusal ? 'secondary' : 'primary'}
+              disabled={busy || !!blocked || canCheckAgain}
+              disabledReason={blocked ?? (busy ? 'Another call is in progress.' : canCheckAgain ? UNSETTLED_REASON : undefined)}
               onClick={() => {
                 setWentAhead(true)
                 onClose()
                 onConfirm()
               }}
             >
-              {confirmLabel}
+              {expectRefusal ? 'Try anyway' : confirmLabel}
             </Button>
           ) : (
             <Button variant="primary" onClick={connect}>
@@ -75,8 +80,8 @@ export function ConfirmDialog({ open, onClose, title, description, children, con
       }
     >
       <div className={css.body}>
+        <UnsettledNote />
         {children}
-        {simulated ? <p className={css.replay}>{REPLAY_NOTE}</p> : null}
       </div>
     </Dialog>
   )

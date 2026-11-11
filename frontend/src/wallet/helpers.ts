@@ -112,12 +112,16 @@ export function walletErrorKind(e: unknown): WalletErrorKind {
   return 'other'
 }
 
-export function describeWalletError(e: unknown, walletName = 'Your wallet'): string {
+/**
+ * A wallet error in one sentence. `action` says what the wallet was asked to do: a refusal while connecting is
+ * not a refusal to sign.
+ */
+export function describeWalletError(e: unknown, walletName = 'Your wallet', action: 'sign' | 'connect' = 'sign'): string {
   switch (walletErrorKind(e)) {
     case 'not-installed':
       return `${walletName} is not installed or not reachable. Install it, unlock it, then try again.`
     case 'rejected':
-      return `You rejected the request in ${walletName}.`
+      return action === 'connect' ? `You declined the connection in ${walletName}.` : `You declined to sign in ${walletName}.`
     default:
       return describeError(e)
   }

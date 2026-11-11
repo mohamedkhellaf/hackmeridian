@@ -10,7 +10,6 @@ import {
   nextMenuIndex,
   secondaryNav,
   sectionOf,
-  sectionTitle,
 } from './nav'
 
 describe('the navigation model', () => {
@@ -29,8 +28,8 @@ describe('the navigation model', () => {
     expect(moreNav(false).map((entry) => entry.id)).toEqual(['learn', 'issuer', 'activity'])
   })
 
-  it('links the footer to Learn, Reserves, Issuer and the design system', () => {
-    expect(FOOTER_NAV.map((entry) => entry.to)).toEqual(['/learn', '/reserves', '/issuer', '/design'])
+  it('links the footer to Learn, Reserves and Issuer, and not to the component gallery', () => {
+    expect(FOOTER_NAV.map((entry) => entry.to)).toEqual(['/learn', '/reserves', '/issuer'])
   })
 
   it('gives every section the path of its own id', () => {
@@ -70,18 +69,6 @@ describe('sectionOf', () => {
     expect(sectionOf('/nowhere')).toBeNull()
     expect(sectionOf('/toString')).toBeNull()
     expect(sectionOf('/constructor')).toBeNull()
-  })
-})
-
-describe('sectionTitle', () => {
-  it('names the section in the phone top bar', () => {
-    expect(sectionTitle('/markets/bond')).toBe('Markets')
-    expect(sectionTitle('/learn')).toBe('Learn')
-    expect(sectionTitle('/design')).toBe('Design system')
-  })
-
-  it('falls back to the product name on an unknown path', () => {
-    expect(sectionTitle('/nowhere')).toBe('StellSec')
   })
 })
 

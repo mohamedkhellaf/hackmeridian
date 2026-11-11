@@ -76,7 +76,10 @@ export interface PositionRow {
   paid: bigint | null
   /** Deficit (the cut on the holder's payout), same rule as `paid`. */
   deficit: bigint | null
-  /** What the position was due, known once claimed. */
+  /**
+   * What the position was due: the claim result once claimed; for an early exercise, what was paid plus the
+   * deficit (the two recorded amounts, as model/settlement does). Null while nothing is known.
+   */
   due: bigint | null
 }
 
@@ -95,7 +98,7 @@ export function positionRow(p: PositionView, series: SeriesView[], books: BookVi
     settlesAtExpiry: p.bookOwner === VAULT && phase === 'live',
     paid: p.claim?.paid ?? (p.exercised ? p.paid : null),
     deficit: p.claim?.deficit ?? (p.exercised ? p.deficit : null),
-    due: p.claim?.due ?? null,
+    due: p.claim?.due ?? (p.exercised ? p.paid + p.deficit : null),
   }
 }
 

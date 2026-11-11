@@ -14,7 +14,7 @@ the "Charts" chapter of `/design` (`src/viz/Gallery.tsx`, default export, mounte
 - **Engraved style** (brief 5.4): 1.5 px ink line, gain area tinted (`--gain-fill`), loss area hatched at 45°
   (`--loss-hatch`), strike as a dotted rule, breakeven as an open circle, the reference price as an ink tick,
   direct labels, no legend, no gridlines but the zero line.
-- **Never colour alone.** Every gain or loss figure has a sign, a word and a triangle; a loss, shortfall or
+- **Never colour alone.** Every gain or loss figure has a sign and a word (no triangle); a loss, shortfall or
   deficit is hatched; states have words.
 - **Labels never collide.** Each label is placed by rule (`labels.ts`, `payoffLayout.ts`,
   `withWithoutLayout.ts`): candidates are tried in order, a label that cannot be placed is shortened, moved to the
@@ -29,11 +29,10 @@ the "Charts" chapter of `/design` (`src/viz/Gallery.tsx`, default export, mounte
 
 | Component | What it shows | Props that matter |
 |---|---|---|
-| `PayoffChart` | Payoff at expiry for one position, with the assumed-price handle | `points: {x, y}[]` (use `samplePiecewise(fn, domain, kinks)`), `domain`, `strike`, `breakevens`, `reference: {value, label}`, `maxGain` / `maxLoss: {value, label?, at?}` (`Infinity` = unlimited; `at` outside the range prints "at 0.00"), `price` + `onPriceChange` (or `defaultPrice`), `unit`, `asset`, `title`, `caption`, `readout`, `valueText`, `readOnly`, `tableVisible` |
+| `PayoffChart` | Payoff at the deadline for one position, with the assumed-price handle | `points: {x, y}[]` (use `samplePiecewise(fn, domain, kinks)`), `domain`, `strike`, `breakevens`, `reference: {value, label}`, `maxGain` / `maxLoss: {value, label?, at?}` (`Infinity` = unlimited; a finite extreme outside the plotted range is said in a line above the plot, "Most you can gain +101.70 USDx, if FUND is at 0.00", never pinned to the end of the line), `price` + `onPriceChange` (or `defaultPrice`), `unit`, `asset`, `title`, `caption`, `readout`, `valueText`, `readOnly`, `tableVisible` |
 | `WithWithoutChart` | Value of a holding at the deadline with the option (solid) and without (dashed) | `points: {x, with, without}[]`, `level: {value, label}` ("Floor 10.00" / "Cap 11.00"), `reference`, `withLabel`, `withoutLabel`, same price, unit, title, caption and readout props |
-| `OutcomeCards` | Three scenario cards: label, serif figure, signed difference, sentence, small bar | `outcomes: {id, label, figure, unit?, delta?: {value, text}, sentence?, bar?: {value, compare?}, current?}[]`, `onSelect(id)` (makes cards buttons), `barKey` |
-| `ScenarioBar` | One bar against a tick (with against without) | `value`, `compare`, `max`, `label` |
-| `HealthBar` | Margin: account value against MM and IM | `nlv`, `mm`, `im` (numbers), `nlvLabel`, `mmLabel`, `imLabel`, `mmShortLabel`, `imShortLabel` (exact strings), `status` (the sentence with the distance), `stateLabel`, `variant: 'full' \| 'compact'` |
+| `OutcomeCards` | Scenario cards side by side: label, serif figure, signed difference, sentence | `outcomes: {id, label, figure, unit?, delta?: {value, text}, sentence?, current?}[]`, `onSelect(id)` (makes cards buttons) |
+| `HealthBar` | Margin: account value against MM and IM | `nlv`, `mm`, `im` (numbers), `nlvLabel`, `mmLabel`, `imLabel`, `mmShortLabel`, `imShortLabel` (exact strings), `status` (the sentence with the distance), `stateLabel` |
 | `Waterfall` | Payout sources in order as one stacked bar | `segments: {id, label, value, valueLabel, kind?: 'paid' \| 'deficit'}[]`, `heading`, `paidLabel`, `max` (shared scale) |
 | `BulletRow` | Reserves: held (bar) against locked (tick) | `name`, `locked`, `held`, `heldLabel`, `lockedLabel`, `differenceLabel` (exact, signed), `differenceWord`, `max`, `decorative` |
 | `Sparkline` | A plain line with a last-value dot | `values`, `label` (what it is), `summary?`, `lastLabel?`, `rule?`, `height` |
@@ -84,7 +83,7 @@ import { PayoffChart, priceDomain, samplePiecewise } from '../../viz'
 
 const domain = priceDomain({ center: reference, include: [strike, breakeven] })
 <PayoffChart
-  title="Payoff at expiry, long put on 5.00 BOND"
+  title="Payoff at the deadline, long put on 5.00 BOND"
   points={samplePiecewise((s) => payoff.pnl(s), domain, [strike])}
   domain={domain}
   strike={{ value: strike, label: '10.00' }}

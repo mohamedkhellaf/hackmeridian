@@ -27,7 +27,7 @@ describe('transaction copy', () => {
     expect(TX_EFFECT_TEXT['outcome-unknown']).toMatch(/not confirmed yet/)
     expect(TX_EFFECT_TEXT['fee-charged']).toMatch(/fee was charged/)
     // Unknown never suggests sending again; expired says it is fine to.
-    expect(TX_PHASE_HELP.unknown).toMatch(/Do not send it again/)
+    expect(TX_PHASE_HELP.unknown).toMatch(/Do not send another one: check again first/)
     expect(TX_PHASE_HELP.unknown).not.toMatch(/try again/i)
     expect(TX_PHASE_HELP.expired).toMatch(/Nothing was charged/)
   })
@@ -38,6 +38,11 @@ describe('transaction copy', () => {
     expect(describeTx(state('failed', 'nothing-sent', 'This offer is no longer open.'))).toEqual({ title: 'Failed', detail: 'This offer is no longer open. Nothing was sent. No fee was charged.' })
     expect(describeTx(state('failed', 'fee-charged', 'The contract refused it.'))!.detail).toBe('The contract refused it. A ledger included the transaction. The network fee was charged.')
     expect(describeTx(state('unknown', 'outcome-unknown', 'Not confirmed yet.'))!.detail).toBe(TX_PHASE_HELP.unknown)
+  })
+
+  it('never runs an error into the fee sentence (late finding errors-edge 8)', () => {
+    expect(describeTx(state('failed', 'fee-charged', 'Option is not active'))!.detail).toBe('Option is not active. A ledger included the transaction. The network fee was charged.')
+    expect(announcementFor('Exercise', state('failed', 'fee-charged', 'Option is not active'))!.message).toBe('Exercise: Failed. Option is not active. A ledger included the transaction. The network fee was charged.')
   })
 
   it('announces progress politely and bad news assertively', () => {

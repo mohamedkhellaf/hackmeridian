@@ -1,49 +1,15 @@
 @layer features {
+  /* One column at reading width: access first (it decides whether the rest is actionable), then the facts. */
   .root {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--s-32);
-    align-items: start;
-    min-width: 0;
-  }
-
-  .main {
     display: flex;
     flex-direction: column;
     gap: var(--s-40);
+    max-width: 48rem;
     min-width: 0;
-  }
-
-  .side {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-16);
-    min-width: 0;
-  }
-
-  @media (min-width: 1024px) {
-    .root {
-      grid-template-columns: minmax(0, 1fr) var(--rail-w);
-    }
-  }
-
-  /* In one column, "Your access" comes first: it decides whether the rest is actionable. */
-  @media (max-width: 1023.98px) {
-    .root {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .side {
-      display: contents;
-    }
-
-    .access {
-      order: -1;
-    }
   }
 
   .section {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: var(--s-12);
@@ -58,11 +24,37 @@
     letter-spacing: var(--h2-track);
   }
 
+  .line {
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
   .note {
     max-width: var(--measure);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
+  }
+
+  /* The issuer sentence: a plain paragraph in the text colour, read before trading (ruling A2). */
+  .issuer {
+    max-width: var(--measure);
+    margin-top: var(--s-16);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text);
+  }
+
+  /* Labels and values close enough to read across: the list is as wide as its facts need. */
+  .facts {
+    max-width: 34rem;
+  }
+
+  .powersList {
+    display: none;
   }
 
   /* The powers table reads as sentences: cells wrap, and the first column names the power. */
@@ -96,6 +88,48 @@
     text-wrap: pretty;
   }
 
+  /* Narrow: each power is a stacked row, name and state on one line and the effect under it at full width. */
+  @container (max-width: 39.99rem) {
+    .powersTable {
+      display: none;
+    }
+
+    .powersList {
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border-top: 1px solid var(--rule);
+
+      & > li {
+        display: flex;
+        flex-direction: column;
+        gap: var(--s-2);
+        padding-block: var(--s-12);
+        border-bottom: 1px solid var(--hairline);
+        font-size: var(--ui-size);
+        line-height: var(--ui-line);
+      }
+
+      & .power,
+      & .state {
+        width: auto;
+      }
+
+      & .power {
+        font-weight: 500;
+      }
+    }
+
+    .powerHead {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-12);
+    }
+  }
+
   .means {
     display: flex;
     flex-direction: column;
@@ -109,39 +143,6 @@
 
     & > li::marker {
       color: var(--muted);
-    }
-  }
-
-  .accessLine {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    color: var(--text);
-    text-wrap: pretty;
-  }
-
-  .more {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-  }
-
-  .links {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-8);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-  }
-
-  @media (max-width: 767.98px) {
-    .power {
-      width: 8.5rem;
-    }
-
-    .state {
-      width: 4rem;
     }
   }
 }

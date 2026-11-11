@@ -8,12 +8,14 @@ import { groupDigits } from '../../../core/format'
 import type { PreTradeLine } from '../../../core/options/preTrade'
 import { stoppedStage } from '../../../core/tx/machine'
 import type { TxState } from '../../../core/tx/machine'
-import { TX_PHASE_HELP, txEffectText, useOptionsClient, useTxBusy } from '../../../data'
-import { Button, Callout, ContractNote, Dialog, IconCheck, IconDanger, IconInfo, Spinner, TxLink, TxStepper } from '../../../ui'
+import { TX_PHASE_HELP, txEffectText, useOptionsClient, useTxBusy, useUnsettledTx } from '../../../data'
+import { Button, Callout, ContractNote, Dialog, IconCheck, IconDanger, IconInfo, Spinner, TxLink, TxStepper, UnsettledNotice } from '../../../ui'
 import type { NoteTerm, PayoffGlyph } from '../../../ui'
 import { useWallet } from '../../../wallet'
 import { BUSY_REASON, CHECK_AGAIN, CHECKS_HEADING, CLOSE, CONNECT, DONE, RECEIPT, REVIEW_AGAIN } from '../copy'
 import type { ActionCopy } from '../copy'
+import { checksSentence } from './checks'
+import type { CheckLine } from './checks'
 import css from './ActionDialog.module.css'
 
 /** The part of a transaction controller the dialog needs. Every `useExercise()`-style hook satisfies it. */
@@ -45,13 +47,14 @@ export interface ActionDialogProps {
   receiptTerms: ReadonlyArray<NoteTerm>
   /** The contract state the option is in once the transaction confirmed. */
   receiptState?: string
+  /** The heading of the receipt's note: the position and asset ("Long put, FUND"). The dialog's title says what was done. */
+  receiptKind?: ReactNode
   /** A link under the receipt, for example to the position. */
   receiptAction?: ReactNode
   /** Where focus goes on close when the element that opened the dialog is gone. */
   finalFocus?: RefObject<HTMLElement | null>
   size?: 'sm' | 'md'
 }
-
 
 function HashLink({ hash, isMock }: { hash: string; isMock: boolean }) {
   return <TxLink hash={hash} explorerUrl={isMock ? undefined : explorerTx(hash)} copy />
@@ -76,27 +79,34 @@ function Progress({ state, isMock }: { state: TxState; isMock: boolean }) {
 
 const LINE_WORD: Record<PreTradeLine['status'], string> = { pending: 'checking', ok: 'passed', fail: 'failed', unknown: 'not checked' }
 
-/** The status rows of a review: what was re-read from the chain, in words, with a mark that repeats the word. */
-export function CheckLines({ lines }: { lines: ReadonlyArray<PreTradeLine | null> }) {
-  const shown = lines.filter((l): l is PreTradeLine => l !== null)
+/**
+ * What was re-read from the chain before signing: the lines that passed as one sentence with the time of the
+ * read; a line that is still running, could not be checked or failed stays a row, with a mark that repeats its word.
+ */
+export function CheckLines({ lines, at = null }: { lines: ReadonlyArray<CheckLine | null>; at?: string | null }) {
+  const shown = lines.filter((l): l is CheckLine => l !== null)
   if (shown.length === 0) return null
+  const sentence = checksSentence(at, shown)
+  const rows = shown.filter((l) => l.status !== 'ok')
   return (
     <section className={css.checks} aria-label={CHECKS_HEADING}>
-      <h3 className={css.checksHeading}>{CHECKS_HEADING}</h3>
-      <ul className={css.checkList}>
-        {shown.map((l) => (
-          <li key={l.label} className={css.check} data-status={l.status}>
-            <span className={css.checkMark}>
-              {l.status === 'pending' ? <Spinner /> : l.status === 'ok' ? <IconCheck size={16} /> : l.status === 'fail' ? <IconDanger size={16} /> : <IconInfo size={16} />}
-            </span>
-            <span className={css.checkLabel}>{l.label}</span>
-            <span className={css.checkText}>
-              {l.text}
-              <span className="ui-vh">, {LINE_WORD[l.status]}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {sentence ? <p className={css.checksSentence}>{sentence}</p> : null}
+      {rows.length > 0 ? (
+        <ul className={css.checkList}>
+          {rows.map((l) => (
+            <li key={l.label} className={css.check} data-status={l.status}>
+              <span className={css.checkMark}>
+                {l.status === 'pending' ? <Spinner /> : l.status === 'fail' ? <IconDanger size={16} /> : l.status === 'ok' ? <IconCheck size={16} /> : <IconInfo size={16} />}
+              </span>
+              <span className={css.checkLabel}>{l.label}</span>
+              <span className={css.checkText}>
+                {l.text}
+                <span className="ui-vh">, {LINE_WORD[l.status]}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   )
 }
@@ -114,6 +124,7 @@ export function ActionDialog({
   children,
   receiptTerms,
   receiptState,
+  receiptKind,
   receiptAction,
   finalFocus,
   size = 'md',
@@ -121,6 +132,8 @@ export function ActionDialog({
   const { me, isMock } = useOptionsClient()
   const wallet = useWallet()
   const busyElsewhere = useTxBusy() && !tx.working
+  // An earlier transaction of this wallet with an unknown outcome: this one waits for it (the runner would refuse it).
+  const unsettled = useUnsettledTx()
   const { state } = tx
   const stage = state.phase === 'idle' ? 'review' : state.phase === 'confirmed' ? 'receipt' : 'progress'
 
@@ -145,8 +158,8 @@ export function ActionDialog({
             variant="primary"
             onClick={onConfirm}
             loading={checking}
-            disabled={blockedReason !== null || busyElsewhere}
-            disabledReason={blockedReason ?? (busyElsewhere ? BUSY_REASON : undefined)}
+            disabled={blockedReason !== null || busyElsewhere || unsettled !== null}
+            disabledReason={blockedReason ?? (unsettled ? unsettled.reason : busyElsewhere ? BUSY_REASON : undefined)}
           >
             {copy.confirm}
           </Button>
@@ -200,11 +213,12 @@ export function ActionDialog({
   ]
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())} title={copy.title} size={size} footer={footer} finalFocus={finalFocus}>
+    <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())} title={stage === 'receipt' ? copy.done : copy.title} size={size} footer={footer} finalFocus={finalFocus}>
       {stage === 'review' ? (
         <div className={css.review}>
           <p className={css.lead}>{copy.body}</p>
           {copy.caveat ? <p className={css.caveat}>{copy.caveat}</p> : null}
+          {unsettled && me ? <UnsettledNotice onCheck={unsettled.check}>{unsettled.reason}</UnsettledNotice> : null}
           {children}
         </div>
       ) : null}
@@ -222,7 +236,7 @@ export function ActionDialog({
             serial={serial}
             ledger={state.ledger !== null ? groupDigits(String(state.ledger)) : undefined}
             glyph={glyph}
-            kind={copy.done}
+            kind={receiptKind ?? copy.done}
             headingLevel={3}
             state={receiptState}
             terms={receipt}

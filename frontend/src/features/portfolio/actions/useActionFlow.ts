@@ -1,7 +1,7 @@
 // The state behind an action dialog: which action is open on which option, and where focus goes when it closes.
 // The option is a snapshot taken when the action was opened: a confirmed exercise changes the option (and may
 // take its row off the list), and the dialog must still print the receipt of what it did.
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import type { Ask, OptionOffer } from '../../../core/options/types'
 import type { PositionAction } from '../model'
@@ -77,4 +77,17 @@ export function useActionFlow(): FlowState {
   )
   const close = useCallback(() => setOpen(false), [])
   return { flow, open, start, close, finalFocus: focus.ref }
+}
+
+/**
+ * Whether the dialog is still open, read after an await: a dialog dismissed while its last re-check ran must not
+ * go on to ask for a signature.
+ */
+export function useOpenRef(open: boolean): RefObject<boolean> {
+  const ref = useRef(open)
+  // A layout effect: a dismissal commits synchronously, before the awaited re-check resumes.
+  useLayoutEffect(() => {
+    ref.current = open
+  }, [open])
+  return ref
 }

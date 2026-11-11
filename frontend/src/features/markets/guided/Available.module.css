@@ -8,11 +8,51 @@
     border-top: 1px solid var(--rule);
   }
 
+  /* What the wallet already has at these terms: said first, in the body face, with its link. */
+  .mine {
+    padding-bottom: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  /* The heading and, right-aligned on the same line, the order's number or the read time. */
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-16);
+  }
+
   .heading {
     font-family: var(--font-serif);
     font-size: var(--h3-size);
     line-height: var(--h3-line);
     font-weight: var(--h3-weight);
+    text-wrap: pretty;
+
+    &:focus:not(:focus-visible) {
+      outline: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  .aside {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
   }
 
   .sentence {
@@ -26,15 +66,6 @@
 
   .terms {
     border-top: 1px solid var(--hairline);
-  }
-
-  .contractWords {
-    max-width: var(--measure);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: var(--body-weight);
-    color: var(--muted);
-    text-wrap: pretty;
   }
 
   .block {
@@ -70,11 +101,12 @@
     list-style: none;
   }
 
+  /* One suggestion: what differs, the price as a right-aligned column, the action. */
   .suggestion {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--s-8) var(--s-16);
+    gap: var(--s-4) var(--s-16);
     padding-block: var(--s-8);
     border-top: 1px solid var(--hairline);
 
@@ -84,59 +116,74 @@
     }
   }
 
-  .suggestionText {
-    min-width: 0;
-  }
-
   .suggestionTerms {
-    font-family: var(--font-serif);
-    font-size: var(--figure-size);
-    line-height: var(--figure-line);
-    font-weight: var(--figure-weight);
-    font-variant-numeric: tabular-nums lining-nums;
-    color: var(--text);
-  }
-
-  .suggestionDetail {
+    min-width: 0;
     font-size: var(--ui-size);
     line-height: var(--ui-line);
-    font-weight: var(--body-weight);
-    color: var(--text-2);
+    font-weight: var(--ui-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    text-wrap: pretty;
   }
 
-  .own {
-    display: grid;
-    grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
-    gap: var(--s-8) var(--s-24);
-    align-items: end;
+  .suggestionPrice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-family: var(--font-serif);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .suggestionTotal {
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .use {
+    justify-self: end;
+  }
+
+  /* The premium field and, on its baseline, the one-tap price of the lowest offer. */
+  .priceRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-8) var(--s-12);
     margin-top: var(--s-4);
   }
 
   .premium {
+    flex: 0 1 16rem;
     min-width: 0;
   }
 
+  /* Level with the input, not with its label or hint. */
+  .match {
+    margin-bottom: var(--s-4);
+  }
+
   .reference {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--s-4);
-    min-width: 0;
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: var(--body-weight);
-    color: var(--text-2);
+    max-width: var(--measure);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
   }
 
   @container (max-width: 35.99rem) {
     .suggestion {
-      flex-direction: column;
-      align-items: flex-start;
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
-    .own {
-      grid-template-columns: minmax(0, 1fr);
-      align-items: start;
+    .use {
+      grid-column: 1 / -1;
+      justify-self: start;
     }
   }
 }

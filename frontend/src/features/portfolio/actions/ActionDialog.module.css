@@ -48,13 +48,11 @@
     gap: var(--s-6);
   }
 
-  .checksHeading {
-    font-family: var(--font-sans);
-    font-size: var(--label-size);
-    line-height: var(--label-line);
-    font-weight: var(--label-weight);
-    font-stretch: var(--label-stretch);
-    color: var(--muted);
+  .checksSentence {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
   }
 
   .checkList {

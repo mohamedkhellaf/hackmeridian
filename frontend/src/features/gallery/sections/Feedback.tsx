@@ -13,6 +13,7 @@ import {
   Tag,
   Timeline,
   TxLink,
+  TxStateWord,
   TxStepper,
 } from '../../../ui'
 import type { TxState } from '../../../ui'
@@ -42,9 +43,9 @@ export function FeedbackSection() {
       title="Feedback"
       lead="State is said in words. Colour, shape and icons repeat it; they never carry it alone. Nothing here reassures: a message states what happened, what it means for the money and what to do."
     >
-      <Specimen title="Callout" note="Three variants, each with an icon and a word. Only a message that answers an action and must interrupt is an alert; standing disclosures are not." layout="stack">
-        <Callout variant="info" title="Demo price">
-          Strikes are placed around 9.82 USDx, a fixed figure for this demo. It is not a market price.
+      <Specimen title="Callout" note="Three variants, each with its icon and at most one heading line; the variant word is read out, not shown. Only a message that answers an action and must interrupt is an alert; standing disclosures are not." layout="stack">
+        <Callout variant="info" title="No offer for these terms yet">
+          You can post a request at these terms and escrow your premium, or choose a strike that has an offer.
         </Callout>
         <Callout variant="warning" title="Deadline in 2 h" actions={<Button size="sm">View position</Button>}>
           Your long put on BOND is in the money at the demo price. Exercise before 13 Nov 2026, 08:00 UTC or it expires.
@@ -52,12 +53,12 @@ export function FeedbackSection() {
         <Callout variant="danger" title="The BOND issuer has not authorized your account" actions={<Button size="sm">Check again</Button>}>
           You cannot buy this option yet. Nothing was sent. Ask the issuer to authorize the account, then check again.
         </Callout>
-        <Callout variant="warning" label="Experimental" title="Margin is a separate contract with partial collateral" />
+        <Callout variant="warning" title="Withdrawals are blocked: an expired position is not settled yet." />
       </Specimen>
 
       <Specimen
         title="Tag"
-        note="The only tag in the product, and it only carries a contract state name. Shape tells the group: outline waits, ink is in force, filled was carried out, dashed has ended."
+        note="The only tag in the product, and it only carries a contract state name. One shape, two tones: ink while it waits or is in force, muted once carried out or ended."
       >
         {['Offered', 'Active', 'Exercised', 'Expired', 'Cancelled'].map((name) => (
           <Tag key={name} state={name} />
@@ -67,7 +68,7 @@ export function FeedbackSection() {
         <Tag state="Reclaimed" />
       </Specimen>
 
-      <Specimen title="Badge" note="A count of what the data says. Never a status, never a marker for something new.">
+      <Specimen title="Badge" note="A count of what the data says. Solid only for the one count that asks for action; next to a tab label it is a plain muted numeral. Never a status, never a marker for something new.">
         <Example label="Actions waiting, on a navigation item">
           <span className={styles.glyphItem}>
             Portfolio <Badge count={2} label="2 actions waiting" />
@@ -81,6 +82,12 @@ export function FeedbackSection() {
         <Example label="Capped">
           <Badge count={140} />
         </Example>
+      </Specimen>
+
+      <Specimen title="Transaction state" note="One glyph and word per state, the same in Activity and in the issuer's recent actions. The word carries the meaning.">
+        {(['pending', 'confirmed', 'failed', 'unknown', 'expired', 'declined'] as const).map((name) => (
+          <TxStateWord key={name} state={name} />
+        ))}
       </Specimen>
 
       <Specimen
@@ -124,14 +131,14 @@ export function FeedbackSection() {
         />
       </Specimen>
 
-      <Specimen title="Timeline" note="A lifecycle: what happens, who acts and by when. Used for an option's life and for a position's history." layout="split">
+      <Specimen title="Timeline" note="A lifecycle: what happens and by when; each title says who acts. Used for an option's life and for a position's history." layout="split">
         <Timeline
           label="Life of this option"
           items={[
-            { time: 'Now', actor: 'You', title: 'Pay the premium', description: 'The maker locked 50.00 USDx in the contract before you pay.', status: 'done' },
-            { time: 'Until the deadline', actor: 'You', title: 'Exercise if it is worth it', description: 'You deliver 5 BOND and receive 50.00 USDx in the same transaction.', status: 'current' },
-            { time: <DateTime value={SAMPLE_DEADLINE} />, actor: 'Nobody', title: 'The right ends', description: 'Nothing settles by itself. An option not exercised by then expires.', status: 'upcoming' },
-            { time: 'After', actor: 'The maker', title: 'Reclaims the collateral', status: 'upcoming' },
+            { time: 'Now', title: 'You pay the premium', description: 'The maker locked 50.00 USDx in the contract before you pay.', status: 'done' },
+            { time: 'Until the deadline', title: 'You exercise if it is worth it', description: 'You deliver 5 BOND and receive 50.00 USDx in the same transaction.', status: 'current' },
+            { time: <DateTime value={SAMPLE_DEADLINE} />, title: 'The deadline passes', description: 'If you have not exercised by then, the right expires and the premium stays with the maker.', status: 'upcoming' },
+            { time: 'After', title: 'The maker reclaims the collateral', status: 'upcoming' },
           ]}
         />
       </Specimen>

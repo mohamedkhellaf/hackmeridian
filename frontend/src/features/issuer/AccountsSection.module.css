@@ -43,32 +43,55 @@
     margin-top: calc(var(--label-line) + var(--s-6));
   }
 
-  /* Cells hold two lines (the id and what it is), so they wrap and sit on the first line. */
+  .limits {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .filter {
+    align-self: flex-start;
+  }
+
+  /* Stated widths: columns keep their place while rows load and while figures change. */
+  .colAccount {
+    width: 32%;
+  }
+
+  .colBalance {
+    width: 17%;
+  }
+
+  .colActions {
+    width: 9.5rem;
+  }
+
+  /* Cells hold two lines (the state and what it means), so they wrap and sit on the first line. */
   .cell {
     padding-block: var(--s-8);
     white-space: normal;
     vertical-align: top;
   }
 
-  .identity {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-2);
-    min-width: 0;
-    font-weight: 450;
+  .panelCell {
+    height: auto;
+    padding-block: var(--s-4) var(--s-12);
+    white-space: normal;
   }
 
-  .identityLine {
-    display: flex;
+  .identity {
+    display: inline-flex;
     align-items: center;
     gap: var(--s-4);
+    min-width: 0;
     min-height: var(--ui-line);
-    white-space: nowrap;
+    font-weight: 450;
   }
 
   .detail {
     display: block;
-    max-width: 34ch;
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     font-weight: 420;
@@ -80,16 +103,17 @@
     display: flex;
     flex-direction: column;
     gap: var(--s-2);
-    min-width: 11rem;
+    min-width: 0;
   }
 
+  /* Ink for the states that need a decision; the others are quiet. */
   .stateWord {
     font-weight: 550;
     color: var(--text);
 
-    &[data-quiet] {
+    &[data-tone='quiet'] {
       font-weight: 450;
-      color: var(--muted);
+      color: var(--text-2);
     }
   }
 
@@ -105,70 +129,67 @@
     text-wrap: pretty;
   }
 
-  .holdersLoading {
-    display: block;
+  /* Narrow: one two-line entry per account. The unit is said once, in the head of the list. */
+  .listWrap {
+    display: flex;
+    flex-direction: column;
   }
 
-  /* Phones: one block per account, ruled like the table. */
+  .listHead {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-16);
+    padding-block-end: var(--s-4);
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
   .list {
     display: flex;
     flex-direction: column;
     margin: 0;
     padding: 0;
     list-style: none;
-    border-top: 1px solid var(--rule);
     border-bottom: 1px solid var(--rule);
   }
 
   .item {
     display: flex;
     flex-direction: column;
-    gap: var(--s-12);
-    padding-block: var(--s-16);
+    gap: var(--s-8);
+    padding-block: var(--s-12);
 
     & + & {
       border-top: 1px solid var(--hairline);
     }
   }
 
-  .itemFacts {
+  .line {
     display: flex;
-    flex-direction: column;
-    gap: var(--s-8);
-    margin: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
+  }
 
-    & > div {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--s-16);
-    }
+  /* The actions keep to the right edge, also when they wrap under a long state line. */
+  .line > :last-child:not(:first-child) {
+    margin-inline-start: auto;
+  }
 
-    & dt {
-      flex: none;
-      color: var(--muted);
-    }
-
-    & dd {
-      margin: 0;
-      min-width: 0;
-      text-align: end;
-    }
-
-    & .state {
-      align-items: flex-end;
-      min-width: 0;
-    }
+  .itemBalance {
+    margin-inline-start: auto;
+    text-align: end;
   }
 
   @media (max-width: 767.98px) {
     .add {
-      max-width: none;
-    }
-
-    .detail {
       max-width: none;
     }
   }

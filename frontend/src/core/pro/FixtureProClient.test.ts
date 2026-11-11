@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CURSOR, DEFAULT_SCENARIO, FixtureProClient, NOT_SCRIPTED, parseFixtures } from './FixtureProClient'
 import { deriveModel } from './replay'
-import { parseProRoute } from './proRoutes'
 
 const file = parseFixtures()
 const scenario = (n: string) => file.scenarios.find((s) => s.name === n)!
@@ -46,10 +45,18 @@ describe('requirement values', () => {
     expect(deriveModel(sc, 15).accounts.find((a) => a.id === 'MAKER_A')?.requirement).toBeNull()
   })
 
-  it('exposes a writer below maintenance in the default state', () => {
-    const c = new FixtureProClient();
+  it('starts where the main path runs: deposit, write, buy, requirement and withdraw follow (E22)', () => {
+    const c = new FixtureProClient()
     expect(c.scenarioName).toBe(DEFAULT_SCENARIO)
+    expect(DEFAULT_SCENARIO).toBe('happy_path_otm')
     expect(c.position).toBe(DEFAULT_CURSOR)
+    const next = scenario(DEFAULT_SCENARIO).steps.slice(DEFAULT_CURSOR).map((s) => s.op)
+    for (const op of ['deposit', 'create_offer', 'buy', 'get_requirement', 'withdraw']) expect(next, op).toContain(op)
+    expect(next[0]).toBe('deposit')
+  })
+
+  it('exposes a writer below maintenance in the early-exercise story', () => {
+    const c = new FixtureProClient(file, 'american_exercise', 22)
     const a = c.getModel().accounts.find((x) => x.id === 'MAKER_A')!
     expect(a.requirement!.nlv).toBeLessThan(a.requirement!.mm)
     expect(a.cushion).toBeLessThan(0n)
@@ -63,11 +70,17 @@ describe('requirement values', () => {
     expect(c.requirementAfterFill(p)?.im).toBe(244_943_093_750n)
     expect(c.requirementAfterFill({ ...p, qty: 7n })).toBeNull()
   })
+
+  it('gives no preview for another premium: the account value after a fill depends on it', () => {
+    const c = new FixtureProClient(file, 'happy_path_otm', 4)
+    const p = { writer: 'MAKER_A', seriesId: 0, qty: 1000n, premium: 1_000_000_000n, quoteExpiry: 1_801_814_400 }
+    expect(c.requirementAfterFill(p)).toBeNull()
+  })
 })
 
 describe('replayed actions', () => {
   it('walks the American exercise story with the real refusal codes', async () => {
-    const c = new FixtureProClient()
+    const c = new FixtureProClient(file, 'american_exercise', 22)
     const refused = await c.exercise('BOB', 1)
     expect(refused).toMatchObject({ ok: false, code: 224, name: 'LiquidateFirst' })
     const take = await c.liquidate('KEEPER', 'MAKER_A', null)
@@ -109,14 +122,5 @@ describe('replayed actions', () => {
     c.moveTo(4)
     expect(n).toBe(2)
     expect(c.scenarioName).toBe('gap_to_vault')
-  })
-})
-
-describe('Pro routes', () => {
-  it('parses sub-routes with a margin fallback', () => {
-    expect(parseProRoute('#/pro/trade')).toBe('trade')
-    expect(parseProRoute('#/pro')).toBe('margin')
-    expect(parseProRoute('#/pro/nope')).toBe('margin')
-    expect(parseProRoute('#/markets')).toBe('margin')
   })
 })

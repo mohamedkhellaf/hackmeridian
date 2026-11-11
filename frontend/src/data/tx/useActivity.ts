@@ -4,7 +4,7 @@ import type { TxState } from '../../core/tx/machine'
 import { useOptionsClient } from '../useOptionsClient'
 import { canCheckEntry, isOpenEntry } from './activityStore'
 import type { ActivityEntry } from './activityStore'
-import { checkEntry } from './runner'
+import { checkEntry, signingSince, stopWaiting } from './runner'
 import { useRunnerDeps } from './useTx'
 
 export interface ActivityView {
@@ -20,6 +20,12 @@ export interface ActivityView {
   remove: (id: string) => void
   /** Takes every settled entry off the list. In-flight and unknown entries stay. */
   clearSettled: () => void
+  /** Puts entries taken off the list back (Undo): `const gone = entries.filter(...); clearSettled(); restore(gone)`. */
+  restore: (entries: readonly ActivityEntry[]) => void
+  /** Epoch ms since which this page's run of the entry waits for a signature, or null (finding 42). */
+  signingSince: (id: string) => number | null
+  /** Stops waiting for a wallet that does not answer; nothing was signed, so the entry goes. */
+  stopWaiting: (id: string) => boolean
 }
 
 /** The Activity list of `address` (default: the connected wallet; a guest sees the guest list). */
@@ -40,6 +46,7 @@ export function useActivity(address?: string | null): ActivityView {
   )
   const remove = useCallback((id: string) => activity.remove(who, id), [activity, who])
   const clearSettled = useCallback(() => activity.clearSettled(who), [activity, who])
+  const restore = useCallback((back: readonly ActivityEntry[]) => activity.restore(who, back), [activity, who])
   return useMemo(
     () => ({
       entries,
@@ -48,7 +55,10 @@ export function useActivity(address?: string | null): ActivityView {
       check,
       remove,
       clearSettled,
+      restore,
+      signingSince,
+      stopWaiting,
     }),
-    [entries, check, remove, clearSettled],
+    [entries, check, remove, clearSettled, restore],
   )
 }

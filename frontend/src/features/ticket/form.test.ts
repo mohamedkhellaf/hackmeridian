@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { SupportedAssets, TokenInfo } from '../../core/options/types'
 import { isStandardExpiry } from '../../core/series'
-import { TICKET_LADDER_COUNT, chipCountdown, draftOf, fieldOfError, gridFor, initialForm, isOnGrid, parseUtcDateTime, strikeText, takeOver, utcDateTimeFields } from './form'
+import { TICKET_LADDER_COUNT, chipCountdown, draftOf, fieldOfError, gridFor, initialForm, isOnGrid, parseUtcDateTime, premiumTotalText, strikeText, takeOver, unitFromTotal, utcDateTimeFields } from './form'
 import type { TermsForm } from './form'
 import type { FormIntent } from './intent'
 
@@ -12,7 +12,9 @@ const u = (n: number) => BigInt(Math.round(n * 1e7))
 const NOW = Math.floor(Date.now() / 1000)
 const grid = gridFor({ nowSec: NOW, referencePerUnit: u(99.4), quoteDecimals: 7 })
 const intent = (extra: Partial<FormIntent> = {}): FormIntent => ({ mode: 'write', assetId: BOND.contractId, kind: 'put', ...extra })
-const filled = (extra: Partial<TermsForm> = {}): TermsForm => ({ kind: 'put', strike: '100', expiry: grid.expiries[0], qty: '5', premium: '1.8', ...extra })
+const D7 = { underlying: 7, quote: 7 }
+// The premium is typed per unit: 0.36 USDx per BOND on 5.00 BOND is 1.80 USDx in total.
+const filled = (extra: Partial<TermsForm> = {}): TermsForm => ({ kind: 'put', strike: '100', expiry: grid.expiries[0], qty: '5', premium: '0.36', ...extra })
 
 describe('gridFor', () => {
   it('lists the standard expiries and nine strikes around the reference', () => {
@@ -32,7 +34,7 @@ describe('gridFor', () => {
 
 describe('initialForm', () => {
   it('defaults to the first listed expiry and the strike nearest the reference, and invents no amounts', () => {
-    const form = initialForm(intent(), grid, u(99.4), 7)
+    const form = initialForm(intent(), grid, u(99.4), D7)
     expect(form.expiry).toBe(grid.expiries[0])
     expect(grid.ladder.map((k) => strikeText(k, 7))).toContain(form.strike)
     expect(form.qty).toBe('')
@@ -40,15 +42,15 @@ describe('initialForm', () => {
     expect(isOnGrid(form, grid, 7)).toBe(true)
   })
 
-  it('keeps the terms the intent carries', () => {
+  it('keeps the terms the intent carries, its total premium held per unit', () => {
     const custom = grid.expiries[0] + 3600
-    const form = initialForm(intent({ kind: 'call', strike: '101.25', expiry: custom, qty: '2', premium: '0.5' }), grid, u(99.4), 7)
-    expect(form).toEqual({ kind: 'call', strike: '101.25', expiry: custom, qty: '2', premium: '0.5' })
+    const form = initialForm(intent({ kind: 'call', strike: '101.25', expiry: custom, qty: '2', premium: '0.5' }), grid, u(99.4), D7)
+    expect(form).toEqual({ kind: 'call', strike: '101.25', expiry: custom, qty: '2', premium: '0.25' })
     expect(isOnGrid(form, grid, 7)).toBe(false)
   })
 
   it('has no strike to offer without a reference and without offers', () => {
-    expect(initialForm(intent(), { expiries: [], ladder: [] }, null, 7)).toEqual({ kind: 'put', strike: '', expiry: null, qty: '', premium: '' })
+    expect(initialForm(intent(), { expiries: [], ladder: [] }, null, D7)).toEqual({ kind: 'put', strike: '', expiry: null, qty: '', premium: '' })
   })
 })
 
@@ -59,10 +61,15 @@ describe('draftOf', () => {
   })
 
   it('asks for a blank field in plain words, under that field', () => {
-    expect(draftOf(filled({ qty: '' }), BOND, ASSETS)).toEqual({ ok: false, field: 'qty', error: 'Enter a quantity of BOND.' })
-    expect(draftOf(filled({ strike: ' ' }), BOND, ASSETS)).toEqual({ ok: false, field: 'strike', error: 'Pick a strike.' })
-    expect(draftOf(filled({ premium: '' }), BOND, ASSETS)).toEqual({ ok: false, field: 'premium', error: 'Enter the premium in USDx.' })
+    expect(draftOf(filled({ qty: '' }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'qty', error: 'Enter a quantity of BOND.' })
+    expect(draftOf(filled({ strike: ' ' }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'strike', error: 'Pick a strike.' })
+    expect(draftOf(filled({ premium: '' }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'premium', error: 'Enter the premium per BOND, in USDx.' })
     expect(draftOf(filled({ expiry: null }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'expiry' })
+  })
+
+  it('marks every field on its own: a quantity of 0 while the premium is still empty', () => {
+    const draft = draftOf(filled({ qty: '0', premium: '' }), BOND, ASSETS)
+    expect(draft).toMatchObject({ ok: false, field: 'qty', errors: { qty: 'Quantity must be a positive amount of BOND.', premium: 'Enter the premium per BOND, in USDx.' } })
   })
 
   it('refuses a strike times quantity that is not an exact amount', () => {
@@ -71,12 +78,18 @@ describe('draftOf', () => {
     expect(draft).toEqual({ ok: false, field: 'qty', error: 'Strike × quantity is not an exact amount; adjust one of them.' })
   })
 
+  it('refuses a premium per unit whose total is not an exact amount', () => {
+    // 0.0000001 USDx per BOND on 0.5 BOND is half a unit of USDx.
+    expect(draftOf(filled({ qty: '0.5', strike: '2', premium: '0.0000001' }), BOND, ASSETS)).toEqual({ ok: false, field: 'premium', error: 'Premium × quantity is not an exact amount; adjust one of them.' })
+  })
+
   it('refuses zero amounts, a past expiry and a tenor over two years', () => {
     expect(draftOf(filled({ qty: '0' }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'qty' })
     expect(draftOf(filled({ strike: '0' }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'strike' })
     expect(draftOf(filled({ premium: '0' }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'premium' })
-    expect(draftOf(filled({ expiry: NOW - 10 }), BOND, ASSETS)).toEqual({ ok: false, field: 'expiry', error: 'Expiry must be in the future.' })
-    expect(draftOf(filled({ expiry: NOW + 3 * 365 * 86_400 }), BOND, ASSETS)).toEqual({ ok: false, field: 'expiry', error: 'Expiry must be within 2 years.' })
+    // The wording of these two is core/maker's (buildOffer); the ticket only adds the full stop.
+    expect(draftOf(filled({ expiry: NOW - 10 }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'expiry', error: expect.stringMatching(/must be in the future\.$/) })
+    expect(draftOf(filled({ expiry: NOW + 3 * 365 * 86_400 }), BOND, ASSETS)).toMatchObject({ ok: false, field: 'expiry', error: expect.stringMatching(/must be within 2 years\.$/) })
   })
 
   it('refuses more decimals than the token has', () => {
@@ -94,10 +107,29 @@ describe('fieldOfError', () => {
   })
 })
 
+describe('premium per unit', () => {
+  it('computes the total exactly, and says when it is not a whole number of quote units', () => {
+    expect(premiumTotalText({ qty: '5', premium: '0.36' }, D7)).toBe('1.8')
+    expect(premiumTotalText({ qty: '3', premium: '0.3333333' }, D7)).toBe('0.9999999')
+    expect(premiumTotalText({ qty: '0.5', premium: '0.0000001' }, D7)).toBe('inexact')
+    expect(premiumTotalText({ qty: '', premium: '0.36' }, D7)).toBeNull()
+  })
+
+  it('reads a total from a link per unit, truncated', () => {
+    expect(unitFromTotal('1.8', '5', D7)).toBe('0.36')
+    expect(unitFromTotal('1', '3', D7)).toBe('0.3333333')
+    expect(unitFromTotal('1.8', '', D7)).toBeNull()
+  })
+})
+
 describe('custom expiry', () => {
   it('reads a date and a time as UTC', () => {
     expect(parseUtcDateTime('2026-12-18', '08:00')).toBe(Date.UTC(2026, 11, 18, 8, 0, 0) / 1000)
     expect(parseUtcDateTime(' 2026-12-18 ', '8:05')).toBe(Date.UTC(2026, 11, 18, 8, 5, 0) / 1000)
+  })
+
+  it('takes the digits alone, as a phone number pad types them', () => {
+    expect(parseUtcDateTime('20261218', '0800')).toBe(Date.UTC(2026, 11, 18, 8, 0, 0) / 1000)
   })
 
   it('rejects what is not a date or a time', () => {
@@ -125,6 +157,11 @@ describe('takeOver', () => {
   it('takes nothing over from an echo of the form itself', () => {
     const form = filled({ strike: '10.20' })
     expect(takeOver(form, intent({ strike: '10.2', expiry: form.expiry!, qty: '5.0', premium: '1.80' }), decimals)).toBeNull()
+  })
+
+  it('takes over a total premium from the URL as a premium per unit', () => {
+    expect(takeOver(filled(), intent({ qty: '5', premium: '2.5' }), decimals)).toEqual({ premium: '0.5' })
+    expect(takeOver(filled(), intent({ qty: '10', premium: '3.6' }), decimals)).toEqual({ qty: '10' })
   })
 
   it('takes over the terms another cell of the chain carries', () => {

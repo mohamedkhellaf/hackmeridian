@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FixtureProClient } from './FixtureProClient'
+import { FixtureProClient, parseFixtures } from './FixtureProClient'
 import { PHASE_ACTION, PHASE_STATE, PHASE_WAITING, phaseOf, positionRow, positionRows } from './phase'
 import type { Phase } from './phase'
 import type { BookView, PositionView, SeriesView } from './types'
@@ -64,8 +64,15 @@ describe('positionRow', () => {
   it('says who is waiting for the settlement price', () => {
     expect(positionRow(position(), [series()], [book()], 5000)).toMatchObject({ phase: 'await-price', waiting: 'Waiting for settlement price', action: null })
   })
+  it('gives an exercised position its due: what was paid plus the deficit (review finding 27)', () => {
+    const row = positionRow(position({ exercised: true, paid: 1_600n, deficit: 0n }), [series()], [book()], 10)
+    expect(row).toMatchObject({ phase: 'exercised', paid: 1_600n, deficit: 0n, due: 1_600n })
+    expect(positionRow(position({ exercised: true, paid: 900n, deficit: 100n }), [series()], [book()], 10).due).toBe(1_000n)
+    expect(positionRow(position(), [series()], [book()], 10).due).toBeNull()
+    expect(positionRow(position({ claim: { due: 5n, paid: 4n, deficit: 1n } }), [series({ closed: true })], [book()], 1000).due).toBe(5n)
+  })
   it('derives a row for every position of the fixture model', () => {
-    const model = new FixtureProClient().getModel()
+    const model = new FixtureProClient(parseFixtures(), 'american_exercise', 22).getModel()
     const rows = positionRows(model)
     expect(rows).toHaveLength(model.positions.length)
     expect(rows.length).toBeGreaterThan(0)

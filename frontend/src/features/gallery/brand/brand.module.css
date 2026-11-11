@@ -18,13 +18,8 @@
     justify-content: space-between;
   }
 
-  .status {
-    font-family: var(--font-mono);
-    font-size: 18px;
-    color: var(--muted);
-  }
-
   .cardBody {
+    flex: 1;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 416px;
     align-items: center;
@@ -61,18 +56,6 @@
     box-shadow: 0 24px 64px -24px color-mix(in srgb, var(--text) 30%, transparent);
   }
 
-  .cardFoot {
-    display: flex;
-    justify-content: space-between;
-    gap: 32px;
-    padding-top: 20px;
-    border-top: 1px solid var(--rule);
-    font-family: var(--font-sans);
-    font-size: 18px;
-    line-height: 26px;
-    color: var(--text-2);
-    white-space: nowrap;
-  }
 
   .icon {
     display: grid;

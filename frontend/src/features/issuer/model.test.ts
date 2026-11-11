@@ -14,12 +14,18 @@ import {
   clawbackImpact,
   clawbackPhrase,
   contractRead,
+  authorizeIsFinal,
+  doneLabel,
   escrowExposure,
-  exposureText,
+  exposureRows,
   flagLimits,
   issuerSubject,
   logRows,
   mergeRows,
+  needsDecision,
+  openIssuerAction,
+  otherIssuedAsset,
+  pickAsset,
   parseHolderDocument,
   parseHoldersPage,
   parseIssuerSubject,
@@ -73,6 +79,33 @@ describe('accessOf', () => {
   })
   it('never grants access when the issuer cannot be known', () => {
     expect(accessOf({ mock: false, address: ALICE, issuer: null })).toEqual({ kind: 'not-issuer', connected: ALICE, issuer: null })
+  })
+})
+
+describe('accessOf, the unchecked case', () => {
+  it('tells a failed check from an account that was checked and does not match', () => {
+    expect(accessOf({ mock: false, address: ALICE, issuer: null, checkFailed: true })).toEqual({ kind: 'unchecked', connected: ALICE })
+    expect(accessOf({ mock: false, address: ALICE, issuer: null, checkFailed: false })).toEqual({ kind: 'not-issuer', connected: ALICE, issuer: null })
+    // A known issuer is never "unchecked".
+    expect(accessOf({ mock: false, address: ALICE, issuer: ISSUER, checkFailed: true }).kind).toBe('not-issuer')
+  })
+})
+
+describe('the asset on screen', () => {
+  const RWA = { contractId: USDX_SAC, code: 'RWA', decimals: 7, issuer: ALICE }
+  const assets = [BOND, RWA]
+  it('opens on the pick, else on the first asset the connected account issues, else the first listed', () => {
+    expect(pickAsset(assets, USDX_SAC, null)).toBe(RWA)
+    expect(pickAsset(assets, null, ALICE)).toBe(RWA)
+    expect(pickAsset(assets, null, BOB)).toBe(BOND)
+    expect(pickAsset(assets, 'CNOTLISTED', null)).toBe(BOND)
+    expect(pickAsset([], null, ALICE)).toBeNull()
+  })
+  it('finds another listed asset the connected account issues', () => {
+    expect(otherIssuedAsset(assets, BOND, ALICE)).toBe(RWA)
+    expect(otherIssuedAsset(assets, RWA, ALICE)).toBeNull()
+    expect(otherIssuedAsset(assets, BOND, BOB)).toBeNull()
+    expect(otherIssuedAsset(assets, BOND, null)).toBeNull()
   })
 })
 
@@ -143,13 +176,13 @@ describe('mergeRows', () => {
     { address: ALICE, read: read('authorized') },
     { address: BOB, read: read('unauthorized') },
   ]
-  it('puts the options contract first, then typed addresses, then holders', () => {
+  it('puts the Covered contract first, then typed addresses, then holders, those that need a decision first', () => {
     const rows = mergeRows({ escrow: ESCROW, added: [USDX_SAC], holders, reads: { [ESCROW]: contractRead(true, 3n * U) } })
     expect(rows.map((r) => [r.address, r.source])).toEqual([
       [ESCROW, 'escrow'],
       [USDX_SAC, 'added'],
-      [ALICE, 'holder'],
       [BOB, 'holder'],
+      [ALICE, 'holder'],
     ])
     expect(rows[0]).toMatchObject({ escrow: true, kind: 'contract', read: { state: 'authorized', balance: 3n * U } })
     expect(rows[1].read).toBeUndefined()
@@ -159,8 +192,35 @@ describe('mergeRows', () => {
     expect(rows.map((r) => r.address)).toEqual([ESCROW, ALICE, BOB])
     expect(rows[1].source).toBe('added')
   })
-  it('works without an options contract and drops malformed addresses', () => {
+  it('sorts the holders: not authorized and restricted first, then a failed read, then the authorized by balance, largest first', () => {
+    const C = 'GDY257DGQREP4NLM2DF2YUS5M2VHRW3JNDK2YYHZP55SMW3FMAUHZUVN'
+    const D = 'GC7ZMEB7HIPST7PWNQLIG6I5N3VZD3UG7VFOOPCZBJ7JWKCENCEK5NAY'
+    const rows = mergeRows({
+      escrow: undefined,
+      added: [],
+      holders: [
+        { address: ALICE, read: read('authorized', 1n * U) },
+        { address: BOB, read: read('authorized', 9n * U) },
+        { address: C, read: read('maintain-only', 1n * U) },
+        { address: D, read: read('unknown', null, null) },
+        { address: ISSUER, read: read('unauthorized', 0n) },
+      ],
+      reads: { [ALICE]: read('authorized', 20n * U) },
+    })
+    expect(rows.map((r) => r.address)).toEqual([C, ISSUER, D, ALICE, BOB])
+  })
+  it('works without a Covered contract and drops malformed addresses', () => {
     expect(mergeRows({ escrow: undefined, added: ['nope'], holders: [], reads: {} })).toEqual([])
+  })
+})
+
+describe('needsDecision', () => {
+  it('is true for the accounts the issuer has a decision to make about', () => {
+    expect(needsDecision({ read: read('unauthorized') })).toBe(true)
+    expect(needsDecision({ read: read('maintain-only') })).toBe(true)
+    expect(needsDecision({ read: read('authorized') })).toBe(false)
+    expect(needsDecision({ read: read('unknown', null, null) })).toBe(false)
+    expect(needsDecision({ read: undefined })).toBe(false)
   })
 })
 
@@ -178,58 +238,53 @@ describe('checkNewAccount', () => {
 })
 
 describe('rowActions', () => {
-  it('offers freeze and clawback on an authorized account, never authorize', () => {
+  const kinds = (a: ReturnType<typeof rowActions>) => ({ primary: a.primary?.kind ?? null, more: a.more.map((m) => m.kind) })
+  it('offers freeze as the button on an authorized account, clawback in the menu, never authorize', () => {
     const a = rowActions({ read: read('authorized') }, ALL_ON, 'BOND')
-    expect(a).toEqual({ authorize: null, freeze: { enabled: true }, clawback: { enabled: true }, note: null })
+    expect(a).toEqual({ primary: { kind: 'freeze', enabled: true }, more: [{ kind: 'clawback', enabled: true }], note: null })
   })
-  it('offers authorize and clawback on an account that is not authorized, never freeze', () => {
-    const a = rowActions({ read: read('unauthorized') }, ALL_ON, 'BOND')
-    expect(a.authorize).toEqual({ enabled: true })
-    expect(a.freeze).toBeNull()
-    expect(a.clawback).toEqual({ enabled: true })
+  it('offers authorize as the button on an account that is not authorized, never freeze', () => {
+    expect(kinds(rowActions({ read: read('unauthorized') }, ALL_ON, 'BOND'))).toEqual({ primary: 'authorize', more: ['clawback'] })
   })
-  it('offers both authorize and freeze on a restricted account', () => {
-    const a = rowActions({ read: read('maintain-only') }, ALL_ON, 'BOND')
-    expect(a.authorize?.enabled).toBe(true)
-    expect(a.freeze?.enabled).toBe(true)
+  it('offers authorize as the button and freeze in the menu on a restricted account: two controls at most', () => {
+    expect(kinds(rowActions({ read: read('maintain-only') }, ALL_ON, 'BOND'))).toEqual({ primary: 'authorize', more: ['freeze', 'clawback'] })
   })
-  it('leaves everything open when the read failed or is still running, so the issuer is never locked out', () => {
-    for (const row of [{ read: undefined }, { read: read('unknown', null, null) }]) {
-      const a = rowActions(row, ALL_ON, 'BOND')
-      expect(a.authorize?.enabled).toBe(true)
-      expect(a.freeze?.enabled).toBe(true)
-      expect(a.clawback?.enabled).toBe(true)
-    }
+  it('leaves everything open when the read failed, so the issuer is never locked out', () => {
+    expect(kinds(rowActions({ read: read('unknown', null, null) }, ALL_ON, 'BOND'))).toEqual({ primary: 'authorize', more: ['freeze', 'clawback'] })
+  })
+  it('offers nothing while the first read of the row is running', () => {
+    expect(rowActions({ read: undefined }, ALL_ON, 'BOND')).toEqual({ primary: null, more: [], note: null })
   })
   it('offers nothing, with the reason, where there is nothing to act on', () => {
-    expect(rowActions({ read: read('no-trustline', null, null) }, ALL_ON, 'BOND')).toEqual({ authorize: null, freeze: null, clawback: null, note: 'This account has no BOND trustline.' })
+    expect(rowActions({ read: read('no-trustline', null, null) }, ALL_ON, 'BOND')).toEqual({ primary: null, more: [], note: 'This account has no BOND trustline.' })
     expect(rowActions({ read: read('unfunded', null, null) }, ALL_ON, 'BOND').note).toBe(COPY.reasons.unfunded)
     expect(rowActions({ read: read('issuer', null, null) }, ALL_ON, 'BOND').note).toBe(COPY.reasons.issuerRow)
   })
-  it('disables freeze when the issuer cannot revoke, and says so', () => {
-    const a = rowActions({ read: read('authorized') }, { ...ALL_ON, authRevocable: false }, 'BOND')
-    expect(a.freeze).toEqual({ enabled: false, reason: COPY.reasons.notRevocable })
-    expect(a.clawback?.enabled).toBe(true)
+  it('does not offer what the flags rule out for the whole asset', () => {
+    expect(kinds(rowActions({ read: read('authorized') }, { ...ALL_ON, authRevocable: false }, 'BOND'))).toEqual({ primary: null, more: ['clawback'] })
+    expect(kinds(rowActions({ read: read('authorized') }, { ...ALL_ON, clawback: false }, 'BOND'))).toEqual({ primary: 'freeze', more: [] })
+    expect(kinds(rowActions({ read: read('maintain-only') }, { ...ALL_ON, authRevocable: false, clawback: false }, 'BOND'))).toEqual({ primary: 'authorize', more: [] })
   })
-  it('disables clawback when the flag is off, when the trustline predates it, and on a zero balance', () => {
-    expect(rowActions({ read: read('authorized') }, { ...ALL_ON, clawback: false }, 'BOND').clawback).toEqual({ enabled: false, reason: COPY.reasons.clawbackOff })
-    expect(rowActions({ read: read('authorized', 5n * U, false) }, ALL_ON, 'BOND').clawback).toEqual({ enabled: false, reason: COPY.reasons.clawbackNotOnLine })
-    expect(rowActions({ read: read('authorized', 0n) }, ALL_ON, 'BOND').clawback).toEqual({ enabled: false, reason: 'The BOND balance is zero.' })
+  it('does not offer clawback on a trustline it does not apply to, or on a zero balance', () => {
+    expect(kinds(rowActions({ read: read('authorized', 5n * U, false) }, ALL_ON, 'BOND')).more).toEqual([])
+    expect(kinds(rowActions({ read: read('authorized', 0n) }, ALL_ON, 'BOND')).more).toEqual([])
   })
   it('does not gate on flags that were not read', () => {
-    const a = rowActions({ read: read('authorized') }, null, 'BOND')
-    expect(a.freeze?.enabled).toBe(true)
-    expect(a.clawback?.enabled).toBe(true)
+    expect(kinds(rowActions({ read: read('authorized') }, null, 'BOND'))).toEqual({ primary: 'freeze', more: ['clawback'] })
   })
   it('keeps what is offered in place and disables it while a transaction is in flight', () => {
     const a = rowActions({ read: read('authorized') }, ALL_ON, 'BOND', COPY.reasons.busy)
-    expect(a.authorize).toBeNull()
-    expect(a.freeze).toEqual({ enabled: false, reason: COPY.reasons.busy })
-    expect(a.clawback).toEqual({ enabled: false, reason: COPY.reasons.busy })
+    expect(a.primary).toEqual({ kind: 'freeze', enabled: false, reason: COPY.reasons.busy })
+    expect(a.more).toEqual([{ kind: 'clawback', enabled: false, reason: COPY.reasons.busy }])
   })
   it('treats a contract like an account', () => {
-    expect(rowActions({ read: contractRead(true, 3n * U) }, ALL_ON, 'BOND')).toMatchObject({ authorize: null, freeze: { enabled: true }, clawback: { enabled: true } })
-    expect(rowActions({ read: contractRead(false, null) }, ALL_ON, 'BOND')).toMatchObject({ authorize: { enabled: true }, freeze: null })
+    expect(kinds(rowActions({ read: contractRead(true, 3n * U) }, ALL_ON, 'BOND'))).toEqual({ primary: 'freeze', more: ['clawback'] })
+    expect(kinds(rowActions({ read: contractRead(false, null) }, ALL_ON, 'BOND'))).toEqual({ primary: 'authorize', more: ['clawback'] })
+  })
+  it('asks before an authorization only when it cannot be undone', () => {
+    expect(authorizeIsFinal(ALL_ON)).toBe(false)
+    expect(authorizeIsFinal({ ...ALL_ON, authRevocable: false })).toBe(true)
+    expect(authorizeIsFinal(null)).toBe(false)
   })
 })
 
@@ -239,8 +294,11 @@ describe('flagLimits', () => {
     // Authorization required does not gate any of the three actions.
     expect(flagLimits({ ...ALL_ON, authRequired: false })).toEqual([])
   })
-  it('names each action the flags rule out', () => {
-    expect(flagLimits({ authRequired: false, authRevocable: false, clawback: false, authImmutable: false })).toEqual([COPY.reasons.notRevocable, COPY.reasons.clawbackOff])
+  it('names each action the flags rule out, once for the whole asset', () => {
+    expect(flagLimits({ authRequired: false, authRevocable: false, clawback: false, authImmutable: false })).toEqual([
+      'Freeze is not available: Authorization revocable is off.',
+      'Claw back is not available: Clawback enabled is off.',
+    ])
   })
 })
 
@@ -339,24 +397,21 @@ describe('exposure', () => {
     expect(accountExposure(options, BOND_SAC, BOB)).toEqual({ holding: 1, written: 1 })
     expect(accountExposure(options, BOND_SAC, ISSUER)).toEqual({ holding: 0, written: 0 })
   })
-  it('says it in one sentence, singular and plural', () => {
-    const row = { address: ALICE, escrow: false }
-    expect(exposureText(row, 'BOND', null, { holding: 1, written: 4 })).toBe('It holds 1 active option on BOND and wrote 4 options that are still open.')
-    expect(exposureText(row, 'BOND', null, { holding: 2, written: 0 })).toBe('It holds 2 active options on BOND.')
-    expect(exposureText(row, 'BOND', null, { holding: 0, written: 1 })).toBe('It wrote 1 option on BOND that is still open.')
-    expect(exposureText(row, 'BOND', null, { holding: 0, written: 0 })).toBe('It has no open option on BOND in this contract.')
-    expect(exposureText(row, 'BOND', null, null)).toBeNull()
+  it('gives what an account has open as rows of the confirmation', () => {
+    const row = { escrow: false }
+    expect(exposureRows(row, null, { holding: 1, written: 4 })).toEqual([
+      { label: 'Open options written', value: 4 },
+      { label: 'Active options held', value: 1 },
+    ])
+    expect(exposureRows(row, null, null)).toBeNull()
   })
-  it('says what the contract has open', () => {
-    const row = { address: ESCROW, escrow: true }
-    expect(exposureText(row, 'BOND', { active: 2, offered: 1, awaiting: 2, total: 5 }, null)).toBe(
-      '5 options on BOND are open in the contract: 2 active, 1 offered, 2 waiting for a claim or a reclaim.',
-    )
-    expect(exposureText(row, 'BOND', { active: 1, offered: 0, awaiting: 0, total: 1 }, null)).toBe(
-      '1 option on BOND is open in the contract: 1 active, 0 offered, 0 waiting for a claim or a reclaim.',
-    )
-    expect(exposureText(row, 'BOND', { active: 0, offered: 0, awaiting: 0, total: 0 }, null)).toBe('No option on BOND is open in the contract.')
-    expect(exposureText(row, 'BOND', null, null)).toBeNull()
+  it('gives what the contract has open, with the split', () => {
+    const row = { escrow: true }
+    expect(exposureRows(row, { active: 2, offered: 1, awaiting: 2, total: 5 }, null)).toEqual([
+      { label: 'Open options', value: 5, hint: '2 active, 1 offered, 2 waiting for a claim or a reclaim' },
+    ])
+    expect(exposureRows(row, { active: 0, offered: 0, awaiting: 0, total: 0 }, null)).toEqual([{ label: 'Open options', value: 0, hint: undefined }])
+    expect(exposureRows(row, null, null)).toBeNull()
   })
 })
 
@@ -372,12 +427,32 @@ describe('transactions and the log', () => {
     expect(parseIssuerSubject('option:12')).toBeNull()
     expect(parseIssuerSubject(null)).toBeNull()
   })
+  it('says a confirmed action in one line', () => {
+    expect(doneLabel({ kind: 'authorize', asset: BOND, target: ALICE })).toBe('Authorized GAE6…ARFS for BOND.')
+    expect(doneLabel({ kind: 'freeze', asset: BOND, target: ESCROW })).toBe('Frozen CAIK…GKY6 for BOND.')
+    expect(doneLabel({ kind: 'clawback', asset: BOND, target: ALICE, units: 25n * U })).toBe('Clawed back 25.00 BOND from GAE6…ARFS.')
+  })
+  const entry = (id: string, action: string, startedAt: number, subject: string | null = issuerSubject(BOND_SAC, ALICE), label = id, phase = 'confirmed') => ({ id, action, label, subject, phase, hash: `h-${id}`, startedAt })
   it('keeps only issuer actions in the log, newest first, capped', () => {
-    const entry = (id: string, action: string, startedAt: number, subject: string | null = issuerSubject(BOND_SAC, ALICE)) => ({ id, action, label: id, subject, phase: 'confirmed', hash: `h-${id}`, startedAt })
-    const rows = logRows([entry('a', actionName('freeze'), 10), entry('b', 'buy', 20, 'option:1'), entry('c', actionName('clawback'), 30), entry('d', actionName('authorize'), 5, null)], 2)
+    const rows = logRows([entry('a', actionName('freeze'), 10), entry('b', 'buy', 20, 'option:1'), entry('c', actionName('authorize'), 30), entry('d', actionName('authorize'), 5, null)], null, 2)
     expect(rows.map((r) => r.id)).toEqual(['c', 'a'])
-    expect(rows[0]).toEqual({ id: 'c', label: 'c', target: ALICE, phase: 'confirmed', hash: 'h-c', at: 30 })
+    expect(rows[0]).toEqual({ id: 'c', action: 'Authorize', label: 'c', target: ALICE, phase: 'confirmed', hash: 'h-c', at: 30 })
     expect(logRows([entry('d', actionName('authorize'), 5, null)])[0].target).toBeNull()
+  })
+  it('names the action without the account, which has its own column, and keeps one asset', () => {
+    const claw = entry('c', actionName('clawback'), 30, issuerSubject(BOND_SAC, ALICE), 'Claw back 123.4567891 BOND from GAE6…ARFS')
+    const other = entry('o', actionName('freeze'), 40, issuerSubject(USDX_SAC, ALICE), 'Freeze GAE6…ARFS for USDx')
+    const rows = logRows([claw, other, entry('f', actionName('freeze'), 20, issuerSubject(BOND_SAC, BOB), 'Freeze GBPH…IEEM for BOND')], BOND_SAC)
+    expect(rows.map((r) => [r.action, r.target])).toEqual([
+      ['Claw back 123.4567891 BOND', ALICE],
+      ['Freeze', BOB],
+    ])
+  })
+  it('finds an issuer action whose outcome is not final, the newest first', () => {
+    expect(openIssuerAction([entry('a', actionName('freeze'), 10)])).toBeNull()
+    expect(openIssuerAction([entry('b', 'buy', 20, 'option:1', 'b', 'unknown')])).toBeNull()
+    expect(openIssuerAction([entry('a', actionName('freeze'), 10, undefined, 'a', 'unknown'), entry('c', actionName('clawback'), 30, undefined, 'c', 'pending')])).toEqual({ id: 'c', unknown: false })
+    expect(openIssuerAction([entry('a', actionName('freeze'), 10, undefined, 'a', 'unknown')])).toEqual({ id: 'a', unknown: true })
   })
   it('knows when an attempt sent nothing', () => {
     expect(sentNothing({ phase: 'declined', effect: 'nothing-sent' })).toBe(true)
@@ -426,9 +501,8 @@ describe('copy', () => {
   collect(STATE_DETAIL)
   collect(RESULT_CODE_TEXT)
 
-  it('has the two sentences other tests and users rely on, word for word', () => {
-    expect(COPY.mock.sentence).toBe('Issuer actions need a Testnet contract.')
-    expect(COPY.access.guestTitle).toBe("Connect the asset issuer's account in your wallet.")
+  it('has the sentence other tests and users rely on, word for word (ruling R24)', () => {
+    expect(COPY.mock.sentence).toBe('On mock data there is no asset contract to read and no transaction to sign.')
   })
   it('uses no banned word, em dash, arrow or exclamation mark', () => {
     expect(strings.length).toBeGreaterThan(120)

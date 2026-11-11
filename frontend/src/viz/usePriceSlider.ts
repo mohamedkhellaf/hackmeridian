@@ -163,9 +163,18 @@ export function usePriceSlider({
   return { sliderRef, dragging, plotHandlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel }, onKeyDown }
 }
 
-/** Controlled when `value` is given, otherwise it keeps its own state starting from `initial`. */
+/**
+ * Controlled when `value` is given, otherwise it keeps its own state starting from `initial`. When `initial`
+ * changes (another position, another reference price) the handle starts again from it, instead of keeping a price
+ * that belonged to the previous figure.
+ */
 export function useControlledPrice(value: number | undefined, initial: number, onChange?: (v: number) => void): [number, (v: number) => void] {
   const [inner, setInner] = useState(initial)
+  const [seed, setSeed] = useState(initial)
+  if (seed !== initial && !(Number.isNaN(seed) && Number.isNaN(initial))) {
+    setSeed(initial)
+    setInner(initial)
+  }
   const controlled = value !== undefined
   const set = useCallback(
     (v: number) => {

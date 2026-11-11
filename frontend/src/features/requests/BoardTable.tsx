@@ -1,27 +1,62 @@
 import { NO_VALUE } from '../../core/format'
 import { Address, Amount, Countdown, DateTime, Glyph, IconWarning, Marker, RowHeader, TBody, THead, Table, TableWrap, Tag, Td, Th, Tr, VisuallyHidden } from '../../ui'
-import { holdsEscrow, money } from './board'
-import { BOARD_CAPTION, COL, ESCROW_LINE, MINE_CAPTION, YOURS, perUnitOf, serialText, youHold } from './copy'
+import type { RequestRow } from './board'
+import { BOARD_CAPTION, COL, LAPSE_LINE, MINE_CAPTION, NOT_FOR_OWN, RETURNED_LINE, STRANDED_LINE, YOURS, inTotal, referenceLine, serialText, shortBy, youHold } from './copy'
 import { RowActions } from './RowActions'
-import { WARN_BELOW_MS, shortfallOf } from './view'
+import { lapsing, shortfallOf, warnBelowOf } from './view'
 import type { RequestsViewProps } from './view'
 import styles from './BoardTable.module.css'
 
-/** The board from 768 px up: a ruled table, two lines per row, the action pinned to the right edge. */
-export function BoardTable({ rows, variant, selectedId, balances, explorerOf, onSell, onCancel }: RequestsViewProps) {
-  const caption = variant === 'board' ? BOARD_CAPTION : MINE_CAPTION
+/** From this many rows the table scrolls inside its frame, so the header row stays in view. */
+const STICKY_FROM = 12
+
+/** The figure the row is priced by: the premium per unit, under the highlighter on the wallet's own request. */
+function PerUnit({ row, marked }: { row: RequestRow; marked: boolean }) {
+  const amount = <Amount value={row.premiumPerUnit.text} exact={row.premiumPerUnit.exact} unit={row.premiumPerUnit.code} />
+  return marked ? <Marker>{amount}</Marker> : amount
+}
+
+/**
+ * The board from 1200 px up: a ruled table of fixed columns (nothing moves when the wallet connects or a figure
+ * changes), figures on the first line of each row and what qualifies them beneath, the action pinned right.
+ */
+export function BoardTable({ rows, variant, selectedId, balances, emptyTokens, nowSec, sort, onSort, explorerOf, onSell, onCancel }: RequestsViewProps) {
   const board = variant === 'board'
+  const caption = board ? BOARD_CAPTION : MINE_CAPTION
   return (
-    <TableWrap label={caption}>
-      <Table caption={caption} className={styles.table}>
+    <TableWrap label={caption} maxHeight={rows.length > STICKY_FROM ? '70vh' : undefined}>
+      <Table caption={caption} fixed className={styles.table} data-variant={variant}>
+        <colgroup>
+          <col className={styles.colAsset} />
+          <col className={styles.colKind} />
+          <col className={styles.colQty} />
+          <col className={styles.colStrike} />
+          <col className={styles.colDeadline} />
+          <col className={styles.colPremium} />
+          {board ? <col className={styles.colLock} /> : null}
+          <col className={board ? styles.colBuyer : styles.colState} />
+          <col className={board ? styles.colAction : styles.colActionMine} />
+        </colgroup>
         <THead>
           <Tr>
             <Th>{COL.asset}</Th>
             <Th>{COL.kind}</Th>
             <Th numeric>{COL.quantity}</Th>
             <Th numeric>{COL.strike}</Th>
-            <Th>{COL.deadline}</Th>
-            <Th numeric>{board ? COL.premium : COL.premiumMine}</Th>
+            {board && onSort ? (
+              <Th sort={sort === 'deadline' ? 'asc' : 'none'} onSort={() => onSort('deadline')}>
+                {COL.deadline}
+              </Th>
+            ) : (
+              <Th>{COL.deadline}</Th>
+            )}
+            {board && onSort ? (
+              <Th numeric sort={sort === 'premium' ? 'desc' : 'none'} onSort={() => onSort('premium')}>
+                {COL.premium}
+              </Th>
+            ) : (
+              <Th numeric>{COL.premium}</Th>
+            )}
             {board ? <Th numeric>{COL.lock}</Th> : null}
             {board ? <Th>{COL.buyer}</Th> : <Th>{COL.state}</Th>}
             <Th pinned>{COL.action}</Th>
@@ -29,13 +64,22 @@ export function BoardTable({ rows, variant, selectedId, balances, explorerOf, on
         </THead>
         <TBody>
           {rows.map((row) => {
-            const shortfall = board ? shortfallOf(row, balances) : null
+            const shortfall = board ? shortfallOf(row, balances, emptyTokens) : null
+            const reference = referenceLine(row)
+            const closed = row.state === 'cancelled' || row.state === 'pruned'
             return (
-              <Tr key={row.key} selected={selectedId === row.bid.id} interactive data-testid="request-row" data-mine={row.mine || undefined}>
+              <Tr
+                key={row.key}
+                selected={selectedId === row.bid.id}
+                interactive
+                className={closed ? styles.closed : undefined}
+                data-testid="request-row"
+                data-mine={row.mine || undefined}
+              >
                 <RowHeader>
                   <span className={styles.asset}>
                     <span className={styles.code}>{row.assetCode}</span>
-                    {row.typeLabel ? <span className={styles.type}>{row.typeLabel}</span> : null}
+                    {row.typeLabel ? <span className={styles.sub}>{row.typeLabel}</span> : null}
                   </span>
                   <span className={styles.serial}>{serialText(row.serial)}</span>
                 </RowHeader>
@@ -49,28 +93,31 @@ export function BoardTable({ rows, variant, selectedId, balances, explorerOf, on
                   <Amount value={row.quantity.text} exact={row.quantity.exact} unit={row.quantity.code} />
                 </Td>
                 <Td numeric>
-                  <Amount value={row.strike.text} exact={row.strike.exact} unit={row.strike.code} />
+                  <span className={styles.stack} data-align="end">
+                    <Amount value={row.strike.text} exact={row.strike.exact} unit={row.strike.code} />
+                    {reference ? <span className={styles.sub}>{reference}</span> : null}
+                  </span>
                 </Td>
                 <Td>
                   <span className={styles.stack}>
                     <DateTime value={row.deadlineSec * 1000} />
-                    {board || holdsEscrow(row.bid) ? (
+                    {row.state === 'open' ? (
                       <span className={styles.sub}>
-                        <Countdown to={row.deadlineSec * 1000} warnBelowMs={WARN_BELOW_MS} />
+                        <Countdown to={row.deadlineSec * 1000} warnBelowMs={warnBelowOf(row)} />
+                      </span>
+                    ) : null}
+                    {lapsing(row, nowSec) ? (
+                      <span className={`${styles.warn} ${styles.wraps}`}>
+                        <IconWarning size={12} />
+                        <span>{LAPSE_LINE}</span>
                       </span>
                     ) : null}
                   </span>
                 </Td>
                 <Td numeric>
                   <span className={styles.stack} data-align="end">
-                    {row.mine && board ? (
-                      <Marker>
-                        <Amount value={row.premium.text} exact={row.premium.exact} unit={row.premium.code} />
-                      </Marker>
-                    ) : (
-                      <Amount value={row.premium.text} exact={row.premium.exact} unit={row.premium.code} />
-                    )}
-                    <span className={styles.sub}>{perUnitOf(row)}</span>
+                    <PerUnit row={row} marked={row.mine && board} />
+                    <span className={styles.sub}>{inTotal(row)}</span>
                   </span>
                 </Td>
                 {board ? (
@@ -80,16 +127,16 @@ export function BoardTable({ rows, variant, selectedId, balances, explorerOf, on
                         <span aria-hidden="true" className={styles.none}>
                           {NO_VALUE}
                         </span>
-                        <VisuallyHidden>Not for your own request</VisuallyHidden>
+                        <VisuallyHidden>{NOT_FOR_OWN}</VisuallyHidden>
                       </>
                     ) : (
                       <span className={styles.stack} data-align="end">
                         <Amount value={row.lock.text} exact={row.lock.exact} unit={row.lock.code} />
                         {shortfall ? (
-                          <span className={styles.short}>
-                            <IconWarning size={14} />
+                          <span className={`${styles.warn} ${styles.wraps}`}>
+                            <IconWarning size={12} />
                             <span>{youHold(shortfall.have)}</span>
-                            <VisuallyHidden>, {money(shortfall.missing)} short</VisuallyHidden>
+                            <VisuallyHidden>{shortBy(shortfall.missing)}</VisuallyHidden>
                           </span>
                         ) : null}
                       </span>
@@ -98,13 +145,7 @@ export function BoardTable({ rows, variant, selectedId, balances, explorerOf, on
                 ) : null}
                 {board ? (
                   <Td>
-                    <Address
-                      value={row.bid.buyer}
-                      name={row.mine ? YOURS : undefined}
-                      explorerUrl={explorerOf(row.bid.buyer)}
-                      explorerLabel="View the buyer on the explorer"
-                      copyLabel="Copy buyer address"
-                    />
+                    <Address value={row.bid.buyer} name={row.mine ? YOURS : undefined} explorerUrl={explorerOf(row.bid.buyer)} explorerLabel="View the buyer on the explorer" copyLabel={null} />
                   </Td>
                 ) : (
                   <Td>
@@ -112,9 +153,14 @@ export function BoardTable({ rows, variant, selectedId, balances, explorerOf, on
                       <span>
                         <Tag state={row.stateName} />
                       </span>
-                      <span className={styles.sub} data-wrap>
-                        {ESCROW_LINE[row.escrow]}
-                      </span>
+                      {row.escrow === 'stranded' ? (
+                        <span className={styles.stranded}>
+                          <IconWarning size={12} />
+                          <span>{STRANDED_LINE}</span>
+                        </span>
+                      ) : row.state === 'pruned' ? (
+                        <span className={styles.sub}>{RETURNED_LINE}</span>
+                      ) : null}
                     </span>
                   </Td>
                 )}

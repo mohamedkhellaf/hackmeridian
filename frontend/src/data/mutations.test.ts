@@ -106,7 +106,7 @@ describe('Covered writes through the transaction layer, on the mock contract', (
     expect(stale()).toEqual(['balancesA', 'balancesB', 'collateral', 'health', 'options', 'writerCount'])
     const entry = deps.activity.get(B, run.entryId!)!
     expect(entry).toMatchObject({ action: 'buy', done: 'Bought', subject: `option:${offer.id}`, phase: 'confirmed', mock: true, hash: run.result!.hash })
-    expect(entry.label).toBe(`Buy put on ${Number(offer.underlyingQty / 10n ** 7n)}.00 FUND`)
+    expect(entry.label).toMatch(new RegExp(`^Buy put on ${Number(offer.underlyingQty / 10n ** 7n)}\\.00 FUND for \\d+\\.\\d\\d USDx$`))
   })
 
   it('exercise, claim delivery and reclaim each move their option one state on', async () => {
@@ -180,7 +180,7 @@ describe('Covered writes through the transaction layer, on the mock contract', (
     const filled = await send(W.fillBid, A, theirs)
     expect(filled.state.phase).toBe('confirmed')
     expect(await option(filled.result!.optionId)).toMatchObject({ state: 'active', writer: A, holder: DEMO_HEDGERS.a })
-    expect(deps.activity.get(A, filled.entryId!)).toMatchObject({ label: 'Fill request for put on 10.00 FUND', subject: 'bid:2' })
+    expect(deps.activity.get(A, filled.entryId!)).toMatchObject({ label: 'Fill request for put on 10.00 FUND, locking 104.00 USDx, receiving 2.80 USDx', subject: 'bid:2' })
     expect(stale()).toContain('options')
   })
 
@@ -250,7 +250,7 @@ describe('labels of the twelve writes', () => {
       W.fillBid.describe(bid),
     ]
     expect(labels.map((l) => l.label)).toEqual([
-      'Buy put on 2.00 BOND',
+      'Buy put on 2.00 BOND for 0.30 USDx',
       'Exercise put on 2.00 BOND',
       'Claim 98.00 USDx',
       'Reclaim 48.00 USDx',
@@ -261,8 +261,13 @@ describe('labels of the twelve writes', () => {
       'Buy put on 2.00 BOND from its holder for 2.50 USDx',
       'Request put on 10.00 FUND',
       'Cancel request for put on 10.00 FUND',
-      'Fill request for put on 10.00 FUND',
+      'Fill request for put on 10.00 FUND, locking 104.00 USDx, receiving 2.80 USDx',
     ])
+    // A new offer or request says what it locks or escrows once the contract's quote token is known (review findings 36, 47).
+    expect(W.writeOffer.label!(held, held.quote)).toBe('Write put on 2.00 BOND, locking 194.00 USDx, asking 0.30 USDx')
+    expect(W.writeOffer.label!({ ...held, kind: 'call' }, held.quote)).toBe('Write call on 2.00 BOND, locking 2.00 BOND, asking 0.30 USDx')
+    expect(W.writeOffer.label!(held, null)).toBe('Write put on 2.00 BOND')
+    expect(W.createBid.label!(bid, bid.quote)).toBe('Request put on 10.00 FUND, escrowing 2.80 USDx')
     expect(labels.map((l) => l.done)).toEqual(['Bought', 'Exercised', 'Delivery claimed', 'Reclaimed', 'Offer cancelled', 'Offer written', 'Listed for sale', 'Listing cancelled', 'Bought from holder', 'Request posted', 'Request cancelled', 'Request filled'])
     // The second line of the Activity entry: the series, exactly. New orders get theirs from the contract's quote token.
     const quote = held.quote

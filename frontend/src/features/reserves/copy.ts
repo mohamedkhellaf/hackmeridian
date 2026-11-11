@@ -6,19 +6,15 @@
 
 export const PAGE_TITLE = 'Reserves'
 
-/** What the page shows and what it does not, in one line under the title. */
-export const PAGE_DESCRIPTION =
-  'What the Covered contract has locked for open offers, options and requests, beside the balance it holds, token by token. It shows what is there now, not what an issuer may do next.'
+/** What the page compares, in one line under the title. */
+export const PAGE_DESCRIPTION = 'What the Covered contract has locked for open offers, options and requests, beside the balance it holds, token by token.'
 
 export const FIGURE_HEADING = 'Held against locked'
 export const TABLE_CAPTION = 'Reserves by token'
 /** The column headers, in order. Tests and the old suite rely on these four words. */
 export const TABLE_COLUMNS = ['Token', 'Locked', 'Held', 'Difference'] as const
 
-/** How to read the bullet rows. Sits under them as the figure's caption. */
-export const FIGURE_LEGEND = 'Bar: the balance the contract holds. Tick: what it has locked. A hatched gap is a shortfall. Each token has its own scale.'
-
-export const READING_HEADING = 'How to read this'
+export const READING_HEADING = 'Notes'
 
 export interface Definition {
   term: string
@@ -44,24 +40,17 @@ export const DEFINITIONS: readonly Definition[] = [
   },
 ]
 
-export const LIMITS_HEADING = 'What this page does not show'
-
-/** Limits of the page, in its own words. Not a required sentence. */
-export const LIMITS: readonly string[] = [
-  'Locked is the contract’s own count of what it owes. The split under each token is rebuilt from the list of options and requests, and the page says so when the two disagree.',
-  'The issuer of a token can still freeze the contract’s balance or claw it back. A shortfall appears here after the fact.',
-  'Margin is a separate contract. Its margin accounts and its vault are not in these figures.',
-]
-
 /** The split of what is locked. Labels are the contract's terms; the meaning says them in plain words. */
 export const ITEM_COPY = {
   offered: { label: 'Offered', meaning: 'Collateral of open offers, not sold yet' },
-  active: { label: 'Active', meaning: 'Collateral of sold options, before their expiry' },
-  pendingReclaim: { label: 'Pending reclaim', meaning: 'Collateral of expired options the writer has not reclaimed' },
-  unclaimed: { label: 'Unclaimed', meaning: 'Proceeds of exercised options the writer has not claimed' },
-  escrowed: { label: 'Escrowed', meaning: 'Premiums of open requests, refunded on cancel or expiry' },
+  active: { label: 'Active', meaning: 'Collateral of sold options, before their deadline' },
+  pendingReclaim: { label: 'Pending reclaim', meaning: 'Collateral of expired options the maker has not reclaimed' },
+  unclaimed: { label: 'Unclaimed', meaning: 'Proceeds of exercised options the maker has not claimed' },
+  escrowed: { label: 'Escrowed', meaning: 'Premiums of open requests, refunded if cancelled or expired' },
 } as const
 
+/** Names the split on a phone, where its amounts cannot sit in the Locked column. */
+export const BREAKDOWN_HEADING = 'Locked, by state'
 export const BREAKDOWN_SUM_LABEL = 'Sum of items'
 export const BREAKDOWN_UNAVAILABLE = 'The split could not be read. Locked above is the contract’s own figure.'
 
@@ -81,18 +70,18 @@ export const ROLE_LABEL = { quote: 'Quote token', underlying: 'Underlying' } as 
 
 /** The word that goes with a signed difference. */
 export const DIFFERENCE_WORD = { equal: 'equal', over: 'over', short: 'short' } as const
+/** A difference of less than a cent, said in words: `under 0.01 short`. The exact value is one press away. */
+export const UNDER_A_CENT = 'under 0.01'
 
 export const HELD_UNAVAILABLE = 'Unavailable'
 
+/** Said in the summary line when every token stands at zero. */
 export const EMPTY_TITLE = 'Nothing is locked in the contract.'
-export const EMPTY_HINT = 'A row appears when a maker writes an offer or a buyer posts a request.'
-export const EMPTY_ACTION = 'Go to markets'
 
 export const ERROR_TITLE = 'Reserves could not be read'
-export const ERROR_FALLBACK = 'The read failed and no earlier figure is on hand, so none is shown.'
-/** `Reason given: RPC 503` */
-export const errorReason = (reason: string): string => `Reason given: ${reason}`
-export const RETRY = 'Read again'
+/** Cause, consequence and fix, in plain words. The raw message sits behind `ERROR_DETAIL`. */
+export const ERROR_TEXT = 'The read of the contract failed, so no figure is shown. Refresh to read again.'
+export const ERROR_DETAIL = 'Technical detail'
 
 export const PARTIAL_HELD_TITLE = 'Held balances could not be read'
 export const PARTIAL_HELD_TEXT = 'Locked below is summed from the open offers, options and requests. Held and the difference are missing until the balances can be read.'
@@ -103,7 +92,11 @@ export const STALE_TITLE = 'The last read failed'
 /** `The figures below are from 14:02:11 UTC.` */
 export const staleText = (time: string): string => `The figures below are from ${time}. They may have changed since.`
 
+/** The one name of the action that reads everything again, in the header and in the error notice. */
 export const REFRESH = 'Refresh'
+
+/** The read line of a mock build: the figures are mock data, read at this time. */
+export const MOCK_READ = 'Mock data'
 
 /** Announced after a manual refresh: `Reserves read again at 14:02:11 UTC.` */
 export const refreshedAnnouncement = (time: string): string => `Reserves read again at ${time}.`
@@ -117,34 +110,32 @@ export const SUMMARY_UNKNOWN = (count: string): string => `Held could not be rea
 // ---------------------------------------------------------------------------------------------- contracts and roles
 
 export const ROLES_HEADING = 'Contracts and roles'
-export const ROLES_LEDE = 'Who can change what. Ids are given in full so they can be checked against the explorer.'
 
 /** Mock builds read no chain: the deployment shown is the recorded Testnet one. */
-export const ROLES_MOCK_NOTE = 'This build runs on mock data and calls no contract. The Testnet deployment is listed here as recorded on 26 Oct 2026.'
+export const ROLES_MOCK_NOTE = 'The Testnet deployment is listed here as recorded on 26 Oct 2026.'
+/** `Its fund token is RWA, shown above as FUND.`: a token the mock market names differently. */
+export const renamedTokenNote = (kind: string, recorded: string, shown: string): string => `Its ${kind} token is ${recorded}, shown above as ${shown}.`
 /** Margin on fixtures, Covered live. */
 export const MARGIN_FIXTURE_NOTE = 'This build replays recorded scenarios for Margin and calls no Margin contract. The Testnet deployment is listed here as recorded on 26 Oct 2026.'
 /** A contract id this app has no record for. */
 export const UNRECORDED_NOTE = 'This build points at a contract id the app holds no record for. Read its wasm hash and history on the explorer.'
 
 export const COVERED_HEADING = 'Covered contract'
-/** The three facts, as the brief words them. */
-export const COVERED_STATEMENT = 'No admin. No upgrades. No oracle.'
 
 export const COVERED_FACTS: readonly { label: string; text: string }[] = [
-  { label: 'Admin', text: 'None. The contract has no admin function and no owner.' },
-  { label: 'Upgrades', text: 'None. The code at this id cannot be replaced.' },
-  { label: 'Oracle', text: 'None. Exercise happens at the strike. The contract reads no price.' },
+  { label: 'Admin', text: 'The contract has no admin function and no owner.' },
+  { label: 'Upgrades', text: 'The code at this id cannot be replaced.' },
+  { label: 'Oracle', text: 'The contract reads no price. Exercise happens at the strike.' },
   {
     label: 'Asset listing',
-    text: 'Open. Anyone can list a classic asset by code and issuer, and nobody can delist one. Listing is not eligibility: the issuer still decides who may hold the asset, the contract included.',
+    text: 'Anyone can list a classic asset by code and issuer, and nobody can delist one. The issuer still decides who may hold the asset, the contract included.',
   },
-  { label: 'Audit', text: 'None. No outside party has reviewed the code.' },
+  { label: 'Audit', text: 'No outside party has reviewed the code.' },
 ]
 
 export const TOKENS_HEADING = 'Token contracts'
 export const TOKENS_CAPTION = 'Token contracts, issuers and issuer flags'
-export const TOKENS_NOTE =
-  'A revocable authorization lets the issuer freeze a holder’s balance, the contract’s included. Clawback lets the issuer take tokens back, from the contract too: that is the shortfall this page reports.'
+export const TOKENS_NOTE = 'An issuer that can freeze or claw back can do so to any holder, the contract included.'
 /** Column headers of the token table. The three flag columns say what the issuer can do, in plain words. */
 export const TOKEN_COLUMNS = { token: 'Token', contract: 'Token contract', issuer: 'Issuer', required: 'Approval required', revocable: 'Can freeze', clawback: 'Can claw back' } as const
 export const FLAG_YES = 'Yes'
@@ -157,56 +148,42 @@ export const flagsFromRecord = (codes: string): string => `Issuer flags of ${cod
 export const flagsUnread = (codes: string): string => `Issuer flags of ${codes} could not be read.`
 /** `USDx has no flag set today. Its issuer account is not immutable, so it could set them later.` */
 export const notImmutableNote = (code: string): string => `${code} has no flag set today. Its issuer account is not immutable, so it could set them later.`
-/** `EQTY was not part of the deployment: it was listed afterwards with list_asset.` */
-export const listedLaterNote = (code: string): string => `${code} was not part of the deployment: it was listed afterwards with list_asset.`
 
 export const MARGIN_HEADING = 'Margin contract'
-export const MARGIN_STATEMENT = 'One admin. One publisher. No upgrades.'
 export const MARGIN_LEDE =
   'A separate contract for uncovered calls on partial margin, settled in USDx. It shares no storage, balance or call with the Covered contract. Both roles are accounts run by the team.'
 
 export const MARGIN_FACTS: readonly { label: string; text: string }[] = [
-  { label: 'Upgrades', text: 'None. The code, the market parameters and both roles are fixed at deployment.' },
-  { label: 'Prices', text: 'A price feed and a settlement price published by the team’s own account. Not a market, not an oracle network.' },
-  { label: 'Audit', text: 'None. No outside party has reviewed the code.' },
+  { label: 'Upgrades', text: 'The code, the market parameters and both roles are fixed at deployment.' },
+  { label: 'Prices', text: 'The price feed and the settlement price are published by the team’s own account, not by a market or an oracle network.' },
+  { label: 'Audit', text: 'No outside party has reviewed the code.' },
 ]
 
 export interface RoleCopy {
   role: string
   summary: string
-  can: readonly string[]
-  cannot: readonly string[]
 }
 
 export const MARGIN_ADMIN: RoleCopy = {
   role: 'Admin',
-  summary: 'Lists the series that can be traded.',
-  can: ['List a new series (a strike and an expiry).'],
-  cannot: [
-    'Change the terms of a series once it is listed.',
-    'Change the market parameters, which are fixed at deployment.',
-    'Publish a price, rewrite a final settlement price or delete a position.',
-    'Trade, take over a position or deposit into the vault.',
-  ],
+  summary: 'Lists the series that can be traded, each a strike and an expiry. It cannot publish a price or change the market parameters, which are fixed at deployment.',
 }
 
 export const MARGIN_PUBLISHER: RoleCopy = {
   role: 'Publisher',
-  summary: 'Publishes the risk snapshots and the settlement price. These prices decide every liquidation, early exercise and payout.',
-  can: [
-    'Publish a risk snapshot for a series. The contract checks its consistency (mark within arbitrage bounds, extreme-scenario floor, freshness, rising sequence), not the price itself.',
-    'Publish the settlement price of a series, once, after its expiry.',
-  ],
-  cannot: [
-    'Change the terms of a live series.',
-    'Rewrite a settlement price once it is final, or delete a position.',
-    'Trade, take over a position or deposit into the vault.',
-  ],
+  summary:
+    'Publishes the risk snapshots and, once after expiry, the settlement price of each series. These prices decide every liquidation, early exercise and payout. The contract checks a snapshot’s consistency (mark within arbitrage bounds, extreme-scenario floor, freshness, rising sequence), not the price itself.',
 }
 
+/** What neither role can do, said once for both. */
+export const NEITHER_LABEL = 'Neither can'
+export const NEITHER_CAN: readonly string[] = [
+  'Change the terms of a listed series.',
+  'Rewrite a final settlement price or delete a position.',
+  'Trade, take over a position or deposit into the vault.',
+]
+
 export const ROLES_SEPARATION = 'The admin and the publisher must be different accounts.'
-export const CAN_LABEL = 'Can'
-export const CANNOT_LABEL = 'Cannot'
 
 export const FIELD = {
   contract: 'Contract id',
@@ -214,5 +191,6 @@ export const FIELD = {
   wasm: 'Wasm hash',
   deployTx: 'Deploy transaction',
   deployer: 'Deployed by',
-  quote: 'Settles in',
+  admin: 'Admin',
+  publisher: 'Publisher',
 } as const

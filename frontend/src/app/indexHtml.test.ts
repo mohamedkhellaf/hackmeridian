@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { COVERED_CONTRACT, MARGIN_CONTRACT } from '../core/deployments'
 import { BANNED_TAGLINES, BANNED_WORDS, findBannedWords } from '../core/disclosures'
 import { SETTINGS_STORAGE_KEY } from '../data/settings'
 import { LANDING_TITLE } from './navigation'
@@ -16,9 +17,20 @@ describe('index.html', () => {
   it('applies the stored settings before the first paint, from the key the app writes', () => {
     const script = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? ''
     expect(script).toContain(`localStorage.getItem('${SETTINGS_STORAGE_KEY}')`)
-    for (const attribute of ['data-theme', 'data-density', 'data-pnl']) expect(script).toContain(attribute)
+    for (const attribute of ['data-theme', 'data-pnl']) expect(script).toContain(attribute)
+    // The density setting left the menu (ruling E23): a stored value is not applied, here or in settings.ts.
+    expect(script).not.toContain('data-density')
     // The inline script comes before any stylesheet or module script.
     expect(html.indexOf('<script>')).toBeLessThan(html.indexOf('<script type="module"'))
+  })
+
+  it('fixes the order of the cascade layers before any stylesheet, as src/ui/index.css states it', () => {
+    const order = /@layer ([a-z, ]+);/.exec(read('src/ui/index.css'))?.[1]
+    expect(order).toBeDefined()
+    const inline = html.indexOf(`@layer ${order};`)
+    expect(inline).toBeGreaterThan(-1)
+    expect(inline).toBeLessThan(html.indexOf('<link'))
+    expect(inline).toBeLessThan(html.indexOf('<script type="module"'))
   })
 
   it('declares the page colour of each scheme as the theme colour', () => {
@@ -36,6 +48,14 @@ describe('index.html', () => {
   it('has the site title and a description', () => {
     expect(/<title>([^<]*)<\/title>/.exec(html)?.[1]).toBe(LANDING_TITLE)
     expect(html).toMatch(/<meta\s+name="description"\s+content="[^"]{60,}"/)
+  })
+
+  it('gives search engines and share cards the same description, with no network line', () => {
+    const description = /<meta\s+name="description"\s+content="([^"]*)"/.exec(html)?.[1]
+    const og = /<meta\s+property="og:description"\s+content="([^"]*)"/.exec(html)?.[1]
+    expect(description).toBeDefined()
+    expect(description).toBe(og)
+    expect(description).not.toMatch(/test network|testnet/i)
   })
 
   it('links only to icons and images that exist in public/', () => {
@@ -93,5 +113,17 @@ describe('public/llms.txt', () => {
   it('says what the product is in sentences, without disclaimer taglines', () => {
     expect(findBannedWords(llms, BANNED_TAGLINES)).toEqual([])
     expect(llms).toContain('test network')
+  })
+
+  it('names the deployed contracts, their versions and the current deploy as core/deployments records them', () => {
+    expect(llms).toContain(`Options contract ${COVERED_CONTRACT.version}`)
+    expect(llms).toContain(`\`${COVERED_CONTRACT.contractId}\``)
+    expect(llms).toContain(`[${COVERED_CONTRACT.version} deploy](https://stellar.expert/explorer/testnet/tx/${COVERED_CONTRACT.deployTx})`)
+    expect(llms).toContain(`${MARGIN_CONTRACT.version}](https://stellar.expert/explorer/testnet/contract/${MARGIN_CONTRACT.contractId})`)
+  })
+
+  it('uses the words of the interface: maker, deadline and request', () => {
+    expect(llms).not.toMatch(/\bwriters?\b/i)
+    expect(llms).not.toMatch(/\bbefore expiry\b|\bby expiry\b|\bfunded bids?\b/i)
   })
 })

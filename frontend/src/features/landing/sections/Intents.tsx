@@ -1,14 +1,13 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import type { Intent } from '../../../app/search'
 import { PAYOFF_CAPTION } from '../../../core/disclosures'
-import { explorerTx } from '../../../core/explorer'
-import { formatMoney, formatUtc } from '../../../core/format'
+import { formatMoney } from '../../../core/format'
 import { strikeUnits } from '../../../core/units'
-import { Glyph, Link, TxLink } from '../../../ui'
+import { Glyph, Link } from '../../../ui'
 import type { PayoffGlyph } from '../../../ui'
 import { WithWithoutChart } from '../../../viz'
-import { INTENTS, SECTION, WIDGET } from '../copy'
-import { RECORDED_CALL, RECORDED_CALL_TX, RECORDED_PUT, RECORDED_PUT_TX } from '../recorded'
+import { INTENTS, SECTION } from '../copy'
+import { RECORDED_CALL, RECORDED_PUT } from '../recorded'
 import { intentFigure } from './intentFigure'
 import { Section } from './Section'
 import css from './Intents.module.css'
@@ -16,15 +15,14 @@ import css from './Intents.module.css'
 interface Plate {
   intent: Intent
   glyph: PayoffGlyph
-  figureNo: number
   figure: ReturnType<typeof intentFigure>
   asset: string
   quote: string
   withLabel: string
   level: string
   figureCaption: string
-  example: string
-  tx: string
+  /** What the recorded example paid or was paid, for the one row under the figure. */
+  flow: string
 }
 
 const put = RECORDED_PUT
@@ -41,47 +39,45 @@ const PLATES: Record<(typeof INTENTS.items)[number]['id'], Plate> = {
   floor: {
     intent: 'floor',
     glyph: 'long-put',
-    figureNo: 2,
     figure: floor,
     asset: put.underlying.code,
     quote: put.quote.code,
     withLabel: INTENTS.floorWith,
     level: INTENTS.floorLevel(floor.strikeText),
     figureCaption: INTENTS.floorFigure(money(put.underlyingQty, put.underlying), perUnit(put)),
-    example: INTENTS.floorExample(money(put.totalPremium, put.quote), formatUtc(put.expiry), money(put.underlyingQty, put.underlying), money(put.totalStrike, put.quote)),
-    tx: RECORDED_PUT_TX.buy.hash,
+    flow: INTENTS.paid(money(put.totalPremium, put.quote)),
   },
   'earn-hold': {
     intent: 'earn-hold',
     glyph: 'short-call',
-    figureNo: 3,
     figure: earnHold,
     asset: call.underlying.code,
     quote: call.quote.code,
     withLabel: INTENTS.earnHoldWith,
     level: INTENTS.capLevel(earnHold.strikeText),
     figureCaption: INTENTS.earnHoldFigure(money(call.underlyingQty, call.underlying), perUnit(call)),
-    example: INTENTS.earnHoldExample(money(call.underlyingQty, call.underlying), money(call.totalPremium, call.quote), money(call.totalStrike, call.quote)),
-    tx: RECORDED_CALL_TX.write.hash,
+    flow: INTENTS.received(money(call.totalPremium, call.quote)),
   },
   'earn-buy': {
     intent: 'earn-buy',
     glyph: 'short-put',
-    figureNo: 4,
     figure: earnBuy,
     asset: put.underlying.code,
     quote: put.quote.code,
     withLabel: INTENTS.earnBuyWith,
     level: INTENTS.buyLevel(earnBuy.strikeText),
     figureCaption: INTENTS.earnBuyFigure(money(put.totalStrike, put.quote), perUnit(put)),
-    example: INTENTS.earnBuyExample(money(put.totalStrike, put.quote), money(put.totalPremium, put.quote), money(put.underlyingQty, put.underlying)),
-    tx: RECORDED_PUT_TX.write.hash,
+    flow: INTENTS.received(money(put.totalPremium, put.quote)),
   },
 }
 
+/**
+ * Three uses, each one recorded option seen from one side. The payoff caption is said once under the row; each
+ * figure still carries it for a screen reader.
+ */
 export function Intents() {
   return (
-    <Section id={SECTION.intents} heading={INTENTS.heading} lead={INTENTS.lead} layout="stack">
+    <Section id={SECTION.intents} heading={INTENTS.heading} layout="stack">
       <ul className={css.list} role="list">
         {INTENTS.items.map((item) => {
           const plate = PLATES[item.id]
@@ -106,7 +102,8 @@ export function Intents() {
                 title={INTENTS.chartTitle(item.name)}
                 caption={
                   <>
-                    {WIDGET.figure(plate.figureNo)} {plate.figureCaption} {PAYOFF_CAPTION}
+                    {plate.figureCaption}
+                    <span className="ui-vh"> {PAYOFF_CAPTION}</span>
                   </>
                 }
                 height={184}
@@ -114,13 +111,7 @@ export function Intents() {
               <dl className={css.facts}>
                 <div className={css.fact}>
                   <dt>{item.flowLabel}</dt>
-                  <dd>{item.flow}</dd>
-                </div>
-                <div className={css.fact}>
-                  <dt>{INTENTS.recordedLabel}</dt>
-                  <dd>
-                    {plate.example} <TxLink hash={plate.tx} explorerUrl={explorerTx(plate.tx)} />
-                  </dd>
+                  <dd>{plate.flow}</dd>
                 </div>
               </dl>
               <Link className={css.action} render={<RouterLink to="/markets" search={{ intent: plate.intent }} />}>
@@ -131,8 +122,9 @@ export function Intents() {
           )
         })}
       </ul>
-      <p className={css.after}>{INTENTS.afterNote}</p>
-      <p className={css.fourth}>{INTENTS.fourth}</p>
+      <p className={css.note} aria-hidden="true">
+        {PAYOFF_CAPTION}
+      </p>
     </Section>
   )
 }

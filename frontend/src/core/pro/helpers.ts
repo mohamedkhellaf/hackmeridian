@@ -1,9 +1,4 @@
-import { DASH, duration, usdx } from './format'
 import type { ProModel, SeriesView } from './types'
-
-export function seriesLabel(s: SeriesView | undefined): string {
-  return s ? `Series ${s.id}, strike ${usdx(s.strike)}` : DASH
-}
 
 /** Series state word, and whether it needs an action (shown in the warn tone). */
 export function seriesStatus(s: SeriesView, now: number): { label: string; warn: boolean } {
@@ -16,4 +11,3 @@ export function snapshotAge(model: ProModel, s: SeriesView): number | null {
   return s.snapshot ? model.now - s.snapshot.ts : null
 }
 
-export const ageText = (a: number | null) => (a == null ? DASH : duration(a))

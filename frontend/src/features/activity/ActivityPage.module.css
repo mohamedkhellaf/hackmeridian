@@ -6,23 +6,13 @@
     min-width: 0;
   }
 
-  /* Where the list lives: said once, set apart by a rule on its left rather than by a tinted panel. */
-  .local {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-4);
+  /* Live builds: where the full record of the account is. */
+  .explorer {
     max-width: 44rem;
-    padding-inline-start: var(--s-12);
-    border-inline-start: 2px solid var(--rule);
     font-size: var(--ui-size);
     line-height: var(--ui-line);
     color: var(--text-2);
     text-wrap: pretty;
-  }
-
-  .localLine {
-    font-weight: 500;
-    color: var(--text);
   }
 
   .list {
@@ -47,21 +37,35 @@
     color: var(--text-2);
   }
 
-  .wallet {
-    display: flex;
+  /* What Clear finished did, with its Undo, kept in the toolbar until the page is left. */
+  .cleared {
+    display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--s-4) var(--s-8);
-    color: var(--muted);
+    margin-inline-start: auto;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    border-radius: var(--r-control);
+  }
+
+  .cleared:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
 
   /* When the count line takes the whole row, the action keeps to the right edge, as on a wide screen. */
-  .clear {
+  .action {
     margin-inline-start: auto;
   }
 
+  .cleared .action {
+    margin-inline-start: 0;
+  }
+
   @media (max-width: 767.98px) {
-    .clear {
+    .action {
       min-height: var(--touch);
     }
   }

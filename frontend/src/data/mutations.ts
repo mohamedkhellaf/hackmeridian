@@ -32,7 +32,7 @@ export interface CoveredTx<A extends unknown[], R> extends Omit<TxController, 'r
   run: (...args: A) => Promise<TxRun<R>>
 }
 
-export type MutationOptions = Pick<UseTxOptions, 'announce'>
+export type MutationOptions = Pick<UseTxOptions, 'announce' | 'open'>
 
 type Terms = { kind: 'put' | 'call'; underlying: TokenInfo; underlyingQty: bigint }
 const on = (o: Terms): string => `${o.kind} on ${amt(o.underlyingQty, o.underlying)}`
@@ -57,13 +57,15 @@ export interface CoveredWrite<A extends unknown[], R extends TxReceipt> {
   describe: (...args: A) => Omit<TxDescription, 'action'>
   /** For a write whose arguments carry no quote token (a new offer, a new bid): the detail line, given the contract's. */
   detail?: (order: A[0], quote: TokenInfo | null) => string
+  /** The same for the label, so it can carry the money that moves ("locking 95.00 USDx"). Falls back to `describe`. */
+  label?: (order: A[0], quote: TokenInfo | null) => string
   /** What the confirmed write created (`option:<id>`, `bid:<id>`), recorded on its Activity entry. */
   created?: (result: R) => string | null
   write: (client: OptionsClient, me: string, opts: Required<TxOptions>, ...args: A) => Promise<R>
 }
 
 function useCoveredTx<A extends unknown[], R extends TxReceipt>(spec: CoveredWrite<A, R>, options: MutationOptions = {}): CoveredTx<A, R> {
-  const tx = useTx({ product: 'covered', announce: options.announce })
+  const tx = useTx({ product: 'covered', announce: options.announce, open: options.open })
   const { getClient, me } = useOptionsClient()
   const qc = useQueryClient()
   const { run: runTx, ...rest } = tx
@@ -71,9 +73,11 @@ function useCoveredTx<A extends unknown[], R extends TxReceipt>(spec: CoveredWri
     (...args: A) => {
       const described = spec.describe(...args)
       // The asset list is in the cache whenever a ticket is open; without it the line falls back to the deadline.
-      const detail = spec.detail ? spec.detail(args[0], qc.getQueryData<SupportedAssets>(keys.assets())?.quote ?? null) : described.detail
+      const quote = qc.getQueryData<SupportedAssets>(keys.assets())?.quote ?? null
+      const detail = spec.detail ? spec.detail(args[0], quote) : described.detail
+      const label = spec.label ? spec.label(args[0], quote) : described.label
       return runTx<R>(
-        { ...described, detail, action: spec.action },
+        { ...described, label, detail, action: spec.action },
         async (opts) => {
           // `useTx` already refuses without a wallet; this guards a wallet that disconnects in between.
           if (!me) throw new TxError('refused', TX_NOT_CONNECTED)
@@ -91,7 +95,7 @@ function useCoveredTx<A extends unknown[], R extends TxReceipt>(spec: CoveredWri
 
 const BUY: CoveredWrite<[offer: OptionOffer], TxResult> = {
   action: 'buy',
-  describe: (o) => ({ label: `Buy ${on(o)}`, detail: terms(o, o.quote), done: 'Bought', subject: optionSubject(o.id) }),
+  describe: (o) => ({ label: `Buy ${on(o)} for ${amt(o.totalPremium, o.quote)}`, detail: terms(o, o.quote), done: 'Bought', subject: optionSubject(o.id) }),
   write: (c, me, opts, o) => c.buy(o.id, me, opts),
 }
 const EXERCISE: CoveredWrite<[option: OptionOffer], TxResult> = {
@@ -124,6 +128,12 @@ const WRITE_OFFER: CoveredWrite<[offer: NewOffer], TxResult & { id: bigint }> = 
   action: 'write-offer',
   describe: (o) => ({ label: `Write ${on(o)}`, done: 'Offer written', subject: null }),
   detail: newTerms,
+  // What the maker locks and asks: the collateral (the strike in the quote token for a put, the underlying for a call).
+  label: (o, quote) => {
+    const ask = quote ? `, asking ${amt(o.totalPremium, quote)}` : ''
+    if (o.kind === 'call') return `Write ${on(o)}, locking ${amt(o.underlyingQty, o.underlying)}${ask}`
+    return quote ? `Write ${on(o)}, locking ${amt(o.totalStrike, quote)}${ask}` : `Write ${on(o)}`
+  },
   created: (r) => optionSubject(r.id),
   write: (c, me, opts, o) => c.createOffer(o, me, opts),
 }
@@ -146,6 +156,7 @@ const CREATE_BID: CoveredWrite<[bid: NewBid], TxResult & { id: bigint }> = {
   action: 'create-bid',
   describe: (b) => ({ label: `Request ${on(b)}`, done: 'Request posted', subject: null }),
   detail: newTerms,
+  label: (b, quote) => (quote ? `Request ${on(b)}, escrowing ${amt(b.totalPremium, quote)}` : `Request ${on(b)}`),
   created: (r) => bidSubject(r.id),
   write: (c, me, opts, b) => c.createBid(b, me, opts),
 }
@@ -156,7 +167,10 @@ const CANCEL_BID: CoveredWrite<[bid: Bid], TxResult> = {
 }
 const FILL_BID: CoveredWrite<[bid: Bid], TxResult & { optionId: bigint }> = {
   action: 'fill-bid',
-  describe: (b) => ({ label: `Fill request for ${on(b)}`, detail: terms(b, b.quote), done: 'Request filled', subject: bidSubject(b.id) }),
+  describe: (b) => {
+    const locks = requiredCollateral(b)
+    return { label: `Fill request for ${on(b)}, locking ${amt(locks.amount, locks.token)}, receiving ${amt(b.totalPremium, b.quote)}`, detail: terms(b, b.quote), done: 'Request filled', subject: bidSubject(b.id) }
+  },
   created: (r) => optionSubject(r.optionId),
   write: (c, me, opts, b) => c.fillBid(b.id, me, opts),
 }

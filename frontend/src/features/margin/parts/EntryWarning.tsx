@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { RefObject } from 'react'
 import { MARGIN_WARNING_BULLETS, MARGIN_WARNING_CONSENT, MARGIN_WARNING_TITLE } from '../../../core/disclosures'
 import { Button, Checkbox, Dialog } from '../../../ui'
 import css from './EntryWarning.module.css'
@@ -9,13 +10,16 @@ export interface EntryWarningProps {
   onContinue: () => void
   /** Cancel, Escape or the close button: the user leaves the Margin section. */
   onCancel: () => void
+  /** Where focus lands after Continue: the page heading, as after any change of page. */
+  finalFocus?: RefObject<HTMLElement | null>
 }
 
 /**
- * The default-risk warning shown once per browser tab before any Margin screen can be used. The three
- * sentences are required disclosures; Continue stays unavailable until "I understand" is ticked.
+ * The default-risk warning shown once per browser tab before a Margin screen of the contract build can be used
+ * (a fixture build signs nothing and does not ask). The three sentences are required disclosures; Continue
+ * stays unavailable until "I understand" is ticked.
  */
-export function EntryWarning({ open, onContinue, onCancel }: EntryWarningProps) {
+export function EntryWarning({ open, onContinue, onCancel, finalFocus }: EntryWarningProps) {
   const [understood, setUnderstood] = useState(false)
   return (
     <Dialog
@@ -27,6 +31,7 @@ export function EntryWarning({ open, onContinue, onCancel }: EntryWarningProps) 
       size="md"
       dismissible={false}
       initialFocus="first-control"
+      finalFocus={finalFocus}
       closeLabel="Cancel and go back to Markets"
       footer={
         <>

@@ -1,9 +1,6 @@
 @layer features {
   /* A ruled strip, like the reference line of a statement: labels above, figures under. */
   .root {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-8);
     padding-block: var(--s-12);
     border-block: 1px solid var(--hairline);
   }
@@ -64,16 +61,6 @@
     flex: none;
     width: var(--icon);
     height: var(--icon);
-  }
-
-  .source {
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    color: var(--text-2);
-  }
-
-  .note {
-    color: var(--muted);
   }
 
   @media (max-width: 767.98px) {

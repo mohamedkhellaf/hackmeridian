@@ -8,11 +8,11 @@ export interface ChoiceChip<V extends string = string> {
   value: V
   /** The first line: a figure or a date. */
   label: string
-  /** A second, smaller line: the days left under an expiry, the distance from a reference price. */
+  /** A second, smaller line: the days left under a deadline, the distance from a reference price. */
   detail?: string
   /** The full accessible name, when the two short lines do not read well on their own. */
   name?: string
-  /** Something stands behind this choice (a funded offer). Drawn as a tick and a solid outline; say it in `name` too. */
+  /** Something stands behind this choice (a funded offer). Drawn as a tick; say it in `name` too. */
   marked?: boolean
 }
 
@@ -29,7 +29,7 @@ export interface ChoiceChipsProps<V extends string = string> {
   columns?: number
   /**
    * `control` (default): compact chips, ink when chosen, for forms.
-   * `note`: serif figures typeset on a contract note; dashed until `marked`. The grid drops to five, then three
+   * `note`: serif figures typeset on a contract note; a tick when `marked`. The grid drops to five, then three
    * columns as its container narrows.
    */
   appearance?: 'control' | 'note'

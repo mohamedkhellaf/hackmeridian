@@ -1,23 +1,27 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { formatCountdown, formatNumber, formatUtc, secondsUntil } from '../../../core/format'
 import type { OfferView } from '../../../core/pro/types'
 import { usePro } from '../../../data'
-import { Button, Checkbox, Dialog, KeyValue, KeyValueItem, Slider } from '../../../ui'
+import { Button, Dialog, Drawer, KeyValue, KeyValueItem, Slider, SwipeIgnore, useIsPhone } from '../../../ui'
 import { Waterfall } from '../../../viz'
-import { BUY_CONSENT, COVERAGE_CAPTION, PAYOUT_ORDER } from '../copy'
+import { BUY_PAYOUT_LINE, PAYOUT_ORDER } from '../copy'
 import { coverageAt, coverageInputs, coveredUpTo, priceRange, splitSentence } from '../../../core/pro/coverage'
-import { QUOTE, lots, perLot, usdx } from '../model/money'
-import { UNDERLYING, contractName } from '../model/names'
+import { QUOTE, bpsPercent, lots, perLot, usdx } from '../model/money'
+import { UNDERLYING, contractTitle } from '../model/names'
+import { breakevenPerLot } from '../model/payout'
 import { premiumPerLot } from '../model/write'
 import { Usdx, Who } from '../parts/figures'
 import { useMarginUi } from '../parts/marginUi'
+import { UNSETTLED_REASON, UnsettledNote } from '../parts/UnsettledNote'
+import { useReplayable } from '../parts/useReplayable'
 import css from './BuyDialog.module.css'
 
 const money = (n: number) => formatNumber(n, { dp: 2 })
 
 /**
- * Buying a call written on partial margin. The terms, then who pays the holder and in which order, drawn at
- * a settlement price the buyer assumes, then the sentence the buyer must tick before the action is available.
+ * Buying a call written on partial margin. The terms with what the buy costs at most and where it breaks even,
+ * then who pays the holder and in which order, drawn at a settlement price the buyer assumes. The sentence of
+ * what is agreed to sits directly above the action; the wallet signature is the consent. A full page on phones.
  */
 export function BuyDialog({ offer, onClose }: { offer: OfferView | null; onClose: () => void }) {
   // The last offer stays mounted while the dialog closes, so focus and the exit transition have a dialog to leave.
@@ -41,9 +45,11 @@ function PayoutOrder() {
 }
 
 function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; onClose: () => void }) {
-  const { client, model, me, busy } = usePro()
+  const { client, model, me, busy, canCheckAgain } = usePro()
   const { act, canAct, connect } = useMarginUi()
-  const [understood, setUnderstood] = useState(false)
+  const replay = useReplayable()
+  const phone = useIsPhone()
+  const lineId = useId()
   const [assumed, setAssumed] = useState<number | null>(null)
 
   const series = model.series.find((s) => s.id === offer.seriesId)
@@ -52,57 +58,72 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
 
   const left = series ? secondsUntil(series.expiry, model.now) : 0
   const each = premiumPerLot(offer.premium, offer.qty)
+  const breakeven = series ? breakevenPerLot(series.strike, offer.premium, offer.qty) : null
   const price = range ? Math.min(range.max, Math.max(range.min, assumed ?? range.start)) : 0
   const split = inputs ? coverageAt(inputs, price) : null
   const cover = inputs ? coveredUpTo(inputs) : null
   const own = offer.writer === me
+  const scripted = replay.can('buy', (args) => args[1] === offer.id)
+  const fee = model.config.reserveFeeBps
 
   const buy = () => {
     onClose()
-    void act({ label: 'Buy', done: 'Bought' }, (opts) => client.buy(me, offer.id, opts), (id) => (id === null ? [] : [{ label: 'Position', value: `No. ${id}` }]))
+    void act({ label: 'Buy', done: 'Bought' }, (opts) => client.buy(me, offer.id, opts), (id) => ({
+      facts: [
+        { label: 'Premium paid', value: offer.premium },
+        { label: 'Contract', value: contractTitle(series) },
+        { label: 'Quantity', value: `${lots(offer.qty)} lots` },
+        ...(series ? [{ label: 'Expiry', value: formatUtc(series.expiry), hint: left > 0 ? `${formatCountdown(left)} left` : undefined }] : []),
+        ...(id === null ? [] : [{ label: 'Position', value: `No. ${id}` }]),
+      ],
+      next: { label: 'View your positions', to: '/margin/positions' },
+    }))
   }
 
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) onClose()
-      }}
-      title={`Buy ${UNDERLYING} call`}
-      description={series ? `${contractName(series)}, ${lots(offer.qty)} lots, expires ${formatUtc(series.expiry)}.` : undefined}
-      size="lg"
-      footer={
-        <>
-          <Button onClick={onClose}>Cancel</Button>
-          {canAct ? (
-            <Button
-              variant="primary"
-              disabled={!understood || own || busy}
-              disabledReason={own ? 'You cannot buy your own offer.' : !understood ? 'Tick the box above first.' : undefined}
-              onClick={buy}
-            >
-              Buy for {usdx(offer.premium)} {QUOTE}
-            </Button>
-          ) : (
-            <Button variant="primary" onClick={connect}>
-              Connect wallet
-            </Button>
-          )}
-        </>
-      }
-    >
+  // On a phone the page has its close button at the top; the bar at the bottom carries the one action.
+  const footer = (
+    <>
+      {phone ? null : <Button onClick={onClose}>Cancel</Button>}
+      {canAct ? (
+        <Button
+          variant="primary"
+          disabled={own || !scripted || busy || canCheckAgain}
+          disabledReason={own ? 'You cannot buy your own offer.' : !scripted ? replay.reason('buy of this offer') : canCheckAgain ? UNSETTLED_REASON : undefined}
+          aria-describedby={lineId}
+          onClick={buy}
+        >
+          Buy for {usdx(offer.premium)} {QUOTE}
+        </Button>
+      ) : (
+        <Button variant="primary" onClick={connect}>
+          Connect wallet
+        </Button>
+      )}
+      <p id={lineId} className={css.line}>
+        {BUY_PAYOUT_LINE}
+      </p>
+    </>
+  )
+
+  const body = (
+    <>
+      <UnsettledNote />
       <div className={css.columns}>
         <section className={css.terms} aria-label="Terms">
           <KeyValue>
-            <KeyValueItem label="Premium, paid now" hint={each !== null ? `${perLot(each)} ${QUOTE} per lot, to the writer.` : undefined} marked>
+            <KeyValueItem label="Premium, paid now" hint={each !== null ? `${perLot(each)} ${QUOTE} per lot. ${bpsPercent(fee)} goes to the vault as a reserve fee, the rest to the writer.` : undefined} marked>
               <Usdx v={offer.premium} unit figure="serif" />
             </KeyValueItem>
-            <KeyValueItem label="Contract" hint={`Series ${offer.seriesId}, offer ${offer.id}`}>
-              {contractName(series)}
-            </KeyValueItem>
+            <KeyValueItem label="Contract">{contractTitle(series)}</KeyValueItem>
             <KeyValueItem label="Quantity">{lots(offer.qty)} lots</KeyValueItem>
             <KeyValueItem label="Expiry" hint={series && left > 0 ? `${formatCountdown(left)} left` : undefined}>
               {series ? formatUtc(series.expiry) : 'Not available'}
+            </KeyValueItem>
+            <KeyValueItem label="Breakeven">
+              <Usdx v={breakeven} perLot unit figure="serif" none="Not available" />
+            </KeyValueItem>
+            <KeyValueItem label="Most you can lose">
+              <Usdx v={offer.premium} unit figure="serif" />
             </KeyValueItem>
             <KeyValueItem label="Writer">
               <Who id={offer.writer} me={me} length="medium" />
@@ -110,9 +131,7 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
             <KeyValueItem label="Collateral" hint="The writer margin is checked when you buy.">
               Partial
             </KeyValueItem>
-            <KeyValueItem label="Settlement" hint="At expiry, or earlier by exercise at a recent snapshot.">
-              Cash, in {QUOTE}
-            </KeyValueItem>
+            <KeyValueItem label="Settlement">Cash, in {QUOTE}</KeyValueItem>
           </KeyValue>
         </section>
 
@@ -120,48 +139,57 @@ function BuyFlow({ offer, open, onClose }: { offer: OfferView; open: boolean; on
           <h3 className={css.heading}>Who pays you</h3>
           {inputs && range && split && cover !== null ? (
             <>
-              <Slider
-                label={`If ${UNDERLYING} settles at`}
-                value={price}
-                min={range.min}
-                max={range.max}
-                step={range.step}
-                largeStep={range.step * 10}
-                valueText={(v) => `${money(v)} ${QUOTE}`}
-                onValueChange={setAssumed}
-                marks={[
-                  { value: range.min, label: `Strike ${money(range.min)}` },
-                  { value: range.max, label: money(range.max) },
-                ]}
-              />
-              <Waterfall
-                heading={`Owed ${money(split.due)} ${QUOTE}`}
-                label={`Hypothetical. ${splitSentence(money(split.due), money(split.fromWriter), money(split.fromVault), split.deficit > 0 ? money(split.deficit) : null, QUOTE)}`}
-                paidLabel={split.due > 0 ? `Paid ${money(split.paid)} of ${money(split.due)}` : undefined}
-                segments={[
-                  { id: 'writer', label: 'Writer margin', value: split.fromWriter, valueLabel: money(split.fromWriter) },
-                  { id: 'vault', label: 'Vault', value: split.fromVault, valueLabel: money(split.fromVault) },
-                  { id: 'deficit', label: 'Deficit', value: split.deficit, valueLabel: money(split.deficit), kind: 'deficit' },
-                ]}
-              />
+              <SwipeIgnore>
+                <Slider
+                  label={`If ${UNDERLYING} settles at`}
+                  value={price}
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
+                  largeStep={range.step * 10}
+                  valueText={(v) => `${money(v)} ${QUOTE}`}
+                  onValueChange={setAssumed}
+                  marks={[{ value: range.min, label: `Strike ${money(range.min)}` }]}
+                />
+              </SwipeIgnore>
+              {/* Reserves the height of the tallest drawing, so the dialog does not move under the pointer. */}
+              <div className={css.figure}>
+                <Waterfall
+                  heading={`Owed ${money(split.due)} ${QUOTE}`}
+                  label={`Hypothetical. ${splitSentence(money(split.due), money(split.fromWriter), money(split.fromVault), split.deficit > 0 ? money(split.deficit) : null, QUOTE)}`}
+                  paidLabel={split.due > 0 ? `Paid ${money(split.paid)} of ${money(split.due)}` : undefined}
+                  segments={[
+                    { id: 'writer', label: 'Writer margin', value: split.fromWriter, valueLabel: money(split.fromWriter) },
+                    { id: 'vault', label: 'Vault', value: split.fromVault, valueLabel: money(split.fromVault) },
+                    { id: 'deficit', label: 'Deficit', value: split.deficit, valueLabel: money(split.deficit), kind: 'deficit' },
+                  ]}
+                />
+              </div>
               <PayoutOrder />
               <p className={css.cover}>
-                With {money(inputs.writerMargin)} {QUOTE} of writer cash and a vault of {money(inputs.vault)} {QUOTE}, the payout is covered in full up to a settlement price of {money(cover)} {QUOTE}.
-                Above it, the rest is a deficit.
+                Hypothetical, at today&apos;s figures ({money(inputs.writerMargin)} {QUOTE} of writer cash, {money(inputs.vault)} {QUOTE} in the vault): a deficit starts above a settlement price of{' '}
+                {money(cover)} {QUOTE}, or lower if the vault also pays other positions or the writer&apos;s cash falls.
               </p>
-              <p className={css.caption}>{COVERAGE_CAPTION}</p>
             </>
           ) : (
             <PayoutOrder />
           )}
         </section>
       </div>
+    </>
+  )
 
-      <div className={css.consent}>
-        <Checkbox checked={understood} onCheckedChange={setUnderstood}>
-          {BUY_CONSENT}
-        </Checkbox>
-      </div>
+  const title = `Buy ${UNDERLYING} call`
+  const onOpenChange = (next: boolean) => {
+    if (!next) onClose()
+  }
+  return phone ? (
+    <Drawer presentation="page" open={open} onOpenChange={onOpenChange} title={title} footer={footer} className={css.page}>
+      {body}
+    </Drawer>
+  ) : (
+    <Dialog open={open} onOpenChange={onOpenChange} title={title} size="lg" footer={footer} className={css.dialog}>
+      {body}
     </Dialog>
   )
 }

@@ -29,8 +29,6 @@ export class TxError extends Error {
   }
 }
 
-export const isTxError = (e: unknown): e is TxError => e instanceof TxError
-
 export const errorMessage = (e: unknown): string => (e instanceof Error ? e.message : typeof e === 'string' ? e : String(e))
 
 /**

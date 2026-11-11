@@ -7,9 +7,6 @@
 import { QUOTE_ASSETS, REFERENCE_ASSETS } from '../../core/assets'
 import type { OptionKind, TokenInfo } from '../../core/options/types'
 
-/** The covered contract these transactions called (v1.3.1). */
-export const RECORDED_CONTRACT = 'CBASUA3LJEZ6G66V2JTB4OHQCHUIH5EK2ZPMLY73GTIBBDZ6JLRMJUEE'
-
 /** The maker and the holder of the recorded runs (disposable Testnet identities, public keys only). */
 export const RECORDED_MAKER = 'GDNPA7N3WIUJLR6TJ2Z2EO3MXFWWZPN4D6P2L4YHSX3M4PZVTKMWDJCI'
 export const RECORDED_HOLDER = 'GAXXQZK5RJRZZH3QDMVWFBRWL45CWHZZZXI4PQSAVPAWKILQJYHBJAR5'
@@ -93,11 +90,6 @@ export const RECORDED_CALL = {
   holder: RECORDED_HOLDER,
 }
 
-export const RECORDED_CALL_TX = {
-  write: { hash: 'dc65433d82c4490e8580955dc07f6e161f948b0a221ffd695d92a9df2ac7b122', ledger: 5_390_486, closedAt: utc('2026-10-26T00:53:37Z'), feeStroops: 251_440n },
-  buy: { hash: '465318452e7805aa70e6c15caf2d683c17f249a328d7c89a1fbe233956886879', ledger: 5_390_488, closedAt: utc('2026-10-26T00:53:47Z'), feeStroops: 31_985n },
-} as const satisfies Record<string, RecordedTx>
-
 /** Option No. 1 of the same run was never exercised: after its deadline the maker took the 50.00 USDx back. */
 export const RECORDED_RECLAIM_TX: RecordedTx = {
   hash: 'dcc8b4bd07fc18720e76baaa44a14709216abe08bf34d0525aab549879e4e98a',
@@ -122,18 +114,13 @@ export const EVIDENCE_TX = {
   fillBid: 'ce841e7eea37bc98821eb34360259aef5d32227b6a879e0f1b64c3f6ac9c35b3',
 } as const
 
-/** sha256 of the deployed v1.5 wasm (AGENTS.md "Deployed contracts", docs/contract-testnet-evidence.md). */
-export const DEPLOYED_WASM_SHA256 = '64ab726516d9dff13921dacb197f786dca1aa64f6ae62f33f10f902fcea62de8'
-export const DEPLOYED_WASM_BYTES = 48_064
-
 /**
  * `#[test]` functions in contracts/options, counted on 11 November 2026 with
  * `grep -c '#\[test\]'`: src/test.rs (unit), tests/invariants.rs (invariants checked against a reference model;
  * two of them run random sequences of calls with proptest) and tests/negative.rs (calls that must be refused).
  * CI runs them with `cargo test` (.github/workflows/ci.yml).
  */
-export const CONTRACT_TESTS = { unit: 146, invariant: 18, negative: 86 } as const
-export const CONTRACT_TEST_TOTAL = CONTRACT_TESTS.unit + CONTRACT_TESTS.invariant + CONTRACT_TESTS.negative
+export { CONTRACT_TESTS, CONTRACT_TEST_TOTAL } from '../../core/deployments'
 
 /** The current covered contract on Testnet (v1.5), for links when the build itself has no contract id. */
 export const COVERED_CONTRACT = 'CAIKMS2B4ATWKOKW7BLWQB7Z4JASPZC4EKZ3XL72N7OYSSKKHKW4GKY6'

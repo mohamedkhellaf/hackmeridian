@@ -1,50 +1,68 @@
-import { Button, DateTime, KeyValue, KeyValueItem } from '../../ui'
-import { CHECK_AGAIN, COLUMNS, PRODUCT_LABEL, TABLE_CAPTION } from './copy'
+import { useId } from 'react'
+import { Button } from '../../ui'
+import { CHECK_AGAIN } from './copy'
 import type { ActivityRowsProps } from './ActivityTable'
 import { HashCell } from './HashCell'
+import type { ActivityGroup } from './model'
+import { Time, What } from './RowParts'
 import { StateWord } from './StateWord'
 import { TargetLink } from './TargetLink'
 import css from './ActivityList.module.css'
 
-/** The same rows on a phone: one block per transaction, every field kept, 44 px targets. */
-export function ActivityList({ rows, showProduct, checking, onCheck }: ActivityRowsProps) {
+function Group({ group, checking, onCheck }: { group: ActivityGroup } & Pick<ActivityRowsProps, 'checking' | 'onCheck'>) {
+  const headingId = useId()
   return (
-    <ul className={css.root} role="list" aria-label={TABLE_CAPTION}>
-      {rows.map((row) => (
-        <li key={row.id} className={css.item} data-tone={row.tone} data-testid="activity-row">
-          <div className={css.head}>
-            <p className={css.label}>{row.label}</p>
-            <StateWord row={row} />
-          </div>
-          {row.terms ? <p className={css.sub}>{row.terms}</p> : null}
-          <p className={css.note}>{row.note}</p>
-          <KeyValue variant="plain" figures="sans" className={css.facts}>
-            <KeyValueItem label={COLUMNS.started}>
-              <DateTime value={row.startedAt} local="below" />
-            </KeyValueItem>
-            <KeyValueItem label={COLUMNS.hash}>
-              <HashCell row={row} />
-            </KeyValueItem>
-            {showProduct ? <KeyValueItem label="Contract">{PRODUCT_LABEL[row.product]}</KeyValueItem> : null}
-          </KeyValue>
-          {row.target || row.canCheck ? (
+    <section className={css.group} aria-labelledby={headingId}>
+      <h2 id={headingId} className={css.groupHead}>
+        {group.title}
+      </h2>
+      <ul className={css.list} role="list" aria-labelledby={headingId}>
+        {group.rows.map((row) => (
+          <li key={row.id} className={css.item} data-tone={row.tone} data-testid="activity-row">
+            <div className={css.head}>
+              <span className={css.label}>{row.label}</span>
+              <StateWord row={row} />
+            </div>
+            {row.terms || row.product === 'margin' ? (
+              <p className={css.what}>
+                <What row={row} stacked termsOnly />
+              </p>
+            ) : null}
+            {row.note ? <p className={css.note}>{row.note}</p> : null}
             <div className={css.foot}>
+              <span className={css.proof}>
+                <Time row={row} local={false} unit />
+                <HashCell row={row} />
+              </span>
               {row.target ? (
                 <span className={css.target}>
                   <TargetLink target={row.target} />
                 </span>
-              ) : (
-                <span />
-              )}
-              {row.canCheck ? (
-                <Button size="sm" variant="secondary" className={css.check} loading={checking === row.id} onClick={() => onCheck(row.id)}>
-                  {CHECK_AGAIN}
-                </Button>
               ) : null}
             </div>
-          ) : null}
-        </li>
+            {row.canCheck ? (
+              <Button size="sm" variant="secondary" className={css.check} loading={checking === row.id} onClick={() => onCheck(row.id)}>
+                {CHECK_AGAIN}
+              </Button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/**
+ * The same rows below 1200 px (a phone, a tablet): a group per heading, and per transaction the label with its state word, the terms,
+ * the note when there is one, and one line with the time and hash on the left and the link on the right. The
+ * ledger of a confirmation is on the explorer page the hash links to. 44 px targets.
+ */
+export function ActivityList({ groups, checking, onCheck }: ActivityRowsProps) {
+  return (
+    <div className={css.root}>
+      {groups.map((group) => (
+        <Group key={group.key} group={group} checking={checking} onCheck={onCheck} />
       ))}
-    </ul>
+    </div>
   )
 }

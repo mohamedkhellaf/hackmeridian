@@ -13,6 +13,7 @@
     min-width: 0;
   }
 
+  /* Heading and summary, the statement, then the notes: one column at every width. */
   .section {
     display: flex;
     flex-direction: column;
@@ -26,6 +27,12 @@
     gap: var(--s-4);
   }
 
+  .heading:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--r-control);
+  }
+
   /* The answer in one sentence, before the figures. */
   .summary {
     font-size: var(--body-size);
@@ -33,40 +40,24 @@
     color: var(--text-2);
   }
 
-  /*
-   * The figure, its reading notes, the statement and the limits. One column until there is room for the notes
-   * beside the figure; in one column the statement comes straight after the figure and the notes follow.
-   */
-  .layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      'figure'
-      'table'
-      'notes'
-      'limits';
-    gap: var(--s-24);
-    align-items: start;
-  }
-
-  .figure {
-    grid-area: figure;
+  /* A four-row statement at the width of a statement: the figures stay near the token they belong to. */
+  .statement {
     min-width: 0;
+    max-width: 60rem;
   }
 
   .notes {
-    grid-area: notes;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
     min-width: 0;
+    max-width: 46rem;
   }
 
-  .table {
-    grid-area: table;
-    min-width: 0;
-  }
-
-  .limits {
-    grid-area: limits;
-    min-width: 0;
+  /* While loading: the height of the table's header row above the skeleton rows. */
+  .headSpace {
+    height: var(--row-h-compact);
+    border-bottom: 1px solid var(--rule);
   }
 
   .hidden {
@@ -76,14 +67,40 @@
     color: var(--muted);
   }
 
-  @media (min-width: 1200px) {
-    .layout {
-      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      grid-template-areas:
-        'figure notes'
-        'table table'
-        'limits limits';
-      gap: var(--s-24) var(--s-40);
+  /* The error notice: the raw message is one press away and wraps inside the notice, whatever it holds. */
+  .error {
+    min-width: 0;
+  }
+
+  .details {
+    margin-top: var(--s-4);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+
+    & > summary {
+      width: fit-content;
+      min-height: var(--control-h-sm);
+      padding-block: var(--s-4);
+      cursor: pointer;
+      border-radius: var(--r-control);
+    }
+  }
+
+  .message {
+    margin-top: var(--s-4);
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 767.98px) {
+    .details > summary {
+      min-height: var(--touch);
+      display: flex;
+      align-items: center;
     }
   }
 }

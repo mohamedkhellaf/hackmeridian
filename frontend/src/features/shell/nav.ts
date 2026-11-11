@@ -11,7 +11,7 @@ export type AppPath = '/markets' | '/portfolio' | '/requests' | '/reserves' | '/
 export interface NavEntry {
   id: SectionId
   to: AppPath
-  /** One word in the bars; the phone top bar shows it as the page title. */
+  /** One word in the bars. */
   label: string
 }
 
@@ -40,20 +40,17 @@ export function moreNav(marginEnabled: boolean): NavEntry[] {
   return [...secondaryNav(marginEnabled), SECTIONS.issuer, SECTIONS.activity]
 }
 
-/** Footer links, in the order of the brief. The repository link is added by the footer itself. */
-export const FOOTER_NAV: readonly NavEntry[] = [SECTIONS.learn, SECTIONS.reserves, SECTIONS.issuer, SECTIONS.design]
+/**
+ * Footer links: what a visitor uses. The repository link is added by the footer itself. The component gallery
+ * keeps its route (/design) and its title but has no link: it is for the team, not for someone who came to trade.
+ */
+export const FOOTER_NAV: readonly NavEntry[] = [SECTIONS.learn, SECTIONS.reserves, SECTIONS.issuer]
 
 /** The section a path belongs to: `/markets/bond` is Markets, `/margin/vault` is Margin. Null outside the app. */
 export function sectionOf(pathname: string): SectionId | null {
   const first = pathname.split('/').find((part) => part !== '')
   if (first === undefined) return null
   return Object.prototype.hasOwnProperty.call(SECTIONS, first) ? (first as SectionId) : null
-}
-
-/** What the phone top bar shows as the page title. */
-export function sectionTitle(pathname: string): string {
-  const id = sectionOf(pathname)
-  return id ? SECTIONS[id].label : 'StellSec'
 }
 
 /** True when `pathname` is inside one of `entries` (the More tab is current on Learn, Margin, Issuer, Activity). */

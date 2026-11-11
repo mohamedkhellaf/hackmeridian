@@ -6,9 +6,8 @@
  */
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { BANNED_PRICE_TERMS, BANNED_TAGLINES, BANNED_WORDS, COPYRIGHT_NOTICE, LEGAL_NOTICE, MARGIN_BANNED_WORDS, PAYOFF_CAPTION, findBannedWords } from '../src/core/disclosures'
-import { HERO, LIMITS, NAV, QUESTIONS, WIDGET } from '../src/features/landing/copy'
-import { CONTRACT_TEST_TOTAL } from '../src/features/landing/recorded'
+import { BANNED_PRICE_TERMS, BANNED_TAGLINES, BANNED_WORDS, COPYRIGHT_NOTICE, MARGIN_BANNED_WORDS, PAYOFF_CAPTION, findBannedWords, legalNotice } from '../src/core/disclosures'
+import { HERO, LIMITS, NAV, PROOF, WIDGET } from '../src/features/landing/copy'
 import { PHONE, bodyText, countVisible, currentPath, expectAnnounced, expectNoAxeViolations, expectNoHorizontalOverflow, openApp, pageHeading } from './helpers'
 
 const LIVE_CHUNK = '**/features/landing/live/LiveBook.tsx*'
@@ -26,17 +25,35 @@ async function openLanding(page: Page): Promise<void> {
   await expect(widget(page)).toHaveAttribute('data-state', 'open')
 }
 
+/** How many times `text` is painted at a readable size (a visually hidden copy for screen readers is not counted). */
+const countPainted = (page: Page, text: string): Promise<number> =>
+  page.evaluate((needle) => {
+    let n = 0
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const el = node.parentElement
+      if (!el || !(node.textContent ?? '').includes(needle)) continue
+      const r = el.getBoundingClientRect()
+      if (r.width > 2 && r.height > 2 && getComputedStyle(el).visibility !== 'hidden') n++
+    }
+    return n
+  }, text)
+
 test.describe('Landing', () => {
   test('has its own layout: the headline, a title of its own, no app shell', async ({ page }) => {
     await openApp(page, '/')
-    await expect(pageHeading(page)).toHaveText(`${HERO.h1Before}${HERO.h1Marked}${HERO.h1After}`)
+    await expect(pageHeading(page)).toHaveText(HERO.h1)
     await expect(pageHeading(page)).toHaveText('Set the lowest price you would sell at.')
+    // No highlighter in the headline: the marker is for a term the visitor set.
+    await expect(pageHeading(page).locator('mark')).toHaveCount(0)
     await expect(page).toHaveTitle(/^StellSec/)
     await expect(page.locator('h1')).toHaveCount(1)
     await expect(page.locator('footer.shell-footer')).toHaveCount(0)
     await expect(page.getByRole('navigation', { name: NAV.label })).toBeVisible()
-    // The network is named once, as a state, in the line above the navigation.
-    await expect(page.getByTestId('status-network')).toHaveText('Network: Mock data')
+    // The navigation is the three anchors of the page and one way into the app.
+    await expect(page.getByRole('navigation', { name: NAV.label }).getByRole('link')).toHaveText([NAV.lifecycle, NAV.proof, NAV.limits])
+    // A mock build has no status line: its one "Mock data" label is on the example it describes.
+    await expect(page.getByTestId('status-network')).toHaveCount(0)
 
     // Headings never skip a level.
     const levels = await page.locator('h1, h2, h3, h4, h5, h6').evaluateAll((els) => els.map((el) => Number(el.tagName[1])))
@@ -74,7 +91,8 @@ test.describe('Landing', () => {
     await expect(page.getByTestId('hero-aside')).toHaveText(WIDGET.recordedAside)
     await expect(widget(page)).toContainText('No. 000008')
     await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, EQTY')
-    await expect(page.getByTestId('hero-source')).toContainText('Exercised on Testnet at ledger 5,390,522')
+    await expect(page.getByTestId('hero-meta')).toHaveText('This option covered 5.00 EQTY for 1.00 USDx (0.20 per unit), paid once to the maker.')
+    await expect(page.getByTestId('hero-source')).toHaveText('Exercised at ledger 5,390,522. The maker had locked 50.00 USDx in the contract.')
     // The recorded put: 5.00 EQTY, floor 10.00, premium 1.00. At 8.00 that is 49.00 with the put and 40.00 without.
     await expect(withFigure(page)).toHaveText('49.00 USDx')
     await expect(withoutFigure(page)).toHaveText('40.00 USDx')
@@ -85,9 +103,12 @@ test.describe('Landing', () => {
 
     release()
     await expect(widget(page)).toHaveAttribute('data-state', 'open')
+    // "Mock data" is said once on the page, on the note it describes; the source line ends at what is locked.
     await expect(page.getByTestId('hero-aside')).toHaveText(WIDGET.openAsideMock)
+    expect(await countPainted(page, 'Mock data')).toBe(1)
     await expect(widget(page)).toContainText(/Offer No\. \d{6}/)
-    await expect(page.getByTestId('hero-source')).toContainText('Mock data: no chain is read.')
+    await expect(page.getByTestId('hero-source')).toHaveText(/^Maker\s*\S+ locked [\d,.]+ USDx\.$/)
+    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+ FUND for [\d,.]+ USDx \([\d,.]+ per unit\), paid once to the maker\.$/)
     await expectAnnounced(page, WIDGET.announceOpen)
     // Only now was the (mock) chain client loaded.
     expect(requests.some((url) => /mockClient/.test(url))).toBe(true)
@@ -100,7 +121,37 @@ test.describe('Landing', () => {
     await expect(widget(page)).toHaveAttribute('data-state', 'recorded')
     await page.unroute(LIVE_CHUNK)
     await widget(page).getByRole('button', { name: WIDGET.retry }).click()
+    await page.mouse.move(0, 0)
     await expect(widget(page)).toHaveAttribute('data-state', 'open')
+  })
+
+  test('the example does not change under a visitor working in the note', async ({ page }) => {
+    let release = () => {}
+    const held = new Promise<void>((resolve) => (release = resolve))
+    await page.route(LIVE_CHUNK, async (route) => {
+      await held
+      await route.continue()
+    })
+    await openApp(page, '/')
+    await expect(widget(page)).toHaveAttribute('data-state', 'recorded')
+
+    // The visitor takes the price handle of the recorded example and moves it.
+    const handle = slider(page)
+    await handle.focus()
+    await page.keyboard.press('PageUp')
+    const price = await handle.getAttribute('aria-valuenow')
+    release()
+    // The book is read, but the open offer waits while focus is in the note: nothing moves, nothing is lost.
+    await expect(widget(page)).toHaveAttribute('data-held', 'true')
+    await expect(widget(page)).toHaveAttribute('data-state', 'recorded')
+    await expect(handle).toBeFocused()
+    await expect(handle).toHaveAttribute('aria-valuenow', price ?? '')
+
+    // Leaving the note lets it show the open offer, without the "print" of a confirmed trade.
+    await page.getByRole('link', { name: HERO.primary }).focus()
+    await expect(widget(page)).toHaveAttribute('data-state', 'open')
+    await expect(widget(page)).not.toHaveAttribute('data-held', /.*/)
+    await expect(widget(page).locator('article')).not.toHaveAttribute('data-printing', /.*/)
   })
 
   test('the price handle works with the keyboard and moves both outcome figures', async ({ page }) => {
@@ -136,15 +187,26 @@ test.describe('Landing', () => {
     const floor = terms.getByLabel(WIDGET.floor)
     const until = terms.getByLabel(WIDGET.until)
     await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, FUND')
+    // "I hold" picks the asset, and shows the asset; the lot is said in the line under the terms.
+    await expect(asset.locator('..')).toContainText('FUND')
+    await expect(page.getByTestId('hero-meta')).toContainText(/covers [\d,.]+ FUND/)
+    // Each floor and each deadline says which lot it would show.
+    await expect(floor.locator('option').first()).toHaveText(/, for [\d,.]+ FUND$/)
+    await expect(until.locator('option').first()).toHaveText(/, for [\d,.]+ FUND$/)
     const serial = () => widget(page).locator('p', { hasText: /Offer No\./ }).first().innerText()
     const first = await serial()
 
-    // Another floor of the same deadline is another offer.
+    // The visitor moves the price; another floor of the same deadline is another offer, and the price stays.
+    const handle = slider(page)
+    await handle.focus()
+    await page.keyboard.press('PageUp')
+    const price = await handle.getAttribute('aria-valuenow')
     const floors = await floor.locator('option').evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value))
     expect(floors.length).toBeGreaterThan(1)
     const current = await floor.inputValue()
     await floor.selectOption(floors.find((value) => value !== current) ?? current)
     await expect.poll(serial).not.toBe(first)
+    await expect(handle).toHaveAttribute('aria-valuenow', price ?? '')
 
     // Another deadline keeps a floor that is on offer there, or says which one it moved to.
     const deadlines = await until.locator('option').evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value))
@@ -155,7 +217,7 @@ test.describe('Landing', () => {
     // Another asset starts from that asset's own default terms.
     await asset.selectOption({ label: 'BOND, bond' })
     await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, BOND')
-    await expect(page.getByTestId('hero-meta')).toContainText(/^Premium [\d,.]+ USDx \([\d,.]+ per unit\)/)
+    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+ BOND for [\d,.]+ USDx \([\d,.]+ per unit\), paid once to the maker\.$/)
   })
 
   test('"Open this offer" opens the asset page with the ticket on that offer', async ({ page }) => {
@@ -198,42 +260,57 @@ test.describe('Landing', () => {
     await openLanding(page)
     const nav = page.getByRole('navigation', { name: NAV.label })
     for (const [label, id, heading] of [
-      [NAV.lifecycle, 'how-it-works', 'One option, five steps'],
+      [NAV.lifecycle, 'how-it-works', 'How it works'],
       [NAV.proof, 'proof', 'Proof'],
       [NAV.limits, 'limits', 'Limits'],
     ] as const) {
       await nav.getByRole('link', { name: label }).click()
       await expect(page).toHaveURL(new RegExp(`#${id}$`))
-      await expect(page.getByRole('heading', { level: 2, name: heading, exact: true })).toBeInViewport()
+      const h2 = page.getByRole('heading', { level: 2, name: heading, exact: true })
+      await expect(h2).toBeInViewport()
+      // The bar stays on screen and the heading lands below it, not under it.
+      const bar = await page.getByRole('banner').boundingBox()
+      await expect(page.getByRole('banner')).toBeInViewport()
+      expect((await h2.boundingBox())?.y ?? 0).toBeGreaterThanOrEqual((bar?.y ?? 0) + (bar?.height ?? 0))
     }
   })
 
   test('the sections are there, in order, with the Limits table', async ({ page }) => {
     await openLanding(page)
     const sections = await page.locator('main h2').evaluateAll((els) => els.map((el) => (el.textContent ?? '').trim()))
-    expect(sections).toEqual(['Long put, FUND', 'Three things you can do', 'One option, five steps', 'Proof', 'What is different', 'Margin', 'Limits', 'Questions', 'Try a put on Testnet.'])
+    expect(sections).toEqual(['Long put, FUND', 'What you can do', 'What is different', 'How it works', 'Proof', 'Margin', 'Limits', 'Try a put.'])
 
     // The three intents, named as everywhere else in the app.
     for (const name of ['Set a floor', 'Earn on what you hold', 'Earn while waiting to buy']) {
       await expect(page.locator('#what-you-can-do').getByRole('heading', { level: 3, name, exact: true })).toBeVisible()
     }
-    // Five steps, each saying who acts.
-    const steps = page.getByRole('list', { name: /five steps of an option/ }).getByRole('listitem')
+    // Five rows, each saying who acts. The deadline row is the other branch of the exercise: it carries "or".
+    const steps = page.getByRole('list', { name: /steps of an option/ }).getByRole('listitem')
     await expect(steps).toHaveCount(5)
-    await expect(steps.nth(2)).toContainText('The holder. Nobody does it for them.')
-    await expect(steps.nth(2)).toContainText('Fee 0.0079873 XLM')
+    await expect(steps.nth(2)).toContainText('The holder')
+    await expect(steps.nth(3).getByRole('heading', { level: 3 })).toHaveText('Step 3, or: The deadline passes')
+    await expect(steps.nth(4).getByRole('heading', { level: 3 })).toHaveText('Step 4: The maker collects')
+    // One transaction link per step, nothing under it; no state tags.
+    await expect(page.locator('#how-it-works')).not.toContainText('Fee ')
+    await expect(page.locator('#how-it-works')).not.toContainText('State after')
 
     const limits = page.getByRole('table', { name: LIMITS.tableCaption })
     await expect(limits).toBeVisible()
     await expect(limits.getByRole('columnheader')).toHaveText([LIMITS.exists, LIMITS.missing])
     await expect(limits.getByRole('row')).toHaveCount(LIMITS.rows.length + 1)
-    await expect(limits).toContainText(`${CONTRACT_TEST_TOTAL} contract tests run in CI.`)
-    await expect(limits).toContainText('No independent auditor has reviewed the contracts.')
+    await expect(limits).toContainText('The contracts are tested in CI.')
+    await expect(limits).toContainText('No independent auditor has reviewed them.')
     await expect(limits).toContainText('Nothing is exercised for you.')
     await expect(limits).toContainText('It cannot stop the issuer from freezing an account or clawing tokens back.')
 
-    await expect(page.getByRole('table', { name: 'Claims and the evidence for each' })).toBeVisible()
-    await expect(page.locator('#questions').getByRole('heading', { level: 3 })).toHaveCount(QUESTIONS.items.length)
+    // Proof: eight claims, one piece of evidence each.
+    const proof = page.getByRole('table', { name: PROOF.tableCaption })
+    await expect(proof).toBeVisible()
+    await expect(proof.getByRole('row')).toHaveCount(9)
+    // No stat row under the hero, no questions, no ornament: each figure has one home.
+    await expect(page.locator('#questions')).toHaveCount(0)
+    expect(await countPainted(page, '0.0079873')).toBe(1)
+    expect(await countPainted(page, 'Decorative')).toBe(0)
   })
 
   test('wording: no banned word, no tagline, the payoff caption on every figure, the legal footer', async ({ page }) => {
@@ -250,16 +327,34 @@ test.describe('Landing', () => {
     expect(margin).toContain('Payouts can be reduced; any deficit is shown.')
     expect(findBannedWords(text, ['fully collateralized', 'fully collateralised'])).toEqual([])
 
-    // Four payoff figures (the widget and the three intents), each with the required caption.
+    // Four payoff figures (the widget and the three intents), each with the required caption for a screen reader;
+    // on screen it is printed under the widget's figure and once under the row of three.
     const captions = page.locator('figure > figcaption', { hasText: PAYOFF_CAPTION })
     await expect(captions).toHaveCount(4)
-    expect(await countVisible(page, PAYOFF_CAPTION)).toBe(4)
+    expect(await countPainted(page, PAYOFF_CAPTION)).toBe(2)
+    await expect(page.locator('figcaption', { hasText: /Fig\. \d/ })).toHaveCount(0)
 
-    // The footer is the legal footer: the copyright line and the legal notice, once each.
+    // The network is named where the visitor acts on it: the hero's button (and the Limits row, in words).
+    expect(await countPainted(page, 'Testnet')).toBe(1)
+
+    // The footer is the app's legal footer: the copyright line and the notice of this build (a mock build here),
+    // once each.
     const footer = page.getByRole('contentinfo')
     await expect(footer).toContainText(COPYRIGHT_NOTICE)
-    await expect(footer).toContainText(LEGAL_NOTICE)
-    expect(await countVisible(page, LEGAL_NOTICE)).toBe(1)
+    await expect(footer).toContainText(legalNotice(true))
+    expect(await countVisible(page, legalNotice(true))).toBe(1)
+    // A conventional footer: two link groups (and the contract on a contract build, never on mock data), no section
+    // index, no gallery, no crawler file.
+    await expect(footer.getByRole('button', { name: 'Copy contract id' })).toHaveCount(0)
+    await expect(footer.getByRole('link', { name: 'Design system' })).toHaveCount(0)
+    await expect(footer.getByRole('link', { name: 'llms.txt' })).toHaveCount(0)
+    await expect(footer.getByRole('link', { name: 'Learn', exact: true })).toBeVisible()
+  })
+
+  test('the closing line links "a few test tokens" to the steps for getting them', async ({ page }) => {
+    await openLanding(page)
+    const link = page.locator('#closing-heading').locator('..').getByRole('link', { name: 'a few test tokens' })
+    await expect(link).toHaveAttribute('href', '/markets?funds=1')
   })
 
   test('is accessible in both themes, with the recorded example and with an open offer', async ({ page }) => {
@@ -306,13 +401,17 @@ test.describe('Landing on a phone @phone', () => {
     await openLanding(page)
     await expectNoHorizontalOverflow(page)
     await expect(pageHeading(page)).toBeInViewport()
-    // The section links move to the footer on a phone; the way into the app stays in the top bar.
-    await expect(page.getByRole('navigation', { name: NAV.label })).toBeHidden()
+    // The section links are one row under the bar; the way into the app stays in the bar.
+    const nav = page.getByRole('navigation', { name: NAV.label })
+    await expect(nav).toBeVisible()
+    await expect(nav.getByRole('link')).toHaveText([NAV.lifecycle, NAV.proof, NAV.limits])
     await expect(page.getByRole('link', { name: NAV.openApp })).toBeVisible()
 
-    // Targets a finger has to hit: the actions, the three inputs, the price handle.
+    // Targets a finger has to hit: the bar, the section links, the actions, the three inputs.
     const targets = [
       page.getByRole('link', { name: NAV.openApp }),
+      nav.getByRole('link', { name: NAV.lifecycle }),
+      nav.getByRole('link', { name: NAV.limits }),
       page.getByRole('link', { name: HERO.primary }),
       widget(page).getByLabel(WIDGET.hold),
       widget(page).getByLabel(WIDGET.floor),
@@ -357,6 +456,10 @@ test.describe('Landing on a phone @phone', () => {
     await page.touchscreen.tap(plot.x + plot.width * 0.8, plot.y + plot.height * 0.5)
     await expect(handle).not.toHaveAttribute('aria-valuenow', before ?? '')
     await expectNoHorizontalOverflow(page)
+
+    // Far down the page, "Open app" is still in the bar.
+    await page.getByRole('heading', { level: 2, name: 'Limits', exact: true }).scrollIntoViewIfNeeded()
+    await expect(page.getByRole('link', { name: NAV.openApp })).toBeInViewport()
   })
 
   test('is accessible on a phone in both themes', async ({ page }) => {
@@ -364,7 +467,7 @@ test.describe('Landing on a phone @phone', () => {
     await expectNoAxeViolations(page)
   })
 
-  test('the headline is the largest paint on a phone too, and the marked words stay on one line', async ({ page }) => {
+  test('the headline is the largest paint on a phone too, and sets on two lines', async ({ page }) => {
     await openApp(page, '/')
     const largest = await page.evaluate(
       () =>
@@ -376,8 +479,8 @@ test.describe('Landing on a phone @phone', () => {
         }),
     )
     expect(largest).toBe('H1')
-    const lines = await page.locator('h1 mark').evaluate((el) => el.getClientRects().length)
-    expect(lines).toBe(1)
+    const lines = await pageHeading(page).evaluate((el) => Math.round(el.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(el).lineHeight)))
+    expect(lines).toBe(2)
   })
 })
 

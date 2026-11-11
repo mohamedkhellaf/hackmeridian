@@ -1,57 +1,61 @@
 /**
- * Issuer (`/issuer`). The suite runs on the mock chain, where the console has nothing to read and nothing to sign:
- * the page must say so in the exact words, explain what the console does on Testnet, and show no control that
- * would do nothing. The console itself (flags, accounts, authorize, freeze, claw back) needs a Testnet contract;
- * it is covered by the unit tests of `src/features/issuer` and by the opt-in Testnet run in
+ * Issuer (`/issuer`). The suite runs on the mock chain, where there is no asset contract to read and no
+ * transaction to sign: the page says so in the one sentence of ruling R24 and shows only what the mock data
+ * holds, read only (the demo flags of each asset and what the Covered contract holds and reserves in it), with
+ * no control that would act. The console itself (accounts, authorize, freeze, claw back) needs a Testnet
+ * contract; it is covered by the unit tests of `src/features/issuer` and by the opt-in Testnet run in
  * `src/features/issuer/actions.live.test.ts`.
  */
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { BANNED_WORDS, ISSUER_DISCLOSURE, clawbackShortfallDisclosure, findBannedWords } from '../src/core/disclosures'
+import { BANNED_TAGLINES, BANNED_WORDS, ISSUER_DISCLOSURE, clawbackShortfallDisclosure, findBannedWords } from '../src/core/disclosures'
 import { COPY } from '../src/features/issuer/copy'
-import { PHONE, connect, connectButton, currentPath, expectNoAxeViolations, expectNoHorizontalOverflow, openApp, pageHeading, walletButton } from './helpers'
+import { PHONE, clawBack, connect, connectButton, currentPath, expectNoAxeViolations, expectNoHorizontalOverflow, openApp, pageHeading, walletButton } from './helpers'
 
-const SENTENCE = 'Issuer actions need a Testnet contract.'
-const GUEST_PROMPT = "Connect the asset issuer's account in your wallet."
+const SENTENCE = 'On mock data there is no asset contract to read and no transaction to sign.'
+const DESCRIPTION = "Who can hold a listed asset, who is frozen and what is taken back. Only the asset's issuer can sign."
 
 const main = (page: Page) => page.locator('main')
+const statement = (page: Page) => main(page).getByRole('region', { name: 'Covered contract' })
+const powers = (page: Page) => main(page).getByRole('table', { name: 'Issuer powers' })
+/** The value of a row of a definition list, by its label. */
+const fact = (scope: ReturnType<typeof main>, label: string) =>
+  scope.locator('dl > div').filter({ has: scope.page().locator('dt', { hasText: new RegExp(`^${label}$`) }) }).locator('dd')
 
-/** Every control inside the page (the shell's own controls are outside `main`). */
-const controls = (page: Page) => main(page).locator('button, input, select, textarea, [role="button"], [role="combobox"], [role="switch"], [role="checkbox"]')
+async function pickAsset(page: Page, code: string): Promise<void> {
+  await main(page).getByRole('combobox', { name: 'Asset' }).click()
+  await page.getByRole('option', { name: code }).click()
+  await expect(main(page).getByRole('combobox', { name: 'Asset' })).toHaveText(code)
+}
 
-test.describe('Issuer on a build without a Testnet contract', () => {
-  test('says the exact sentence and explains what the console does on Testnet', async ({ page }) => {
+test.describe('Issuer on mock data', () => {
+  test('says the one sentence and shows what the mock data holds, read only', async ({ page }) => {
     await openApp(page, '/issuer')
     await expect(pageHeading(page)).toHaveText('Issuer')
     await expect(page).toHaveTitle('Issuer · StellSec')
 
-    // The sentence, word for word, as the first thing under the page heading.
+    // The sentence, word for word, directly under the page heading; the console's description is not there.
     expect(COPY.mock.sentence).toBe(SENTENCE)
-    const sentence = main(page).getByRole('heading', { level: 2, name: SENTENCE, exact: true })
-    await expect(sentence).toBeVisible()
-    await expect(main(page).getByText(COPY.mock.hint, { exact: true })).toBeVisible()
-    await expect(main(page).locator('h2').first()).toHaveText(SENTENCE)
+    await expect(main(page).locator('header p').first()).toHaveText(SENTENCE)
+    await expect(main(page).getByText(DESCRIPTION)).toHaveCount(0)
+    await expect(main(page).getByText('Issuer actions need a Testnet contract.')).toHaveCount(0)
 
-    // The explanation: the three actions, each with what the issuer signs and what it means for options.
-    const what = main(page).getByRole('region', { name: 'What the console does on Testnet' })
-    await expect(what).toBeVisible()
-    const actions = what.getByRole('listitem')
-    await expect(actions).toHaveCount(3)
-    await expect(what.getByRole('heading', { level: 3 })).toHaveText(['Authorize', 'Freeze', 'Claw back'])
-    for (const [i, action] of COPY.mock.actions.entries()) {
-      await expect(actions.nth(i)).toContainText('What the issuer signs')
-      await expect(actions.nth(i)).toContainText(action.signs)
-      await expect(actions.nth(i)).toContainText('What it means for options')
-      await expect(actions.nth(i)).toContainText(action.options)
-    }
-    // Freezing the options contract stops settlement, and a clawback from it leaves holders short: both are said.
-    await expect(actions.nth(1)).toContainText('If the options contract is frozen, no option written on the asset can settle.')
-    await expect(actions.nth(2)).toContainText('first come, first served')
+    // The Covered contract as a statement: what it holds and owes, and how many options depend on it. The mock
+    // chain has no authorization model, so no authorization is shown.
+    await expect(statement(page)).toBeVisible()
+    await expect(fact(statement(page), 'Held')).toHaveText(/^[\d,]+\.\d{2} FUND/)
+    await expect(fact(statement(page), 'Reserved for open options')).toHaveText(/^[\d,]+\.\d{2} FUND/)
+    await expect(fact(statement(page), 'Open options')).toContainText(/\d/)
+    await expect(statement(page).getByText('Authorization', { exact: true })).toHaveCount(0)
 
-    // What it reads and who can sign.
-    const reads = main(page).getByRole('region', { name: 'What it reads' })
-    await expect(reads.getByRole('term')).toHaveText(['Issuer flags', 'Accounts', 'The options contract'])
-    await expect(main(page).getByRole('region', { name: 'Who can sign' })).toContainText('Only the issuer account of the asset.')
+    // What the issuer can do: the demo flags as the same table as the asset's About tab.
+    await expect(main(page).getByRole('heading', { level: 2, name: 'What the issuer can do' })).toBeVisible()
+    await expect(powers(page).getByRole('rowheader')).toHaveText(['Authorization required', 'Authorization revocable', 'Clawback enabled', 'Change these settings'])
+
+    // The asset's identity, with no explorer link: mock ids never reach the network.
+    const card = main(page).getByRole('complementary', { name: 'Asset' })
+    await expect(fact(card, 'Code')).toHaveText('FUND')
+    await expect(card.getByRole('link')).toHaveCount(0)
   })
 
   test('headings run in order: one h1, then h2 and h3 with no level skipped', async ({ page }) => {
@@ -64,64 +68,84 @@ test.describe('Issuer on a build without a Testnet contract', () => {
     for (let i = 1; i < headings.length; i++) {
       expect(headings[i].level, `"${headings[i].text}" after "${headings[i - 1].text}"`).toBeLessThanOrEqual(headings[i - 1].level + 1)
     }
-    expect(headings.filter((h) => h.level === 2).map((h) => h.text)).toEqual([SENTENCE, 'What the console does on Testnet', 'What it reads', 'Who can sign'])
+    expect(headings.filter((h) => h.level === 2).map((h) => h.text)).toEqual(['Covered contract', 'What the issuer can do', 'Asset'])
   })
 
-  test('a guest sees the same page: nothing asks for a wallet that could not help, and no control is dead', async ({ page }) => {
+  test('the asset select switches every figure to that asset', async ({ page }) => {
+    await openApp(page, '/issuer')
+    const state = (power: string) => powers(page).getByRole('row').filter({ has: page.getByRole('rowheader', { name: power }) }).getByRole('cell').first()
+
+    await pickAsset(page, 'BOND')
+    await expect(fact(statement(page), 'Held')).toContainText('BOND')
+    await expect(state('Authorization required')).toHaveText('On')
+    await expect(state('Clawback enabled')).toHaveText('On')
+
+    await pickAsset(page, 'EQTY')
+    await expect(fact(statement(page), 'Reserved for open options')).toContainText('EQTY')
+    await expect(state('Clawback enabled')).toHaveText('Off')
+  })
+
+  test('the reserves follow the mock chain: a clawback leaves the contract short, and the page says by how much', async ({ page }) => {
+    await openApp(page, '/issuer')
+    await pickAsset(page, 'BOND')
+    await expect(statement(page).getByText('Short', { exact: true })).toHaveCount(0)
+    const held = await fact(statement(page), 'Held').innerText()
+    await clawBack(page, 'C_MOCK_BOND', 15n * 10n ** 7n)
+    // The page has no refresh of its own on mock data: the reads are invalidated the way a transaction would.
+    await page.evaluate(() => (window as unknown as { __stellsec: { queryClient: { invalidateQueries: () => Promise<void> } } }).__stellsec.queryClient.invalidateQueries())
+    await expect(fact(statement(page), 'Held')).not.toHaveText(held)
+    await expect(fact(statement(page), 'Short')).toHaveText(/^15\.00 BOND/)
+  })
+
+  test('nothing acts and nothing asks for a wallet that could not help, connected or not', async ({ page }) => {
     await openApp(page, '/issuer')
     // The shell offers the wallet; the page itself does not, because connecting changes nothing on mock data.
     await expect(connectButton(page)).toBeVisible()
     await expect(main(page).getByRole('button', { name: 'Connect wallet' })).toHaveCount(0)
-    await expect(page.getByText(GUEST_PROMPT)).toHaveCount(0)
 
-    // No console is drawn: no table of accounts, no action button, no field. Nothing in the page is disabled.
-    await expect(controls(page)).toHaveCount(0)
-    await expect(main(page).locator('table')).toHaveCount(0)
-    await expect(main(page).locator(':disabled, [aria-disabled="true"], [data-disabled]')).toHaveCount(0)
-    for (const name of ['Authorize', 'Freeze', 'Claw back']) {
-      await expect(page.getByRole('button', { name })).toHaveCount(0)
+    const noActions = async () => {
+      for (const name of [/^Authorize/, /^Freeze/, /^Claw back/, /^More actions/]) await expect(main(page).getByRole('button', { name })).toHaveCount(0)
+      await expect(main(page).getByRole('textbox')).toHaveCount(0)
+      await expect(main(page).getByRole('heading', { name: 'Accounts' })).toHaveCount(0)
+      await expect(main(page).locator(':disabled, [aria-disabled="true"]')).toHaveCount(0)
     }
-    // The old console printed "Mock" in place of every value. Nothing pretends to be a reading here.
-    await expect(main(page).getByText('Mock', { exact: true })).toHaveCount(0)
-  })
-
-  test('connecting a wallet changes nothing on the page', async ({ page }) => {
-    await openApp(page, '/issuer')
+    await noActions()
     const before = await main(page).innerText()
+
     await connect(page)
     await expect(walletButton(page)).toBeVisible()
-    await expect(main(page).getByRole('heading', { level: 2, name: SENTENCE, exact: true })).toBeVisible()
-    await expect(controls(page)).toHaveCount(0)
+    await noActions()
+    await expect(main(page).getByText(/^Read only\./)).toHaveCount(0)
     expect(await main(page).innerText()).toBe(before)
   })
 
   test('the two links lead on, with the keyboard too', async ({ page }) => {
     await openApp(page, '/issuer')
-    const links = main(page).getByRole('link')
-    await expect(links).toHaveText(['See what the contract holds', 'How an issuer action affects an option'])
+    const reserves = main(page).getByRole('link', { name: 'See what the contract holds' })
+    const learn = main(page).getByRole('link', { name: 'How an issuer action affects an option' })
+    await expect(reserves).toBeVisible()
+    await expect(learn).toBeVisible()
 
-    await links.nth(0).focus()
-    await expect(links.nth(0)).toBeFocused()
+    await reserves.focus()
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL((url) => url.pathname === '/reserves')
     await expect(pageHeading(page)).toHaveText('Reserves')
 
     await page.goBack()
     await expect(pageHeading(page)).toHaveText('Issuer')
-    // Tab moves from the first link to the second: they are the only stops inside the page.
-    await main(page).getByRole('link').nth(0).focus()
-    await page.keyboard.press('Tab')
-    await expect(main(page).getByRole('link').nth(1)).toBeFocused()
+    await main(page).getByRole('link', { name: 'How an issuer action affects an option' }).focus()
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL((url) => url.pathname === '/learn')
     expect(await currentPath(page)).toBe('/learn#risks')
   })
 
-  test('the wording keeps to the honest-claims rules and repeats no required sentence', async ({ page }) => {
+  test('the wording keeps to the honest-claims rules, carries no tagline and repeats no required sentence', async ({ page }) => {
     await openApp(page, '/issuer')
     const text = await main(page).innerText()
     expect(findBannedWords(text, BANNED_WORDS)).toEqual([])
+    expect(findBannedWords(text, BANNED_TAGLINES)).toEqual([])
     expect(text).not.toMatch(/[—→←!]/)
+    expect(text).not.toMatch(/fictional|experimental/i)
     // The issuer and shortfall disclosures have their own homes (ticket review, About tab, Reserves).
     expect(text).not.toContain(ISSUER_DISCLOSURE)
     expect(text).not.toContain(clawbackShortfallDisclosure('BOND').split(':')[1])
@@ -139,27 +163,14 @@ test.describe('Issuer on a build without a Testnet contract', () => {
 
     test('reads top to bottom with no sideways scroll, and its links are 44 px targets', async ({ page }) => {
       await openApp(page, '/issuer')
-      await expect(main(page).getByRole('heading', { level: 2, name: SENTENCE, exact: true })).toBeVisible()
+      await expect(main(page).getByText(SENTENCE, { exact: true })).toBeVisible()
       await expectNoHorizontalOverflow(page)
 
-      // The three actions stack: each name sits above its two answers, and every answer keeps its label.
-      const what = main(page).getByRole('region', { name: 'What the console does on Testnet' })
-      const boxes = await what.getByRole('listitem').evaluateAll((items) =>
-        items.map((item) => {
-          const name = item.querySelector('h3')!.getBoundingClientRect()
-          const cells = [...item.querySelectorAll('h3 ~ div')].map((cell) => cell.getBoundingClientRect())
-          return { nameBottom: name.bottom, cellTops: cells.map((c) => c.top), cellLefts: cells.map((c) => Math.round(c.left)), nameLeft: Math.round(name.left) }
-        }),
+      // The statement comes before the powers, the asset's facts last.
+      const tops = await Promise.all(
+        [statement(page), main(page).getByRole('heading', { name: 'What the issuer can do' }), main(page).getByRole('complementary', { name: 'Asset' })].map(async (l) => (await l.boundingBox())?.y ?? 0),
       )
-      expect(boxes).toHaveLength(3)
-      for (const box of boxes) {
-        expect(box.cellTops).toHaveLength(2)
-        expect(box.cellTops[0]).toBeGreaterThanOrEqual(box.nameBottom)
-        expect(box.cellTops[1]).toBeGreaterThan(box.cellTops[0])
-        expect(box.cellLefts).toEqual([box.nameLeft, box.nameLeft])
-      }
-      await expect(what.getByText('What the issuer signs', { exact: true })).toHaveCount(3)
-      for (const label of await what.getByText('What it means for options', { exact: true }).all()) await expect(label).toBeVisible()
+      expect([...tops].sort((a, b) => a - b)).toEqual(tops)
 
       for (const link of await main(page).getByRole('link').all()) {
         const box = await link.boundingBox()

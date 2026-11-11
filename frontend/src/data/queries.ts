@@ -20,6 +20,7 @@ import { readLatestLedger } from '../core/stellar/ledger'
 import type { LatestLedger } from '../core/stellar/ledger'
 import { balancesById, isMockToken } from '../core/stellar/tokens'
 import type { TokenBalance } from '../core/stellar/tokens'
+import { noteLedgerTime } from './clock'
 import { keys } from './keys'
 import { POLL_MS, STALE_MS, intervalOf } from './queryClient'
 import type { Cadence } from './queryClient'
@@ -221,7 +222,8 @@ export function useAsk(id: bigint | null | undefined, opts: ReadOptions = {}): U
 export function useLedger(opts: ReadOptions = {}): UseQueryResult<LatestLedger> {
   return useQuery({
     queryKey: keys.ledger(),
-    queryFn: () => readLatestLedger(),
+    // The close time also corrects the app's clock when the device is off (data/clock).
+    queryFn: () => readLatestLedger().then((l) => (noteLedgerTime(l.closeTime), l)),
     staleTime: STALE_MS.ledger,
     refetchInterval: opts.cadence === 'off' ? false : POLL_MS.ledger,
     enabled: (opts.enabled ?? true) && !isMockMode(),

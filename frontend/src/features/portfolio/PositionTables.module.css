@@ -1,8 +1,14 @@
 @layer features {
+  /* The list's own width decides between the table and the list, so a tablet or a half-width window gets the list. */
+  .root {
+    container-type: inline-size;
+    min-width: 0;
+  }
+
   .desktop {
     min-width: 0;
 
-    @media (max-width: 767.98px) {
+    @container (max-width: 51.99rem) {
       display: none;
     }
   }
@@ -14,20 +20,34 @@
     list-style: none;
     border-top: 1px solid var(--rule);
 
-    @media (max-width: 767.98px) {
+    @container (max-width: 51.99rem) {
       display: block;
     }
   }
 
-  /* Fixed columns: below this width the table scrolls inside its wrap instead of squeezing its figures. */
+  /* Fixed columns: below this width the list replaces the table. */
   .table {
-    min-width: 62rem;
+    min-width: 52rem;
+  }
+
+  .row {
+    cursor: pointer;
+
+    &[data-closed] {
+      color: var(--muted);
+    }
   }
 
   .option {
     display: inline-flex;
     align-items: center;
     gap: var(--s-8);
+  }
+
+  .optionLink {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
   }
 
   .stack {
@@ -38,11 +58,34 @@
     vertical-align: middle;
   }
 
+  .stackEnd {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    vertical-align: middle;
+  }
+
   .sub {
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     font-weight: 400;
     color: var(--muted);
+    white-space: normal;
+  }
+
+  /* News about the row since the last visit: in ink, so it is read before the rest of the cell. */
+  .news {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .short {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--warn);
   }
 
   /* A sentence in a cell may take two lines; figures never wrap. */
@@ -58,7 +101,9 @@
 
   .actions {
     display: inline-flex;
-    gap: var(--s-8);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-4);
   }
 
   .phoneItem {
@@ -67,16 +112,26 @@
     &:last-child {
       border-bottom-color: var(--rule);
     }
+
+    &[data-closed] {
+      color: var(--muted);
+    }
   }
 
   .phoneRow {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: var(--s-4);
+    gap: var(--s-2);
     min-height: var(--touch);
     padding-block: var(--s-12);
-    color: var(--text);
+    padding-right: var(--s-24);
+    color: inherit;
     text-decoration: none;
+
+    &[data-plain] {
+      padding-right: 0;
+    }
 
     &:not([data-plain]) {
       @media (hover: hover) {
@@ -86,6 +141,15 @@
         }
       }
     }
+  }
+
+  /* The row opens the position: the chevron says so on a touch screen, where there is no hover. */
+  .chevron {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    translate: 0 -50%;
+    color: var(--muted);
   }
 
   .phoneLine {
@@ -115,11 +179,19 @@
     text-wrap: pretty;
   }
 
+  .phoneMeta {
+    min-width: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--muted);
+  }
+
   .phoneWhen {
     flex: none;
     font-size: var(--ui-size);
     line-height: var(--ui-line);
-    font-weight: 500;
+    font-weight: 600;
     font-variant-numeric: tabular-nums lining-nums;
     white-space: nowrap;
     color: var(--text);

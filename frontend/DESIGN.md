@@ -12,14 +12,17 @@ replaces `STYLE.md`. Every change under `frontend/` is checked against it. The l
    step plus a hairline. Only what floats (popover, dialog) casts a shadow.
 3. **Figures have rank.** Titles and key figures are serif; the interface is sans; ids are mono. Dense tables stay
    sans, except the strike column.
-4. **One loud thing.** The highlighter marks the user's own terms and nothing else. Everything around it is quiet.
+4. **One loud thing.** The highlighter marks one figure per surface: a term the user set (their floor, their price)
+   or, on the term sheet of their own order or position, the breakeven. Everything around it is quiet.
 5. **Never colour alone.** Every colour-coded meaning also has a word, a sign or a glyph.
 6. **Motion answers an action.** Ink settles; numbers never roll. Nothing moves by itself to get attention.
 
 ## 2. Tokens
 
 Semantic CSS variables in `src/ui/tokens/tokens.css`, the only file where raw colours and theme selectors may appear.
-Cascade layers: `tokens, base, ui, features`. Components are in `@layer ui`, feature CSS in `@layer features`.
+Cascade layers: `tokens, base, ui, features`. Components are in `@layer ui`, feature CSS in `@layer features`. The
+order is declared inline in `index.html` before any stylesheet (and again at the top of `src/ui/index.css`): the
+build splits CSS into chunks, and whichever chunk loaded first would otherwise fix the order.
 
 | Token | Paper | Carbon | Use |
 |---|---|---|---|
@@ -28,8 +31,9 @@ Cascade layers: `tokens, base, ui, features`. Components are in `@layer ui`, fea
 | `--text` / `--text-2` / `--muted` | `#1a1915` `#46433c` `#68645b` | `#efece4` `#bdb8ac` `#948f84` | ink; secondary; labels and captions |
 | `--accent` / `--accent-tint` | `#2442b8` `#e4e9fa` | `#93a6ff` `#1f2540` | links, focus, selection; selected row |
 | `--primary` / `--primary-fg` | `#1a1915` `#fbfaf6` | `#efece4` `#121210` | the one primary button |
-| `--marker` (+ `--marker-rule`) | `#ffe98a` | `#4a4121` + `#e8c547` underline | highlighter |
-| `--gain` / `--loss` | `#00707a` `#b5451b` | `#4cc3d0` `#f0884f` | always with sign and triangle |
+| `--marker` | `#ffe98a` | `#52471e` | highlighter: one stroke of wash in both themes (`--marker-rule` is transparent) |
+| `--gain` / `--loss` | `#00707a` `#b5451b` | `#4cc3d0` `#f0884f` | always with a sign; a word where it sits in a sentence |
+| `--cell-tone` | ink at 7 % | ink at 7 % | the strike column and in-the-money cells: moves away from the page in both themes |
 | `--warn` / `--danger` (+ tints) | `#855600` `#a3341a` | `#e8b45a` `#ff8f70` | action needed; errors and destructive actions |
 
 - **Contrast gate.** `src/ui/tokens/contrast.test.ts` parses tokens.css and requires text, text-2, muted, accent,
@@ -37,14 +41,16 @@ Cascade layers: `tokens, base, ui, features`. Components are in `@layer ui`, fea
   marker and the tints; in both themes and all three gain and loss schemes. Muted text never sits on the marker.
 - **Recorded adjustments.** The brief's values all pass untouched. The "classic" scheme did not: green `#1a7f37`
   and red `#c0392b` fell under 4.5:1 on `--sunken` and had no Carbon pair. They are now `#177832` / `#bb3526`
-  on Paper and `#4ac26b` / `#ff7b72` on Carbon. Phones keep 44 px rows even in compact density.
+  on Paper and `#4ac26b` / `#ff7b72` on Carbon. Phones and every touch screen keep 44 px rows, compact tables included.
 - **Space** (px): 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56, 72 as `--s-N`. Layout rhythm on 8.
 - **Shape**: 0 tables, 2 px tags, 3 px controls, 4 px cards and dialogs. Nothing pill-shaped except the switch.
 - **Motion**: hover 120 ms, changed figure 160 ms, popover 180 ms, dialog and drawer 240 ms, note prints 360 ms.
   Enter `cubic-bezier(0.2, 0, 0, 1)`, exit `cubic-bezier(0.3, 0, 1, 1)`. With reduced motion nothing travels.
 - **Breakpoints**: 768 px and 1200 px. Container queries inside components.
-- **Settings** are attributes on `<html>`: `data-theme` (absent means system), `data-density="compact"`,
-  `data-pnl="classic" | "mono"`. `applyTheme`, `applyDensity`, `applyPnlScheme` set them; the data layer stores them.
+- **Settings** are attributes on `<html>`: `data-theme` (absent means system) and `data-pnl="classic" | "mono"`.
+  `applyTheme` and `applyPnlScheme` set them; the data layer stores them, and `index.html` applies them before the
+  first paint. Density is not a setting: a dense table says so itself (`Table density="compact"`, the chain and
+  Margin's desk tables); `/design` can preview the whole page compact.
 - In component CSS: tokens only. No raw colour, no `light-dark()`, no `[data-theme]`, no px except 1 px and 2 px
   rules. State and variants are `data-*` attributes, not class names. The same test enforces this in `src/ui`.
 
@@ -63,7 +69,8 @@ Cascade layers: `tokens, base, ui, features`. Components are in `@layer ui`, fea
 
 - Tabular lining figures everywhere (set on `body`). Right-align numeric columns; fixed decimals per asset.
 - The unit appears once: in the column header or as a suffix, never both. The true minus sign `−`.
-- Sentence case everywhere. No uppercase or tracked labels. Lines of prose stay under about 68 characters.
+- Sentence case everywhere. No uppercase or tracked labels. Lines of prose stay under about 70 characters:
+  `--measure` is 32rem (a `ch` is the wide tabular zero, so 68ch ran to about 100 characters).
 - Fonts are self-hosted through Fontsource. No font link to a third party.
 
 ## 4. Components and when to use each
@@ -74,49 +81,55 @@ Import from `src/ui` only. `@base-ui/react` and `@phosphor-icons/react` are impo
 |---|---|---|
 | The one main action of a view | `Button variant="primary"` (ink) | two primary buttons; a gradient |
 | Other actions | `secondary` (outline), `quiet`, `danger` (destructive); `size="sm"` in rows | icon-only where a word fits |
-| A disabled action | `disabled` + `disabledReason` (tooltip, read out, still focusable) | a dead button with no reason |
-| Navigation that looks like a button | `ButtonLink`, `Link` (`external` says "opens in a new tab") | `Button` with `onClick` to navigate |
-| An amount to type | `AmountField`: decimal strings, `inputmode=decimal`, unit suffix, Max, 16 px | `type="number"`, a float, a library number field |
-| A short known list / a long list | `Select` / `Combobox` | rows of chips |
+| A disabled action | `disabled` + `disabledReason` (read out, still focusable; shown under the button on hover, focus and on a tap on touch screens) | a dead button with no reason |
+| Navigation that looks like a button | `ButtonLink`, `Link` (`external` says "opens in a new tab"; `standalone` for a link on its own line, 44 px on touch) | `Button` with `onClick` to navigate |
+| An amount to type | `AmountField`: decimal strings, `inputmode=decimal`, unit suffix, Max, 16 px; a comma groups thousands ("1,000"), an exponent is refused | `type="number"`, a float, a library number field |
+| A short known list / a long list | `Select` / `Combobox` | rows of chips (one exception: strike and deadline in the guided note, `ChoiceChips`, where each choice shows whether it is funded) |
 | A few options with a sentence each | `RadioGroup` | |
 | Modes of one view (Guided or Chain, Put or Call, a deadline) | `Segmented`: a real radio group, one tab stop, arrow keys | tabs |
 | Panels inside a page | `Tabs` + `TabPanel` | links styled as tabs |
 | Links between sub-pages | `NavTabs` + `NavTab` (`aria-current="page"`) | `Tabs` |
 | An immediate setting | `Switch` | a checkbox |
-| Consent before signing | `Checkbox` carrying the full sentence; it gates the action | a pre-ticked box |
+| Consent where the product asks for it (the Margin entry warning; exercising an option out of the money) | `Checkbox` carrying the full sentence; it gates the action. An order review has none: the wallet signature is the consent | a pre-ticked box; a tick box on every order |
 | An assumed price in a hypothetical figure | `Slider` with `valueText` | a slider bound to a signed amount |
 | A label for an icon | `Tooltip` (never essential: touch has none) | `title` attributes, anywhere |
 | An explanation or an exact value on request | `Popover` | a tooltip |
+| A term of the trade where it is met (Premium, Collateral, Breakeven, Deadline) | `Term`: the word is the button, a press opens its one glossary sentence | a caption that defines its label |
 | Saying what a control does, on request, at the control | `Coachmark` (through the welcome guide, `features/tour`) | a tooltip; a tour library; a dimmed page |
 | The first-visit welcome | `GuideSlip`: one, on Markets, a plain ruled block in the page flow | a dialog, a banner, a toast, an illustration |
 | Actions on one object, settings | `Menu` | a select |
-| A decision that interrupts | `Dialog` (one per flow, never stacked) | nested dialogs |
+| A decision that interrupts | `Dialog` (one per flow, never stacked; a bottom sheet on phones) | nested dialogs |
 | The ticket from 768 to 1199 px | `Drawer` (right, 420 px) | |
 | A short confirmation on phones | `Sheet` | a sheet for a flow with inputs: that is a page |
-| A message set apart | `Callout` info, warning or danger: icon plus word; `alert` only for a true alert | tinted reassurance panels |
-| A lifecycle state | `Tag`, with the contract's own state name | any other tag, pill, "New", "Beta", "Verified" |
-| A count | `Badge` | a status dot |
-| Rows of things | `TableWrap` + `Table`: native, ruled, sticky header, pinned action column | grids of cards; div tables |
-| Terms and summaries | `KeyValue` + `KeyValueItem` (`dl > div > dt + dd`) | ad hoc two-column divs |
+| A message set apart | `Callout` info, warning or danger: the icon plus at most one heading line; the variant word is read out, not shown; `alert` only for a true alert | a category word beside a title; tinted reassurance panels |
+| A lifecycle state | `Tag`, with the contract's own state name: one shape, two tones (open and live in ink, done and ended muted) | any other tag, pill, "New", "Beta", "Verified"; fills, dashes |
+| A count | `Badge`: solid for the one count that asks for action (Portfolio in the navigation); `quiet`, a plain muted numeral after a tab label | a box around every count; a status dot |
+| Rows of things | `TableWrap` + `Table`: native, ruled, a header that sticks to the page, pinned action column | grids of cards; div tables |
+| Terms and summaries | `KeyValue` + `KeyValueItem` (`dl > div > dt + dd`). A `hint` holds only a required sentence, a second figure of the same quantity (per unit against total, local time, time left) or where the money sits; never a definition of its label or a description of the page | ad hoc two-column divs; a grey line under every value |
 | A key figure | `Stat` (real, exact figures; four at most in a row) | vanity counters |
 | One discrete object | `Card` (no shadow, never nested) | a card around a table |
-| An option, an offer, a bid, a receipt | `ContractNote` | |
-| Any empty state | `EmptyNote`: one serif sentence, at most one action | an illustration, a blank screen |
-| The user's own figure | `Marker` (`band` at display sizes) | emphasis, promotion, state |
-| An amount on screen | `Amount`: exact value in a popover on focus or press; `direction` adds sign, triangle, word | rounding up; `title` |
+| An option, an offer, a request, a receipt (a number in the contract) | `ContractNote`, one per screen | the slip on a form or an example |
+| A form or an example on a card | `ContractNote plain`: no perforation, no serial line | |
+| Any empty state | `EmptyNote`: one serif sentence, at most one short line and one action, no frame. `slip` only where the missing thing is itself a contract note (Portfolio with no positions or no wallet, an unknown position number) | an illustration, a blank screen, blank form lines |
+| The user's own figure | `Marker`, one per surface | a headline word, a price somebody else set, an example, emphasis, promotion, state |
+| An amount on screen | `Amount`: exact value in a popover on press; `direction` adds the sign, the colour and the spoken word | rounding up; `title`; triangles |
 | An address / a transaction | `Address` (4+4 in tables, 6+6 on decisions, full where checked) / `TxLink` | "Verified" marks |
-| A deadline | `DateTime` (UTC canonical in `<time>`, local time secondary) and `Countdown` (ledger time) | local time alone; relative time alone |
-| Transaction progress | `TxStepper` with the nine states | a spinner with no words |
-| Who acts and by when | `Timeline` | numbered marketing steps |
+| A deadline | `DateTime` (UTC canonical in `<time>`, local time secondary) and `Countdown` (ledger time through `ClockProvider`; `2 d 4 h`, `3 h`, `12 min`, `<1 min`) | local time alone; relative time alone |
+| Transaction progress | `TxStepper` with the nine states (the action button carries the only spinner) | a spinner with no words |
+| An earlier transaction of the wallet whose outcome is unknown | `UnsettledNotice` above the review, with "Check again"; the action waits, with the sentence of `useUnsettledTx` as its reason | letting the press meet the refusal |
+| What happens and by when | `Timeline`: each title says who acts (`actor` is deprecated) | numbered marketing steps; an eyebrow split by a pipe |
+| A transaction's state in a list | `TxStateWord`: glyph and word | a bare phase word |
 | First load of a view | `Skeleton` (hidden from assistive technology; container `aria-busy`) | skeletons on refresh |
 | Screen-reader announcements | `announce()` through `LiveRegions`; `toast()` only to repeat what is recorded elsewhere | `role="status"` or `role="alert"` in features |
 
 **Signature pieces.** `ContractNote`: perforated left edge, mono serial line (`No. 000184 · L 58,331,204`: the id
-and the ledger it was read at), payoff glyph plus kind in serif, ruled terms with the key term under the marker,
-the state tag, a footer for proof and actions; it "prints" on a confirmed trade. `Glyph`: long call, long put, short
-call, short put (a short is the long mirrored), always next to the word; plus fund, bond, equity, quote, reserve,
-margin, issuer, expiry. `Mark`: the Counterpart mark, a sheet cut in two along the payoff line, in two-ink, hollow
-and display cuts. `Wordmark`: "StellSec" in Source Serif 4 at 620, −0.012 em, set as text.
+and the ledger), payoff glyph plus kind in serif, ruled terms with at most one term under the marker, the state
+tag, a footer for proof and actions; it "prints" on a confirmed trade. The slip dress is for a contract object with
+a number in the contract (an offer, a position, a request, a receipt), one per screen. `Glyph`: long call, long
+put, short call, short put (a short is the long mirrored), always next to a kind or an intent name, never before a
+sentence; plus quote, reserve, margin, issuer and the deadline (`expiry`). Assets carry no glyph: their code and
+type are words. `Mark`: the Counterpart mark, a sheet cut in two along the payoff line, in two-ink, hollow and
+display cuts. `Wordmark`: "StellSec" in Source Serif 4 at 620, −0.012 em, set as text.
 
 **Icons.** Phosphor through `src/ui` only, under domain names. Regular at 16 px, Light at 20 px. Icons sit in
 navigation and where they replace a word in a tight row. Status icons always sit next to their word.
@@ -125,9 +138,24 @@ navigation and where they replace a word in a tight row. Status icons always sit
 
 - Buttons name the contract action: `Buy`, `Write put`, `Exercise`, `Claim delivery`, `Reclaim`, `Cancel offer`,
   `Connect wallet`. An action keeps its name through the flow. Confirmations are two or three words.
-- One word per thing: offer, request (bid in the book), maker (writer in a position), holder, premium, strike,
-  deadline (expiry in the chain), collateral, reserves, exercise, claim delivery, reclaim, resale listing.
+- One word per thing, everywhere a user reads it, chain mode included. Code identifiers and contract function
+  names are not renamed.
+  - **request**, never "bid": the side of the book is "Requests", the buttons "Post a request" and "Fill
+    request"; an empty chain cell asks "Ask for a price". The Learn entry for Request says once that the contract
+    calls it a bid.
+  - **deadline** for the instant, never "expiry" as a noun ("Nearest deadline", "Deadline (UTC)"); the state name
+    "Expired" and the verb "expires" stay. The Learn entry may say once that it is also called the expiry.
+  - **maker** for whoever wrote the option and for whoever fills a request; never "writer" or "counterparty" as
+    a noun in Covered. Rows are labelled by role with the address alone as the value: Maker, Buyer, Seller.
+    **seller** means only a holder reselling. The verbs write, wrote, written and the tab "Written" stay. Margin
+    keeps "writer": it is its contract's own term (Learn has one Writer entry, as Margin's term).
+  - the instrument's own terms: put, call, strike, premium, holder, collateral, reserves, exercise, claim
+    delivery, reclaim, resale listing.
+  - **clawback shortfall** (not "collateral shortfall"); **Covered contract** (not "options contract");
+    **declined** for a refusal in the wallet (not "rejected"). Page names keep their capital: "Go to Markets".
   "Covered" and "Margin" name the two regimes and stay visually and structurally separate.
+- A reference price always carries its two-word source label ("Demo price 99.40"); the sentence that explains the
+  label appears once, in the asset header ("Demo price. A fixed figure chosen by the team.").
 - Never: "guaranteed", "insured", "safe", "secure", "fully backed", "risk-free", "protected" as a promise;
   "insurance", "yield", "APY", "earn interest"; "Verified"; "seamless", "unlock", "empower", "trustless".
   Margin is never called fully collateralized. No reassurance copy: no sentence ends by comforting the reader.
@@ -139,7 +167,10 @@ navigation and where they replace a word in a tight row. Status icons always sit
   charged. No contract enum names, except in Margin refusals where the code helps (`LiquidateFirst (224)`).
 - Amounts are exact integers from chain to screen, truncated, grouped, with fixed decimals; `+` for gains and `−`
   for losses. Time is `13 Nov 2026, 08:00 UTC`, local time secondary, countdown `2 d 4 h`.
-- Empty states are one line and at most one action. Proof is a truncated id with copy and an explorer link.
+- Empty states are one sentence, at most one short line and one action. Proof is a shortened id with an explorer
+  link; an id printed in full also has a copy button.
+- A disclosure is stated once per page, at the step or decision it belongs to. A line that exists to sound careful,
+  impressive or reassuring is deleted, not reworded. Prefer deletion to rewording.
 
 ### No disclaimer taglines
 
@@ -152,14 +183,15 @@ explained in sentences where they matter to a decision (the ticket review, the a
 
 | Sentence | Home |
 |---|---|
-| The legal notice (`LEGAL_NOTICE`, after `COPYRIGHT_NOTICE`) | App footer, every route |
-| `The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.` | Ticket review (buy, fill, resale buy); asset About tab |
+| The legal notice of the build, `legalNotice(isMock)` (`LEGAL_NOTICE` on a contract build, `LEGAL_NOTICE_MOCK` on mock data), after `COPYRIGHT_NOTICE`; one paragraph | Footer of every route, the landing included |
+| `The issuer controls this asset and can freeze or claw it back, which can block settlement. Collateral does not cover that.` | Ticket review of every mode except list (buy, write, request, fill, resale buy), as a plain paragraph; asset About tab |
 | `Paid to the maker now. Not refundable.` (resale: `Set by the seller. Paid to the seller now.`) | Next to the premium in the buy review |
-| `Hypothetical payoff at expiry. Not a quote.` | Caption of every payoff figure |
+| `PAYOFF_CAPTION`: `Hypothetical payoff at the deadline. Not a quote.` | Caption of a payoff figure; a row of several figures carries it once, under the row |
 | `Clawback shortfall on X: payouts are first come, first served until the balance runs out, with no refund, and new trades are refused.` | Reserves, and any ticket for that token |
-| `You escrow X now; refunded if you cancel or it expires.` | Bid ticket |
+| `bidEscrowDisclosure(X)` | Request ticket |
 | `Set the wallet to Testnet. StellSec never asks for your secret key or recovery phrase.` | Connect dialog |
-| Margin banner (`marginBanner`), warning bullets and collateral cards | Margin screens |
+| The Margin sentences (`marginBanner`: partial margin and the publisher's prices; on a fixture build the simulation sentence) | One plain paragraph under the title of every Margin screen, loading and error states included |
+| The Margin entry warning (`MARGIN_WARNING_*`) | A dialog before Margin opens on a contract build, once per tab |
 
 The landing "Limits" section and the asset "Risks" block may restate limits in their own words. The gallery does
 not reuse these sentences as specimens.
@@ -173,14 +205,17 @@ not reuse these sentences as specimens.
 - Two permanent live regions, mounted once by the shell (`LiveRegions`). Nothing else uses `role="status"` or
   `role="alert"`, except a `Callout` with `alert`.
 - Targets are 44 px on touch screens. Inputs are 16 px on phones. Horizontal scroll stays inside `.ui-table-wrap`.
-- The exact value of a figure, and every explanation, is reachable by focus or press. Nothing lives in `title`.
+- The exact value of a figure, and every explanation, is one press away (click, tap, Enter or Space); focus alone
+  opens nothing, so Tab never stops inside a popup. Nothing lives in `title`.
 - Reduced motion, forced colours and more-contrast preferences are honoured in `base.css` and `tokens.css`.
 - Structural contracts kept for tests: `.ui-table-wrap`, `dl > div > dt + dd`, `footer.shell-footer`,
   `figure > figcaption` with `data-testid="payoff-chart"`.
 
 ## 7. Banned
 
-Gradients, glows and blurs. Purple anywhere. Shadows in the page. Pills (except the switch). Status dots.
+Gradients, glows and blurs. Purple anywhere. Shadows in the page. Pills (except the switch). Status dots. A dashed
+border on any box: a dashed line is a line in a drawing only (the "Without" line of a chart, the reference-price
+rule of the chain). Triangles beside gain and loss figures. Category words ("Note", "Notice") beside a heading.
 Uppercase tracked labels and eyebrows. Hero panels inside the app. Stat cards for vanity numbers. Decorative
 illustration, 3D, photos, video. Icons inside headings. Middle-dot meta strings where columns would do (the
 serial line of a contract note is the one exception). Tags other than contract states. `title` attributes.

@@ -8,8 +8,8 @@ export { WithWithoutChart } from './WithWithoutChart.tsx'
 export type { WithWithoutChartProps, WithWithoutReadoutState } from './WithWithoutChart.tsx'
 export type { WithWithoutPoint } from './withWithoutLayout.ts'
 
-export { OutcomeCards, ScenarioBar } from './OutcomeCards.tsx'
-export type { Outcome, OutcomeCardsProps, ScenarioBarProps } from './OutcomeCards.tsx'
+export { OutcomeCards } from './OutcomeCards.tsx'
+export type { Outcome, OutcomeCardsProps } from './OutcomeCards.tsx'
 
 export { HealthBar } from './HealthBar.tsx'
 export type { HealthBarProps } from './HealthBar.tsx'

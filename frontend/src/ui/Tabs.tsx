@@ -85,8 +85,8 @@ export interface NavTabsProps {
 /** Links between pages or sub-pages, styled like tabs. They are links: Tab moves through them, Enter follows. */
 export function NavTabs({ label, children, className }: NavTabsProps) {
   return (
-    <nav className={cx(styles.root, className)} aria-label={label}>
-      <ul className={styles.list} role="list">
+    <nav className={cx(styles.root, styles.navRoot, className)} aria-label={label}>
+      <ul className={cx(styles.list, styles.navList)} role="list">
         {children}
       </ul>
     </nav>

@@ -86,7 +86,7 @@ describe('spoken', () => {
   it('reads a body as it is and a list of terms as sentences', () => {
     expect(spoken(byId(desktop, 'assets'))).toBe(byId(desktop, 'assets').body)
     expect(spoken(byId(desktop, 'nav'))).toBe(
-      'Portfolio: Your options, each with its deadline and what it needs from you. Requests: Buyers whose payment is locked in, waiting for a seller. Reserves: The collateral the contract holds, token by token.',
+      'Portfolio: Your options, each with its deadline and what it needs from you. Requests: Buyers whose payment is locked in, waiting for a maker. Reserves: The collateral the contract holds, token by token.',
     )
     expect(spoken(byId(phone, 'nav'))).toMatch(/ More: Learn, Activity, Settings and this guide\.$/)
   })

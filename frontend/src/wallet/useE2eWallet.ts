@@ -19,13 +19,14 @@ export function useE2eWallet(): WalletState {
   const disconnect = useCallback(() => setAddress(null), [])
   const sign = useCallback(async (xdr: string) => xdr, [])
   const signAuth = useCallback(async (entryXdr: string) => entryXdr, [])
+  const recheckNetwork = useCallback(async () => {}, [])
 
   return {
     address,
     walletName: address ? 'Test wallet' : null,
     wrongNetwork: false,
     networkMessage: null,
-    error: null,
+    recheckNetwork,
     connect,
     disconnect,
     sign,

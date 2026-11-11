@@ -2,19 +2,25 @@
 // concatenated from fragments). Facts come from PRODUCT_SPEC.md, README.md, AGENTS.md and src/core only.
 //
 // Voice: a clearing desk. Numbers before adjectives; "can" for rights, "is locked" for facts, "must" for
-// deadlines; the contract's own verbs. The required disclosure sentences of core/disclosures are not retyped
-// here: each has its one home elsewhere, and this page restates limits in its own words (brief D16).
+// deadlines; the contract's own verbs. One word per thing: request, deadline, maker (Margin keeps "writer", its
+// contract's own term). The required disclosure sentences of core/disclosures are not retyped here: each has its
+// one home elsewhere, and this page restates limits in its own words (brief D16).
 // content.test.ts checks every string below against the banned wording.
 
-import { NBSP } from '../../core/format'
+import { CONTRACT_TEST_TOTAL, RECORDED_PUT_FEES } from '../../core/deployments'
+import { NBSP, formatExact } from '../../core/format'
+import { GLOSSARY as CORE_GLOSSARY } from '../../core/glossary'
 import type { GuidedIntent } from '../../core/payoff/strategies'
 import { FAUCET_PRICE } from '../../core/reference'
 import type { Scenario, WorkedExample } from './examples'
 
+/** A recorded network fee in XLM, every stroop shown: `0.0309366`. */
+const xlm = (stroops: bigint): string => formatExact(stroops, 7, { minDp: 7, group: false })
+
 // ---------------------------------------------------------------------------------------------- page
 
-export const PAGE_TITLE = 'How it works'
-export const PAGE_DESCRIPTION = 'What an option is here, who acts and by when, what it costs and what can go wrong.'
+/** The page's one name: the route title, the h1, the navigation and the footer all say it. */
+export const PAGE_TITLE = 'Learn'
 
 export const NAV_LABEL = 'On this page'
 
@@ -44,8 +50,8 @@ export const SECTIONS: readonly SectionInfo[] = [
 /** Three sentences, no more. */
 export const WHAT_THIS_IS: readonly [string, string, string] = [
   'StellSec is a venue for options on tokenized assets, on Stellar Testnet: a put is the right to sell a set quantity of an asset at a set price until a deadline, and a call is the right to buy it.',
-  'The seller, called the maker, locks the whole collateral in the contract before anyone can buy: the full strike for a put, the full quantity of the asset for a call.',
-  'The buyer pays a premium once and can exercise at any time before the deadline; exercise swaps the tokens against the strike in one transaction, and nothing settles by itself.',
+  'The maker, who writes and sells the option, locks the whole collateral in the contract before anyone can buy: the full strike for a put, the full quantity of the asset for a call.',
+  'The buyer pays a premium once and can exercise at any time before the deadline; exercise swaps the tokens against the strike in one transaction.',
 ]
 
 export const RULES_TITLE = 'The rules in brief'
@@ -64,10 +70,8 @@ export const RULES: readonly RuleRow[] = [
   { rule: 'Collateral', text: 'The whole obligation, locked in the contract before the sale.' },
   { rule: 'Premium', text: 'Paid once, by the buyer to the maker, at purchase. Never refunded.' },
   { rule: 'Lots', text: 'One offer, one position. No partial fill and no partial exercise.' },
-  { rule: 'Amounts', text: 'Exact integers with 7 decimals. The contract stores totals, not prices per unit.' },
   { rule: 'Longest term', text: '2 years from the day the offer is written.' },
-  { rule: 'Open at once', text: '500 offers and 500 requests per asset; 50 offers per maker and 50 requests per buyer.' },
-  { rule: 'Who can take part', text: 'Any account the issuer of the asset allows to hold it. The contract checks this; it does not decide it.' },
+  { rule: 'Who can take part', text: 'Any account the issuer of the asset allows to hold it.' },
   { rule: 'Control', text: 'No admin, no price feed and no upgrade path.' },
 ]
 
@@ -76,13 +80,11 @@ export const RULES: readonly RuleRow[] = [
 export const LIFECYCLE_TIMELINE_LABEL = 'The life of one put, step by step'
 
 export const lifecycleIntro = (x: WorkedExample): string =>
-  `Follow one put on ${x.qtyText}: a strike of ${x.strikePerUnitText}${NBSP}${x.quoteCode} per ${x.assetCode}, ${x.strikeTotalText} in all, for a premium of ${x.premiumText}. It has just been bought, so the first two steps are behind it.`
+  `Follow one put on ${x.qtyText}: a strike of ${x.strikePerUnitText}${NBSP}${x.quoteCode} per ${x.assetCode}, ${x.strikeTotalText} in all, for a premium of ${x.premiumText}.`
 
 export interface LifecycleStep {
-  /** By when. */
+  /** By when. The title says who acts. */
   when: string
-  /** Who acts. */
-  who: string
   title: string
   text: string
   /** The contract state the option is in after the step, when the step changes it. */
@@ -93,21 +95,18 @@ export interface LifecycleStep {
 export const lifecycleSpine = (x: WorkedExample, deadline: string): LifecycleStep[] => [
   {
     when: 'Before the sale',
-    who: 'The maker acts',
     title: 'The maker locks the collateral and posts an offer',
     text: `${x.collateralText}, the whole strike, moves from the maker into the contract. The offer states every term: a put on ${x.qtyText} at ${x.strikePerUnitText}${NBSP}${x.quoteCode} each, a premium of ${x.premiumText}, a deadline of ${deadline}. While nobody has bought it, the maker can cancel it and take the collateral back.`,
     state: 'Offered',
   },
   {
     when: 'Any time before the deadline',
-    who: 'The buyer acts',
     title: 'A buyer pays the premium and becomes the holder',
     text: `${x.premiumText} goes from the buyer to the maker. It is paid once and is never refunded. From here nobody can cancel the option: the right belongs to the holder.`,
     state: 'Active',
   },
   {
     when: `Until ${deadline}`,
-    who: 'The holder decides',
     title: 'The holder can exercise',
     text: 'At any time before the deadline the holder can use the right, for the whole quantity or not at all. The contract reads no price and takes no decision: whether and when to exercise is up to the holder.',
   },
@@ -117,7 +116,7 @@ export const LIFECYCLE_FORK_INTRO = 'Then one of two things happens.'
 
 export interface LifecycleBranch {
   id: 'exercised' | 'expired'
-  title: string
+  /** Accessible name of the branch's list. Its first step names the branch on screen. */
   label: string
   steps: LifecycleStep[]
 }
@@ -125,19 +124,16 @@ export interface LifecycleBranch {
 export const lifecycleBranches = (x: WorkedExample): LifecycleBranch[] => [
   {
     id: 'exercised',
-    title: 'The holder exercises',
     label: 'If the holder exercises, step by step',
     steps: [
       {
         when: 'Before the deadline',
-        who: 'The holder acts',
-        title: 'Tokens against the strike, in one transaction',
+        title: 'The holder exercises',
         text: `The holder delivers ${x.qtyText} into the contract and receives the ${x.strikeTotalText} that were locked. Exercise is physical: the asset itself changes hands. If any part fails, nothing moves.`,
         state: 'Exercised',
       },
       {
         when: 'Any time after the exercise',
-        who: 'The maker acts',
         title: 'The maker claims what was delivered',
         text: `The ${x.qtyText} wait in the contract until the maker claims them. The premium stays with the maker.`,
         state: 'Settled',
@@ -146,18 +142,15 @@ export const lifecycleBranches = (x: WorkedExample): LifecycleBranch[] => [
   },
   {
     id: 'expired',
-    title: 'The deadline passes',
     label: 'If the deadline passes without an exercise, step by step',
     steps: [
       {
         when: 'At the deadline',
-        who: 'Nobody acts',
-        title: 'The option can no longer be exercised',
+        title: 'The deadline passes',
         text: `An option that was not exercised in time ends there, whatever ${x.assetCode} is worth. The holder has spent the ${x.premiumText}.`,
       },
       {
         when: 'Any time after the deadline',
-        who: 'The maker acts',
         title: 'The maker reclaims the collateral',
         text: `The ${x.collateralText} return to the maker. The premium stays with the maker.`,
         state: 'Expired',
@@ -169,11 +162,10 @@ export const lifecycleBranches = (x: WorkedExample): LifecycleBranch[] => [
 export const STATE_AFTER = 'State after'
 
 export const NOTHING_SETTLES_TITLE = 'Nothing settles by itself'
-export const NOTHING_SETTLES_LABEL = 'Deadline'
 export const NOTHING_SETTLES_TEXT =
   'Every step above is a transaction that somebody signs. An option that is not exercised before its deadline expires, even when exercising would have paid. Tokens that a maker has not claimed or reclaimed stay in the contract until the maker acts.'
 
-export const SIDES_TITLE = 'A call is the mirror of a put'
+export const SIDES_TITLE = 'Put and call, side by side'
 export const SIDES_CAPTION = 'What each side locks, pays and receives for a put and for a call'
 export const SIDES_HEAD = { row: 'At each step', put: 'Put', call: 'Call' } as const
 
@@ -195,10 +187,7 @@ export const SIDES: readonly SidesRow[] = [
 // ---------------------------------------------------------------------------------------------- 3. four intents
 
 export const intentsIntro = (x: WorkedExample, deadline: string): string =>
-  `Each one is a single option, seen from your side. The four examples share one fictional lot: ${x.qtyText}, with ${x.assetCode} at ${x.startText}${NBSP}${x.quoteCode} when you start and a deadline of ${deadline}. The premiums are examples, not offers.`
-
-export const EXAMPLE_SERIAL_LABEL = 'Example'
-export const exampleSerial = (index: number, total: number): string => `${index} of ${total}`
+  `Each one is a single option, seen from your side. The four share one lot: ${x.qtyText}, with ${x.assetCode} at ${x.startText}${NBSP}${x.quoteCode} when you start and a deadline of ${deadline}. The premiums are examples, not offers.`
 
 export interface IntentCopy {
   /** What you do, in one sentence, without the vocabulary of options. */
@@ -213,20 +202,28 @@ export interface IntentCopy {
   trade: (x: WorkedExample) => string
   strikeLabel: (x: WorkedExample) => string
   premiumLabel: string
-  breakevenLabel: (x: WorkedExample) => string
-  breakevenHint: string
   collateralLabel: string
-  maxLossHint: (x: WorkedExample) => string
-  maxGainHint: (x: WorkedExample) => string
+  /** Where the figure comes from, under "Most you can lose". */
+  maxLossHint?: (x: WorkedExample) => string
+  maxGainHint?: (x: WorkedExample) => string
+  /**
+   * A written call: the writer cannot owe more than the asset already locked, so the note prints what is given up
+   * in place of a loss figure.
+   */
+  givesUp?: { value: (x: WorkedExample) => string; hint: (x: WorkedExample) => string }
   /** One sentence for a scenario: what happens and who acts. */
   outcome: (x: WorkedExample, s: Scenario) => string
+  /** Accessible name of the with-and-without figure. */
   chartTitle: (x: WorkedExample) => string
-  /** Label of the solid line of a with-and-without chart. */
+  /** Direct labels of the two lines of the figure, and of the three outcomes: the words of the guided page. */
   withLabel: string
   withoutLabel: string
-  /** `Floor 10.00`, `Cap 10.50`: the level a with-and-without chart marks. */
-  levelLabel?: (x: WorkedExample) => string
-  /** The price the chart opens on. */
+  /** What the outcomes are measured against: "compared with keeping the cash", and the words for no difference. */
+  comparedWith: string
+  sameAs: string
+  /** The level the figure marks, as the guided page names it: `Floor 10.00`, `Buy at 9.50`. */
+  levelLabel: (x: WorkedExample) => string
+  /** The price the figure opens on. */
   openAt: number
   /** Text of the link to the guided flow. */
   action: string
@@ -235,22 +232,33 @@ export interface IntentCopy {
 export const TERM_LABELS = {
   quantity: 'Quantity',
   deadline: 'Deadline',
+  breakeven: 'Breakeven',
   maxLoss: 'Most you can lose',
   maxGain: 'Most you can gain',
+  givesUp: 'You give up',
   noCap: 'No cap',
 } as const
 
 /** The premium per unit, under its total: `0.36 USDx per BOND`. */
 export const premiumPerUnit = (x: WorkedExample): string => `${x.premiumPerUnitText}${NBSP}${x.quoteCode} per ${x.assetCode}`
 
+export const breakevenLabel = (x: WorkedExample): string => `${TERM_LABELS.breakeven}, per ${x.assetCode}`
+
 export const scenarioLabel = (x: WorkedExample, s: Scenario): string => `If ${x.assetCode} is at ${s.priceText}`
 
-/** The signed difference a scenario makes against not having the option, with its unit: `+8.20 USDx more than without`. */
+/**
+ * The signed difference a scenario makes, with its unit, against the other line of the figure: `+8.20 USDx compared
+ * with no floor`. The sign carries the direction, so the words stay neutral.
+ */
 export function scenarioDelta(x: WorkedExample, s: Scenario): string {
-  if (s.difference > 0) return `${s.differenceText}${NBSP}${x.quoteCode} more than without`
-  if (s.difference < 0) return `${s.differenceText}${NBSP}${x.quoteCode} less than without`
-  return `${s.differenceText}${NBSP}${x.quoteCode}, same as without`
+  const copy = INTENT_COPY[x.intent]
+  if (s.difference === 0) return `${s.differenceText}${NBSP}${x.quoteCode}, ${copy.sameAs}`
+  return `${s.differenceText}${NBSP}${x.quoteCode} ${copy.comparedWith}`
 }
+
+/** Visible heading over the three outcomes: the guided page's own words. */
+export const OUTCOMES_TITLE = 'What you would hold at the deadline'
+/** Accessible name of the list of outcomes, after the name of the intent. */
 export const OUTCOMES_LABEL = 'Three outcomes at the deadline'
 
 export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
@@ -263,8 +271,6 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
       `The premium is spent whether or not you exercise. To exercise you must hold the ${x.qtyText} and press Exercise before the deadline.`,
     strikeLabel: (x) => `Floor, per ${x.assetCode}`,
     premiumLabel: 'You pay',
-    breakevenLabel: (x) => `Breakeven, per ${x.assetCode}`,
-    breakevenHint: 'The floor less the premium',
     collateralLabel: 'Locked by the maker',
     maxLossHint: (x) => `With ${x.assetCode} at ${x.startText} when you start`,
     maxGainHint: (x) => `You keep any rise in ${x.assetCode}`,
@@ -272,9 +278,12 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
       s.exercised
         ? `You exercise: deliver ${x.qtyText} and receive ${x.strikeTotalText}, less the ${x.premiumText} you paid.`
         : `You do nothing and the put expires. You keep ${x.qtyText} worth ${s.assetValueText}${NBSP}${x.quoteCode}, less the ${x.premiumText} you paid.`,
-    chartTitle: (x) => `Value of ${x.qtyText} at the deadline, with and without a put at ${x.strikePerUnitText}`,
-    withLabel: 'With the put',
+    chartTitle: (x) =>
+      `What ${x.qtyText} would be worth to you at the deadline, with a floor at ${x.strikePerUnitText}${NBSP}${x.quoteCode} and without`,
+    withLabel: 'With the floor',
     withoutLabel: 'Without',
+    comparedWith: 'compared with no floor',
+    sameAs: 'the same as without the floor',
     levelLabel: (x) => `Floor ${x.strikePerUnitText}`,
     openAt: 8,
     action: 'Set a floor in Markets',
@@ -289,19 +298,22 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
       `You give up any rise above ${x.strikePerUnitText}, and a fall in ${x.assetCode} is still yours. The holder can exercise early, not only at the end. The premium reaches you when a buyer takes your offer, or at once if you fill a request.`,
     strikeLabel: (x) => `Sale price, per ${x.assetCode}`,
     premiumLabel: 'You are paid',
-    breakevenLabel: (x) => `Breakeven, per ${x.assetCode}`,
-    breakevenHint: 'The sale price plus the premium',
     collateralLabel: 'You lock',
-    maxLossHint: (x) => `If ${x.assetCode} falls to zero from ${x.startText}`,
-    maxGainHint: (x) => `The rise from ${x.startText} to ${x.strikePerUnitText}, plus the premium`,
+    givesUp: {
+      value: (x) => `Every rise above ${x.strikePerUnitText}${NBSP}${x.quoteCode} per ${x.assetCode}`,
+      hint: (x) => `You cannot owe more than the ${x.qtyText} you lock; it can still fall in price.`,
+    },
     outcome: (x, s) =>
       s.exercised
         ? `If the holder exercises, your ${x.qtyText} go for ${x.strikeTotalText}, which you claim. You keep the ${x.premiumText}; the rise above ${x.strikePerUnitText} is not yours.`
         : `The call is not exercised. After the deadline you reclaim ${x.qtyText} worth ${s.assetValueText}${NBSP}${x.quoteCode} and keep the ${x.premiumText}.`,
-    chartTitle: (x) => `Value of ${x.qtyText} at the deadline, with and without a call written at ${x.strikePerUnitText}`,
-    withLabel: 'With the call written',
-    withoutLabel: 'Without',
-    levelLabel: (x) => `Cap ${x.strikePerUnitText}`,
+    chartTitle: (x) =>
+      `What ${x.qtyText} would be worth to you at the deadline, with an agreement to sell at ${x.strikePerUnitText}${NBSP}${x.quoteCode} and without`,
+    withLabel: 'With the agreement',
+    withoutLabel: 'Just holding',
+    comparedWith: 'compared with just holding',
+    sameAs: 'the same as just holding',
+    levelLabel: (x) => `Sell at ${x.strikePerUnitText}`,
     openAt: 12,
     action: 'Earn on what you hold in Markets',
   },
@@ -315,8 +327,6 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
       `You may have to buy at ${x.strikePerUnitText} when ${x.assetCode} is worth far less. The holder can exercise early, not only at the end. The premium reaches you when a buyer takes your offer, or at once if you fill a request.`,
     strikeLabel: (x) => `Buy price, per ${x.assetCode}`,
     premiumLabel: 'You are paid',
-    breakevenLabel: (x) => `Breakeven, per ${x.assetCode}`,
-    breakevenHint: 'The buy price less the premium',
     collateralLabel: 'You lock',
     maxLossHint: (x) => `If you buy at ${x.strikePerUnitText} and ${x.assetCode} falls to zero`,
     maxGainHint: () => 'The premium',
@@ -324,9 +334,13 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
       s.exercised
         ? `If the holder exercises, your ${x.collateralText} buy ${x.qtyText}, which you claim, now worth ${s.assetValueText}${NBSP}${x.quoteCode}. You keep the ${x.premiumText}.`
         : `The put is not exercised. After the deadline you reclaim your ${x.collateralText} and keep the ${x.premiumText}.`,
-    chartTitle: (x) => `Payoff at expiry, put written on ${x.qtyText} at ${x.strikePerUnitText}`,
-    withLabel: 'With the put written',
-    withoutLabel: 'Without',
+    chartTitle: (x) =>
+      `What you would hold at the deadline with an agreement to buy ${x.qtyText} at ${x.strikePerUnitText}${NBSP}${x.quoteCode}, and without`,
+    withLabel: 'With the agreement',
+    withoutLabel: 'Keeping the cash',
+    comparedWith: 'compared with keeping the cash',
+    sameAs: 'the same as keeping the cash',
+    levelLabel: (x) => `Buy at ${x.strikePerUnitText}`,
     openAt: 8,
     action: 'Earn while waiting to buy in Markets',
   },
@@ -339,8 +353,6 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
       `The premium is spent whether or not you exercise. To exercise you must hold the ${x.strikeTotalText} and press Exercise before the deadline.`,
     strikeLabel: (x) => `Buy price, per ${x.assetCode}`,
     premiumLabel: 'You pay',
-    breakevenLabel: (x) => `Breakeven, per ${x.assetCode}`,
-    breakevenHint: 'The buy price plus the premium',
     collateralLabel: 'Locked by the maker',
     maxLossHint: () => 'The premium',
     maxGainHint: (x) => `You keep any rise above ${x.strikePerUnitText}`,
@@ -348,9 +360,13 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
       s.exercised
         ? `You exercise: pay ${x.strikeTotalText} and receive ${x.qtyText} worth ${s.assetValueText}${NBSP}${x.quoteCode}, less the ${x.premiumText} you paid.`
         : `You do nothing and the call expires. You keep your ${x.strikeTotalText}, less the ${x.premiumText} you paid.`,
-    chartTitle: (x) => `Payoff at expiry, long call on ${x.qtyText} at ${x.strikePerUnitText}`,
-    withLabel: 'With the call',
-    withoutLabel: 'Without',
+    chartTitle: (x) =>
+      `What you would hold at the deadline with the right to buy ${x.qtyText} at ${x.strikePerUnitText}${NBSP}${x.quoteCode}, and without`,
+    withLabel: 'With the locked price',
+    withoutLabel: 'Keeping the cash',
+    comparedWith: 'compared with keeping the cash',
+    sameAs: 'the same as keeping the cash',
+    levelLabel: (x) => `At most ${x.strikePerUnitText}`,
     openAt: 12,
     action: 'Lock a buy price in Markets',
   },
@@ -359,18 +375,20 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
 // ---------------------------------------------------------------------------------------------- 4. requests and resale
 
 export const REQUESTS_TITLE = 'Requests'
-export const REQUESTS_TEXT =
-  'When no offer has your terms, you can post a request. You name the option you want (put or call, asset, quantity, strike, deadline) and the premium you offer, and that premium is escrowed in the contract. Any eligible maker can fill it in one transaction: the maker locks the whole collateral, receives the escrowed premium, and the option exists with you as its holder. Until then you can cancel and the premium comes back in full. A request that reaches its deadline unfilled can no longer be filled; its premium returns when you cancel it, or when anyone clears expired requests. A request is filled whole or not at all, and requests and offers never match automatically: a maker fills a request, or a buyer takes an offer.'
+export const REQUESTS_TEXT: readonly string[] = [
+  'When no offer has your terms, you can post a request: the option you want and the premium you offer for it. The premium is escrowed in the contract. Any eligible maker can fill the request, whole or not at all, in one transaction: the maker locks the whole collateral, receives the premium, and you hold the option.',
+  'Until a maker fills it you can cancel, and the premium comes back in full. After its deadline a request can no longer be filled, and the premium comes back when you cancel it or when anyone clears expired requests. Requests and offers are never matched automatically.',
+]
 
 export const RESALE_TITLE = 'Resale'
-export const RESALE_TEXT =
-  'A holder who no longer wants an option can list it for resale at a price of their choosing, in USDx. An eligible buyer, other than the holder or the maker, pays that price to the holder and becomes the holder in one transaction. Strike, deadline, quantity and the collateral in the contract do not change. If the seller raises the price while a buyer is signing, the purchase fails and nothing is paid. An option has one listing at most; it ends when the option is bought, exercised or expires, and the maker cannot buy the option back. The price is a limit set by one holder, not a quote from a market.'
+export const RESALE_TEXT: readonly string[] = [
+  'A holder can list an option for resale at a price of their choosing, in USDx. An eligible buyer pays that price to the holder and becomes the holder in one transaction; the maker of the option cannot buy it back. Strike, deadline, quantity and the collateral in the contract do not change.',
+  'An option has one listing at most, and the listing ends when the option is bought, exercised or expires. If the seller raises the price while a buyer is signing, the purchase fails and nothing is paid.',
+]
 
 export const REQUESTS_LINK = 'See open requests'
 
 // ---------------------------------------------------------------------------------------------- 5. what can go wrong
-
-export const RISKS_INTRO = 'Five limits of the Covered contract and of this deployment, each with what it costs you. Margin has other risks; they are set apart at the end.'
 
 export interface RiskItem {
   id: string
@@ -382,7 +400,7 @@ export const RISK_ISSUER: RiskItem = {
   id: 'issuer',
   title: 'The issuer can freeze an account or claw tokens back',
   paragraphs: [
-    'A tokenized asset has an issuer, who decides who may hold it and can freeze an account or take tokens back. The contract checks the decision of the issuer before every trade; it cannot override it. The collateral covers the option, not what the issuer does.',
+    'A tokenized asset has an issuer, who decides who may hold it and can freeze an account or take tokens back. The contract checks the decision of the issuer before every trade. The collateral covers the option, not what the issuer does.',
   ],
 }
 
@@ -421,8 +439,8 @@ export const RISKS: readonly RiskItem[] = [
     id: 'deadline',
     title: 'You can miss the deadline',
     paragraphs: [
-      'Nothing is exercised for you. An option that is in the money at its deadline and was not exercised expires all the same, and the premium is spent. The deadline is decided by the close time of the ledger, not by the clock of your device, so a transaction signed in the last minutes may land too late.',
-      'Put the deadline in your calendar when you buy. Portfolio lists what is waiting for you; it sends no reminder.',
+      'An option that is in the money at its deadline and was not exercised expires all the same, and the premium is spent. The deadline is decided by the close time of the ledger, not by the clock of your device, so a transaction signed in the last minutes may land too late.',
+      'The receipt of a purchase and the position in Portfolio can add the deadline to your calendar. StellSec sends no reminder of its own.',
     ],
   },
   {
@@ -438,14 +456,14 @@ export const RISKS: readonly RiskItem[] = [
     title: 'The test network is reset',
     paragraphs: [
       'Everything here runs on Stellar Testnet, which its operators reset from time to time. A reset erases every account, balance and contract, and every option with them.',
-      'Contract storage also expires unless its rent is extended. Anyone can extend it, and the team runs a script that does.',
+      'Contract storage also expires unless its rent is extended. Anyone can extend it. Nothing extends it automatically.',
     ],
   },
   {
     id: 'unaudited',
     title: 'The contracts are not audited',
     paragraphs: [
-      'Nobody independent has reviewed the code. The Covered contract has 250 automated tests (146 unit tests, 18 property-based invariants, 86 negative tests), and the contract on Testnet is byte-identical to a build of the published source. That is evidence, not an audit.',
+      `Nobody independent has reviewed the code. The Covered contract has ${CONTRACT_TEST_TOTAL} automated tests, and the contract on Testnet is byte-identical to a build of the published source.`,
       'The Covered contract has no admin and no upgrade path. Nobody can change its rules, and nobody can patch a defect in place.',
     ],
   },
@@ -453,7 +471,7 @@ export const RISKS: readonly RiskItem[] = [
 
 export const MARGIN_TITLE = 'Margin has its own risks'
 export const MARGIN_INTRO =
-  'Margin is a separate, experimental contract for uncovered calls, settled in cash in USDx. Nothing in the sections above describes it. The two contracts share no storage and no balance, so a loss in Margin cannot reach collateral locked in the Covered contract.'
+  'Margin is a separate contract for uncovered calls, settled in cash in USDx. The two contracts share no storage and no balance, so a loss in Margin cannot reach collateral locked in the Covered contract.'
 
 export const MARGIN_POINTS: readonly string[] = [
   'The writer posts partial margin, not the whole obligation. A writer whose account value falls below the maintenance margin can be liquidated: the vault, or another account, takes the position over at the published price.',
@@ -473,33 +491,14 @@ export interface GlossaryEntry {
   definition: string
 }
 
-/** In alphabetical order. The vocabulary is the one of the interface: one word per thing. */
-export const GLOSSARY: readonly GlossaryEntry[] = [
-  { term: 'Bid', definition: 'The name of a request where it sits in the book of a series, opposite the offers.' },
-  { term: 'Call', definition: 'The right to buy a set quantity of an asset for the strike, at any time before the deadline.' },
-  { term: 'Claim delivery', definition: 'After an exercise, the maker collects what the holder delivered: the asset for a put, the strike for a call.' },
-  { term: 'Collateral', definition: 'What the maker locks in the contract to settle the option: the whole strike in USDx for a put, the whole quantity of the asset for a call.' },
-  { term: 'Covered', definition: 'The regime this page describes, in which the maker locks the whole collateral before the sale.' },
-  { term: 'Deadline', definition: 'The moment after which the option can no longer be exercised, by the close time of the ledger; the chain view calls it the expiry.' },
-  { term: 'Eligible', definition: 'Allowed by the issuer to hold the asset; the contract refuses a maker, a buyer or a new holder who is not.' },
-  { term: 'Exercise', definition: 'The holder uses the right: the asset and the strike change hands through the contract in one transaction, for the whole quantity.' },
-  { term: 'Expiry', definition: 'The same instant as the deadline, under the name the chain view uses.' },
-  { term: 'Holder', definition: 'The account that owns the option and the only one that can exercise it.' },
-  { term: 'Issuer', definition: 'The account that issued an asset; it decides who may hold it and can freeze an account or claw tokens back.' },
-  { term: 'Maker', definition: 'The account that locks the collateral and sells the option; a position calls it the writer.' },
-  { term: 'Margin', definition: 'The separate, experimental contract in which a writer posts partial margin and calls settle in cash.' },
-  { term: 'Offer', definition: 'An option a maker has put up for sale, with its collateral already locked in the contract.' },
-  { term: 'Premium', definition: 'The price of the option, paid once by the buyer to the maker at purchase and never refunded.' },
-  { term: 'Put', definition: 'The right to sell a set quantity of an asset for the strike, at any time before the deadline.' },
-  { term: 'Reclaim', definition: 'After the deadline, the maker takes back the collateral of an option that was not exercised.' },
-  { term: 'Reference price', definition: 'A price the interface shows, always with its source, to say where a strike stands; the Covered contract never reads a price.' },
-  { term: 'Request', definition: 'The terms a buyer wants and the premium they offer, with that premium escrowed in the contract until a maker fills the request or the buyer cancels it.' },
-  { term: 'Resale listing', definition: 'The price, in USDx, at which a holder is willing to hand an option over to an eligible buyer.' },
-  { term: 'Reserves', definition: 'The page that sets, token by token, what the contract has locked against what it holds.' },
-  { term: 'Strike', definition: 'The price at which the holder can sell (put) or buy (call); the contract stores it as a total for the whole quantity.' },
-  { term: 'USDx', definition: 'The fictional test token in which strikes and premiums are paid.' },
-  { term: 'Writer', definition: 'The maker of an option, under the name a position uses.' },
-]
+/** The id of a term's row, so a page can link to it: `/learn#term-breakeven`. */
+export const termId = (term: string): string => `term-${term.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`
+
+/**
+ * In alphabetical order, from core/glossary: the same sentences as the `Term` popovers in the flows. Escrow is
+ * left out here, where the Request entry already says it.
+ */
+export const GLOSSARY: readonly GlossaryEntry[] = CORE_GLOSSARY.filter((g) => g.id !== 'escrow').map(({ term, definition }) => ({ term, definition }))
 
 // ---------------------------------------------------------------------------------------------- 7. questions
 
@@ -507,6 +506,8 @@ export interface Question {
   id: string
   question: string
   answer: readonly string[]
+  /** A way on from the answer, inside the app. */
+  link?: { label: string; to: '/markets'; search?: { funds: '1' } }
 }
 
 export const QUESTIONS: readonly Question[] = [
@@ -514,21 +515,22 @@ export const QUESTIONS: readonly Question[] = [
     id: 'real-money',
     question: 'Is this real money?',
     answer: [
-      'No. Everything runs on Stellar Testnet. The assets, the makers and the token USDx are fictional, and none of the tokens has a monetary value.',
+      "No. Everything runs on Stellar Testnet. The tokens are test tokens issued by the team, the makers are the team's accounts, and nothing has a monetary value.",
     ],
+  },
+  {
+    id: 'start',
+    question: 'What do I need to start?',
+    answer: [
+      'A Stellar wallet set to Testnet, such as Freighter, and test tokens. Fund the account with test XLM from Friendbot, the Testnet faucet; add trustlines for USDx and the asset you want; then swap XLM for test tokens in your wallet.',
+    ],
+    link: { label: 'Get test funds', to: '/markets', search: { funds: '1' } },
   },
   {
     id: 'who-sells',
     question: 'Who sells the options?',
     answer: [
       'Makers: accounts that lock the collateral and post offers. On this deployment the makers are the accounts of the team. Any eligible account can write an offer, and any eligible account can fill a request.',
-    ],
-  },
-  {
-    id: 'do-nothing',
-    question: 'What happens if I do nothing at the deadline?',
-    answer: [
-      'The option expires. It is not exercised for you, whatever the price. After the deadline an exercise fails, the maker can reclaim the collateral, and the premium stays with the maker.',
     ],
   },
   {
@@ -547,45 +549,26 @@ export const QUESTIONS: readonly Question[] = [
     ],
   },
   {
-    id: 'issuer',
-    question: 'Can the issuer stop me?',
-    answer: [
-      'Yes. The issuer decides who may hold the asset and can freeze an account or claw tokens back. A frozen holder cannot exercise, and the premium is not refunded. The section "What can go wrong" lists each case.',
-    ],
-  },
-  {
     id: 'price',
     question: 'Where does the price on screen come from?',
     answer: [
-      `Not from the contract: the Covered contract reads no price. The interface shows a reference price with its source so that you can see where a strike stands. On Testnet it is the rate of the test faucet, ${FAUCET_PRICE}${NBSP}USDx per unit, fixed by the team. With mock data it is a demo price chosen by the team. Neither is a market.`,
-      'You can always set your own assumed price on a payoff figure.',
+      `Not from the contract: the Covered contract reads no price. The interface shows a reference price with its source so that you can see where a strike stands. On Testnet it is the rate of the test faucet, ${FAUCET_PRICE}${NBSP}USDx per unit, fixed by the team. With mock data it is a demo price chosen by the team.`,
+      'On a payoff figure the price is an assumption, and you can move it.',
     ],
   },
   {
     id: 'fees',
     question: 'What does a transaction cost?',
     answer: [
-      'The contract takes no fee: premium, strike and asset move in full between the two sides. The network fee is paid in test XLM. Measured on Testnet: 0.031 XLM to write an offer, 0.003 to buy, 0.008 to exercise, 0.001 to claim.',
+      // The four fees of option No. 8 of the recorded Testnet run (landing/recorded.ts, RECORDED_PUT_TX), exact.
+      `The contract takes no fee: premium, strike and asset move in full between the two sides. The network fee is paid in test XLM. For one option recorded on Testnet it was ${xlm(RECORDED_PUT_FEES.write)} XLM to write the offer, ${xlm(RECORDED_PUT_FEES.buy)} to buy, ${xlm(RECORDED_PUT_FEES.exercise)} to exercise and ${xlm(RECORDED_PUT_FEES.claim)} to claim.`,
     ],
-  },
-  {
-    id: 'covered-margin',
-    question: 'What is the difference between Covered and Margin?',
-    answer: [
-      'Covered is what this page describes: the maker locks the whole collateral, and exercise delivers the asset itself. Margin is a separate, experimental contract: the writer posts partial margin, calls settle in cash at a price published by the team, and a holder can be paid less than the payoff, with the deficit shown.',
-    ],
-  },
-  {
-    id: 'audit',
-    question: 'Has it been audited?',
-    answer: ['No. The Covered contract has 250 automated tests and no admin or upgrade path. That is evidence, not an audit.'],
   },
 ]
 
 /** Every string of this module that reaches the screen, for the wording tests. Templates are rendered by the test. */
 export const STATIC_COPY: readonly string[] = [
   PAGE_TITLE,
-  PAGE_DESCRIPTION,
   NAV_LABEL,
   ...SECTIONS.map((s) => s.title),
   ...WHAT_THIS_IS,
@@ -598,21 +581,19 @@ export const STATIC_COPY: readonly string[] = [
   LIFECYCLE_FORK_INTRO,
   STATE_AFTER,
   NOTHING_SETTLES_TITLE,
-  NOTHING_SETTLES_LABEL,
   NOTHING_SETTLES_TEXT,
   SIDES_TITLE,
   SIDES_CAPTION,
   ...Object.values(SIDES_HEAD),
   ...SIDES.flatMap((r) => [r.step, r.put, r.call]),
-  EXAMPLE_SERIAL_LABEL,
   ...Object.values(TERM_LABELS),
+  OUTCOMES_TITLE,
   OUTCOMES_LABEL,
   REQUESTS_TITLE,
-  REQUESTS_TEXT,
+  ...REQUESTS_TEXT,
   RESALE_TITLE,
-  RESALE_TEXT,
+  ...RESALE_TEXT,
   REQUESTS_LINK,
-  RISKS_INTRO,
   RISK_ISSUER.title,
   ...RISK_ISSUER.paragraphs,
   ISSUER_TABLE_CAPTION,
@@ -625,5 +606,5 @@ export const STATIC_COPY: readonly string[] = [
   ...MARGIN_POINTS,
   MARGIN_LINK,
   ...GLOSSARY.flatMap((g) => [g.term, g.definition]),
-  ...QUESTIONS.flatMap((q) => [q.question, ...q.answer]),
+  ...QUESTIONS.flatMap((q) => [q.question, ...q.answer, q.link?.label ?? '']).filter((text) => text !== ''),
 ]

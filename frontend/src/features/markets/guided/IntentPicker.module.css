@@ -2,7 +2,7 @@
   .root {
     display: flex;
     flex-direction: column;
-    gap: var(--s-12);
+    gap: var(--s-8);
     min-width: 0;
     container-type: inline-size;
   }
@@ -15,26 +15,21 @@
     color: var(--muted);
   }
 
+  /* Four equal names in a row; two by two on a narrow column. */
   .group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-8);
-  }
-
-  .cards {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--s-8);
   }
 
   .option {
     position: relative;
     display: flex;
-    flex-direction: column;
-    gap: var(--s-6);
+    align-items: center;
+    gap: var(--s-8);
     min-width: 0;
     min-height: var(--touch);
-    padding: var(--s-12) var(--s-16);
+    padding: var(--s-8) var(--s-12);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
     background: var(--surface);
@@ -51,7 +46,10 @@
       outline: 1px solid var(--text);
     }
 
+    /* The ring is a box-shadow; the transparent outline is what forced colours paints instead. */
     &:has(.input:focus-visible) {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
       box-shadow: var(--focus-ring);
     }
   }
@@ -66,106 +64,28 @@
     cursor: pointer;
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    gap: var(--s-8);
-    min-width: 0;
-  }
-
   .glyph {
     flex: none;
     color: var(--text);
   }
 
   .name {
-    font-family: var(--font-serif);
-    font-size: var(--h3-size);
-    line-height: var(--h3-line);
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    text-wrap: balance;
+  }
+
+  .option[data-selected] .name {
     font-weight: var(--h3-weight);
   }
 
-  .lead {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    color: var(--muted);
-  }
-
-  .line {
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    font-weight: var(--body-weight);
-    color: var(--text-2);
-    text-wrap: pretty;
-  }
-
-  .money {
-    margin-top: auto;
-    padding-top: var(--s-8);
-    border-top: 1px solid var(--hairline);
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    color: var(--text);
-  }
-
-  .moneyLabel {
-    font-size: var(--label-size);
-    font-stretch: var(--label-stretch);
-    color: var(--muted);
-    margin-inline-end: var(--s-4);
-  }
-
-  /* The secondary intent: one quiet row, no card. */
-  .option[data-quiet] {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--s-4) var(--s-12);
-    padding: var(--s-8) var(--s-16);
-    border-style: dashed;
-    border-color: var(--rule);
-    background: transparent;
-
-    & .name {
-      font-family: var(--font-sans);
-      font-size: var(--ui-size);
-      line-height: var(--ui-line);
-      font-weight: var(--ui-weight);
-    }
-
-    & .line {
-      color: var(--muted);
-    }
-
-    & .money {
-      display: none;
-    }
-
-    &[data-selected] {
-      border-style: solid;
-      border-color: var(--text);
-      background: var(--surface);
-    }
-  }
-
-  /* Narrow: the cards become rows, and only the chosen one keeps its sentence. */
   @container (max-width: 39.99rem) {
-    .cards {
-      grid-template-columns: minmax(0, 1fr);
+    .group {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--s-6);
-    }
-
-    .option:not([data-quiet]) {
-      padding: var(--s-12);
-
-      &:not([data-selected]) .line,
-      &:not([data-selected]) .money {
-        display: none;
-      }
-    }
-
-    .option[data-quiet]:not([data-selected]) .line {
-      display: none;
     }
   }
 }

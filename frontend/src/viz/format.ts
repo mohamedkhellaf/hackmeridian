@@ -15,25 +15,49 @@ function formatter(decimals: number): Intl.NumberFormat {
   return f
 }
 
-function snapZero(value: number, decimals: number): number {
-  // Below half of the last printed unit the figure prints as zero, so it must not carry a sign.
-  return Math.abs(value) < 0.5 / 10 ** decimals ? 0 : value
+/**
+ * At or below one stroop (1e-7, the smallest amount of a Stellar asset), or half the last printed unit if that is
+ * smaller, a float is noise from the arithmetic (a crossing found at 1e-14), not an amount: it is zero. A real
+ * sub-cent amount is far above it and prints `<0.01`.
+ */
+export function isNoise(value: number, decimals = 2): boolean {
+  return Math.abs(value) <= Math.min(1e-7, 0.5 / 10 ** decimals)
 }
 
-/** Grouped, fixed decimals, true minus sign: `1,284.50`, `−1.80`. Never prints `−0.00`. */
+/**
+ * The magnitude in printed units, truncated toward zero like every amount from the chain (never rounded up), after
+ * snapping a float that sits a hair under its printed value (6.3999999999 is 6.40).
+ */
+function printedUnits(abs: number, decimals: number): number {
+  const scaled = abs * 10 ** decimals
+  const near = Math.round(scaled)
+  return Math.abs(scaled - near) <= 1e-9 * Math.max(1, near) ? near : Math.floor(scaled)
+}
+
+/** The magnitude as printed, or `<0.01` (the last printed unit) for a real amount smaller than it. */
+function body(value: number, decimals: number): { text: string; zero: boolean } {
+  if (isNoise(value, decimals)) return { text: formatter(decimals).format(0), zero: true }
+  const units = printedUnits(Math.abs(value), decimals)
+  if (units === 0) return { text: `<${formatter(decimals).format(1 / 10 ** decimals)}`, zero: false }
+  return { text: formatter(decimals).format(units / 10 ** decimals), zero: false }
+}
+
+/**
+ * Grouped, fixed decimals, true minus sign: `1,284.50`, `−1.80`. Truncated toward zero, as amounts are; a real
+ * amount under the last unit prints `<0.01`. Never prints `−0.00`.
+ */
 export function formatNumber(value: number, decimals = 2): string {
   if (!Number.isFinite(value)) return value > 0 ? '∞' : value < 0 ? `${MINUS}∞` : ''
-  const v = snapZero(value, decimals)
-  const body = formatter(decimals).format(Math.abs(v))
-  return v < 0 ? `${MINUS}${body}` : body
+  const b = body(value, decimals)
+  return !b.zero && value < 0 ? `${MINUS}${b.text}` : b.text
 }
 
-/** Always signed, for gains, losses and differences: `+5.70`, `−1.80`, and `0.00` without a sign. */
+/** Always signed, for gains, losses and differences: `+5.70`, `−1.80`, `+<0.01`, and `0.00` without a sign. */
 export function formatSigned(value: number, decimals = 2): string {
   if (!Number.isFinite(value)) return value > 0 ? '+∞' : value < 0 ? `${MINUS}∞` : ''
-  const v = snapZero(value, decimals)
-  const body = formatter(decimals).format(Math.abs(v))
-  return v > 0 ? `+${body}` : v < 0 ? `${MINUS}${body}` : body
+  const b = body(value, decimals)
+  if (b.zero) return b.text
+  return value > 0 ? `+${b.text}` : `${MINUS}${b.text}`
 }
 
 /** Axis ends only: full figures below 10,000, then `10K`, `1.2M`, `3B`. Never used for amounts in text. */

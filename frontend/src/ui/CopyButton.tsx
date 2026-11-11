@@ -23,10 +23,15 @@ async function writeClipboard(text: string): Promise<boolean> {
   } catch {
     // Fall through to the selection fallback (insecure context, denied permission).
   }
+  // The fallback selects text in a hidden field, which takes focus: give it back, or focus would drop to the page
+  // body (and, inside a drawer, escape the modal).
+  const before = document.activeElement instanceof HTMLElement ? document.activeElement : null
   try {
     const area = document.createElement('textarea')
     area.value = text
     area.setAttribute('readonly', '')
+    area.setAttribute('tabindex', '-1')
+    area.setAttribute('aria-hidden', 'true')
     area.style.position = 'fixed'
     area.style.opacity = '0'
     document.body.appendChild(area)
@@ -36,6 +41,8 @@ async function writeClipboard(text: string): Promise<boolean> {
     return ok
   } catch {
     return false
+  } finally {
+    before?.focus({ preventScroll: true })
   }
 }
 

@@ -1,31 +1,50 @@
 @layer features {
   .root {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-20);
-    padding-top: var(--s-24);
-    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--hairline);
   }
 
-  .lead {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-8);
-    max-width: var(--measure);
+  /*
+   * The row that opens the example: the intent's name, the anchor of the section, at the size of a section heading,
+   * with its one-sentence statement under it. The chevron takes the free cell beside the name.
+   */
+  .summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--s-16);
+    row-gap: var(--s-4);
+    padding-block: var(--s-16);
   }
 
   .name {
-    font-size: var(--h3-size);
-    line-height: var(--h3-line);
-    font-weight: var(--h3-weight);
+    grid-column: 1;
+    grid-row: 1;
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
   }
 
   .statement {
+    grid-column: 1;
+    grid-row: 2;
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
     color: var(--text-2);
   }
 
-  /* The deal in exact figures, set as a figure: serif, tabular. */
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    padding-block: var(--s-8) var(--s-32);
+  }
+
+  /* The deal in exact figures, set as a figure: serif, tabular. The one 22 px line of the example. */
   .deal {
+    max-width: var(--measure);
     font-family: var(--font-serif);
     font-size: var(--figure-lg-size);
     line-height: var(--figure-lg-line);
@@ -55,6 +74,12 @@
     }
   }
 
+  /* The note's heading ("Long put, BOND") at figure size: below the intent's name, not level with it. */
+  .note {
+    --h2-size: var(--h3-size);
+    --h2-line: var(--h3-line);
+  }
+
   .note,
   .figure,
   .sheet,
@@ -72,5 +97,16 @@
   .trade {
     max-width: var(--measure);
     color: var(--text-2);
+  }
+
+  .outcomesTitle {
+    margin-top: var(--s-8);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .action {
+    display: flex;
   }
 }

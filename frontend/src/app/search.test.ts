@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import { describe, expect, it } from 'vitest'
 import {
   AssetSearchSchema,
+  IssuerSearchSchema,
   MarketsSearchSchema,
   PortfolioSearchSchema,
   PositionSearchSchema,
@@ -13,12 +14,13 @@ import {
   parseSearch,
   stringifySearch,
   validateAssetSearch,
+  validateIssuerSearch,
   validateMarketsSearch,
   validatePortfolioSearch,
   validatePositionSearch,
   validateRequestsSearch,
 } from './search'
-import type { AssetSearch, MarketsSearch, PortfolioSearch, PositionSearch, RequestsSearch } from './search'
+import type { AssetSearch, IssuerSearch, MarketsSearch, PortfolioSearch, PositionSearch, RequestsSearch } from './search'
 
 // The types are the contract with the features; the schemas are what the router runs. These objects fail to
 // compile when a type gains or loses a field, and the tests below fail when a schema does.
@@ -37,10 +39,11 @@ const ASSET_FIELDS: Record<keyof AssetSearch, true> = {
   ask: true,
   step: true,
 }
-const MARKETS_FIELDS: Record<keyof MarketsSearch, true> = { all: true, intent: true }
+const MARKETS_FIELDS: Record<keyof MarketsSearch, true> = { all: true, intent: true, funds: true }
 const PORTFOLIO_FIELDS: Record<keyof PortfolioSearch, true> = { tab: true, closed: true }
 const POSITION_FIELDS: Record<keyof PositionSearch, true> = { do: true }
-const REQUESTS_FIELDS: Record<keyof RequestsSearch, true> = { asset: true, kind: true, sort: true, bid: true, new: true, mine: true }
+const REQUESTS_FIELDS: Record<keyof RequestsSearch, true> = { asset: true, kind: true, sort: true, bid: true, new: true, mine: true, closed: true }
+const ISSUER_FIELDS: Record<keyof IssuerSearch, true> = { asset: true }
 
 // Each schema's output is assignable to its type and back.
 const assetOut: AssetSearch = {} as v.InferOutput<typeof AssetSearchSchema>
@@ -49,7 +52,8 @@ const marketsOut: MarketsSearch = {} as v.InferOutput<typeof MarketsSearchSchema
 const portfolioOut: PortfolioSearch = {} as v.InferOutput<typeof PortfolioSearchSchema>
 const positionOut: PositionSearch = {} as v.InferOutput<typeof PositionSearchSchema>
 const requestsOut: RequestsSearch = {} as v.InferOutput<typeof RequestsSearchSchema>
-void [assetOut, assetIn, marketsOut, portfolioOut, positionOut, requestsOut]
+const issuerOut: IssuerSearch = {} as v.InferOutput<typeof IssuerSearchSchema>
+void [assetOut, assetIn, marketsOut, portfolioOut, positionOut, requestsOut, issuerOut]
 
 const fieldsOf = (schema: { entries: Record<string, unknown> }) => Object.keys(schema.entries).sort()
 
@@ -60,6 +64,7 @@ describe('search schemas', () => {
     expect(fieldsOf(PortfolioSearchSchema)).toEqual(Object.keys(PORTFOLIO_FIELDS).sort())
     expect(fieldsOf(PositionSearchSchema)).toEqual(Object.keys(POSITION_FIELDS).sort())
     expect(fieldsOf(RequestsSearchSchema)).toEqual(Object.keys(REQUESTS_FIELDS).sort())
+    expect(fieldsOf(IssuerSearchSchema)).toEqual(Object.keys(ISSUER_FIELDS).sort())
   })
 })
 
@@ -123,6 +128,13 @@ describe('the other routes', () => {
   it('/markets', () => {
     expect(validateMarketsSearch({ all: '1', intent: 'floor' })).toEqual({ all: '1', intent: 'floor' })
     expect(validateMarketsSearch({ all: 'true', intent: 'hedge' })).toEqual({ all: undefined, intent: undefined })
+    expect(validateMarketsSearch({ funds: '1' })).toEqual({ funds: '1' })
+    expect(validateMarketsSearch({ funds: 'yes' })).toEqual({ funds: undefined })
+  })
+
+  it('/issuer', () => {
+    expect(validateIssuerSearch({ asset: 'bond' })).toEqual({ asset: 'bond' })
+    expect(validateIssuerSearch({ asset: '<b>' })).toEqual({ asset: undefined })
   })
 
   it('/portfolio', () => {
@@ -145,6 +157,7 @@ describe('the other routes', () => {
       mine: '1',
     })
     expect(validateRequestsSearch({ asset: '<script>', bid: '-1', sort: 'price' })).toEqual({ asset: undefined, bid: undefined, sort: undefined })
+    expect(validateRequestsSearch({ mine: '1', closed: '1' })).toEqual({ mine: '1', closed: '1' })
   })
 })
 

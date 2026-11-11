@@ -274,12 +274,27 @@
     color: var(--text-2);
   }
 
-  .sign {
-    flex: none;
-    align-self: center;
-    width: 0.5em;
-    height: 0.5em;
-    fill: currentColor;
+  /* A maximum or minimum the plotted range does not reach: said in words, never pinned to the corner of the line. */
+  .offScale {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .offScale + .offScale {
+    margin-top: calc(-1 * var(--s-4));
+  }
+
+  .offScaleFigure[data-direction='gain'] {
+    color: var(--gain);
+    font-weight: 600;
+  }
+
+  .offScaleFigure[data-direction='loss'] {
+    color: var(--loss);
+    font-weight: 600;
   }
 
   .readoutBlock {

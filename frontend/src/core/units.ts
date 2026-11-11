@@ -1,7 +1,7 @@
 // Exact integer-unit helpers shared by every core module: one copy of "amount with its code", "per unit of
 // underlying" and the cross-multiplied comparisons. Token amounts are bigint from chain to screen; nothing here
 // rounds up (bigint division floors) and nothing uses `number`.
-import { formatDisplay } from './options/format'
+import { formatExact, formatUnits } from './format/amount'
 
 /** The minimum a token needs to be formatted with its unit. `TokenInfo` satisfies it. */
 export interface UnitToken {
@@ -9,8 +9,15 @@ export interface UnitToken {
   code: string
 }
 
-/** `5.00 FUND`: at least two decimals, at most four, grouped, truncated. */
-export const amt = (units: bigint, t: UnitToken): string => `${formatDisplay(units, t.decimals)} ${t.code}`
+/**
+ * `5.00 FUND`: two decimals, grouped, truncated, `<0.01` for a non-zero dust amount (core/format `formatUnits`, the
+ * one rule for amounts on screen). Exact digits belong in the Amount popover: use `amtExact` only for a figure the
+ * user must act on to the last unit, such as a shortfall.
+ */
+export const amt = (units: bigint, t: UnitToken): string => `${formatUnits(units, t.decimals)} ${t.code}`
+
+/** `470.0055 USDx`: every digit, at least two decimals. For a shortfall, which truncation would understate. */
+export const amtExact = (units: bigint, t: UnitToken): string => `${formatExact(units, t.decimals)} ${t.code}`
 
 /** Decimal string without grouping or padding (`12.5`), for prefilling an input. Round-trips through `parseAmount`. */
 export function plainAmount(units: bigint, decimals: number): string {
@@ -42,10 +49,10 @@ export const strikeUnits = (o: Sized & { totalStrike: bigint }): bigint | null =
 /** Premium per unit of underlying, in quote units, floored. */
 export const premiumUnits = (o: Sized & { totalPremium: bigint }): bigint | null => perUnit(o.totalPremium, o)
 
-/** Per-unit figure as display text (`0.36`), or an en dash when the quantity is zero. */
+/** Per-unit figure as display text (`0.36`, truncated to two decimals), or an en dash when the quantity is zero. */
 export function perUnitText(total: bigint, o: Sized, quoteDecimals: number): string {
   const v = perUnit(total, o)
-  return v === null ? '–' : formatDisplay(v, quoteDecimals)
+  return v === null ? '–' : formatUnits(v, quoteDecimals)
 }
 
 const sign = (l: bigint, r: bigint): number => (l < r ? -1 : l > r ? 1 : 0)

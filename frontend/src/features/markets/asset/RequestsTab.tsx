@@ -1,25 +1,26 @@
-// The Requests tab of an asset: buyers' funded bids waiting for a seller. A seller fills one from the ticket
-// ("Sell to this bid"); a buyer posts one ("Post a request"); the wallet's own bids are marked and can be
-// cancelled, which refunds the escrowed premium.
+// The Requests tab of an asset: buyers' funded bids waiting for a maker. A maker fills one from the ticket ("Fill
+// request"); a buyer posts one ("Post a request"); the wallet's own requests are marked and can be cancelled in
+// the same dialog as in the chain, which says what comes back and shows the transaction's stages.
 import { Link as RouterLink } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { AssetSearch } from '../../../app/search'
 import { formatCountdown, formatUnits } from '../../../core/format'
+import type { BookRow } from '../../../core/market/book'
 import type { TokenInfo } from '../../../core/options/types'
-import { STATUS_LABEL } from '../../../core/requests/requests'
 import type { Bid } from '../../../core/requests/types'
 import { premiumUnits, strikeUnits } from '../../../core/units'
-import { bidSubject, describeTx, txEffectText, useBids, useCancelBid, useMe, useNowSec, useSubjectBusy } from '../../../data'
-import { Button, ButtonLink, Callout, DateTime, EmptyNote, Glyph, Marker, Skeleton, Table, TableWrap, Tag, TBody, Td, Th, THead, Tr } from '../../../ui'
+import { bidSubject, useBids, useMe, useNowSec, useSubjectBusy } from '../../../data'
+import { Button, ButtonLink, Callout, DateTime, EmptyNote, Glyph, Marker, Skeleton, Table, TableWrap, TBody, Td, Th, THead, Tr } from '../../../ui'
 import { searchFromTicketIntent } from '../../ticket'
 import type { TicketIntent } from '../../ticket'
+import { CancelDialog } from '../chain/CancelDialog'
 import {
   CANCEL_REFUND,
   CANCEL_REQUEST,
   KIND_WORD,
+  LAPSED,
   NONE,
   POST_REQUEST,
-  REQUESTS_EMPTY_HINT,
   REQUESTS_ERROR,
   REQUESTS_HEADING,
   REQUESTS_UNSUPPORTED,
@@ -32,7 +33,7 @@ import {
   requestsEmpty,
   requestsLead,
 } from '../copy'
-import { assetRequests } from '../model'
+import { assetRequests, requestRow } from '../model'
 import type { AssetRequest } from '../model'
 import { ChainId, Money } from '../parts'
 import { moneyText } from '../values'
@@ -49,22 +50,12 @@ function useTicketSearch(): (intent: TicketIntent) => AssetSearch {
   return (intent) => compactSearch({ ...search, ...CLEAR_TICKET, ...searchFromTicketIntent(intent) })
 }
 
-function CancelButton({ bid }: { bid: Bid }) {
-  const cancel = useCancelBid()
+function CancelButton({ bid, onCancel, fullWidth = false }: { bid: Bid; onCancel: (bid: Bid) => void; fullWidth?: boolean }) {
   const busy = useSubjectBusy(bidSubject(bid.id))
-  const failed = cancel.state.phase === 'failed' || cancel.state.phase === 'declined' || cancel.state.phase === 'expired' || cancel.state.phase === 'unknown'
-  const summary = failed ? describeTx(cancel.state) : null
   return (
-    <span className={styles.cancel}>
-      <Button size="sm" loading={cancel.working || busy} aria-label={`${CANCEL_REQUEST} your request for ${KIND_WORD[bid.kind].toLowerCase()} on ${moneyText(bid.underlyingQty, bid.underlying)}. ${CANCEL_REFUND}`} onClick={() => void cancel.run(bid)}>
-        {CANCEL_REQUEST}
-      </Button>
-      {summary ? (
-        <span className={styles.cancelError}>
-          {summary.title}. {cancel.state.phase === 'failed' ? summary.detail : txEffectText(cancel.state)}
-        </span>
-      ) : null}
-    </span>
+    <Button size={fullWidth ? 'md' : 'sm'} fullWidth={fullWidth} loading={busy} aria-label={`${CANCEL_REQUEST} your request for ${KIND_WORD[bid.kind].toLowerCase()} on ${moneyText(bid.underlyingQty, bid.underlying)}. ${CANCEL_REFUND}`} onClick={() => onCancel(bid)}>
+      {CANCEL_REQUEST}
+    </Button>
   )
 }
 
@@ -77,7 +68,15 @@ function Kind({ bid }: { bid: Bid }) {
   )
 }
 
-const stateOf = (r: AssetRequest): string => (r.open ? STATUS_LABEL.open : STATUS_LABEL.expired)
+/** The deadline, and under it the time left; the wallet's own lapsed request says it expired instead. */
+function Deadline({ r, nowSec }: { r: AssetRequest; nowSec: number }) {
+  return (
+    <span className={styles.stack}>
+      <DateTime value={r.bid.expiry * 1000} format="date" />
+      <span className={styles.sub}>{r.open ? formatCountdown(r.bid.expiry - nowSec) : LAPSED}</span>
+    </span>
+  )
+}
 
 export function RequestsTab({ token }: RequestsTabProps) {
   const me = useMe()
@@ -87,6 +86,8 @@ export function RequestsTab({ token }: RequestsTabProps) {
   const search = useAssetSearch()
   const ticketSearch = useTicketSearch()
   const rows = useMemo(() => (bids.data ? assetRequests(bids.data, token.contractId, me, nowSec) : null), [bids.data, token.contractId, me, nowSec])
+  const [cancelling, setCancelling] = useState<BookRow | null>(null)
+  const cancel = (bid: Bid) => setCancelling(requestRow(bid))
 
   const postRequest = (
     <ButtonLink render={<RouterLink to={ASSET_ROUTE} params={{ asset: param }} search={ticketSearch({ mode: 'bid', assetId: token.contractId, kind: 'put' })} activeOptions={EXACT} resetScroll={false} />}>
@@ -99,15 +100,14 @@ export function RequestsTab({ token }: RequestsTabProps) {
 
   return (
     <section className={styles.root} aria-labelledby="asset-requests" aria-busy={bids.isPending || undefined}>
-      <header className={styles.head}>
-        <div className={styles.headMain}>
-          <h2 id="asset-requests" className={styles.title}>
-            {REQUESTS_HEADING}
-          </h2>
-          <p className={styles.lead}>{requestsLead(token.code)}</p>
-        </div>
+      {/* The tab above already says "Requests": the heading is for screen readers, the definition leads. */}
+      <h2 id="asset-requests" className="ui-vh">
+        {REQUESTS_HEADING}
+      </h2>
+      <div className={styles.head}>
+        <p className={styles.lead}>{requestsLead(token.code)}</p>
         {rows && rows.length > 0 ? postRequest : null}
-      </header>
+      </div>
 
       {bids.isError && rows === null ? (
         <Callout variant="danger" title={REQUESTS_ERROR} actions={<Button onClick={() => void bids.refetch()}>{RETRY}</Button>}>
@@ -118,9 +118,9 @@ export function RequestsTab({ token }: RequestsTabProps) {
       ) : rows === null ? (
         <EmptyNote title={REQUESTS_UNSUPPORTED} />
       ) : rows.length === 0 ? (
-        <EmptyNote title={requestsEmpty(token.code)} hint={REQUESTS_EMPTY_HINT} action={postRequest} />
+        <EmptyNote title={requestsEmpty(token.code)} action={postRequest} />
       ) : (
-        <>
+        <div className={styles.list}>
           <TableWrap label={requestsCaption(token.code)} className={styles.table}>
             <Table caption={requestsCaption(token.code)}>
               <THead>
@@ -131,8 +131,9 @@ export function RequestsTab({ token }: RequestsTabProps) {
                   <Th numeric>{REQ_COL.expiry}</Th>
                   <Th numeric>{REQ_COL.premium}</Th>
                   <Th>{REQ_COL.buyer}</Th>
-                  <Th>{REQ_COL.state}</Th>
-                  <Th pinned>{REQ_COL.action}</Th>
+                  <Th>
+                    <span className="ui-vh">{REQ_COL.action}</span>
+                  </Th>
                 </Tr>
               </THead>
               <TBody>
@@ -153,10 +154,7 @@ export function RequestsTab({ token }: RequestsTabProps) {
                         <Money units={bid.underlyingQty} token={bid.underlying} />
                       </Td>
                       <Td numeric>
-                        <span className={styles.stack}>
-                          <DateTime value={bid.expiry * 1000} format="date" />
-                          <span className={styles.sub}>{formatCountdown(bid.expiry - nowSec)}</span>
-                        </span>
+                        <Deadline r={r} nowSec={nowSec} />
                       </Td>
                       <Td numeric>
                         <span className={styles.stack}>
@@ -165,12 +163,9 @@ export function RequestsTab({ token }: RequestsTabProps) {
                         </span>
                       </Td>
                       <Td>{r.mine ? <span className={styles.yours}>{YOURS}</span> : <ChainId value={bid.buyer} copyLabel={null} explorerLabel="View the buyer on the explorer" />}</Td>
-                      <Td>
-                        <Tag state={stateOf(r)} />
-                      </Td>
-                      <Td pinned>
+                      <Td align="end" className={styles.actionCell}>
                         {r.mine ? (
-                          <CancelButton bid={bid} />
+                          <CancelButton bid={bid} onCancel={cancel} />
                         ) : (
                           <ButtonLink size="sm" aria-label={sellName(bid)} render={sellLink(bid)}>
                             {SELL_TO_BID}
@@ -200,7 +195,7 @@ export function RequestsTab({ token }: RequestsTabProps) {
                         </span>
                       ) : null}
                     </span>
-                    <Tag state={stateOf(r)} />
+                    {r.open ? null : <span className={styles.lapsed}>{LAPSED}</span>}
                   </div>
                   <dl className={styles.cardFacts}>
                     <div>
@@ -213,13 +208,21 @@ export function RequestsTab({ token }: RequestsTabProps) {
                       <dt>{REQ_COL.expiry}</dt>
                       <dd>
                         <DateTime value={bid.expiry * 1000} format="date" />
-                        <span className={styles.sub}>{formatCountdown(bid.expiry - nowSec)}</span>
+                        {r.open ? <span className={styles.sub}>{formatCountdown(bid.expiry - nowSec)}</span> : null}
                       </dd>
                     </div>
                     <div>
                       <dt>{REQ_COL.premium}</dt>
                       <dd>
-                        <span>{r.mine ? <Marker><Money units={bid.totalPremium} token={bid.quote} /></Marker> : <Money units={bid.totalPremium} token={bid.quote} />}</span>
+                        <span>
+                          {r.mine ? (
+                            <Marker>
+                              <Money units={bid.totalPremium} token={bid.quote} />
+                            </Marker>
+                          ) : (
+                            <Money units={bid.totalPremium} token={bid.quote} />
+                          )}
+                        </span>
                         {per !== null ? <span className={styles.sub}>{perUnitLine(formatUnits(per, bid.quote.decimals))}</span> : null}
                       </dd>
                     </div>
@@ -230,7 +233,7 @@ export function RequestsTab({ token }: RequestsTabProps) {
                   </dl>
                   <div className={styles.cardFoot}>
                     {r.mine ? (
-                      <CancelButton bid={bid} />
+                      <CancelButton bid={bid} onCancel={cancel} fullWidth />
                     ) : (
                       <ButtonLink fullWidth aria-label={sellName(bid)} render={sellLink(bid)}>
                         {SELL_TO_BID}
@@ -241,8 +244,9 @@ export function RequestsTab({ token }: RequestsTabProps) {
               )
             })}
           </ul>
-        </>
+        </div>
       )}
+      <CancelDialog row={cancelling} onClose={() => setCancelling(null)} />
     </section>
   )
 }

@@ -5,11 +5,11 @@ import type { LifecycleStep } from './content'
 import type { WorkedExample } from './examples'
 import css from './Lifecycle.module.css'
 
-const toItem = (step: LifecycleStep, status: TimelineItem['status']): TimelineItem => ({
+// A walk-through of an option in general, not anybody's position: no step is done, current or ahead, so every mark
+// is the same ink point. The title of each step says who acts; the line above it says by when.
+const toItem = (step: LifecycleStep): TimelineItem => ({
   title: step.title,
   time: step.when,
-  actor: step.who,
-  status,
   description: (
     <>
       <p>{step.text}</p>
@@ -31,25 +31,20 @@ export interface LifecycleProps {
 }
 
 /**
- * One put from offer to end: who acts, by when, and the contract state after each step. The option has just been
- * bought, so the first two steps are done, the third is where it stands, and the two ways it can end are ahead.
+ * One put from offer to end: who acts, by when, and the contract state after each step; then the two ways it can
+ * end, side by side with equal weight. The first step of each ending names it.
  */
 export function Lifecycle({ example, deadline }: LifecycleProps) {
   const spine = lifecycleSpine(example, deadline)
   const branches = lifecycleBranches(example)
   return (
     <div className={css.root}>
-      <Timeline
-        className={css.spine}
-        label={LIFECYCLE_TIMELINE_LABEL}
-        items={spine.map((step, i) => toItem(step, i === spine.length - 1 ? 'current' : 'done'))}
-      />
+      <Timeline className={css.spine} label={LIFECYCLE_TIMELINE_LABEL} items={spine.map(toItem)} />
       <p className={css.forkIntro}>{LIFECYCLE_FORK_INTRO}</p>
       <div className={css.fork}>
         {branches.map((branch) => (
           <div key={branch.id} className={css.branch}>
-            <h3 className={css.branchTitle}>{branch.title}</h3>
-            <Timeline label={branch.label} items={branch.steps.map((step) => toItem(step, 'upcoming'))} />
+            <Timeline label={branch.label} items={branch.steps.map(toItem)} />
           </div>
         ))}
       </div>

@@ -4,13 +4,26 @@ import type { AssetSearch } from '../../../app/search'
 import { guideAnchor } from '../../../core/guide'
 import { useModeNoteOffer } from '../../../data'
 import { NavTab, NavTabs, Segmented } from '../../../ui'
-import { MODE_LABEL, MODE_NAMES, TABS_LABEL, TAB_NAMES } from '../copy'
+import { MODE_LABEL, MODE_NAMES, MODE_SHORT, TABS_LABEL, TAB_NAMES } from '../copy'
 import { ASSET_ROUTE, EXACT, compactSearch } from '../routing'
 import type { AssetMode, AssetTab } from '../routing'
 import styles from './AssetTabs.module.css'
 
 const TABS: readonly AssetTab[] = ['trade', 'requests', 'about']
 const MODES: readonly AssetMode[] = ['guided', 'chain']
+
+/** A mode's name: in full where there is room, short on a phone; the accessible name is always the full one. */
+function ModeName({ mode }: { mode: AssetMode }) {
+  if (MODE_NAMES[mode] === MODE_SHORT[mode]) return <>{MODE_NAMES[mode]}</>
+  return (
+    <>
+      <span className={styles.long}>{MODE_NAMES[mode]}</span>
+      <span className={styles.short} aria-hidden="true">
+        {MODE_SHORT[mode]}
+      </span>
+    </>
+  )
+}
 
 export interface AssetTabsProps {
   /** The `$asset` segment of the current URL. */
@@ -50,7 +63,7 @@ export function AssetTabs({ param, tab, mode, urlMode, onModeChange, requests }:
       </NavTabs>
       {tab === 'trade' ? (
         <div className={styles.mode} {...guideAnchor('mode')}>
-          <Segmented<AssetMode> label={MODE_LABEL} size="sm" fullWidth value={mode} onValueChange={onModeChange} options={MODES.map((m) => ({ value: m, label: MODE_NAMES[m] }))} />
+          <Segmented<AssetMode> label={MODE_LABEL} size="sm" value={mode} onValueChange={onModeChange} options={MODES.map((m) => ({ value: m, label: <ModeName mode={m} /> }))} />
         </div>
       ) : null}
     </div>

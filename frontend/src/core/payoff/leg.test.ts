@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { longCall, longPut, shortCall, shortPut } from '../../../../packages/payoff/src/index.ts'
 import type { TokenInfo } from '../options/types'
-import { breakevenPerUnit, legNumbers, legPnl, legPnlOf, mostYouCanGain, mostYouCanLose, premiumPerUnit, strikePerUnit, toNumber } from './leg'
+import { breakevenPerUnit, givesUp, legNumbers, legPnl, legPnlOf, mostYouCanGain, mostYouCanLose, premiumPerUnit, strikePerUnit, toNumber } from './leg'
 import type { Leg } from './leg'
 
 const BOND: TokenInfo = { code: 'BOND', contractId: 'C-BOND', decimals: 7 }
@@ -23,13 +23,20 @@ describe('exact figures of a leg', () => {
     expect(breakevenPerUnit({ ...leg('put'), totalPremium: 60n * U })).toBe(0n)
   })
 
-  it('caps each side by the premium or by the strike less the premium, and leaves a call uncapped', () => {
+  it('caps each side by the premium or by the strike less the premium; a written call has no loss figure', () => {
     expect(mostYouCanLose(leg('put'), 'long')?.amount).toBe(18_000_000n)
     expect(mostYouCanGain(leg('put'), 'short')?.amount).toBe(18_000_000n)
     expect(mostYouCanGain(leg('put'), 'long')?.amount).toBe(482_000_000n)
     expect(mostYouCanLose(leg('put'), 'short')?.amount).toBe(482_000_000n)
     expect(mostYouCanGain(leg('call'), 'long')).toBeNull()
     expect(mostYouCanLose(leg('call'), 'short')).toBeNull()
+  })
+
+  it('says what a written call gives up instead: the rise above the strike, owing at most the underlying locked (E14)', () => {
+    expect(givesUp(leg('call'), 'short')).toEqual({ abovePerUnit: 10n * U, locked: { token: BOND, amount: 5n * U } })
+    expect(givesUp(leg('call'), 'long')).toBeNull()
+    expect(givesUp(leg('put'), 'short')).toBeNull()
+    expect(givesUp(leg('put'), 'long')).toBeNull()
   })
 })
 

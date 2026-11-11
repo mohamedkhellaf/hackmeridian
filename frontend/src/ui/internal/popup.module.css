@@ -80,12 +80,13 @@
       font-weight: 600;
     }
 
-    &[data-disabled] {
-      color: var(--disabled-fg);
-    }
-
     &[data-tone='danger'] {
       color: var(--danger);
+    }
+
+    /* After the tone: a disabled danger item looks disabled, not live. */
+    &[data-disabled] {
+      color: var(--disabled-fg);
     }
 
     @media (pointer: coarse) {

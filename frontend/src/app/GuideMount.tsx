@@ -1,7 +1,25 @@
-import { Suspense, lazy, useState } from 'react'
+import { Component, Suspense, lazy, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useGuide } from '../data'
 
 const GuideHost = lazy(() => import('../features/tour').then((m) => ({ default: m.GuideHost })))
+
+/** A guide that fails is left out: it is never worth the page. */
+class GuideBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: unknown): void {
+    console.error('The welcome guide failed and is left out.', error)
+  }
+
+  render(): ReactNode {
+    return this.state.failed ? null : this.props.children
+  }
+}
 
 /**
  * The welcome guide, beside the app shell. Its chunk is fetched the first time a guide is asked for (the welcome
@@ -13,8 +31,10 @@ export function GuideMount() {
   const [asked, setAsked] = useState(false)
   if (run && !asked) setAsked(true)
   return asked ? (
-    <Suspense fallback={null}>
-      <GuideHost />
-    </Suspense>
+    <GuideBoundary>
+      <Suspense fallback={null}>
+        <GuideHost />
+      </Suspense>
+    </GuideBoundary>
   ) : null
 }

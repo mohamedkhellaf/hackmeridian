@@ -1,8 +1,5 @@
 @layer features {
   .page {
-    /* Figures, tables and lists may run wider than the reading measure, up to this. */
-    --learn-wide: 56rem;
-
     display: flex;
     flex-direction: column;
     gap: var(--s-32);
@@ -25,13 +22,13 @@
     }
   }
 
+  /* The article fills its column, so section rules and tables meet the page edge; prose keeps its own measure. */
   .article {
     container-type: inline-size;
     display: flex;
     flex-direction: column;
     gap: var(--s-56);
     min-width: 0;
-    max-width: var(--learn-wide);
   }
 
   /* A section opens with an ink rule and its number, like a clause of a term sheet. */
@@ -134,11 +131,12 @@
     max-width: var(--measure);
   }
 
+  /* The four examples, one ruled row each: closed, a list of four names. */
   .examples {
     display: flex;
     flex-direction: column;
-    gap: var(--s-56);
     min-width: 0;
+    border-top: 1px solid var(--rule);
   }
 
   /* Requests and resale: two paragraphs, side by side when each keeps a readable measure. */
@@ -160,6 +158,12 @@
     flex-direction: column;
     gap: var(--s-8);
     min-width: 0;
+    max-width: var(--measure);
     color: var(--text-2);
+  }
+
+  .action {
+    display: flex;
+    margin-top: var(--s-8);
   }
 }

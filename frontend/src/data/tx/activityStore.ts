@@ -91,6 +91,11 @@ export interface ActivityStore {
   setCreated(address: string | null, id: string, created: string): void
   /** Removes the entries whose outcome is final. In-flight and unknown entries stay. */
   clearSettled(address: string | null): void
+  /**
+   * Puts entries removed by `remove` or `clearSettled` back (an Undo), in their place by start time. Entries of
+   * another address and ids already in the list are ignored.
+   */
+  restore(address: string | null, entries: readonly ActivityEntry[]): void
   /** Reads the list of an address from storage again (another tab wrote it). */
   reload(address: string | null): void
 }
@@ -330,6 +335,18 @@ export function createActivityStore(options: ActivityStoreOptions = {}): Activit
       if (kept.length === list.length) return
       for (const e of list) if (!isOpenEntry(e)) dropped.add(e.id)
       commit(key, kept)
+    },
+    restore(address, entries) {
+      const key = keyOf(address)
+      const list = load(key)
+      const known = new Set(list.map((e) => e.id))
+      const back = entries.filter((e) => e.address === key && !known.has(e.id))
+      if (back.length === 0) return
+      for (const e of back) dropped.delete(e.id)
+      commit(
+        key,
+        [...list, ...back].sort((a, b) => b.startedAt - a.startedAt),
+      )
     },
     reload(address) {
       const key = keyOf(address)

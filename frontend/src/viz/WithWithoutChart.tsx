@@ -5,7 +5,7 @@ import type { Direction } from './a11y.ts'
 import { autoDecimals, formatAxis, formatNumber, formatSigned } from './format.ts'
 import { interpolateAt, linePath, polygonPath, sortPoints } from './geometry.ts'
 import { cx } from './cx.ts'
-import { DataTable, Grip, Hatch, Knockout, SignGlyph, SvgLabel } from './parts.tsx'
+import { DataTable, Grip, Hatch, Knockout, SvgLabel } from './parts.tsx'
 import type { TableRow } from './parts.tsx'
 import type { PayoffReference } from './PayoffChart.tsx'
 import { needsBareGround } from './richLabel.ts'
@@ -177,7 +177,6 @@ export function WithWithoutChart(props: WithWithoutChartProps) {
           props.readoutDifference(state)
         ) : (
           <p className={css.difference} data-direction={state.direction}>
-            {state.direction !== 'even' && <SignGlyph direction={state.direction} />}
             <span>
               Difference {state.differenceText} {unit}
             </span>

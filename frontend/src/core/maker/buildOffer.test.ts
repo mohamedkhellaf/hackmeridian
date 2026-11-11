@@ -75,6 +75,18 @@ describe('buildOffer', () => {
     expect(err(buildOffer(assets, form({ expiry: ok })))).toBeNull()
   })
 
+  it('names the field of each refusal, so a form never reads the sentence to place it (review finding 52)', () => {
+    const field = (d: ReturnType<typeof buildOffer>) => ('field' in d ? d.field : null)
+    expect(field(buildOffer(assets, form({ underlyingId: 'nope' })))).toBe('underlying')
+    expect(field(buildOffer(assets, form({ qty: '0' })))).toBe('qty')
+    expect(field(buildOffer(assets, form({ qty: '0.5', strike: '0.0000001' })))).toBe('qty')
+    expect(field(buildOffer(assets, form({ strike: '0' })))).toBe('strike')
+    expect(field(buildOffer(assets, form({ premium: '0' })))).toBe('premium')
+    expect(field(buildOffer(assets, form({ expiry: '' })))).toBe('expiry')
+    expect(err(buildOffer(assets, form({ expiry: '' })))).toBe('The deadline must be in the future')
+    expect(field(buildOffer(assets, form()))).toBeNull()
+  })
+
   it('supports calls', () => {
     const d = buildOffer(assets, form({ kind: 'call' }))
     expect('offer' in d && d.offer.kind).toBe('call')

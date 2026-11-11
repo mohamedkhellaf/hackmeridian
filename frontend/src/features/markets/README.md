@@ -7,7 +7,7 @@ here: `guided/` (the guided flow) and `chain/` (the option chain and the series 
 
 | Route | Export | Search (types in `src/app/search.ts`) |
 |---|---|---|
-| `/markets` | `MarketsIndexPage` | `intent` (an intent card was chosen and waits for its asset), `all=1` (every listed asset, not only the reference list) |
+| `/markets` | `MarketsIndexPage` | `intent` (an intent was chosen and the Assets section asks for its asset), `all=1` (every listed asset, not only the reference list), `funds=1` (the "Get test funds" strip for any connected wallet) |
 | `/markets/$asset` | `AssetPage` | `tab` (`trade` default, `requests`, `about`), `mode` (`guided`, `chain`; without it the remembered setting applies), and everything the two modes and the ticket own |
 
 `$asset` is a slug (`bond`), `CODE-ISSUER` or an asset contract id. `core/assets` resolves it; an accepted alias is
@@ -17,8 +17,12 @@ replaced by the canonical segment, and anything else gets the not-found view, wh
 
 - `<GuidedMode assetId />` or `<ChainMode assetId />` in the main column of the Trade tab, by `mode`.
 - `<TicketHost placement="rail" />` beside the Trade and Requests tabs, fed by `ticketIntentFromSearch(search, assetId)`.
-  Closing clears `side, offer, bid, ask, step, qty, premium`; the series selection (`kind`, `strike`, `expiry`) and
-  `intent` stay.
+  From 1200 px the rail is a column on the Trade tab (its idle content is `<GuidedClosing />` in guided mode and
+  nothing in chain mode) and, on the Requests tab, only while a ticket is open.
+- Closing clears `side, offer, bid, ask, step` (and `qty, premium` outside guided mode). It goes back to the entry
+  that opened the ticket when nothing changed in between, and otherwise replaces the ticket's entry, so Back never
+  reopens a closed ticket. Entering an entry whose order this browser has since bought, filled or cancelled opens
+  the page without its ticket. A ticket link whose order is on another asset is moved to that asset.
 - A tab link keeps `mode` and drops the selection and the ticket.
 - The mode switch writes `mode` to the URL and to the setting (`useDefaultMode`), so a link names its view and a
   bare link opens the user's last choice.
@@ -28,24 +32,31 @@ replaced by the canonical segment, and anything else gets the not-found view, wh
 | File | What it holds |
 |---|---|
 | `routing.ts` | Route ids, search readers (`useAssetSearch`, `useMarketsSearch`), `usePatchSearch`, `EXACT` for links to the route they are on |
-| `model.ts` | Pure decisions, unit-tested: `indexList`, `obviousAsset`, `needsTestFunds`, `fundingProgress`, `assetRequests` |
+| `model.ts` | Pure decisions, unit-tested: `indexList`, `obviousAsset`, `needsTestFunds`, `fundsLead`, `fundingProgress`, `assetRequests`, `requestRow`, `accessCase` |
 | `copy.ts` | Every sentence of the feature (required disclosures come from `core/disclosures`); `copy.test.ts` checks the wording rules |
-| `parts.tsx`, `values.ts` | `Money`, `ChainId`, `BackToMarkets`, `ShortfallNotice`; `moneyText`, `assetGlyph` |
-| `index-page/` | `MarketsIndexPage`, `IntentCards`, `AssetChoice`, `AssetsTable` (table from 768 px, cards below), `GetFunds`, `GuideSlip` (the welcome of the guide: a first visit only, in the page flow under the header; it gives way to `GetFunds`). The two sections carry the guide's anchors `guideAnchor('intents')` and `guideAnchor('assets')` |
-| `asset/` | `AssetPage`, `AssetHeader`, `AssetTabs` (sub-tabs and mode switch; the switch's wrapper carries `guideAnchor('mode')`, and `useModeNoteOffer` asks for the guide's one note on it), `AssetStates` (skeleton, error, not found), `RequestsTab`, `AboutTab`, `TicketIdle` |
+| `parts.tsx`, `values.ts` | `Money`, `ChainId`, `BackToMarkets`, `ShortfallNotice`; `moneyText` |
+| `index-page/` | `MarketsIndexPage`, `IntentList` (the four intents as ruled rows; one 56 px line each in a narrow column), `AssetsTable` (a table while it fits its column, cards below that, by container query; with an intent it answers "on which asset?"), `GetFunds`, `GuideSlip` (the welcome of the guide: a first visit only, in the page flow under the header; it gives way to `GetFunds`). The two sections carry the guide's anchors `guideAnchor('intents')` and `guideAnchor('assets')` |
+| `asset/` | `AssetPage`, `AssetHeader` (on the page's two columns; the holdings in the rail column), `AssetSwitch` (the other listed assets), `AssetTabs` (sub-tabs and mode switch; the switch's wrapper carries `guideAnchor('mode')`, and `useModeNoteOffer` asks for the guide's one note on it), `AssetStates` (skeleton, error, not found), `RequestsTab`, `AboutTab` |
 
 ## Decisions
 
-- **Intent to asset.** A card links to `/markets?intent=…`, which opens the asset choice under the cards; a row
-  there links to `/markets/$asset?mode=guided&intent=…`. When one asset is the obvious choice (one asset listed,
-  or the wallet holds exactly one for an intent that starts from the asset) the card links straight to it.
-- **Reference price.** Always printed with its label; the header adds the note and, when the price has one, its
-  age. Nothing here calls it a market price.
-- **Thin markets.** An asset without open offers says so in its row and offers the two ways out.
-- **First run.** "Get test funds" shows for a connected wallet whose balances are all zero or missing. The steps
-  happen in the wallet; progress is read from the balance statuses, never assumed.
+- **Intent to asset.** An intent row links to `/markets?intent=…`: the Assets section then asks the question, each
+  row's action carries the intent and links to `/markets/$asset?mode=guided&intent=…`, and a "You hold" column
+  appears for an intent that starts from the asset. When one asset is the obvious choice (one asset listed, or the
+  wallet holds exactly one for an intent that starts from the asset) the row names it and links straight to it.
+- **Same on every row is not a cell.** The price source goes in the column header when every row shares it; the
+  tier column and its legend only appear when tiers differ; the issuer only for assets outside the app's list
+  (whose code is set in the mono face, slashed zero). The count line only appears when assets are hidden.
+- **Reference price.** Always printed with its label; the asset header is the one home of the sentence that
+  explains it, and adds the age when the price has one. Nothing here calls it a market price.
+- **Thin markets and shortfalls.** An asset without open offers says so in its row and offers the two ways out;
+  a token the contract is short of after a clawback says so in its row, linked to Reserves.
+- **First run.** "Get test funds" shows for a connected wallet with no quote token, and at `?funds=1`. The steps
+  happen in the wallet; progress is read from the balance statuses, never assumed. The asset header links to it
+  when the wallet cannot pay.
 - **Requests tab.** Open, unexpired bids of the asset, highest premium per unit first, then the wallet's own
-  lapsed bids (cancelling refunds them). The wallet's own premium is under the highlighter.
-- **About tab.** Home of the issuer sentence. A mock asset has no on-chain facts and says so; its flags are
-  shown as "Not read" with the effect each flag has when it is on.
+  lapsed bids ("Expired" under the deadline; cancelling refunds them, in the chain's cancel dialog).
+- **About tab.** "Your access" first for a connected wallet (what the wallet lacks before what the issuer
+  decided), then what the token is, the facts, the issuer's powers with the issuer sentence, and what they mean for
+  an option. The contract's own facts are on Reserves.
 - **Explorer links.** None in a build that runs on mock data, and none for mock placeholder ids.

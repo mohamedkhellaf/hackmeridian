@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MockOptionsClient } from '../../core/options/mockClient'
 import type { CollateralHealth, CollateralLine, SupportedAssets, TokenInfo } from '../../core/options/types'
-import { chartNumber, differenceExact, differenceMagnitude, differenceSpoken, differenceText, amountText, exactText, ledgerText, readTimeIso, readTimeText, reserveRows, shortRows, summaryLine, visibleRows } from './model'
+import { chartNumber, differenceExact, differenceMagnitude, differenceShown, differenceSpoken, differenceText, subCent, amountText, exactText, ledgerText, readTimeIso, readTimeText, reserveRows, shortRows, summaryLine, visibleRows } from './model'
 
 const USDX: TokenInfo = { contractId: 'C_USDX', code: 'USDx', decimals: 7 }
 const BOND: TokenInfo = { contractId: 'C_BOND', code: 'BOND', decimals: 7 }
@@ -46,6 +46,16 @@ describe('reserveRows', () => {
     expect(bond.state).toBe('short')
     expect(differenceText(bond)).toBe('−<0.01')
     expect(differenceExact(bond)).toBe('−0.0000001')
+  })
+
+  it('says a difference under a cent in words, with the word beside it carrying the side', () => {
+    const [, bond] = reserveRows(ASSETS, [line(BOND, { active: u(250) })], [health(BOND, u(250), u(250) - 1n)])
+    expect(subCent(bond)).toBe(true)
+    expect(differenceShown(bond)).toBe('under 0.01')
+    expect(differenceSpoken(bond)).toBe('short by under 0.01 BOND')
+    const [, whole] = reserveRows(ASSETS, [line(BOND, { active: u(250) })], [health(BOND, u(250), u(230))])
+    expect(subCent(whole)).toBe(false)
+    expect(differenceShown(whole)).toBe('−20.00')
   })
 
   it('reads held above locked as over, with a plus sign', () => {

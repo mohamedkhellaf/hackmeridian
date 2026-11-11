@@ -2,49 +2,93 @@
   .wrap {
     /* The focus ring of a cell is drawn inside it, so nothing is clipped by the scroll container. */
     overflow-y: hidden;
+    /* Desk density: the ladder keeps the proportions it has at 600 to 700 px, whatever the column's width. */
+    max-inline-size: 46rem;
   }
 
   .table {
     --strike-w: calc(var(--s-72) + var(--s-24));
+    /* A tone that moves away from the page in both themes: darker than Paper, lighter than Carbon. */
+    --chain-tone: color-mix(in srgb, var(--text) 7%, transparent);
+    /* The slots of a side: premium, size, request. In rem, so the header labels and the figures (two type
+       sizes) share one grid. A premium up to 99.99, a size up to 9,999.00. */
+    --premium-w: 2.75rem;
+    --size-w: 4.25rem;
+    --request-w: 3rem;
   }
 
   .strikeCol {
     width: var(--strike-w);
   }
 
-  /* ---- Header: "Makers" at the outer edge, the premium next to the strike ---- */
+  /* ---- One grid for the header labels, the button and the layer over it ---- */
 
-  .headInner {
-    display: flex;
+  .headSlots,
+  .button:not([data-variant='empty']),
+  .overlay {
+    display: grid;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--s-8);
+    align-content: center;
+    column-gap: var(--s-8);
+    grid-template-columns: var(--premium-w) var(--size-w) var(--request-w) minmax(0, 1fr);
+    grid-template-areas: 'premium size request mark';
+  }
+
+  /* The call side is the mirror: the offer next to the strike, the request further out. */
+  .head[data-kind='call'] .headSlots,
+  .button[data-kind='call']:not([data-variant='empty']),
+  .overlay[data-kind='call'] {
+    grid-template-columns: minmax(0, 1fr) var(--request-w) var(--premium-w) var(--size-w);
+    grid-template-areas: 'mark request premium size';
+  }
+
+  /* ---- Header: the kind over its two columns ---- */
+
+  .head {
+    vertical-align: bottom;
   }
 
   .headKind {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: var(--s-6);
     color: var(--text-2);
   }
 
+  .head[data-kind='call'] .headKind {
+    justify-content: flex-end;
+  }
+
+  /* Each label ends where its figures end: premiums and requests are right-aligned in their slots. */
+  .headOffer {
+    grid-area: premium;
+    text-align: end;
+  }
+
+  .headRequest {
+    grid-area: request;
+    text-align: end;
+  }
+
   .strikeHead {
+    background: var(--chain-tone);
     color: var(--text-2);
   }
 
   /* ---- Cells ---- */
 
   .cell {
+    position: relative;
     padding: 0;
 
     &[data-itm] {
-      background: var(--sunken);
+      background: var(--chain-tone);
     }
   }
 
   .strike {
     padding-inline: var(--s-8);
-    background: var(--sunken);
+    background: var(--chain-tone);
     font-family: var(--font-serif);
     font-size: var(--figure-size);
     line-height: var(--figure-line);
@@ -56,12 +100,27 @@
     }
   }
 
+  /* Right-aligned in a box of one width, centred: the decimal point does not move from 99.00 to 100.00. */
+  .strikeFigure {
+    display: inline-block;
+    min-inline-size: 4.25rem;
+    text-align: end;
+  }
+
+  /* The reference equals this strike: its label sits under the figure, and no rule is drawn. */
+  .atTag {
+    display: block;
+    color: var(--text-2);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
   .button {
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--s-8);
     width: 100%;
     min-height: calc(var(--row-h) - 1px);
     padding: 0 var(--cell-px);
@@ -73,19 +132,16 @@
       background-color var(--dur-hover) var(--ease-enter),
       color var(--dur-hover) var(--ease-enter);
 
-    /* Read as "premium, count" on both sides; shown mirrored, so the premium is next to the strike on both.
-       An empty cell is read "No offer, Request": the mirror is the other way round. */
-    &[data-kind='call']:not([data-variant='empty']),
-    &[data-kind='put'][data-variant='empty'] {
-      flex-direction: row-reverse;
+    &[data-kind='call'] {
+      justify-content: flex-end;
     }
 
     &[aria-pressed='true'] {
       background: var(--accent-tint);
     }
 
-    /* A quiet hover: the chain is dense and the pointer crosses it constantly. The wash sits over the tone of an
-       in-the-money cell, so it shows there too. */
+    /* A quiet hover: the chain is dense and the pointer crosses it constantly. The wash lies over the tone of
+       an in-the-money cell, so it is a step stronger there. */
     @media (hover: hover) {
       &:hover:not([aria-pressed='true']) {
         background: var(--hover);
@@ -100,37 +156,76 @@
     }
   }
 
-  .figure[data-variant='bid-only'] {
-    color: var(--text-2);
+  /* The size, the request beside an offer and "yours": over the button, transparent to the pointer. */
+  .overlay {
+    position: absolute;
+    z-index: 2;
+    inset: 0;
+    padding: 0 var(--cell-px);
+    white-space: nowrap;
+    pointer-events: none;
   }
 
-  .count,
-  .bidWord {
+  /* The figures the table exists for: the offer is the loudest thing in a row. */
+  .premium,
+  .size,
+  .request,
+  .mark {
+    line-height: var(--ui-line);
+  }
+
+  .premium {
+    grid-area: premium;
+    color: var(--text);
+    font-weight: 550;
+    text-align: end;
+  }
+
+  .size {
+    grid-area: size;
     color: var(--muted);
     font-size: var(--caption-size);
-    line-height: var(--caption-line);
     font-weight: 450;
   }
 
-  .count {
+  .request {
+    grid-area: request;
+    color: var(--text-2);
+    font-weight: 450;
+    text-align: end;
+  }
+
+  .mark {
+    grid-area: mark;
     overflow: hidden;
+    color: var(--muted);
+    font-size: var(--caption-size);
+    font-weight: 450;
     text-overflow: ellipsis;
   }
 
-  .request {
+  .overlay[data-kind='call'] .mark {
+    text-align: end;
+  }
+
+  /* An empty cell asks for a price: quiet until it is pointed at or focused. */
+  .ask {
+    color: var(--text-2);
+    font-weight: 450;
+  }
+
+  .button:hover .ask,
+  .button:focus-visible .ask {
     color: var(--accent);
-    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
 
   .none {
     color: var(--muted);
   }
 
-  .bidWord {
-    margin-inline-end: var(--s-4);
-  }
-
-  /* ---- The reference price: a dashed rule between two strikes, with its tag on the strike column ---- */
+  /* ---- The reference price: a quiet dashed rule between two strikes, with its label on the strike column ---- */
 
   .ruleSide,
   .ruleMid {
@@ -145,28 +240,144 @@
       position: absolute;
       inset-inline: 0;
       top: 50%;
-      border-top: 1px dashed var(--text);
+      border-top: 1px dashed var(--control);
     }
   }
 
-  .ruleMid {
-    background: var(--sunken);
-  }
-
-  /* Centred on the strike column; a long tag (the faucet price) reaches over the side cells. */
+  /* Centred on the strike column; a long label (the faucet price) reaches over the side cells. */
   .tag {
     position: absolute;
-    z-index: 1;
+    z-index: 3;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    padding: 0 var(--s-6);
-    border-radius: var(--r-tag);
-    background: var(--primary);
-    color: var(--primary-fg);
+    padding: 0 var(--s-8);
+    background: var(--bg);
+    color: var(--text-2);
     font-size: var(--caption-size);
     line-height: var(--caption-line);
     font-weight: 500;
     white-space: nowrap;
+  }
+
+  /* ---- A phone: both halves; the request (or "yours") on a second line under the offer ---- */
+
+  .table[data-compact] {
+    --strike-w: calc(var(--s-72) + var(--s-8));
+    --cell-px: var(--s-8);
+    /* Fixed tracks again, so the button and the layer over it place their parts at the same x. */
+    --premium-w: 2.5rem;
+    --size-w: 3.75rem;
+
+    & .headSlots,
+    & .button:not([data-variant='empty']),
+    & .overlay {
+      column-gap: var(--s-4);
+      grid-template-columns: var(--premium-w) minmax(0, var(--size-w)) minmax(0, 1fr);
+      grid-template-rows: var(--ui-line);
+      grid-template-areas: 'premium size .';
+    }
+
+    & .headSlots,
+    & .button[data-two],
+    & .overlay[data-two] {
+      grid-template-rows: var(--ui-line) var(--caption-line);
+      grid-template-areas:
+        'premium size .'
+        'request mark .';
+    }
+
+    & .button[data-variant='request-only'],
+    & .overlay[data-variant='request-only'] {
+      grid-template-areas: 'request mark .';
+    }
+
+    & .head[data-kind='call'] .headSlots,
+    & .button[data-kind='call']:not([data-variant='empty']),
+    & .overlay[data-kind='call'] {
+      grid-template-columns: minmax(0, 1fr) var(--premium-w) minmax(0, var(--size-w));
+      grid-template-areas: '. premium size';
+    }
+
+    & .head[data-kind='call'] .headSlots,
+    & .button[data-kind='call'][data-two],
+    & .overlay[data-kind='call'][data-two] {
+      grid-template-areas:
+        '. premium size'
+        '. mark request';
+    }
+
+    & .button[data-kind='call'][data-variant='request-only'],
+    & .overlay[data-kind='call'][data-variant='request-only'] {
+      grid-template-areas: '. mark request';
+    }
+
+    & .headSlots {
+      grid-template-rows: auto auto;
+    }
+
+    /* Two lines over two lines: "Offer" over the offer, "Request" over the request. */
+    & .headOffer,
+    & .headRequest {
+      grid-column: 1 / span 2;
+      text-align: start;
+    }
+
+    & .headOffer {
+      grid-row: 1;
+    }
+
+    & .headRequest {
+      grid-row: 2;
+    }
+
+    & .head[data-kind='call'] .headOffer,
+    & .head[data-kind='call'] .headRequest {
+      grid-column: 2 / span 2;
+      text-align: end;
+    }
+
+    & .overlay[data-two] .request,
+    & .overlay[data-two] .mark {
+      line-height: var(--caption-line);
+    }
+
+    & .overlay[data-two] .request {
+      font-size: var(--caption-size);
+    }
+
+    & .request,
+    & .mark {
+      text-align: start;
+    }
+
+    & .button[data-kind='call'] .request,
+    & .overlay[data-kind='call'] .request,
+    & .overlay[data-kind='call'] .mark {
+      text-align: end;
+    }
+
+    & .size {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    & .strikeFigure {
+      min-inline-size: 3.5rem;
+    }
+
+    & .ask {
+      white-space: normal;
+    }
+
+    & .button[data-kind='call'] .ask {
+      text-align: end;
+    }
+
+    @media (pointer: coarse) {
+      & .button {
+        min-height: var(--touch);
+      }
+    }
   }
 }

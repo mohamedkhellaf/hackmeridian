@@ -3,8 +3,10 @@
 import type { AssetSearch } from '../../../app/search'
 import { parseAmount } from '../../../core/format'
 import type { BookRow } from '../../../core/market/book'
-import { bookRowAction, cellKey } from '../../../core/market/selection'
+import { bookRowAction, cellKey, seriesRefOf } from '../../../core/market/selection'
+import type { SeriesRef } from '../../../core/market/selection'
 import type { OptionKind } from '../../../core/options/types'
+import { intentFor } from '../../../core/payoff/strategies'
 import type { GuidedIntent } from '../../../core/payoff/strategies'
 import { expiryFromDayKey } from '../../../core/series'
 import type { TicketIntent } from '../../ticket'
@@ -28,15 +30,42 @@ export interface Series {
 }
 
 /**
- * The strike and expiry the URL names, kept only when they are on the standard grid: the chips are the grid, so
- * anything else falls back to the default rather than selecting a chip that does not exist.
+ * The intent a link means. A link from the chain names an option kind and no intent: a call is a buy price to
+ * lock (or, written, an income on what you hold), a put a floor (or, written, an income while waiting to buy).
  */
-export function pinnedSeries(search: Pick<AssetSearch, 'strike' | 'expiry'>, grid: Grid, quoteDecimals: number): Series {
+export function intentOf(search: Pick<AssetSearch, 'intent' | 'kind' | 'side'>): GuidedIntent {
+  if (search.intent) return search.intent
+  if (search.kind) return intentFor(search.kind, search.side === 'write' ? 'write' : 'buy')
+  return 'floor'
+}
+
+/**
+ * The strike and expiry the URL names, kept only when they are on the standard grid and belong to the intent's
+ * option kind: the chips are the grid, so anything else falls back to the default rather than selecting a chip
+ * that does not exist, and a call's strike never becomes a floor.
+ */
+export function pinnedSeries(search: Pick<AssetSearch, 'strike' | 'expiry' | 'kind'>, grid: Grid, quoteDecimals: number, kind?: OptionKind): Series {
+  if (kind !== undefined && search.kind !== undefined && search.kind !== kind) return { strike: null, expiry: null }
   const strike = search.strike ? parseAmount(search.strike, quoteDecimals) : null
   const expiry = search.expiry ? expiryFromDayKey(search.expiry) : null
   return {
     strike: strike !== null && grid.ladder.includes(strike) ? strike : null,
     expiry: expiry !== null && grid.expiries.includes(expiry) ? expiry : null,
+  }
+}
+
+/**
+ * What the URL named that is not on the grid, to say so once: the strike in exact units (null when it was a
+ * listed price, missing, or not a number) and the expiry in unix seconds. A term dropped because it belongs to
+ * another option kind is not reported: the intent changed, not the price.
+ */
+export function offGrid(search: Pick<AssetSearch, 'strike' | 'expiry' | 'kind'>, grid: Grid, quoteDecimals: number, kind: OptionKind): { strike: bigint | null; expiry: number | null } {
+  if (search.kind !== undefined && search.kind !== kind) return { strike: null, expiry: null }
+  const strike = search.strike ? parseAmount(search.strike, quoteDecimals) : null
+  const expiry = search.expiry ? expiryFromDayKey(search.expiry) : null
+  return {
+    strike: strike !== null && strike > 0n && !grid.ladder.includes(strike) ? strike : null,
+    expiry: expiry !== null && !grid.expiries.includes(expiry) ? expiry : null,
   }
 }
 
@@ -171,6 +200,42 @@ export interface OwnTerms {
 export function ownIntent(side: 'buy' | 'write', t: OwnTerms): TicketIntent {
   const terms = { assetId: t.assetId, kind: t.kind, strike: t.strike, expiry: t.expiry, qty: t.qty, ...(t.premium ? { premium: t.premium } : {}) }
   return side === 'buy' ? { mode: 'bid', ...terms } : { mode: 'write', ...terms }
+}
+
+// ------------------------------------------------------------------------------------------- lots
+
+/** The quantities on offer in one series, smallest first, each once. Offers are sold whole: these are the lots. */
+export function lotsOf(rows: readonly Pick<BookRow, 'underlyingQty'>[]): bigint[] {
+  return [...new Set(rows.map((r) => r.underlyingQty))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+}
+
+/**
+ * Smaller lots of the same series that together stay within the quantity asked for, best price per unit first:
+ * what taking them one by one would cover. Empty when no smaller lot exists.
+ */
+export function coverWith<R extends Pick<BookRow, 'underlyingQty' | 'totalPremium'>>(rows: readonly R[], qty: bigint, side: 'buy' | 'write'): { rows: R[]; total: bigint } {
+  const smaller = rows
+    .filter((r) => r.underlyingQty < qty)
+    .sort((a, b) => {
+      // Cross-multiplied per-unit prices: cheaper first for a buyer, higher first for a seller.
+      const lhs = a.totalPremium * b.underlyingQty
+      const rhs = b.totalPremium * a.underlyingQty
+      return side === 'buy' ? (lhs < rhs ? -1 : lhs > rhs ? 1 : 0) : lhs > rhs ? -1 : lhs < rhs ? 1 : 0
+    })
+  const taken: R[] = []
+  let total = 0n
+  for (const r of smaller) {
+    if (total + r.underlyingQty > qty) continue
+    taken.push(r)
+    total += r.underlyingQty
+  }
+  return { rows: taken, total }
+}
+
+/** True when an option, offer or request is of exactly this series. */
+export function inSeries(o: Parameters<typeof seriesRefOf>[0], ref: Pick<SeriesRef, 'underlyingId' | 'expiry' | 'kind' | 'strikePerUnit'>): boolean {
+  const own = seriesRefOf(o)
+  return own !== null && own.underlyingId === ref.underlyingId && own.expiry === ref.expiry && own.kind === ref.kind && own.strikePerUnit === ref.strikePerUnit
 }
 
 // ------------------------------------------------------------------------------------------- display numbers

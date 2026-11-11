@@ -1,9 +1,66 @@
 @layer features {
   .root {
+    min-width: 0;
+    border-top: 1px solid var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .summary {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    min-height: var(--control-h);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    list-style: none;
+    border-radius: var(--r-control);
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    /* A plus that turns into a minus: drawn with two rules, no glyph font. */
+    &::before {
+      content: '';
+      flex: none;
+      width: var(--s-12);
+      height: var(--s-12);
+      background:
+        linear-gradient(currentcolor, currentcolor) center / 100% 1px no-repeat,
+        linear-gradient(currentcolor, currentcolor) center / 1px 100% no-repeat;
+    }
+
+    @media (hover: hover) {
+      &:hover {
+        color: var(--text);
+      }
+    }
+
+    /* The transparent outline is what forced colours paints: it drops the box-shadow ring. */
+    &:focus-visible {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      box-shadow: var(--focus-ring);
+    }
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+
+  .root[open] > .summary::before {
+    background: linear-gradient(currentcolor, currentcolor) center / 100% 1px no-repeat;
+  }
+
+  .body {
     display: flex;
     flex-direction: column;
     gap: var(--s-4);
     min-width: 0;
+    padding-bottom: var(--s-16);
   }
 
   .source {

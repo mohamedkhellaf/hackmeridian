@@ -14,21 +14,6 @@
     gap: var(--s-12) var(--s-24);
   }
 
-  .headMain {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-6);
-    min-width: 0;
-  }
-
-  .title {
-    font-family: var(--font-serif);
-    font-size: var(--h2-size);
-    line-height: var(--h2-line);
-    font-weight: var(--h2-weight);
-    letter-spacing: var(--h2-track);
-  }
-
   .lead {
     max-width: var(--measure);
     font-size: var(--ui-size);
@@ -36,8 +21,26 @@
     color: var(--text-2);
   }
 
+  /* Table while it fits its column, the list below that: measured on the column, not the window. */
+  .list {
+    container-type: inline-size;
+    min-width: 0;
+  }
+
   .table {
     display: block;
+  }
+
+  .actionCell {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .lapsed {
+    color: var(--muted);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
   }
 
   .cards {
@@ -73,23 +76,7 @@
     font-weight: 600;
   }
 
-  .cancel {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--s-4);
-  }
-
-  .cancelError {
-    max-width: 16rem;
-    color: var(--danger);
-    font-size: var(--caption-size);
-    line-height: var(--caption-line);
-    white-space: normal;
-    text-align: end;
-  }
-
-  @media (max-width: 767.98px) {
+  @container (max-width: 43.99rem) {
     .table {
       display: none;
     }

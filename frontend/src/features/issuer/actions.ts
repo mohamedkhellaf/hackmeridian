@@ -130,7 +130,7 @@ export async function sendIssuerAction(request: ActionRequest, sign: Sign, opts:
   } catch (e) {
     throw new TxError('refused', COPY.tx.noSource, { cause: e })
   }
-  if (sequence === null) throw new TxError('refused', COPY.flags.missing)
+  if (sequence === null) throw new TxError('refused', COPY.powers.missing)
   const unsigned = await build(request, sourceAccount(request.issuer, sequence), deps)
 
   // ---- sign

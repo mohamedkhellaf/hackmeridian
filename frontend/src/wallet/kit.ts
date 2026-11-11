@@ -3,7 +3,7 @@ import { config } from '../core/config'
 
 // Lazy loader for Stellar Wallets Kit v2 (JSR: @creit-tech/stellar-wallets-kit, installed from the
 // JSR npm mirror as @jsr/creit-tech__stellar-wallets-kit). Imported dynamically so the e2e mock path
-// and first paint never pull the kit in. Testnet only.
+// and first paint never pull the kit in. The kit is set to the Stellar test network.
 type Kit = typeof import('@jsr/creit-tech__stellar-wallets-kit').StellarWalletsKit
 let loading: Promise<Kit> | null = null
 
@@ -21,7 +21,7 @@ export function loadKit(): Promise<Kit> {
       import('@jsr/creit-tech__stellar-wallets-kit/modules/bitget'),
     ])
     const [freighter, xbull, lobstr, albedo, rabet, hana, onekey, bitget] = mods
-    if (config.networkPassphrase !== Networks.TESTNET) throw new Error('StellSec supports Testnet only')
+    if (config.networkPassphrase !== Networks.TESTNET) throw new Error('This build is not configured for Testnet.')
     // Explicit list instead of defaultModules(): that helper also pulls in the MetaMask module, whose
     // dependency (@metamask/connect-stellar) imports the v1 npm package and breaks the Vite build.
     // Ledger/Trezor are deliberately not added.
@@ -46,7 +46,7 @@ export function loadKit(): Promise<Kit> {
           allowedChains: [WalletConnectTargetChain.TESTNET],
           metadata: {
             name: 'StellSec',
-            description: 'Tokenised options on Stellar Testnet',
+            description: 'Options on tokenized assets, on Stellar',
             url: window.location.origin,
             icons: [`${window.location.origin}/favicon.svg`],
           },

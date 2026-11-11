@@ -8,7 +8,10 @@ export interface StatProps {
   value: ReactNode
   /** Unit, once, after the figure. */
   unit?: ReactNode
-  /** One line of context: the source of a price, what a total includes. */
+  /**
+   * One line of context: the source of a price, what a total includes, a second figure of the same quantity, or
+   * where the money sits. Never a definition of the label, never a description of the page.
+   */
   hint?: ReactNode
   size?: 'md' | 'lg'
   className?: string

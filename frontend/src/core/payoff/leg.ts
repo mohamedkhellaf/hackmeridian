@@ -46,14 +46,34 @@ export function breakevenPerUnit(leg: Pick<Leg, 'kind' | 'underlying' | 'underly
 }
 
 /**
- * The most this side can lose on the option itself, or null when there is no cap.
+ * The most this side can lose on the option itself: the one definition of "Most you can lose" (ruling E14), used by
+ * the ticket, the guided page, Learn and the position page.
  * Long: the premium. Short put: the strike paid for an asset worth nothing, less the premium.
- * Short call: no cap (every rise above the strike is given up), so null.
+ * Short call: null, and null never means "no cap". A written call in the Covered contract locks the underlying
+ * itself, so it has no loss figure: it gives up every rise above the strike and can never owe more than the
+ * underlying it locked (`givesUp` says both). "No cap" and "unlimited" are words of the naked Margin call only.
  */
 export function mostYouCanLose(leg: Pick<Leg, 'kind' | 'quote' | 'totalStrike' | 'totalPremium'>, side: Side): Money | null {
   if (side === 'long') return { token: leg.quote, amount: leg.totalPremium }
   if (leg.kind === 'put') return { token: leg.quote, amount: floorZero(leg.totalStrike - leg.totalPremium) }
   return null
+}
+
+/** What a written call gives up in place of a loss figure (ruling E14). */
+export interface GivesUp {
+  /** Every rise above this price per whole unit of underlying, in quote units, truncated. Null for a zero quantity. */
+  abovePerUnit: bigint | null
+  /** The most the writer can owe: the underlying it locked. It can still fall in price. */
+  locked: Money
+}
+
+/**
+ * The written call's side of "Most you can lose": the rise it gives up above the strike, and the underlying it locked
+ * as the most it can owe. Null for every other side, which has a figure in `mostYouCanLose`.
+ */
+export function givesUp(leg: Pick<Leg, 'kind' | 'underlying' | 'underlyingQty' | 'totalStrike'>, side: Side): GivesUp | null {
+  if (side !== 'short' || leg.kind !== 'call') return null
+  return { abovePerUnit: perUnit(leg.totalStrike, leg), locked: { token: leg.underlying, amount: leg.underlyingQty } }
 }
 
 /**

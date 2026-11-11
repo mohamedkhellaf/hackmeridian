@@ -1,23 +1,29 @@
 import { PRO_ENABLED, config } from '../../core/config'
-import { COPYRIGHT_NOTICE, LEGAL_NOTICE } from '../../core/disclosures'
+import { COPYRIGHT_NOTICE, TRADEMARK_NOTICE, legalNotice } from '../../core/disclosures'
 import { explorerContract } from '../../core/explorer'
+import { useIsMock } from '../../data'
 import { Address, Link } from '../../ui'
 import { REPOSITORY_URL } from '../../core/links'
 import { FOOTER_NAV } from './nav'
 import { RouteLink } from './RouteLink'
 import styles from './Footer.module.css'
 
+/** One contract: its name, then its id with copy and a link to the explorer. Ids share a left edge. */
 function ContractLine({ label, id }: { label: string; id: string }) {
   const name = label.toLowerCase()
   return (
-    <p className={styles.contract}>
-      <span>{label}</span>
-      <Address value={id} length="medium" explorerUrl={explorerContract(id)} explorerLabel={`View the ${name} on the explorer`} copyLabel={`Copy the ${name} id`} />
-    </p>
+    <div className={styles.contract}>
+      <dt>{label}</dt>
+      <dd>
+        <Address value={id} length="medium" explorerUrl={explorerContract(id)} explorerLabel={`View the ${name} on the explorer`} copyLabel={`Copy the ${name} id`} />
+      </dd>
+    </div>
   )
 }
 
 export interface FooterViewProps {
+  /** A build on mock data: its legal notice says so instead of naming the network. */
+  mock: boolean
   /** The Covered contract id. A build without one runs on mock data and has no contract to show. */
   coveredId?: string
   /** The Margin contract id, when Margin is enabled and runs against a contract. */
@@ -25,13 +31,14 @@ export interface FooterViewProps {
 }
 
 /** The footer from plain props (the specimens show the variant with contract ids). */
-export function FooterView({ coveredId, marginId }: FooterViewProps) {
+export function FooterView({ mock, coveredId, marginId }: FooterViewProps) {
   return (
     <footer className={`shell-footer ${styles.footer}`}>
       <div className={styles.inner}>
         <div className={styles.notice}>
           <p className={styles.copyright}>{COPYRIGHT_NOTICE}</p>
-          <p className={styles.legal}>{LEGAL_NOTICE}</p>
+          <p className={styles.legal}>{legalNotice(mock)}</p>
+          <p className={styles.legal}>{TRADEMARK_NOTICE}</p>
         </div>
         <div className={styles.aside}>
           <nav aria-label="Footer">
@@ -50,8 +57,12 @@ export function FooterView({ coveredId, marginId }: FooterViewProps) {
               </li>
             </ul>
           </nav>
-          {coveredId ? <ContractLine label={marginId ? 'Covered contract' : 'Contract'} id={coveredId} /> : null}
-          {marginId ? <ContractLine label="Margin contract" id={marginId} /> : null}
+          {coveredId || marginId ? (
+            <dl className={styles.contracts}>
+              {coveredId ? <ContractLine label={marginId ? 'Covered contract' : 'Contract'} id={coveredId} /> : null}
+              {marginId ? <ContractLine label="Margin contract" id={marginId} /> : null}
+            </dl>
+          ) : null}
         </div>
       </div>
     </footer>
@@ -59,10 +70,11 @@ export function FooterView({ coveredId, marginId }: FooterViewProps) {
 }
 
 /**
- * The footer of every app route, a conventional one: the copyright line, the legal notice in small print, the
- * links, and the contract id with copy and a link to the explorer. Nothing else belongs at the bottom of a page.
- * The class `shell-footer` is a structural contract: tests look for it.
+ * The footer of every app route, a conventional one: the copyright line, the legal notice of this build and the
+ * trademark notice in small print, the links, and the contract ids with copy and a link to the explorer. Nothing else belongs at the bottom
+ * of a page. The class `shell-footer` is a structural contract: tests look for it.
  */
 export function Footer() {
-  return <FooterView coveredId={config.optionsContractId} marginId={PRO_ENABLED ? config.proContractId : undefined} />
+  const mock = useIsMock()
+  return <FooterView mock={mock} coveredId={config.optionsContractId} marginId={PRO_ENABLED ? config.proContractId : undefined} />
 }

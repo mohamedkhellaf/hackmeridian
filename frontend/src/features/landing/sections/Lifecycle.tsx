@@ -1,8 +1,8 @@
 import { Link as RouterLink } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { explorerTx } from '../../../core/explorer'
-import { formatMoney, formatUnits, formatUtcDate, groupDigits } from '../../../core/format'
-import { Link, Tag, TxLink } from '../../../ui'
+import { formatMoney, formatUtcDate } from '../../../core/format'
+import { Link, TxLink } from '../../../ui'
 import { LIFECYCLE, SECTION } from '../copy'
 import { RECORDED_PUT, RECORDED_PUT_TX, RECORDED_RECLAIM_TX } from '../recorded'
 import type { RecordedTx } from '../recorded'
@@ -14,21 +14,26 @@ const qty = formatMoney(put.underlyingQty, put.underlying)
 const strike = formatMoney(put.totalStrike, put.quote)
 const premium = formatMoney(put.totalPremium, put.quote)
 
-/** Stroops to XLM, every digit: fees are small, so they are printed whole. */
-const xlm = (stroops: bigint): string => formatUnits(stroops, 7, { dp: 7 })
-
+/** One transaction of the recorded option: its link, and a label when a step has two. */
 function Recorded({ tx, label }: { tx: RecordedTx; label?: string }) {
   return (
     <p className={css.recorded}>
       {label ? <span className={css.recordedLabel}>{label}</span> : null}
       <TxLink hash={tx.hash} explorerUrl={explorerTx(tx.hash)} />
-      <span className={css.recordedMeta}>
-        {LIFECYCLE.fee(xlm(tx.feeStroops))}
-        <br />
-        {LIFECYCLE.ledger(groupDigits(String(tx.ledger)))}
-      </span>
     </p>
   )
+}
+
+/**
+ * The visible mark of each row. The deadline row is the other branch of the exercise, not a step after it, so it
+ * carries "or" and the maker's step after it is number 4.
+ */
+const MARKS: Record<(typeof LIFECYCLE.steps)[number]['id'], { mark: string; label: string }> = {
+  write: { mark: '1', label: LIFECYCLE.stepLabel(1) },
+  buy: { mark: '2', label: LIFECYCLE.stepLabel(2) },
+  exercise: { mark: '3', label: LIFECYCLE.stepLabel(3) },
+  deadline: { mark: LIFECYCLE.or, label: LIFECYCLE.orLabel(3) },
+  collect: { mark: '4', label: LIFECYCLE.stepLabel(4) },
 }
 
 const MOVES: Record<(typeof LIFECYCLE.steps)[number]['id'], string> = {
@@ -66,21 +71,16 @@ export function Lifecycle() {
           <span>{columns.recorded}</span>
         </div>
         <ol className={css.steps} role="list" aria-label={LIFECYCLE.tableCaption}>
-          {LIFECYCLE.steps.map((step, i) => (
-            <li key={step.id} className={css.step}>
+          {LIFECYCLE.steps.map((step) => (
+            <li key={step.id} className={css.step} data-branch={step.id === 'deadline' || undefined}>
               <div className={css.title}>
                 <span className={css.number} aria-hidden="true">
-                  {i + 1}
+                  {MARKS[step.id].mark}
                 </span>
-                <div className={css.titleText}>
-                  <h3 className={css.name}>
-                    <span className="ui-vh">{`${columns.step} ${i + 1}: `}</span>
-                    {step.title}
-                  </h3>
-                  <p className={css.state}>
-                    <span className={css.stateLabel}>{LIFECYCLE.stateAfter}</span> <Tag state={step.state} />
-                  </p>
-                </div>
+                <h3 className={css.name}>
+                  <span className="ui-vh">{MARKS[step.id].label}</span>
+                  {step.title}
+                </h3>
               </div>
               <dl className={css.facts}>
                 <div className={css.fact}>

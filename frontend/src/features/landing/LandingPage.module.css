@@ -1,5 +1,5 @@
 /*
- * Layout of the landing page: status rule, navigation, hero, closing band, footer.
+ * Layout of the landing page: status line (chain builds only), navigation, hero, closing band, footer.
  *
  * The landing has a type scale of its own, set here on the page root and read by every landing module
  * (`--landing-*`). The app's tokens stop at a 44 px display size; a public first screen needs a larger headline,
@@ -11,7 +11,9 @@
     --landing-max: 82rem;
     --landing-section-gap: clamp(3.5rem, 2.2rem + 4.6vw, 6rem);
 
-    --landing-h1-size: clamp(2.625rem, 1.5rem + 4vw, 4rem);
+    /* 38 px on a 390 px phone and 35 px on a 360 px one (two lines each), 64 px from 650 px in one column. Two
+       columns: see .h1. */
+    --landing-h1-size: clamp(2.125rem, 10vw - 0.0625rem, 4rem);
     --landing-h1-line: 1.1;
     --landing-h2-size: clamp(1.75rem, 1.42rem + 1.2vw, 2.25rem);
     --landing-h2-line: 1.14;
@@ -27,6 +29,12 @@
     --landing-figure-line: 1.875rem;
     --landing-fact-size: 1.75rem;
     --landing-fact-line: 2rem;
+    /* The sticky bar; anchors land under it. */
+    --landing-nav-h: var(--s-72);
+
+    @media (max-width: 767.98px) {
+      --landing-nav-h: var(--s-56);
+    }
 
     display: flex;
     flex-direction: column;
@@ -98,7 +106,12 @@
   /* ---- Navigation -------------------------------------------------------------------------------------- */
 
   .top {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
     padding-inline: var(--landing-gutter);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--bg);
   }
 
   .topInner {
@@ -106,7 +119,7 @@
     align-items: center;
     gap: var(--s-32);
     max-width: var(--landing-max);
-    min-height: var(--s-72);
+    min-height: var(--landing-nav-h);
     margin-inline: auto;
   }
 
@@ -129,6 +142,25 @@
     }
   }
 
+  /* Phones: the same three links, one quiet row under the bar. */
+  .phoneNav {
+    display: none;
+
+    @media (max-width: 767.98px) {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0 var(--s-24);
+      padding-inline: var(--landing-gutter);
+      border-bottom: 1px solid var(--hairline);
+
+      & .navLink {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--touch);
+      }
+    }
+  }
+
   .navLink {
     font-size: var(--body-size);
     line-height: var(--body-line);
@@ -141,8 +173,8 @@
     padding-inline: var(--landing-gutter);
   }
 
-  /* Phones read text, widget, facts. Wide screens put the facts on the foot of the text column, level with
-     the foot of the note beside it. */
+  /* Phones read the text, then the note. From 1100 px the two sit side by side: the note keeps at least 35rem, so
+     its three terms stay on one row, and the text block is centred on it. */
   .heroInner {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -152,10 +184,15 @@
     padding-block: var(--s-32) var(--landing-section-gap);
 
     @media (min-width: 1100px) {
-      grid-template-columns: minmax(0, 38rem) minmax(0, 1fr);
-      grid-template-rows: auto 1fr;
+      grid-template-columns: minmax(0, 38rem) minmax(35rem, 1fr);
+      align-items: center;
       gap: var(--s-56);
       padding-top: var(--s-40);
+    }
+
+    /* A short laptop screen: the note's outcomes and its action stay on the first screen. */
+    @media (min-width: 1100px) and (max-height: 800px) {
+      padding-top: var(--s-16);
     }
   }
 
@@ -171,7 +208,8 @@
     color: var(--muted);
   }
 
-  /* The headline is text and the largest thing painted on the first screen. */
+  /* The headline is text and the largest thing painted on the first screen. Beside the note it grows from 40 px
+     at 1100 px (two lines in a 24rem column) to 52 px at 1280 px and 64 px at 1440 px. */
   .h1 {
     font-family: var(--font-serif);
     font-size: var(--landing-h1-size);
@@ -179,11 +217,10 @@
     font-weight: 600;
     letter-spacing: var(--display-track);
     text-wrap: balance;
-  }
 
-  /* The marked words stay on one line: a highlighter stroke does not break in two. */
-  .marked {
-    white-space: nowrap;
+    @media (min-width: 1100px) {
+      font-size: clamp(2.5rem, 7.5vw - 2.75rem, 4rem);
+    }
   }
 
   .lede {
@@ -219,70 +256,8 @@
     font-weight: 500;
   }
 
-  .facts {
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.2fr);
-    gap: var(--s-16) var(--s-24);
-    margin: 0;
-    padding-top: var(--s-16);
-    border-top: 1px solid var(--rule);
-
-    @media (min-width: 1100px) {
-      grid-column: 1;
-      grid-row: 2;
-      align-self: end;
-    }
-
-    @media (max-width: 519.98px) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-
-  /* The figure is read first and its label after, so the pair is reversed on screen only. */
-  .fact {
-    display: flex;
-    flex-direction: column-reverse;
-    justify-content: flex-end;
-    gap: var(--s-4);
-    min-width: 0;
-
-    & dd {
-      margin: 0;
-      font-family: var(--font-serif);
-      font-size: var(--landing-fact-size);
-      line-height: var(--landing-fact-line);
-      font-weight: 560;
-      letter-spacing: var(--h1-track);
-      font-variant-numeric: tabular-nums lining-nums;
-      white-space: nowrap;
-    }
-
-    & dt {
-      font-size: var(--ui-size);
-      line-height: var(--ui-line);
-      color: var(--muted);
-      text-wrap: pretty;
-    }
-  }
-
-  .factUnit {
-    line-height: 1;
-    font-size: 0.6em;
-    font-weight: 560;
-    letter-spacing: normal;
-  }
-
-  .factLink {
-    white-space: nowrap;
-  }
-
   .heroWidget {
     min-width: 0;
-
-    @media (min-width: 1100px) {
-      grid-column: 2;
-      grid-row: 1 / span 2;
-    }
 
     @media (min-width: 768px) and (max-width: 1099.98px) {
       max-width: 44rem;
@@ -295,27 +270,16 @@
     padding-inline: var(--landing-gutter);
   }
 
+  /* One column: the heading, one sentence, the button. */
   .closingInner {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--s-40);
-    align-items: end;
-    max-width: var(--landing-max);
-    margin-inline: auto;
-    padding-block: var(--landing-section-gap);
-    border-top: 1px solid var(--rule);
-
-    @media (min-width: 1000px) {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    }
-  }
-
-  .closingText {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: var(--s-12);
-    min-width: 0;
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--landing-section-gap);
+    border-top: 1px solid var(--rule);
   }
 
   .closingHeading {
@@ -331,21 +295,6 @@
     font-size: var(--landing-lede-size);
     line-height: var(--landing-lede-line);
     color: var(--text-2);
-  }
-
-  .ornament {
-    min-width: 0;
-    margin: 0;
-  }
-
-  .ornamentCaption {
-    margin-top: var(--s-8);
-    font-family: var(--font-serif);
-    font-style: italic;
-    font-size: var(--ui-size);
-    line-height: var(--ui-line);
-    color: var(--muted);
-    text-align: end;
   }
 
   /* ---- Footer ------------------------------------------------------------------------------------------ */
@@ -392,13 +341,15 @@
     color: var(--muted);
   }
 
+  /* Two link groups, set against the right edge on a wide screen. */
   .footerNav {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--s-32) var(--s-24);
 
-    @media (max-width: 519.98px) {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    @media (min-width: 1000px) {
+      grid-template-columns: repeat(2, minmax(0, 14rem));
+      justify-content: end;
     }
   }
 

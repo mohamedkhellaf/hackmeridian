@@ -2,23 +2,25 @@
  * The route manifest. This is the ONLY place where a URL is bound to a page: features never edit this file.
  *
  * Contract with the features (also in README.md):
- * - each page is a NAMED export of `src/features/<name>/index.tsx`, loaded lazily here;
+ * - each page is a NAMED export of `src/features/<name>/index.tsx`, loaded lazily here (Markets is the one
+ *   feature with two pages, so each is loaded from its own module and the index page never pulls the asset page);
  * - a page reads its params and search with `getRouteApi('<route id>')`, where the id is the path as written
  *   below (`/markets/$asset`, `/portfolio/$id`); the search types are the ones of `./search.ts`;
  * - every route except `/` renders inside the app shell; `/` brings its own layout.
  */
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, retainSearchParams } from '@tanstack/react-router'
-import { CrashPage } from './CrashPage'
 import { assetTitle, installNavigationEffects, positionTitle, scrollKeyOf } from './navigation'
 import { NotFoundPage } from './NotFoundPage'
 import { RootLayout } from './RootLayout'
 import { RouteError } from './RouteError'
-import { RoutePending } from './RoutePending'
+import { RootError } from './RootError'
+import { DocumentPending, RoutePending } from './RoutePending'
 import { warmShell } from './shellChunk'
 import {
   parseSearch,
   stringifySearch,
   validateAssetSearch,
+  validateIssuerSearch,
   validateMarketsSearch,
   validatePortfolioSearch,
   validatePositionSearch,
@@ -45,6 +47,8 @@ const validateRootSearch = (raw: Record<string, unknown>): RootSearch => (E2E &&
 
 const rootRoute = createRootRoute({
   component: RootLayout,
+  // The frame itself failed (the shell, or the layout around it): a page of its own, with no chrome to rely on.
+  errorComponent: RootError,
   notFoundComponent: NotFoundPage,
   validateSearch: validateRootSearch,
   search: { middlewares: [retainSearchParams(['as'])] },
@@ -66,7 +70,8 @@ const marketsRoute = createRoute({
   path: 'markets',
   staticData: { title: 'Markets' },
   validateSearch: validateMarketsSearch,
-  component: lazyRouteComponent(() => import('../features/markets'), 'MarketsIndexPage'),
+  // Each markets page is its own lazy module: the index never waits for the asset page, the ticket and the charts.
+  component: lazyRouteComponent(() => import('../features/markets/index-page/MarketsIndexPage'), 'MarketsIndexPage'),
 })
 
 const assetRoute = createRoute({
@@ -74,7 +79,7 @@ const assetRoute = createRoute({
   path: 'markets/$asset',
   staticData: { title: assetTitle },
   validateSearch: validateAssetSearch,
-  component: lazyRouteComponent(() => import('../features/markets'), 'AssetPage'),
+  component: lazyRouteComponent(() => import('../features/markets/asset/AssetPage'), 'AssetPage'),
 })
 
 const portfolioRoute = createRoute({
@@ -119,13 +124,15 @@ const issuerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'issuer',
   staticData: { title: 'Issuer' },
+  validateSearch: validateIssuerSearch,
   component: lazyRouteComponent(() => import('../features/issuer'), 'IssuerPage'),
 })
 
 const learnRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'learn',
-  staticData: { title: 'How it works' },
+  staticData: { title: 'Learn' },
+  pendingComponent: DocumentPending,
   component: lazyRouteComponent(() => import('../features/learn'), 'LearnPage'),
 })
 
@@ -143,7 +150,7 @@ const designRoute = createRoute({
 function marginRoutes() {
   const margin = createRoute({ getParentRoute: () => rootRoute, path: 'margin', component: lazyRouteComponent(() => import('./MarginRoute'), 'MarginRoute') })
   return margin.addChildren([
-    createRoute({ getParentRoute: () => margin, path: '/', staticData: { title: 'Margin', screen: 'account' } }),
+    createRoute({ getParentRoute: () => margin, path: '/', staticData: { title: 'Account · Margin', screen: 'account' } }),
     createRoute({ getParentRoute: () => margin, path: 'trade', staticData: { title: 'Trade · Margin', screen: 'trade' } }),
     createRoute({ getParentRoute: () => margin, path: 'positions', staticData: { title: 'Positions · Margin', screen: 'positions' } }),
     createRoute({ getParentRoute: () => margin, path: 'liquidations', staticData: { title: 'Liquidations · Margin', screen: 'liquidations' } }),
@@ -151,8 +158,10 @@ function marginRoutes() {
   ])
 }
 
-// Test builds only: a page that throws, to exercise the error boundary end to end.
-const crashRoute = () => createRoute({ getParentRoute: () => rootRoute, path: 'e2e/crash', staticData: { title: 'Crash test' }, component: CrashPage })
+// Test builds only: a page that throws, to exercise the error boundary end to end. Loaded lazily, so no other
+// build carries it.
+const crashRoute = () =>
+  createRoute({ getParentRoute: () => rootRoute, path: 'e2e/crash', staticData: { title: 'Crash test' }, component: lazyRouteComponent(() => import('./CrashPage'), 'CrashPage') })
 
 const routeTree = rootRoute.addChildren([
   landingRoute,
@@ -186,7 +195,7 @@ export const router = createRouter({
   defaultPendingMinMs: 300,
   scrollRestoration: true,
   getScrollRestorationKey: scrollKeyOf,
-  // Outlet content is a child of <main>, so a hash link inside a page still lands under the sticky top bar.
+  // A hash link inside a page scrolls its target to the top of the viewport (the top bar scrolls with the page).
   defaultHashScrollIntoView: { block: 'start', behavior: 'instant' },
 })
 

@@ -15,22 +15,29 @@ import type { DialogState, WalletState } from './walletContext'
 
 type Kit = Awaited<ReturnType<typeof loadKit>>
 
+/**
+ * Wallets whose account can be read again without a prompt (`skipRequestAccess`). The others (Albedo, xBull's web
+ * bridge, ...) open a popup to answer, so their account is read only when the user connects.
+ */
+const SILENT_ADDRESS_IDS = new Set(['freighter'])
+
 // Multi-wallet state on top of Stellar Wallets Kit. The kit is loaded lazily; the picker UI is
 // StellSec's own (the shell's connect dialog), driven by `dialog` through useWalletDialog().
 export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
   const [address, setAddress] = useState<string | null>(null)
   const [walletName, setWalletName] = useState<string | null>(null)
   const [reported, setReported] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [wallets, setWallets] = useState<WalletInfo[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const nameRef = useRef<string | null>(null)
+  const addressRef = useRef<string | null>(null)
   useEffect(() => {
     nameRef.current = walletName
-  }, [walletName])
+    addressRef.current = address
+  }, [walletName, address])
 
   // A wallet that cannot report its network yields null: we show nothing rather than block.
   const refreshNetwork = useCallback(async (kit: Kit) => {
@@ -66,16 +73,36 @@ export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
     }
   }, [refreshNetwork])
 
-  // Re-check the network when the user comes back from switching it in the wallet.
+  // Reads again what the wallet reports: its network and, where that needs no prompt, its account. A user who
+  // switches account inside the extension must not keep seeing, or signing for, the old one.
+  const recheckNetwork = useCallback(async () => {
+    if (!addressRef.current) return
+    let kit: Kit
+    try {
+      kit = await loadKit()
+    } catch {
+      return
+    }
+    await refreshNetwork(kit)
+    const id = readStoredWalletId()
+    if (!id || !SILENT_ADDRESS_IDS.has(id)) return
+    try {
+      const { address: now } = await kit.selectedModule.getAddress({ skipRequestAccess: true })
+      if (now && addressRef.current && now !== addressRef.current) setAddress(now)
+    } catch {
+      // Locked or unreachable: keep the account; signing will say what is wrong.
+    }
+  }, [refreshNetwork])
+
+  // Check again when the user comes back from the wallet (network or account switched there).
   useEffect(() => {
     if (!address) return
-    const onFocus = () => void loadKit().then(refreshNetwork)
+    const onFocus = () => void recheckNetwork()
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [address, refreshNetwork])
+  }, [address, recheckNetwork])
 
   const connect = useCallback(async () => {
-    setError(null)
     setDialogError(null)
     setOpen(true)
     setLoading(true)
@@ -83,7 +110,7 @@ export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
       const kit = await loadKit()
       setWallets(toWalletInfos(await kit.refreshSupportedWallets(), probeWallets()))
     } catch (e) {
-      setDialogError(describeWalletError(e))
+      setDialogError(describeWalletError(e, undefined, 'connect'))
     } finally {
       setLoading(false)
     }
@@ -111,7 +138,7 @@ export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
           setOpen(false)
           await refreshNetwork(kit)
         } catch (e) {
-          setDialogError(describeWalletError(e, info?.name))
+          setDialogError(describeWalletError(e, info?.name, 'connect'))
         } finally {
           setBusyId(null)
         }
@@ -164,13 +191,13 @@ export function useKitWallet(): { wallet: WalletState; dialog: DialogState } {
       walletName,
       wrongNetwork,
       networkMessage: wrongNetwork ? wrongNetworkMessage(walletName) : null,
-      error,
+      recheckNetwork,
       connect,
       disconnect,
       sign,
       signAuthEntry,
     }),
-    [address, walletName, wrongNetwork, error, connect, disconnect, sign, signAuthEntry],
+    [address, walletName, wrongNetwork, recheckNetwork, connect, disconnect, sign, signAuthEntry],
   )
   const dialog = useMemo<DialogState>(
     () => ({ open, loading, wallets, busyId, error: dialogError, pick, close }),

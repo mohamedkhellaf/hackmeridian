@@ -1,4 +1,4 @@
-import { formatDisplay } from '../options/format'
+import { formatUnits } from '../format/amount'
 import type { Ask, OptionOffer } from '../options/types'
 import { byId as byOptionId, perUnit } from '../units'
 
@@ -11,7 +11,7 @@ export function askPerUnit(o: Pick<OptionOffer, 'underlying' | 'underlyingQty'>,
 
 export function formatAskPerUnit(o: Pick<OptionOffer, 'underlying' | 'quote' | 'underlyingQty'>, askTotal: bigint): string {
   const v = askPerUnit(o, askTotal)
-  return v === null ? '–' : formatDisplay(v, o.quote.decimals)
+  return v === null ? '–' : formatUnits(v, o.quote.decimals)
 }
 
 /** Active and not yet expired: the only state in which an option can be listed or bought from its holder. */

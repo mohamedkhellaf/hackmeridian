@@ -1,7 +1,7 @@
 import { Field as BaseField } from '@base-ui/react/field'
 import { useState } from 'react'
 import type { InputHTMLAttributes, ReactNode, Ref } from 'react'
-import { sanitizeDecimalInput } from './format'
+import { hasExponent, sanitizeDecimalInput } from './format'
 import { IconWarning } from './icons'
 import { cx } from './internal/cx'
 import { isFieldError } from './internal/fieldError'
@@ -180,8 +180,12 @@ export function AmountField({
   ...input
 }: AmountFieldProps) {
   const [touched, setTouched] = useState(false)
+  // What the user typed, while it still reads as the value given back: "1,000" stays on screen as typed (it is
+  // 1000) instead of turning into "1000" under the cursor, and a comma typed mid-number is not swallowed.
+  const [draft, setDraft] = useState<string | null>(null)
   const validation = touched && validate ? validate(value) : undefined
   const shown = error ?? validation ?? undefined
+  const display = draft !== null && sanitizeDecimalInput(draft, decimals) === value ? draft : value
 
   return (
     <Field
@@ -211,10 +215,18 @@ export function AmountField({
           enterKeyHint="done"
           placeholder={placeholder}
           className={styles.input}
-          value={value}
-          onValueChange={(next) => onValueChange(sanitizeDecimalInput(next, decimals))}
+          value={display}
+          onValueChange={(next) => {
+            // An exponent is refused rather than read as digits ("1e3" would otherwise become 13).
+            if (hasExponent(next)) return
+            const clean = sanitizeDecimalInput(next, decimals)
+            const typed = next.replace(/[^0-9.,]/g, '')
+            setDraft(typed.includes(',') ? typed : null)
+            onValueChange(clean)
+          }}
           onBlur={(event) => {
             setTouched(true)
+            setDraft(null)
             onBlur?.(event)
           }}
         />

@@ -1,85 +1,100 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { shortAddress } from '../../core/options/format'
 import { Button, Callout, EmptyNote, PageHeader, Select } from '../../ui'
-import { AccessNotice } from './AccessNotice'
+import { AccessLine } from './AccessLine'
 import { AccountsSection } from './AccountsSection'
 import { ActionLog } from './ActionLog'
 import { AssetCard } from './AssetCard'
 import { ClawbackDialog } from './ClawbackDialog'
+import { ConfirmDialog } from './ConfirmDialog'
 import { ConsoleSkeleton } from './ConsoleSkeleton'
+import { ContractStatement } from './ContractStatement'
 import { COPY } from './copy'
-import { FreezeDialog } from './FreezeDialog'
-import { exposureText, sentNothing } from './model'
-import type { AccountRow } from './model'
-import { TxPanel } from './TxPanel'
+import { IssuerPowers } from './IssuerPowers'
+import { authorizeIsFinal, exposureRows, sentNothing } from './model'
+import type { AccountRow, IssuerActionKind } from './model'
 import type { IssuerConsole } from './useIssuerConsole'
 import styles from './IssuerConsoleView.module.css'
 
-type ConfirmKind = 'freeze' | 'clawback'
+type ConfirmKind = 'freeze' | 'authorize' | 'clawback'
 
 /**
- * The console on a Testnet build, in every state of who is looking: a guest and a wallet that is not the issuer
- * read the asset's flags and the options contract; the issuer also gets the accounts, the three actions, the
- * staged transaction and the log. Presentational: everything comes from `useIssuerConsole`.
+ * The Issuer page in every state of who is looking. Everyone reads the Covered contract as a statement, what
+ * the issuer can do to the asset and the asset's facts; the issuer also gets the accounts, the actions and the
+ * log. On mock data the same read-only page is drawn from the mock data, under the one sentence that says
+ * nothing can be read from a network or signed. Presentational: everything comes from `useIssuerConsole`.
  */
 export function IssuerConsoleView({ model: c }: { model: IssuerConsole }) {
   // The confirmation being shown. `nonce` makes each opening a fresh dialog (an empty amount, nothing typed).
   const [confirm, setConfirm] = useState<{ kind: ConfirmKind; target: string; nonce: number } | null>(null)
   const [open, setOpen] = useState(false)
+  // The heading of the transaction shown under its row: where focus goes when a confirmation closes on a
+  // transaction it sent (the row's own controls may have changed by then).
+  const txHeading = useRef<HTMLHeadingElement | null>(null)
   const asset = c.asset
   const isIssuer = c.access.kind === 'issuer'
-  const code = asset?.code ?? ''
-  const confirmRow = confirm ? c.rows.find((row) => row.address === confirm.target) : undefined
+  const flags = c.flags.status === 'ready' ? c.flags.facts.flags : null
+  const contractRow = c.contract.row
+  const rowOf = (address: string): AccountRow | undefined => (contractRow?.address === address ? contractRow : c.rows.find((row) => row.address === address))
+  const confirmRow = confirm ? rowOf(confirm.target) : undefined
   // The transaction shown inside a confirmation is the one that confirmation started.
   const confirmTx = confirm && c.tx.kind === confirm.kind && c.tx.target === confirm.target ? c.tx : null
+  const sent = c.tx.state.phase !== 'idle' && !sentNothing(c.tx.state)
 
   const openConfirm = (kind: ConfirmKind, row: AccountRow) => {
-    // A settled outcome leaves the panel when the next action is prepared; it stays in "Recent actions".
+    // A settled outcome leaves the page when the next action is prepared; it stays in "Recent actions".
     if (!c.tx.working) c.tx.dismiss()
     setConfirm((prev) => ({ kind, target: row.address, nonce: (prev?.nonce ?? 0) + 1 }))
     setOpen(true)
   }
+  const onAction = (kind: IssuerActionKind, row: AccountRow) => {
+    // Authorize takes nothing away and runs at once, unless the issuer cannot revoke: then it cannot be undone.
+    if (kind === 'authorize' && !authorizeIsFinal(flags)) {
+      if (!c.tx.working) c.tx.dismiss()
+      void c.authorize(row.address)
+      return
+    }
+    openConfirm(kind, row)
+  }
+  // The dialog can be closed at any time: a transaction it started goes on, and shows under its row.
   const closeConfirm = () => {
     setOpen(false)
     // Nothing was sent (declined, or refused before sending): there is no outcome to keep on the page.
     if (c.tx.state.phase !== 'idle' && sentNothing(c.tx.state)) c.tx.dismiss()
   }
-  const confirmFreeze = async () => {
-    if (!confirm) return
-    const state = await c.freeze(confirm.target)
+  const settle = (state: { phase: string; effect: string }) => {
     if (!sentNothing(state)) setOpen(false)
+  }
+  const confirmAction = async () => {
+    if (!confirm) return
+    settle(confirm.kind === 'authorize' ? await c.authorize(confirm.target) : await c.freeze(confirm.target))
   }
   const confirmClawback = async (units: bigint) => {
     if (!confirm) return
-    const state = await c.clawback(confirm.target, units)
-    if (!sentNothing(state)) setOpen(false)
+    settle(await c.clawback(confirm.target, units))
   }
 
-  const exposureOfRow = (row: AccountRow) => exposureText(row, code, c.escrowExposure, row.escrow ? null : c.exposureOf(row.address))
+  const exposureOf = (row: AccountRow) => exposureRows(row, c.contract.exposure, row.escrow ? null : c.exposureOf(row.address))
+  const health = c.contract.held !== null && c.contract.reserved !== null ? { held: c.contract.held, reserved: c.contract.reserved } : null
+
+  const meta = asset ? (
+    <>
+      {c.assets.length > 1 ? (
+        <Select
+          label={COPY.page.assetLabel}
+          hideLabel
+          value={asset.contractId}
+          onValueChange={c.selectAsset}
+          options={c.assets.map((a) => ({ value: a.contractId, label: a.code, detail: a.issuer && !c.mock ? shortAddress(a.issuer) : undefined }))}
+        />
+      ) : null}
+      <AccessLine access={c.access} code={asset.code} issuer={c.issuer} otherIssued={c.otherIssued} onConnect={c.connect} onRetry={c.retryAccess} onOpen={c.selectAsset} />
+    </>
+  ) : undefined
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title={COPY.page.title}
-        description={COPY.page.description}
-        meta={
-          asset && c.access.kind === 'issuer' ? (
-            <span>{COPY.access.issuer(asset.code)}</span>
-          ) : asset && c.access.kind === 'checking' ? (
-            <span>{COPY.access.checking(asset.code)}</span>
-          ) : undefined
-        }
-        actions={
-          asset && c.assets.length > 1 ? (
-            <Select
-              label={COPY.page.assetLabel}
-              value={asset.contractId}
-              onValueChange={c.selectAsset}
-              options={c.assets.map((a) => ({ value: a.contractId, label: a.code, detail: a.issuer ? shortAddress(a.issuer) : undefined }))}
-            />
-          ) : undefined
-        }
-      />
+      <PageHeader title={COPY.page.title} description={c.mock ? COPY.mock.sentence : COPY.page.description} meta={meta} />
 
       {c.assetsStatus === 'loading' ? (
         <ConsoleSkeleton />
@@ -90,52 +105,62 @@ export function IssuerConsoleView({ model: c }: { model: IssuerConsole }) {
       ) : !asset ? (
         <EmptyNote title={COPY.page.noAssets} hint={COPY.page.noAssetsHint} headingLevel={2} />
       ) : (
-        <div className={styles.layout} data-issuer={isIssuer || undefined}>
-          {c.access.kind === 'guest' || c.access.kind === 'not-issuer' ? (
-            <div className={styles.notice}>
-              <AccessNotice access={c.access} code={asset.code} onConnect={c.connect} />
-            </div>
-          ) : null}
-
+        <div className={styles.layout}>
           <div className={styles.main}>
-            {!open ? <TxPanel tx={c.tx} /> : null}
-            <AccountsSection
+            {isIssuer && c.unresolved ? (
+              <Callout variant="warning" title={COPY.reasons.unknownPending} actions={<Button onClick={c.unresolved.check}>{COPY.tx.checkAgain}</Button>} />
+            ) : null}
+            <ContractStatement
               asset={asset}
-              rows={c.rows}
-              holders={c.holders}
-              flags={c.flags.status === 'ready' ? c.flags.facts.flags : null}
+              contract={c.contract}
               canAct={isIssuer}
+              flags={flags}
               busy={c.busy}
-              running={c.tx.working && c.tx.kind && c.tx.target ? { kind: c.tx.kind, target: c.tx.target } : null}
-              reserved={c.health?.reserved ?? null}
-              readAt={c.readAt}
-              refreshing={c.refreshing}
-              onRefresh={c.refresh}
-              onAdd={c.addAccount}
-              onRemove={c.removeAccount}
-              onAuthorize={(row) => void c.authorize(row.address)}
-              onFreeze={(row) => openConfirm('freeze', row)}
-              onClawback={(row) => openConfirm('clawback', row)}
-              onRetryHolders={c.refresh}
+              tx={c.tx}
+              dialogOpen={open}
+              txHeadingRef={txHeading}
+              onAction={onAction}
             />
-            {isIssuer || c.log.length > 0 ? <ActionLog rows={c.log} /> : null}
+            {isIssuer ? (
+              <AccountsSection
+                asset={asset}
+                rows={c.rows}
+                holders={c.holders}
+                flags={flags}
+                busy={c.busy}
+                tx={c.tx}
+                dialogOpen={open}
+                txHeadingRef={txHeading}
+                readAt={c.readAt}
+                refreshing={c.refreshing}
+                onRefresh={c.refresh}
+                onAdd={c.addAccount}
+                onRemove={c.removeAccount}
+                onAction={onAction}
+                onRetryHolders={c.refresh}
+              />
+            ) : null}
+            {c.log.length > 0 ? <ActionLog rows={c.log} code={asset.code} onCheck={c.checkLogged} /> : null}
+            <IssuerPowers flags={c.flags} onRetry={c.retryFlags} />
           </div>
 
           <aside className={styles.side} aria-label={COPY.asset.title}>
-            <AssetCard asset={asset} issuer={c.issuer} flags={c.flags} record={c.record} onRetryFlags={c.retryFlags} />
+            <AssetCard asset={asset} issuer={c.issuer} flags={c.flags} record={c.record} mock={c.mock} />
           </aside>
         </div>
       )}
 
-      {asset && confirm && confirmRow && confirm.kind === 'freeze' ? (
-        <FreezeDialog
-          key={`freeze:${confirm.target}:${confirm.nonce}`}
+      {asset && confirm && confirmRow && confirm.kind !== 'clawback' ? (
+        <ConfirmDialog
+          key={`${confirm.kind}:${confirm.target}:${confirm.nonce}`}
           open={open}
+          kind={confirm.kind}
           asset={asset}
           row={confirmRow}
-          exposure={exposureOfRow(confirmRow)}
+          exposure={exposureOf(confirmRow)}
           tx={confirmTx}
-          onConfirm={() => void confirmFreeze()}
+          finalFocus={sent ? txHeading : undefined}
+          onConfirm={() => void confirmAction()}
           onClose={closeConfirm}
         />
       ) : null}
@@ -145,9 +170,10 @@ export function IssuerConsoleView({ model: c }: { model: IssuerConsole }) {
           open={open}
           asset={asset}
           row={confirmRow}
-          health={confirmRow.escrow ? c.health : null}
-          exposure={exposureOfRow(confirmRow)}
+          health={confirmRow.escrow ? health : null}
+          exposure={exposureOf(confirmRow)}
           tx={confirmTx}
+          finalFocus={sent ? txHeading : undefined}
           onConfirm={(units) => void confirmClawback(units)}
           onClose={closeConfirm}
         />
