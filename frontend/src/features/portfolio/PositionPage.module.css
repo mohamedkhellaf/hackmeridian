@@ -1,0 +1,112 @@
+@layer features {
+  .page {
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  .empty {
+    max-width: 34rem;
+  }
+
+  .note {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .uncovered {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--warn);
+    text-wrap: pretty;
+  }
+
+  /* The deadline under the title: date and time left on one line, wrapping as a unit. */
+  .deadline {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-2) var(--s-8);
+    color: var(--text);
+  }
+
+  .metaLink {
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--touch);
+    }
+  }
+
+  .headerActions {
+    display: contents;
+  }
+
+  /* The note and the lifecycle on the left, the figure on the right, from about 48rem of the page's width. */
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--s-24);
+    min-width: 0;
+
+    @container (min-width: 48rem) {
+      grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+      gap: var(--s-32);
+    }
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  .side {
+    min-width: 0;
+
+    @container (min-width: 48rem) {
+      position: sticky;
+      top: var(--s-24);
+    }
+  }
+
+  /* On a phone the actions of a live position stay reachable: a bar on the bottom edge, above the tab bar. */
+  .actionBar {
+    display: none;
+
+    @media (max-width: 767.98px) {
+      position: sticky;
+      bottom: var(--shell-tabbar-h, 0px);
+      z-index: 2;
+      display: flex;
+      gap: var(--s-8);
+      margin-inline: calc(-1 * var(--s-16));
+      padding: var(--s-8) var(--s-16);
+      border-top: 1px solid var(--rule);
+      background: var(--bg);
+
+      & > * {
+        flex: 1 1 0;
+      }
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .page[data-bar] .headerActions {
+      display: none;
+    }
+
+    /* The bar's height, published for the shell: keyboard focus and toasts clear it and the tab bar. */
+    :global(html):has(.actionBar) {
+      --page-bar-h: calc(var(--touch) + var(--s-16));
+    }
+  }
+}

@@ -1,0 +1,187 @@
+@layer ui {
+  .root {
+    --button-bg: transparent;
+    --button-fg: var(--text);
+    --button-border: var(--control);
+    --button-bg-hover: var(--hover);
+    --button-bg-active: var(--pressed);
+    --button-h: var(--control-h);
+    --button-px: var(--s-16);
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-8);
+    min-width: var(--button-h);
+    height: var(--button-h);
+    padding-inline: var(--button-px);
+    border: 1px solid var(--button-border);
+    border-radius: var(--r-control);
+    background: var(--button-bg);
+    color: var(--button-fg);
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 550;
+    text-decoration: none;
+    white-space: nowrap;
+    user-select: none;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-hover) var(--ease-enter),
+      border-color var(--dur-hover) var(--ease-enter),
+      color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover:not([data-disabled]) {
+        background: var(--button-bg-hover);
+      }
+    }
+
+    &:active:not([data-disabled]) {
+      background: var(--button-bg-active);
+    }
+
+    &[data-variant='primary'] {
+      --button-bg: var(--primary);
+      --button-fg: var(--primary-fg);
+      --button-border: var(--primary);
+      --button-bg-hover: var(--primary-hover);
+      --button-bg-active: var(--primary-hover);
+    }
+
+    &[data-variant='quiet'] {
+      --button-border: transparent;
+      --button-px: var(--s-12);
+    }
+
+    &[data-variant='danger'] {
+      --button-fg: var(--danger);
+      --button-border: var(--danger);
+      --button-bg-hover: var(--danger-tint);
+      --button-bg-active: var(--danger-tint);
+    }
+
+    /* A destructive action in a dense row: the danger ink, no border. */
+    &[data-variant='quiet'][data-tone='danger']:not([data-disabled]) {
+      --button-fg: var(--danger);
+      --button-bg-hover: var(--danger-tint);
+      --button-bg-active: var(--danger-tint);
+    }
+
+    &[data-size='sm'] {
+      --button-h: var(--control-h-sm);
+      --button-px: var(--s-12);
+
+      gap: var(--s-6);
+    }
+
+    &[data-size='sm'][data-variant='quiet'] {
+      --button-px: var(--s-8);
+    }
+
+    &[data-full-width] {
+      display: flex;
+      width: 100%;
+    }
+
+    /*
+     * Disabled keeps its shape and quiets its ink: no fill, a hairline, the disabled ink. A primary looks like a
+     * disabled secondary, never like a field (fields own the sunken fill). A loading button keeps its colours.
+     */
+    &[data-disabled] {
+      cursor: not-allowed;
+    }
+
+    &[data-disabled]:not([data-loading]) {
+      --button-bg: transparent;
+      --button-fg: var(--disabled-fg);
+      --button-border: var(--hairline);
+
+      &[data-variant='quiet'] {
+        --button-border: transparent;
+      }
+    }
+
+    &[data-loading] {
+      cursor: progress;
+    }
+
+    /* Touch: 44 px targets. `md` grows; `sm` keeps its look and widens its hit area. */
+    @media (pointer: coarse) {
+      &[data-size='md'] {
+        --button-h: var(--touch);
+      }
+
+      &[data-size='sm']::after {
+        content: '';
+        position: absolute;
+        /* Measured from inside the 1 px border: 26 px of padding box plus 9 px above and below is 44. */
+        inset: calc(var(--s-8) * -1 - 1px) 0;
+      }
+    }
+  }
+
+  .iconOnly {
+    --button-px: 0;
+
+    width: var(--button-h);
+    padding: 0;
+
+    &[data-variant='quiet'],
+    &[data-size='sm'][data-variant='quiet'] {
+      --button-px: 0;
+
+      color: var(--text-2);
+    }
+
+    @media (hover: hover) {
+      &[data-variant='quiet']:hover:not([data-disabled]) {
+        color: var(--text);
+      }
+    }
+
+    /* Touch: a small icon button (copy, open) is a 44 by 44 target around its 28 px mark. */
+    @media (pointer: coarse) {
+      &[data-size='sm']::after {
+        inset: calc(var(--s-8) * -1 - 1px);
+      }
+    }
+  }
+
+  .label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .icon {
+    display: inline-flex;
+    flex: none;
+  }
+
+  /*
+   * A button keeps its width while it works, so nothing beside it moves: the spinner takes the icon's 16 px slot,
+   * or, on a button without an icon, sits over the label, which keeps its room (and is still read out).
+   */
+  .label[data-covered] {
+    opacity: 0;
+  }
+
+  .spinnerOver {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .spinnerSlot {
+    align-items: center;
+    justify-content: center;
+    width: var(--s-16);
+    height: var(--s-16);
+  }
+}

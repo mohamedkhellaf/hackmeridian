@@ -1,0 +1,16 @@
+@layer features {
+  /*
+   * The guide's row in the More sheet. Its look is the page rows' (their class is passed in); this adds what a
+   * button needs to read as the last row of that list: the full width, start-aligned words, no gap above it, and
+   * the hairline that closes it.
+   */
+  .row {
+    width: 100%;
+    /* Flush under the list of pages: the sheet sets its blocks this far apart. */
+    margin-top: calc(var(--s-16) * -1);
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-sans);
+    text-align: start;
+    cursor: pointer;
+  }
+}

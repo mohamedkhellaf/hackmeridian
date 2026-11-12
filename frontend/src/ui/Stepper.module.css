@@ -1,0 +1,142 @@
+@layer ui {
+  .root {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    --step-ink: var(--text);
+
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-12);
+    padding-bottom: var(--s-12);
+
+    &:last-child {
+      padding-bottom: 0;
+    }
+
+    /* The rule that joins a step to the next one. */
+    &:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      top: var(--s-20);
+      bottom: 0;
+      inset-inline-start: calc(var(--s-20) / 2);
+      width: 1px;
+      margin-inline-start: -0.5px;
+      background: var(--rule);
+    }
+
+    &[data-status='done']:not(:last-child)::before {
+      background: var(--text);
+    }
+
+    &[data-status='upcoming'] {
+      --step-ink: var(--muted);
+    }
+
+    &[data-status='failed'] {
+      --step-ink: var(--danger);
+    }
+
+    &[data-status='attention'] {
+      --step-ink: var(--warn);
+    }
+  }
+
+  .mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--s-20);
+    height: var(--s-20);
+    border: 1px solid var(--step-ink);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--step-ink);
+
+    & path {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
+
+  .dot {
+    fill: currentColor;
+  }
+
+  .step[data-status='done'] .mark {
+    background: var(--text);
+    color: var(--bg);
+  }
+
+  .step[data-status='upcoming'] .mark {
+    border-color: var(--rule);
+  }
+
+  .step[data-status='failed'] .mark {
+    background: var(--danger);
+    color: var(--bg);
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    flex: 1;
+    min-width: 0;
+    padding-top: 0;
+  }
+
+  .label {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .step[data-status='upcoming'] .label {
+    font-weight: 450;
+    color: var(--muted);
+  }
+
+  .step[data-status='current'] .label,
+  .step[data-status='failed'] .label,
+  .step[data-status='attention'] .label,
+  .step[data-status='stopped'] .label {
+    font-weight: 600;
+  }
+
+  .step[data-status='failed'] .label {
+    color: var(--danger);
+  }
+
+  .step[data-status='attention'] .label {
+    color: var(--warn);
+  }
+
+  .detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .hash {
+    display: flex;
+    align-items: center;
+  }
+}

@@ -22,5 +22,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* Browser code only. Tests are checked by tsconfig.test.json, which has the Node types (vitest pulls them in);
+     keeping them out of this project is what stops `process`, `Buffer` and `node:fs` from type-checking in the app. */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.testhelper.ts"]
 }

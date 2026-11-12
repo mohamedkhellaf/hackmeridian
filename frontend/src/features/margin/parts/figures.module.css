@@ -1,0 +1,36 @@
+@layer features {
+  .none {
+    color: var(--muted);
+  }
+
+  .amount {
+    display: inline-flex;
+    align-items: baseline;
+
+    /* A shortfall, debt or deficit: the column or label names it, the tone repeats it. */
+    &[data-tone='loss'] {
+      color: var(--loss);
+    }
+  }
+
+  /* An id is a plain number in the sans face (ruling F1: mono is kept for addresses, hashes and the note's serial). */
+  .sub {
+    margin-inline-start: var(--s-6);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .party {
+    white-space: nowrap;
+  }
+
+  .you {
+    color: var(--muted);
+    font-weight: 450;
+  }
+}

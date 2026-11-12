@@ -1,0 +1,104 @@
+@layer ui {
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-drawer);
+    min-height: 100dvh;
+    background: var(--scrim);
+    opacity: calc(1 - var(--drawer-swipe-progress, 0));
+    transition: opacity var(--dur-dialog) var(--ease-enter);
+
+    @supports (-webkit-touch-callout: none) {
+      position: absolute;
+    }
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      opacity: 0;
+    }
+
+    &[data-swiping] {
+      transition-duration: 0ms;
+    }
+  }
+
+  .viewport {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-drawer);
+    display: flex;
+    pointer-events: none;
+
+    &[data-placement='right'] {
+      justify-content: flex-end;
+    }
+
+    &[data-placement='bottom'] {
+      align-items: flex-end;
+      justify-content: center;
+    }
+  }
+
+  .popup {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-dialog);
+    outline: none;
+    overflow: hidden;
+    will-change: transform;
+    transition: transform var(--dur-dialog) var(--ease-enter);
+
+    &[data-swiping] {
+      transition-duration: 0ms;
+      user-select: none;
+    }
+
+    &[data-ending-style] {
+      transition-timing-function: var(--ease-exit);
+      transition-duration: calc(var(--drawer-swipe-strength, 1) * var(--dur-dialog));
+    }
+
+    /* Right drawer: the ticket rail on medium screens. */
+    &[data-placement='right'] {
+      width: min(100vw, var(--drawer-w));
+      height: 100dvh;
+      transform: translateX(var(--drawer-swipe-movement-x, 0px));
+
+      &[data-starting-style],
+      &[data-ending-style] {
+        transform: translateX(100%);
+      }
+    }
+
+    /* Bottom sheet: phones, short confirmations. */
+    &[data-placement='bottom'] {
+      width: min(100vw, var(--dialog-md));
+      max-height: min(85dvh, var(--sheet-max-h));
+      border-radius: var(--r-card) var(--r-card) 0 0;
+      transform: translateY(var(--drawer-swipe-movement-y, 0px));
+
+      &[data-starting-style],
+      &[data-ending-style] {
+        transform: translateY(100%);
+      }
+    }
+  }
+
+  /* A page on phones: the whole viewport, flat. */
+  @media (max-width: 767.98px) {
+    .popup[data-placement='right'][data-page] {
+      width: 100vw;
+      box-shadow: none;
+    }
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}

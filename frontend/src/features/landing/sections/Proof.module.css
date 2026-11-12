@@ -1,0 +1,108 @@
+@layer features {
+  .table {
+    table-layout: fixed;
+  }
+
+  /* Prose cells: they wrap, and sit on their first line. */
+  .claim,
+  .evidence {
+    height: auto;
+    padding-block: var(--s-12);
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  /* The claim is the statement: the landing's reading size, in ink. */
+  .claim {
+    width: 62%;
+    padding-inline-start: 0;
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .evidence {
+    padding-inline-end: 0;
+  }
+
+  .links {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+    padding-top: var(--s-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    /* A finger needs a row pitch of at least 32 px between two stacked hashes. */
+    @media (pointer: coarse) {
+      gap: var(--s-12);
+
+      & a {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--s-32);
+      }
+    }
+  }
+
+  .all {
+    margin-top: var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+
+    & a {
+      display: inline-flex;
+      align-items: center;
+
+      @media (pointer: coarse) {
+        min-height: var(--touch);
+      }
+    }
+  }
+
+  .table th:first-child {
+    padding-inline-start: 0;
+  }
+
+  .table th:last-child {
+    padding-inline-end: 0;
+  }
+
+  /* Phones: each row is a block, the claim and then its evidence under it. The roles are set in Proof.tsx. */
+  @media (max-width: 599.98px) {
+    .table,
+    .table tbody,
+    .table tr,
+    .table td {
+      display: block;
+    }
+
+    .table thead {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .table tr {
+      padding-block: var(--s-12);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .table td {
+      width: auto;
+      padding: 0;
+      border: 0;
+    }
+
+    .evidence {
+      margin-top: var(--s-6);
+    }
+  }
+}

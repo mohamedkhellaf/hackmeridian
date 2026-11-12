@@ -1,0 +1,97 @@
+@layer features {
+  /* A tool beside the product: the sunken ground with a solid hairline (no dashed fence). */
+  .root {
+    scroll-margin-top: var(--s-72);
+    border-color: var(--hairline);
+  }
+
+  .summary {
+    margin-top: calc(var(--s-8) * -1);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .scenario {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+    gap: var(--s-20) var(--s-32);
+    align-items: start;
+  }
+
+  .control {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .stepper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .next {
+    margin-inline-start: var(--s-4);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .recent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  .recentHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12);
+  }
+
+  .recentTitle {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .refused {
+    color: var(--warn);
+  }
+
+  .none {
+    padding-block: var(--s-8);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  @media (max-width: 1199.98px) {
+    .controls {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .controls {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

@@ -1,0 +1,31 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--rule);
+  }
+
+  .item {
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .item:last-child {
+    border-bottom-color: var(--rule);
+  }
+
+  /* A question is a row of the list, in the interface's voice: sans, medium. Serif is for the headings. */
+  .question {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 550;
+  }
+
+  .answer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: var(--measure);
+    padding-bottom: var(--s-16);
+    color: var(--text-2);
+  }
+}

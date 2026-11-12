@@ -1,0 +1,138 @@
+@layer features {
+  /* Wide: the requirement and the facts on the left, the form in a rail. Phones: requirement, form, facts. */
+  .root {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'requirement form'
+      'facts form';
+    gap: var(--s-32);
+    align-items: start;
+  }
+
+  .requirement {
+    grid-area: requirement;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    min-width: 0;
+  }
+
+  .facts {
+    grid-area: facts;
+  }
+
+  .form {
+    grid-area: form;
+    position: sticky;
+    top: var(--s-72);
+  }
+
+  /* The distance to liquidation leads the account, at the size of a closing figure. */
+  .lead {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    text-wrap: pretty;
+
+    &[data-state='liquidatable'] {
+      color: var(--loss);
+    }
+
+    &[data-state='unknown'] {
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+      color: var(--text-2);
+    }
+  }
+
+  .figures {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-8);
+  }
+
+  /* Wide: the three requirement figures as one ruled row. */
+  .figureRow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-24);
+    align-self: stretch;
+    padding-block: var(--s-4);
+    border-block: 1px solid var(--hairline);
+  }
+
+  .definitions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: 22rem;
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    & dt {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    & dd {
+      margin: 0;
+      color: var(--text-2);
+    }
+  }
+
+  .muted {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .shorts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-2);
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-8);
+
+    /* A replayed step: each button carries its amount, so they stack. */
+    &[data-recorded] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 1199.98px) {
+    .root {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+      grid-template-areas:
+        'requirement'
+        'form'
+        'facts';
+    }
+
+    .form {
+      position: static;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .root {
+      gap: var(--s-24);
+    }
+
+    .figures {
+      align-items: stretch;
+    }
+  }
+}

@@ -1,0 +1,30 @@
+@layer ui {
+  .root {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--s-16);
+    height: var(--s-16);
+    padding-inline: var(--s-4);
+    border-radius: var(--r-tag);
+    background: var(--text);
+    color: var(--bg);
+    font-family: var(--font-sans);
+    font-size: var(--badge-size);
+    line-height: 1;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums lining-nums;
+
+    /* A count of rows after a tab label: a plain muted numeral, no box. */
+    &[data-tone='quiet'] {
+      min-width: 0;
+      height: auto;
+      padding: 0;
+      background: none;
+      color: var(--muted);
+      font-size: inherit;
+      line-height: inherit;
+      font-weight: 500;
+    }
+  }
+}

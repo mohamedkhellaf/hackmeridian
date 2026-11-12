@@ -1,0 +1,143 @@
+/* Shared look of list popups: Select, Combobox and Menu. A raised sheet with a hairline and a soft shadow. */
+@layer ui {
+  .positioner {
+    z-index: var(--z-popover);
+    outline: none;
+  }
+
+  .popup {
+    min-width: max(var(--anchor-width, 0px), var(--popup-min));
+    max-width: min(var(--available-width, 100vw), var(--popup-max));
+    max-height: min(var(--available-height, 100vh), var(--popup-max-h));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-block: var(--s-4);
+    border-radius: var(--r-card);
+    background: var(--raised);
+    color: var(--text);
+    box-shadow: var(--shadow-popover);
+    outline: none;
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity var(--dur-popover) var(--ease-enter),
+      transform var(--dur-popover) var(--ease-enter);
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      opacity: 0;
+      transform: translateY(calc(var(--s-4) * -1)) scale(0.98);
+    }
+
+    &[data-ending-style] {
+      transition-duration: var(--dur-hover);
+      transition-timing-function: var(--ease-exit);
+    }
+  }
+
+  /* A menu with many 44 px rows (the wallet menu on phones) may use more of the viewport before it scrolls. */
+  .popup[data-size='tall'] {
+    max-height: min(var(--available-height, 100vh), 32rem);
+  }
+
+  .list {
+    outline: none;
+  }
+
+  /* Plain content in a menu group, starting where the words of the items start: past the edge, the icon slot and its gap. */
+  .static {
+    padding: 0 var(--s-12) var(--s-4) calc(var(--s-12) + var(--icon) + var(--s-8));
+  }
+
+  .item {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    min-height: var(--s-32);
+    padding: var(--s-4) var(--s-12);
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 450;
+    color: var(--text);
+    text-decoration: none;
+    cursor: default;
+    user-select: none;
+    outline: none;
+
+    /* The row under the pointer or the arrow keys: a tone step and an ink bar, so it does not rest on tone alone. */
+    &[data-highlighted] {
+      background: var(--sunken);
+      box-shadow: inset 2px 0 0 var(--text);
+    }
+
+    /* Rows that take real focus (menus, selects) draw the ring inside themselves. */
+    &:focus-visible {
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    &[data-selected],
+    &[data-checked] {
+      font-weight: 600;
+    }
+
+    &[data-tone='danger'] {
+      color: var(--danger);
+    }
+
+    /* After the tone: a disabled danger item looks disabled, not live. */
+    &[data-disabled] {
+      color: var(--disabled-fg);
+    }
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+
+  .itemText {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .itemDetail {
+    flex: none;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  /* A fixed slot so labels line up whether or not the row is ticked. */
+  .indicatorSlot {
+    display: inline-flex;
+    flex: none;
+    width: var(--icon);
+    height: var(--icon);
+  }
+
+  .separator {
+    height: 1px;
+    margin: var(--s-4) 0;
+    background: var(--hairline);
+  }
+
+  .groupLabel {
+    padding: var(--s-8) var(--s-12) var(--s-4);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .empty {
+    padding: var(--s-8) var(--s-12);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+
+    &:empty {
+      display: none;
+    }
+  }
+}

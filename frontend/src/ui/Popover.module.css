@@ -1,0 +1,48 @@
+@layer ui {
+  .positioner {
+    z-index: var(--z-popover);
+  }
+
+  .popup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    max-width: min(var(--popover-max), var(--available-width, 100vw));
+    padding: var(--s-12) var(--s-16);
+    border-radius: var(--r-card);
+    background: var(--raised);
+    color: var(--text);
+    box-shadow: var(--shadow-popover);
+    outline: none;
+    transform-origin: var(--transform-origin);
+    transition:
+      opacity var(--dur-popover) var(--ease-enter),
+      transform var(--dur-popover) var(--ease-enter);
+
+    &[data-starting-style],
+    &[data-ending-style] {
+      opacity: 0;
+      transform: translateY(calc(var(--s-4) * -1)) scale(0.98);
+    }
+
+    &[data-ending-style] {
+      transition-duration: var(--dur-hover);
+      transition-timing-function: var(--ease-exit);
+    }
+  }
+
+  .title {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .body {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text);
+  }
+}

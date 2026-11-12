@@ -1,0 +1,226 @@
+@layer features {
+  /*
+   * The page's own columns: what the asset is on the left; on the right (the rail's column from 1200 px, on the x of
+   * the ticket below it) what the wallet holds and the issuer, label beside value, top-aligned with the code.
+   * Under 768 px: code and price on one line, the sentence under them, the holdings on one line.
+   */
+  .root {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'back .'
+      'main side';
+    gap: var(--s-12) var(--s-32);
+    align-items: start;
+    min-width: 0;
+  }
+
+  .back {
+    grid-area: back;
+    display: flex;
+  }
+
+  .main {
+    grid-area: main;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'title title'
+      'figure source';
+    align-items: baseline;
+    gap: var(--s-4) var(--s-16);
+    min-width: 0;
+  }
+
+  .title {
+    grid-area: title;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-12);
+    min-width: 0;
+  }
+
+  .code {
+    font-family: var(--font-serif);
+    font-size: var(--h1-size);
+    line-height: var(--h1-line);
+    font-weight: var(--h1-weight);
+    letter-spacing: var(--h1-track);
+    /* Room for the focus ring when the shell moves focus here after a navigation. */
+    margin-inline: calc(var(--s-6) * -1);
+    padding-inline: var(--s-6);
+    border-radius: var(--r-control);
+
+    &:focus:not(:focus-visible) {
+      box-shadow: none;
+    }
+
+    /* Outside the app's list a zero and an O must not look alike: the mono face slashes its zero. */
+    &[data-unlisted] {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      letter-spacing: 0;
+      font-variant-numeric: slashed-zero;
+    }
+  }
+
+  .type {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  .figure {
+    grid-area: figure;
+    display: flex;
+    align-items: baseline;
+    white-space: nowrap;
+  }
+
+  .noPrice {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    color: var(--text-2);
+  }
+
+  .source {
+    grid-area: source;
+    min-width: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .label {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  /* A look-alike of a reference code: said in words, with the glyph, before any figure. */
+  /* Only when there is something to say: auto-placed rows, so an absent line leaves no gap. */
+  .similar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-8);
+    margin-top: var(--s-4);
+    color: var(--warn);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+
+    & > svg {
+      flex: none;
+      margin-top: var(--s-2);
+    }
+  }
+
+  .tier {
+    grid-column: 1 / -1;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  /* The right-hand column: one grid for both rows, so the two labels and the two values each share an edge. */
+  .side {
+    grid-area: side;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--s-4) var(--s-16);
+    margin: 0;
+    min-width: 0;
+    /* The first figure sits on the code's line. */
+    padding-top: calc((var(--h1-line) - var(--figure-line)) / 2);
+  }
+
+  .row {
+    display: contents;
+  }
+
+  .holdings,
+  .issuer {
+    margin: 0;
+    min-width: 0;
+  }
+
+  /* The holdings one per line, left-aligned under each other at the value edge. */
+  .holdings {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .holding {
+    display: inline-flex;
+    align-items: baseline;
+  }
+
+  .word {
+    font-size: var(--ui-size);
+    line-height: var(--figure-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .funds {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .issuer {
+    display: inline-flex;
+    align-items: baseline;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  @media (min-width: 1200px) {
+    .root {
+      grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .root {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'back'
+        'main'
+        'side';
+      gap: var(--s-8);
+    }
+
+    .main {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        'title figure'
+        'source source';
+      gap: var(--s-2) var(--s-12);
+    }
+
+    .side {
+      padding-top: 0;
+    }
+
+    /* The issuer has its row on the About tab. */
+    .row[data-row='issuer'] {
+      display: none;
+    }
+
+    /* One line: the two holdings side by side. */
+    .holdings {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0 var(--s-12);
+    }
+  }
+}

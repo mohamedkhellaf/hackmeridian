@@ -1,0 +1,15 @@
+@layer features {
+  /* The same back link as the asset page's: a chevron, and a 44 px target on a touch screen. */
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    min-height: var(--s-24);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+}

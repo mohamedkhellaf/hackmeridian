@@ -1,0 +1,123 @@
+@layer features {
+  /*
+   * One ruled row, like the reference line of a statement: the scenario on the left (fixtures), the publisher's
+   * figures on the right, labels above them. It wraps to two lines where the two do not fit side by side.
+   */
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-12) var(--s-40);
+    /* The sub-navigation's rule is directly above: the row closes with its own rule only. */
+    padding-block-end: var(--s-12);
+    border-block-end: 1px solid var(--hairline);
+  }
+
+  .scenario {
+    flex: 1 1 18rem;
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .strong {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .root {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-12) var(--s-32);
+    margin: 0;
+  }
+
+  .fact {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+
+    & dt {
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      font-stretch: var(--label-stretch);
+      color: var(--muted);
+    }
+
+    & dd {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--s-6);
+      margin: 0;
+      font-size: var(--ui-size);
+      line-height: var(--figure-line);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums lining-nums;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    & dd[data-warn] {
+      color: var(--warn);
+    }
+  }
+
+  .fact dd.figure {
+    align-items: baseline;
+  }
+
+  .icon {
+    flex: none;
+    width: var(--icon);
+    height: var(--icon);
+  }
+
+  /* Under 768 px: the figures are one line of text under the scenario sentence. */
+  .line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-6);
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+
+    &[data-warn] .icon {
+      margin-top: var(--s-2);
+      color: var(--warn);
+    }
+  }
+
+  .part {
+    display: inline-block;
+  }
+
+  .price {
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 767.98px) {
+    .row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--s-6);
+      padding-block-end: var(--s-8);
+    }
+
+    .scenario {
+      flex: none;
+    }
+  }
+}

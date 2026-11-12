@@ -1,0 +1,129 @@
+@layer features {
+  /* Three equal columns: the same axis is drawn at the same scale in each. The rule sits in the gap. */
+  .list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--s-56);
+    margin: 0;
+
+    @media (max-width: 999.98px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+
+    & + &::before {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: calc(var(--s-56) / -2);
+      border-inline-start: 1px solid var(--hairline);
+    }
+
+    @media (max-width: 999.98px) {
+      max-width: 34rem;
+      padding-block: var(--s-32);
+      border-top: 1px solid var(--hairline);
+
+      &:first-child {
+        padding-top: 0;
+        border-top: 0;
+      }
+
+      &:last-child {
+        padding-bottom: 0;
+      }
+
+      & + &::before {
+        content: none;
+      }
+    }
+  }
+
+  .name {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    font-family: var(--font-serif);
+    font-size: var(--landing-h3-size);
+    line-height: var(--landing-h3-line);
+    font-weight: 600;
+    letter-spacing: var(--h2-track);
+  }
+
+  .glyph {
+    flex: none;
+    color: var(--text);
+  }
+
+  /* The name is the way into Markets on that intent. On touch it gets a finger-sized row. */
+  .nameLink {
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--touch);
+    }
+  }
+
+  .statement {
+    /* Two lines on a wide screen, so the three figures start level. */
+    min-height: calc(var(--landing-body-line) * 2);
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+
+    @media (max-width: 999.98px) {
+      min-height: 0;
+    }
+  }
+
+  .figure {
+    margin-block: var(--s-8) var(--s-4);
+  }
+
+  /* The row sits on the foot of its column, so the three stay level whatever the text above them needs. */
+  .facts {
+    display: flex;
+    flex-direction: column;
+    margin: auto 0 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: var(--s-12);
+    padding-block: var(--s-8);
+    border-bottom: 1px solid var(--hairline);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    & dt {
+      color: var(--muted);
+      font-size: var(--label-size);
+      line-height: var(--ui-line);
+      font-weight: var(--label-weight);
+    }
+
+    & dd {
+      margin: 0;
+      color: var(--text);
+      text-wrap: pretty;
+    }
+  }
+
+  /* The payoff caption, once for the row. */
+  .note {
+    margin-top: var(--s-24);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+}

@@ -1,0 +1,22 @@
+@layer features {
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  /* Once sent: what is being signed, in one line, over its progress. */
+  .progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+  }
+
+  .summary {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 550;
+    color: var(--text);
+  }
+}

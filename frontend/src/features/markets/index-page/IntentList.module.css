@@ -1,0 +1,127 @@
+@layer features {
+  /* Four equal rows between hairlines: no card, no fill, no radius. */
+  .list {
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+  }
+
+  .item {
+    display: flex;
+    min-width: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .row {
+    display: grid;
+    flex: 1;
+    /* The same tracks in every row (no auto track), so the sentences start at one edge. */
+    grid-template-columns: var(--s-20) minmax(10rem, 0.8fr) minmax(0, 2fr) minmax(6rem, 0.4fr) var(--s-16);
+    align-items: baseline;
+    column-gap: var(--s-16);
+    min-width: 0;
+    min-height: var(--s-56);
+    padding: var(--s-12) var(--s-8);
+    color: var(--text);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    text-decoration: none;
+    transition: background-color var(--dur-hover) var(--ease-enter);
+  }
+
+  a.row {
+    @media (hover: hover) {
+      &:hover {
+        background: var(--hover);
+      }
+    }
+
+    &:active {
+      background: var(--pressed);
+    }
+
+    /* The intent whose asset is being chosen below. */
+    &[data-current] {
+      background: var(--sunken);
+    }
+
+    /* The ring is drawn inside the row; the transparent outline is what forced colours paints instead. */
+    &:focus-visible {
+      box-shadow: inset 0 0 0 2px var(--accent);
+      outline: 2px solid transparent;
+      outline-offset: -2px;
+    }
+  }
+
+  /* On the line of the name, whatever the height of the sentences beside it. */
+  .glyph {
+    align-self: start;
+    margin-top: var(--s-2);
+    color: var(--text);
+  }
+
+  .name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-8);
+    min-width: 0;
+  }
+
+  .nameText {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+  }
+
+  .target {
+    color: var(--muted);
+  }
+
+  .consequence {
+    color: var(--text-2);
+    font-weight: var(--body-weight);
+  }
+
+  /* Who pays the premium, in two words, in its own column at every width. */
+  .payer {
+    justify-self: end;
+    color: var(--muted);
+    font-weight: var(--body-weight);
+    white-space: nowrap;
+  }
+
+  .go {
+    align-self: center;
+    color: var(--muted);
+  }
+
+  /* Narrow: one 56 px line per intent (glyph, name, who pays, chevron); the sentences are on the asset page. */
+  @container (max-width: 39.99rem) {
+    .row {
+      grid-template-columns: var(--s-20) minmax(0, 1fr) auto var(--s-16);
+      align-items: center;
+      padding-block: var(--s-8);
+    }
+
+    .glyph {
+      align-self: center;
+      margin-top: 0;
+    }
+
+    .consequence {
+      display: none;
+    }
+
+    .payer {
+      font-size: var(--caption-size);
+      line-height: var(--caption-line);
+    }
+  }
+}

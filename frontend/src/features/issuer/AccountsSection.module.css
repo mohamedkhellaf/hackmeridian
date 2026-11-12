@@ -1,0 +1,196 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+  }
+
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .readAt {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  /* The button lines up with the input, under the label, whatever hint or error sits below the field. */
+  .add {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--s-8);
+    max-width: 44rem;
+  }
+
+  .addField {
+    min-width: 0;
+  }
+
+  .addButton {
+    margin-top: calc(var(--label-line) + var(--s-6));
+  }
+
+  .limits {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .filter {
+    align-self: flex-start;
+  }
+
+  /* Stated widths: columns keep their place while rows load and while figures change. */
+  .colAccount {
+    width: 32%;
+  }
+
+  .colBalance {
+    width: 17%;
+  }
+
+  .colActions {
+    width: 9.5rem;
+  }
+
+  /* Cells hold two lines (the state and what it means), so they wrap and sit on the first line. */
+  .cell {
+    padding-block: var(--s-8);
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  .panelCell {
+    height: auto;
+    padding-block: var(--s-4) var(--s-12);
+    white-space: normal;
+  }
+
+  .identity {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    min-width: 0;
+    min-height: var(--ui-line);
+    font-weight: 450;
+  }
+
+  .detail {
+    display: block;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 420;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .state {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  /* Ink for the states that need a decision; the others are quiet. */
+  .stateWord {
+    font-weight: 550;
+    color: var(--text);
+
+    &[data-tone='quiet'] {
+      font-weight: 450;
+      color: var(--text-2);
+    }
+  }
+
+  .none {
+    color: var(--muted);
+  }
+
+  .footnote {
+    max-width: var(--measure);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  /* Narrow: one two-line entry per account. The unit is said once, in the head of the list. */
+  .listWrap {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .listHead {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-16);
+    padding-block-end: var(--s-4);
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    padding-block: var(--s-12);
+
+    & + & {
+      border-top: 1px solid var(--hairline);
+    }
+  }
+
+  .line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  /* The actions keep to the right edge, also when they wrap under a long state line. */
+  .line > :last-child:not(:first-child) {
+    margin-inline-start: auto;
+  }
+
+  .itemBalance {
+    margin-inline-start: auto;
+    text-align: end;
+  }
+
+  @media (max-width: 767.98px) {
+    .add {
+      max-width: none;
+    }
+  }
+}

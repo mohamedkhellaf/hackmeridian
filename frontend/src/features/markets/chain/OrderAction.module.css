@@ -1,0 +1,8 @@
+@layer features {
+  .note {
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    white-space: nowrap;
+  }
+}

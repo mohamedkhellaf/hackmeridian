@@ -1,0 +1,51 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .quiet {
+    color: var(--muted);
+  }
+
+  .warn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    color: var(--warn);
+  }
+
+  /* "Not authorized" stops every option on the asset: it is the one state word in ink weight. */
+  .state {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    font-weight: 450;
+    color: var(--text-2);
+
+    &[data-state='unauthorized'],
+    &[data-state='maintain-only'] {
+      font-weight: 550;
+      color: var(--text);
+    }
+  }
+
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12) var(--s-24);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    @media (pointer: coarse) {
+      & a {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--touch);
+      }
+    }
+  }
+}

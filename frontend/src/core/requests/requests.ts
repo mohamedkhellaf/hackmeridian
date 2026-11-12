@@ -1,0 +1,36 @@
+import { formatAmount } from '../options/format'
+import { requiredCollateral } from '../options/types'
+import { perUnit as perUnitUnits } from '../units'
+import type { Bid, BidState } from './types'
+
+// Pure helpers for the Requests UI (contract v1.5 bids). Display only: settlement uses exact units.
+// `amt(units, token)` lives in core/units.
+
+/** A quote-token total per one unit of underlying, 2 decimals, truncated. */
+export function perUnit(total: bigint, b: Pick<Bid, 'underlyingQty' | 'underlying' | 'quote'>): string {
+  const scaled = perUnitUnits(total, b)
+  return scaled === null ? '–' : formatAmount(scaled, b.quote.decimals, 2, Math.min(2, b.quote.decimals))
+}
+
+/** What a maker locks to fill: PUT -> total strike in the quote token; CALL -> the underlying quantity. */
+export const fillCollateral = (b: Bid) => requiredCollateral(b)
+
+/** Requests shown on Markets: open ones first (soonest expiry first), then expired-but-unrefunded and filled. */
+export function marketBids(bids: Bid[]): Bid[] {
+  const rank: Record<BidState, number> = { open: 0, expired: 1, filled: 2, cancelled: 3, pruned: 3 }
+  return bids
+    .filter((b) => rank[b.state] < 3)
+    .sort((a, b) => rank[a.state] - rank[b.state] || a.expiry - b.expiry || (a.id < b.id ? -1 : 1))
+}
+
+/** The wallet's requests that still hold its escrowed premium (open, or expired and not yet refunded). */
+export const myOpenBids = (bids: Bid[], me: string | null): Bid[] =>
+  me ? bids.filter((b) => b.buyer === me && (b.state === 'open' || b.state === 'expired')) : []
+
+/** Why the connected wallet cannot fill this request, or null if it can try. */
+export function fillBlockReason(b: Bid, me: string | null, nowSec: number): string | null {
+  if (!me) return 'Connect a wallet to fill'
+  if (b.buyer === me) return 'This is your own request'
+  if (b.state !== 'open' || b.expiry <= nowSec) return 'This request is no longer open'
+  return null
+}

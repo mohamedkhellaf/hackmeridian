@@ -1,0 +1,21 @@
+@layer features {
+  /*
+   * Plain words in the bar: no box, no dot. Caption size in the muted ink, so it reads as a state beside the
+   * navigation and never as one more link of it.
+   */
+  .indicator {
+    flex: none;
+    margin: 0;
+    color: var(--muted);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    white-space: nowrap;
+
+    /* A late or failed read: the warning ink, and words that say so. */
+    &[data-late] {
+      color: var(--warn);
+    }
+  }
+}

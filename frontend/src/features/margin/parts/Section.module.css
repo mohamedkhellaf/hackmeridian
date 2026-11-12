@@ -1,0 +1,49 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+    scroll-margin-top: var(--s-72);
+  }
+
+  .header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-16);
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+    color: var(--text);
+  }
+
+  .aside {
+    display: flex;
+    align-items: center;
+    gap: var(--s-12);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .note {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .footnote {
+    max-width: var(--measure);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+}

@@ -1,0 +1,115 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    min-width: 0;
+  }
+
+  /* The vault value leads; cash, reserved payments and debts follow at the figure size. */
+  .figures {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
+    gap: var(--s-16) var(--s-32);
+    align-items: start;
+  }
+
+  .total {
+    max-width: 34rem;
+  }
+
+  /* No recorded vault value at this step: the label as on a figure, then where the scenario records it. */
+  .noValue {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .noValueLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  /* The contract's name and number for a refusal: a quiet reference after the sentence. */
+  .code {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    gap: var(--s-32);
+    align-items: start;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+    min-width: 0;
+  }
+
+  .form {
+    min-width: 0;
+  }
+
+  .lock {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+
+  .settlements {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    max-width: 45rem;
+    padding-top: var(--s-12);
+  }
+
+  .settlement {
+    margin: 0;
+  }
+
+  @media (max-width: 1199.98px) {
+    .figures {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .figures > :first-child {
+      grid-column: 1 / -1;
+    }
+
+    .columns {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .root {
+      gap: var(--s-32);
+    }
+
+    .figures {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-12) var(--s-16);
+    }
+  }
+}

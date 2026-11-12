@@ -1,0 +1,50 @@
+@layer features {
+  /* One column of blocks on the 8 px rhythm. The shell sets the width and the gutters. */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  /* The required sentences: plain text under the title, no box, no label, no tint. */
+  .sentences {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+  }
+
+  .loadingRail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    gap: var(--s-32);
+    align-items: start;
+  }
+
+  .loadingMain {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  @media (max-width: 1199.98px) {
+    .loadingRail {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .page {
+      gap: var(--s-20);
+    }
+  }
+}

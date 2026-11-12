@@ -1,0 +1,136 @@
+@layer features {
+  /* Two or three columns: as wide as the content, not the page. */
+  .narrow {
+    max-width: 34rem;
+  }
+
+  /* A table with row actions: every row as tall as one that carries the small button, so rows never differ. */
+  .table[data-actions] > tbody > tr > * {
+    height: calc(var(--control-h-sm) + var(--s-8) + 1px);
+  }
+
+  /* The total under the rows. */
+  .foot > tr > * {
+    border-top: 1px solid var(--rule);
+    border-bottom: 0;
+    font-weight: 600;
+  }
+
+  /* The list layout keeps an inert copy of the table to measure, out of sight and out of the flow. */
+  .listBox {
+    position: relative;
+  }
+
+  .measure {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* The list layout: each row of the desk table is an item with a title line, labelled pairs and its actions. */
+  .list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    padding-block: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+  }
+
+  .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-12);
+  }
+
+  .title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-2) var(--s-8);
+    min-width: 0;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .aside {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--s-6);
+  }
+
+  /* Label left, value right, one pair per line: a label is always in the same place. */
+  .pairs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-4) var(--s-32);
+    margin: 0;
+
+    @media (min-width: 768px) {
+      grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    }
+  }
+
+  .pair {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-12);
+    min-width: 0;
+
+    & dt {
+      flex: none;
+      max-width: 55%;
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      font-stretch: var(--label-stretch);
+      color: var(--muted);
+    }
+
+    & dd {
+      min-width: 0;
+      margin: 0;
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums lining-nums;
+      text-align: end;
+      color: var(--text);
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-8);
+    padding-top: var(--s-4);
+  }
+
+  .action {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+  }
+}

@@ -1,0 +1,57 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+  }
+
+  .risk {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
+  .title {
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .text {
+    max-width: var(--measure);
+    color: var(--text-2);
+  }
+
+  .table {
+    padding-block: var(--s-8);
+  }
+
+  /*
+   * Margin is fenced off: a sunken well inside a full rule, so it never reads as part of the Covered rules. The rule
+   * carries the edge in Carbon, where the well and the page are almost the same tone.
+   */
+  .margin {
+    border: 1px solid var(--rule);
+    border-radius: var(--r-card);
+  }
+
+  .marginText {
+    max-width: var(--measure);
+    color: var(--text);
+  }
+
+  .action {
+    display: flex;
+    margin-top: var(--s-8);
+  }
+
+  .marginList {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: var(--measure);
+    margin: 0;
+    padding-inline-start: var(--s-20);
+    color: var(--text-2);
+  }
+}

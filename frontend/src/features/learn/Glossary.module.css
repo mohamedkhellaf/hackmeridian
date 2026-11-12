@@ -1,0 +1,45 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .entry {
+    /* A link to a term lands under the section select, which stays at the top below 1200 px. */
+    scroll-margin-top: var(--s-72);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-2);
+    padding-block: var(--s-8);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .entry:last-child {
+    border-bottom-color: var(--rule);
+  }
+
+  @container (min-width: 36rem) {
+    .entry {
+      grid-template-columns: 11rem minmax(0, 1fr);
+      gap: var(--s-16);
+      align-items: baseline;
+    }
+  }
+
+  /* A term is a label of the list, in the interface's voice: sans, medium. Serif is for the headings. */
+  .term {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 550;
+    color: var(--text);
+  }
+
+  .definition {
+    max-width: var(--measure);
+    margin: 0;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+}

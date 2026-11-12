@@ -1,0 +1,220 @@
+@layer features {
+  /* The list's own width decides between the table and the list, so a tablet or a half-width window gets the list. */
+  .root {
+    container-type: inline-size;
+    min-width: 0;
+  }
+
+  .desktop {
+    min-width: 0;
+
+    @container (max-width: 51.99rem) {
+      display: none;
+    }
+  }
+
+  .phone {
+    display: none;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+
+    @container (max-width: 51.99rem) {
+      display: block;
+    }
+  }
+
+  /* Fixed columns: below this width the list replaces the table. */
+  .table {
+    min-width: 52rem;
+  }
+
+  .row {
+    cursor: pointer;
+
+    &[data-closed] {
+      color: var(--muted);
+    }
+  }
+
+  .option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .optionLink {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+  }
+
+  .stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    vertical-align: middle;
+  }
+
+  .stackEnd {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    vertical-align: middle;
+  }
+
+  .sub {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    color: var(--muted);
+    white-space: normal;
+  }
+
+  /* News about the row since the last visit: in ink, so it is read before the rest of the cell. */
+  .news {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .short {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--warn);
+  }
+
+  /* A sentence in a cell may take two lines; figures never wrap. */
+  .wrap {
+    display: block;
+    white-space: normal;
+    text-wrap: pretty;
+  }
+
+  .none {
+    color: var(--muted);
+  }
+
+  /* Every row action is the same small outlined button, right-aligned; a third one wraps under the first two. */
+  .actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--s-4) var(--s-8);
+  }
+
+  .phoneItem {
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+
+    &[data-closed] {
+      color: var(--muted);
+    }
+  }
+
+  .phoneRow {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-height: var(--touch);
+    padding-block: var(--s-12);
+    padding-right: var(--s-24);
+    color: inherit;
+    text-decoration: none;
+
+    &[data-plain] {
+      padding-right: 0;
+    }
+
+    &:not([data-plain]) {
+      @media (hover: hover) {
+        &:hover .phoneTitle {
+          text-decoration: underline;
+          text-underline-offset: 0.2em;
+        }
+      }
+    }
+  }
+
+  /* The row opens the position: the chevron says so on a touch screen, where there is no hover. */
+  .chevron {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    translate: 0 -50%;
+    color: var(--muted);
+  }
+
+  .phoneLine {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .phoneTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    min-width: 0;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 600;
+  }
+
+  .phoneWhere {
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 400;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  /* The premium and the date: two columns, or one line each where two would break a figure (about 360 px). */
+  .phoneMetaLine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 var(--s-12);
+    min-width: 0;
+
+    @container (max-width: 21.99rem) {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  .phoneMeta {
+    min-width: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--muted);
+  }
+
+  .phoneWhen {
+    flex: none;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .phoneAction {
+    display: flex;
+    padding-top: var(--s-8);
+  }
+}

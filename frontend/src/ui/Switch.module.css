@@ -1,0 +1,77 @@
+@layer ui {
+  .root {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 450;
+    color: var(--text);
+    cursor: pointer;
+
+    &[data-label-first] {
+      flex-direction: row-reverse;
+      justify-content: space-between;
+    }
+
+    &[data-disabled] {
+      color: var(--disabled-fg);
+      cursor: not-allowed;
+    }
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+
+  /* The one pill in the system. On is ink; off is an empty well. The thumb position carries the state. */
+  .track {
+    --switch-w: var(--s-32);
+    --switch-h: var(--s-20);
+    --thumb: var(--s-12);
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    width: var(--switch-w);
+    height: var(--switch-h);
+    padding: 0 var(--s-2);
+    border: 1px solid var(--control);
+    border-radius: var(--switch-h);
+    background: var(--sunken);
+    transition:
+      background-color var(--dur-hover) var(--ease-enter),
+      border-color var(--dur-hover) var(--ease-enter);
+
+    &[data-checked] {
+      border-color: var(--primary);
+      background: var(--primary);
+    }
+
+    &[data-disabled] {
+      border-color: var(--hairline);
+    }
+
+    &[data-disabled][data-checked] {
+      background: var(--disabled-fg);
+      border-color: var(--disabled-fg);
+    }
+  }
+
+  .thumb {
+    width: var(--thumb);
+    height: var(--thumb);
+    margin-inline-start: 1px;
+    border-radius: 50%;
+    background: var(--control);
+    transition:
+      translate var(--dur-hover) var(--ease-enter),
+      background-color var(--dur-hover) var(--ease-enter);
+
+    &[data-checked] {
+      translate: calc(var(--switch-w) - var(--thumb) - var(--s-8)) 0;
+      background: var(--primary-fg);
+    }
+  }
+}

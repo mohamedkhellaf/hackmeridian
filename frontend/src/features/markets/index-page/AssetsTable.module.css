@@ -1,0 +1,304 @@
+@layer features {
+  /* The table needs about 52rem with every column; below that the rows are cards. Measured on its own column. */
+  .root {
+    container-type: inline-size;
+    min-width: 0;
+  }
+
+  .table {
+    display: block;
+  }
+
+  .cards {
+    display: none;
+  }
+
+  /* One target per row: the action link is stretched over the whole row. */
+  .row {
+    position: relative;
+    cursor: pointer;
+
+    &:has(.stretch:focus-visible) {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+  }
+
+  /* Static, so its ::after is placed against the row or the card and not against the button itself. */
+  .stretch {
+    position: static;
+
+    &::after {
+      position: absolute;
+      inset: 0;
+      content: '';
+    }
+
+    /* The ring is drawn around the row or the card instead. */
+    &:focus-visible {
+      box-shadow: none;
+    }
+  }
+
+  /* Links inside a row stay clickable above the stretched one. */
+  .above {
+    position: relative;
+    z-index: 1;
+  }
+
+  .assetCell {
+    padding-block: var(--s-8);
+    font-weight: inherit;
+  }
+
+  .actionCell {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .identity {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  .idLine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-8);
+  }
+
+  .code {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+
+    /* Outside the app's list a zero and an O must not look alike: the mono face slashes its zero. */
+    &[data-unlisted] {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-variant-numeric: slashed-zero;
+    }
+  }
+
+  .type {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .issuer {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .similar {
+    color: var(--warn);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    white-space: normal;
+  }
+
+  .head {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  /* The second line of a column head: what the bare figures under it are counted in. */
+  .headUnit {
+    font-weight: 450;
+  }
+
+  .stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .sub {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    white-space: nowrap;
+  }
+
+  .none {
+    color: var(--muted);
+  }
+
+  .wideCell {
+    white-space: normal;
+    color: var(--text-2);
+  }
+
+  .thin {
+    text-wrap: pretty;
+  }
+
+  .short {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    color: var(--warn);
+
+    & svg {
+      flex: none;
+      align-self: center;
+    }
+  }
+
+  @container (max-width: 51.99rem) {
+    .table {
+      display: none;
+    }
+
+    /* One card per row on a phone, two side by side on a tablet. */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+      gap: var(--s-12);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-12);
+      padding: var(--s-16);
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-card);
+      background: var(--surface);
+      transition: border-color var(--dur-hover) var(--ease-enter);
+
+      @media (hover: hover) {
+        &:hover {
+          border-color: var(--control);
+        }
+      }
+
+      &:has(.stretch:focus-visible) {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+    }
+
+    .cardHead {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--s-12);
+    }
+
+    .cardPrice {
+      display: flex;
+      flex: none;
+      flex-direction: column;
+      align-items: flex-end;
+      font-size: var(--figure-size);
+      line-height: var(--figure-line);
+    }
+
+    .cardHeld {
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      color: var(--text-2);
+    }
+
+    .cardFacts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--s-2) var(--s-12);
+      padding-top: var(--s-12);
+      border-top: 1px solid var(--hairline);
+
+      & dl {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: subgrid;
+        gap: var(--s-12);
+        margin: 0;
+      }
+
+      & dl > div {
+        display: flex;
+        flex-direction: column;
+        gap: var(--s-2);
+        min-width: 0;
+      }
+
+      & dt {
+        color: var(--muted);
+        font-size: var(--label-size);
+        line-height: var(--label-line);
+        font-weight: var(--label-weight);
+        font-stretch: var(--label-stretch);
+      }
+
+      & dd {
+        margin: 0;
+        font-size: var(--ui-size);
+        line-height: var(--ui-line);
+        font-weight: 500;
+      }
+
+      & .stack {
+        align-items: flex-start;
+      }
+
+      & .sub {
+        white-space: normal;
+      }
+    }
+
+    .cardUnit {
+      grid-column: 2 / -1;
+      color: var(--muted);
+      font-size: var(--caption-size);
+      line-height: var(--caption-line);
+    }
+
+    .cardWide {
+      padding-top: var(--s-12);
+      border-top: 1px solid var(--hairline);
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+      color: var(--text-2);
+    }
+
+    .cardFoot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--s-8) var(--s-12);
+
+      & > a {
+        flex: none;
+        margin-inline-start: auto;
+      }
+    }
+
+    .cardExpiry {
+      flex: 1 1 12rem;
+      min-width: 0;
+      color: var(--muted);
+      font-size: var(--caption-size);
+      line-height: var(--caption-line);
+    }
+  }
+}

@@ -1,0 +1,95 @@
+@layer features {
+  .root {
+    display: grid;
+    gap: var(--s-32);
+    min-width: 0;
+  }
+
+  .chain {
+    display: grid;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .caption,
+  .legend {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  /* The one line while nothing is selected: a premium is a control, or nothing is posted on this deadline yet. */
+  .hint {
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  /* The URL named a date the chain does not show. */
+  .moved {
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+
+    & > svg {
+      color: var(--warn);
+    }
+  }
+
+  /* ---- First load: the chain's own shape, so nothing jumps when it lands ---- */
+
+  .skeleton {
+    display: grid;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .skeletonTable {
+    display: grid;
+  }
+
+  .skeletonRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) calc(var(--s-72) + var(--s-24)) minmax(0, 1fr);
+    align-items: center;
+    height: var(--row-h-compact);
+    border-bottom: 1px solid var(--hairline);
+
+    &[data-head] {
+      border-bottom-color: var(--rule);
+    }
+  }
+
+  .skeletonSide {
+    display: flex;
+    padding-inline: var(--s-12);
+
+    &[data-side='call'] {
+      justify-content: flex-end;
+    }
+  }
+
+  .skeletonStrike {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    background: var(--cell-tone);
+  }
+
+  @media (max-width: 767.98px) {
+    .skeletonRow {
+      height: var(--touch);
+    }
+  }
+}

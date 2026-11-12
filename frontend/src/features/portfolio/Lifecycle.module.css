@@ -1,0 +1,19 @@
+@layer features {
+  .tx {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-2) var(--s-8);
+    margin-top: var(--s-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  /* Its link sits in the sentence and keeps the sentence's line box. */
+  .note {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+}

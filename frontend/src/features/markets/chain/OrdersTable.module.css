@@ -1,0 +1,204 @@
+@layer features {
+  .root {
+    min-width: 0;
+  }
+
+  /* Fixed widths: the figures of the offers and the requests share their columns, and a busy button does not
+     push them aside. In the book and "Other offers", "From" (a role and an address) takes what is left. */
+  .noCol {
+    width: 3.5rem;
+  }
+
+  .seriesCol {
+    width: 11rem;
+  }
+
+  .qtyCol {
+    width: calc(var(--s-72) + var(--s-24));
+  }
+
+  .perUnitCol {
+    width: calc(var(--s-72) * 2 - var(--s-12));
+  }
+
+  .totalCol {
+    width: calc(var(--s-72) + var(--s-40));
+  }
+
+  .whyCol {
+    width: 8rem;
+  }
+
+  .noteCol {
+    width: calc(var(--s-72) * 2 + var(--s-24));
+  }
+
+  .actionColW {
+    width: calc(var(--s-72) + var(--s-24));
+
+    &[data-wide] {
+      width: calc(var(--s-72) * 2 - var(--s-8));
+    }
+  }
+
+  /* "Your orders": the role alone in "From", and the spare width to the two figures. */
+  .root[data-mine] {
+    & .fromCol {
+      width: 6rem;
+    }
+
+    & .qtyCol,
+    & .perUnitCol {
+      width: auto;
+    }
+  }
+
+  .actionCol {
+    white-space: nowrap;
+  }
+
+  /* The contract's own number, unpadded and right-aligned (ruling F1). */
+  .no {
+    color: var(--text-2);
+  }
+
+  /* The column that gives way: never drawn over its neighbours. */
+  .fromCell {
+    overflow: hidden;
+  }
+
+  .from {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .source {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .own {
+    color: var(--text-2);
+  }
+
+  .series {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+    font-weight: 500;
+  }
+
+  /* "Your orders": the series is the control that selects it in the chain. */
+  .seriesButton {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    border-radius: var(--r-tag);
+    color: var(--accent);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 0.2em;
+
+    @media (hover: hover) {
+      &:hover {
+        text-decoration-color: currentColor;
+      }
+    }
+  }
+
+  /* The second line of a cell: a deadline under its series, a total under its per-unit figure. */
+  .sub,
+  .totalInline {
+    display: block;
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .perUnit {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: var(--s-8);
+  }
+
+  .best {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .figure {
+    font-weight: 550;
+  }
+
+  .why,
+  .noteCell {
+    color: var(--text-2);
+    white-space: normal;
+  }
+
+  .reason {
+    display: block;
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .warn {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-6);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+
+    & > svg {
+      flex: none;
+      color: var(--warn);
+    }
+  }
+
+  /* ---- Groups of the book: "Offers 2", the gap line, "Requests 1" ---- */
+
+  .group {
+    padding: var(--s-12) 0 var(--s-4);
+    border-bottom: 1px solid var(--hairline);
+    color: var(--text);
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    text-align: start;
+  }
+
+  .groupCount {
+    margin-inline-start: var(--s-4);
+    color: var(--muted);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  .gap {
+    padding: var(--s-8) var(--cell-px);
+    border-bottom: 1px solid var(--rule);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .emptyCell {
+    color: var(--muted);
+  }
+
+  /* "Other offers": two-line rows, the total under the per-unit figure. */
+  .root[data-layout='series'] .table td {
+    padding-block: var(--s-6);
+  }
+}

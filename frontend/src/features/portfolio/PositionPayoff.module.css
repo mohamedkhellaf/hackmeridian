@@ -1,0 +1,27 @@
+@layer features {
+  /* The holder's readout: what exercising pays, in the serif, then the net after the premium at body size. */
+  .readout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-height: calc(var(--figure-lg-line) + var(--ui-line) * 2);
+  }
+
+  .readoutLabel {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .readoutValue {
+    display: flex;
+    align-items: baseline;
+  }
+
+  .readoutNet {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+}

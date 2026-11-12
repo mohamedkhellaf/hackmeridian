@@ -1,0 +1,87 @@
+@layer features {
+  .address {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    font-feature-settings: 'zero';
+  }
+
+  /* Narrow bars: "Connect" alone is shown; " wallet" stays in the accessible name. */
+  @media (max-width: 899.98px) {
+    .walletWord {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+
+  /* The balance rows sit in the kit's `MenuStatic`, which starts them where the words of the menu items start. */
+  .balances {
+    display: flex;
+    flex-direction: column;
+    min-width: 16rem;
+  }
+
+  .balance {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-24);
+    padding-block: var(--s-4);
+
+    & + & {
+      border-top: 1px solid var(--hairline);
+    }
+  }
+
+  .code {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    color: var(--text-2);
+  }
+
+  .value {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 0;
+    text-align: end;
+  }
+
+  .amount {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .reason {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .problem {
+    padding-block: var(--s-4);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .note {
+    margin-inline-start: var(--s-8);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    color: var(--muted);
+  }
+}

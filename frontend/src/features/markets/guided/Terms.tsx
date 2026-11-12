@@ -1,0 +1,112 @@
+import type { ReactNode } from 'react'
+import { Amount, AmountField, ChoiceChips, IconCheck, Marker } from '../../../ui'
+
+import styles from './Terms.module.css'
+import type { ChoiceChip } from '../../../ui'
+
+export interface TermsProps {
+  /** The quantity field. */
+  qty: {
+    label: string
+    text: string
+    unit: string
+    decimals: number
+    onChange: (text: string) => void
+    onMax?: () => void
+    maxLabel?: string
+    /** The wallet balance, right of the label. */
+    aside?: ReactNode
+    hint?: ReactNode
+    error?: ReactNode
+  }
+  strike: {
+    label: string
+    /** The chosen strike as a figure and its unit. */
+    figure: string
+    unit: string
+    /** Where it stands against the reference, in words, with the price's two-word label. */
+    hint?: string
+    chipsLabel: string
+    chips: readonly ChoiceChip[]
+    value: string | null
+    onChange: (value: string) => void
+  }
+  expiry: {
+    label: string
+    /** `20 Nov`, `08:00 UTC`, and the machine-readable instant. */
+    day: string
+    time: string
+    iso: string
+    hint?: string
+    chipsLabel: string
+    chips: readonly ChoiceChip[]
+    value: string | null
+    onChange: (value: string) => void
+  }
+  /** The key to the tick on the chips, or null when no chip carries one. */
+  fundedKey: string | null
+  /** Said once above the chips when the link named a price or a date that is not on the list. */
+  notice?: string | null
+}
+
+/**
+ * The three plain inputs of the contract note (brief 4.3): a quantity, a price per unit and a deadline. The top
+ * row states them as three figures, as on the landing note; the two rows of chips under it change the price and
+ * the date.
+ */
+export function Terms({ qty, strike, expiry, fundedKey, notice }: TermsProps) {
+  return (
+    <div className={styles.root}>
+      <div className={styles.header}>
+        <AmountField
+          className={styles.qty}
+          label={qty.label}
+          value={qty.text}
+          onValueChange={qty.onChange}
+          unit={qty.unit}
+          decimals={qty.decimals}
+          onMax={qty.onMax}
+          maxLabel={qty.maxLabel}
+          aside={qty.aside}
+          hint={qty.hint}
+          error={qty.error}
+        />
+        <dl className={styles.figures}>
+          <div className={styles.figure}>
+            <dt>{strike.label}</dt>
+            <dd>
+              <span className={styles.value} data-testid="guided-strike">
+                <Marker>
+                  <Amount value={strike.figure} unit={strike.unit} figure="serif" size="lg" />
+                </Marker>
+              </span>
+              {strike.hint ? <span className={styles.hint}>{strike.hint}</span> : null}
+            </dd>
+          </div>
+          <div className={styles.figure}>
+            <dt>{expiry.label}</dt>
+            <dd>
+              <time className={styles.value} dateTime={expiry.iso} data-testid="guided-expiry">
+                <span className={styles.day}>{expiry.day}</span> <span className={styles.time}>{expiry.time}</span>
+              </time>
+              {expiry.hint ? <span className={styles.hint}>{expiry.hint}</span> : null}
+            </dd>
+          </div>
+        </dl>
+      </div>
+      {notice ? (
+        <p className={styles.notice} data-testid="guided-off-grid">
+          {notice}
+        </p>
+      ) : null}
+      {/* Both rows span the note, each chip a column of it, so the two end on the same edge. */}
+      <ChoiceChips appearance="note" label={strike.chipsLabel} chips={strike.chips} value={strike.value} onValueChange={strike.onChange} columns={Math.max(strike.chips.length, 1)} />
+      <ChoiceChips appearance="note" label={expiry.chipsLabel} chips={expiry.chips} value={expiry.value} onValueChange={expiry.onChange} columns={Math.max(expiry.chips.length, 1)} />
+      {fundedKey ? (
+        <p className={styles.legend} aria-hidden="true">
+          <IconCheck size={12} className={styles.tick} /> {fundedKey}
+        </p>
+      ) : null}
+    </div>
+  )
+}

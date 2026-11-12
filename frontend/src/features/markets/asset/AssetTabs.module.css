@@ -1,0 +1,60 @@
+@layer features {
+  .root {
+    container-type: inline-size;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  /* The switch sits at the right end of the tab rule, at its own width, floating a few pixels above the rule. */
+  .mode {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    display: flex;
+    align-items: center;
+    height: var(--control-h);
+    padding-bottom: var(--s-4);
+    padding-inline-start: var(--s-16);
+    background: var(--bg);
+  }
+
+  /* Touch: the kit's switch is 44 px tall, as tall as the tabs, so it is lifted to clear the rule. */
+  @media (pointer: coarse) {
+    .mode {
+      inset-block-start: calc(var(--s-6) * -1);
+      height: var(--touch);
+      padding-bottom: 0;
+    }
+  }
+
+  /* Too narrow for the tabs and the switch on one line: the switch is a row of its own under the tabs. */
+  @container (max-width: 21.99rem) {
+    .mode {
+      position: static;
+      height: auto;
+      padding: 0;
+    }
+  }
+
+  .short {
+    display: none;
+  }
+
+  @media (max-width: 767.98px) {
+    .long {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .short {
+      display: inline;
+    }
+  }
+}

@@ -1,0 +1,117 @@
+@layer ui {
+  .root {
+    min-width: 0;
+  }
+
+  /* A ruled line; the active tab sits on it with an ink underline. */
+  .list {
+    position: relative;
+    display: flex;
+    gap: var(--s-24);
+    margin: 0;
+    padding: 0;
+    border-bottom: 1px solid var(--rule);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .navItem {
+    display: flex;
+    list-style: none;
+  }
+
+  /*
+   * Links between sub-pages never hide one off the edge: in a narrow column they wrap onto a second line. The two
+   * lines touch (no row gap), so they read as one block above the rule.
+   */
+  .navRoot {
+    container-type: inline-size;
+  }
+
+  @container (max-width: 24rem) {
+    .navList {
+      flex-wrap: wrap;
+      gap: 0 var(--s-16);
+      overflow-x: visible;
+    }
+  }
+
+  .tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    height: var(--control-h);
+    padding: 0;
+    color: var(--text-2);
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover:not([data-disabled]) {
+        color: var(--text);
+      }
+    }
+
+    &[data-active] {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    &[data-disabled] {
+      color: var(--disabled-fg);
+      cursor: not-allowed;
+    }
+
+    /* The list scrolls, so the ring is drawn inside the tab. */
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      box-shadow: none;
+      border-radius: var(--r-control);
+    }
+
+    @media (pointer: coarse) {
+      height: var(--touch);
+    }
+  }
+
+  /* Links have no sliding indicator: the current page carries its own underline. */
+  .navItem .tab[data-active]::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 2px;
+    background: var(--text);
+  }
+
+  .indicator {
+    position: absolute;
+    bottom: 0;
+    left: var(--active-tab-left);
+    width: var(--active-tab-width);
+    height: 2px;
+    background: var(--text);
+    transition:
+      left var(--dur-popover) var(--ease-enter),
+      width var(--dur-popover) var(--ease-enter);
+  }
+
+  .panel {
+    padding-top: var(--s-16);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+
+    &:focus-visible {
+      box-shadow: var(--focus-ring);
+      border-radius: var(--r-card);
+    }
+  }
+}

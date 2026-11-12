@@ -79,7 +79,7 @@
 
 ## StellSec Pro UI (Dev 3)
 
-- **Isolation:** the "Margin" section (`frontend/src/pro/`, route `#/pro`) is mounted only when the build sets `VITE_ENABLE_PRO=1`; it runs on fixtures while `VITE_PRO_CONTRACT_ID` is empty and on the live contract otherwise (`frontend/src/config.ts`, `frontend/src/layout/routes.ts`). It never changes the Covered markets, buy, exercise or collateral flows. The hosted app sets both variables.
+- **Isolation:** the "Margin" section (`frontend/src/features/margin/`, with its logic in `frontend/src/core/pro/`, route `/margin`) is mounted only when the build sets `VITE_ENABLE_PRO=1`; it runs on fixtures while `VITE_PRO_CONTRACT_ID` is empty and on the live contract otherwise (`frontend/src/core/config.ts`, `frontend/src/app/router.tsx`). It never changes the Covered markets, buy, exercise or collateral flows. The hosted app sets both variables.
 - **Data:**
   - the client runs on `packages/risk/fixtures/pro_v0.json` (every step carries the full state and the expected result or error code) when `VITE_PRO_CONTRACT_ID` is empty, and on the live contract when it is set;
   - amounts stay exact integer units (`bigint`), as in Covered, and use the model's names (`nlv`, `mm`, `im`, `owed`, `reserve`, `deficit`).
@@ -94,7 +94,7 @@
   6. **Vault:** LP deposit only (no withdrawal in v0), vault value, reserved takeover payments, debts owed by writers, shortfalls and deficits per series.
   7. **Oracle:** latest snapshot age and sequence, and settlement-price status. The banner "prices and the settlement price are set by the team's publisher" is shown on every Pro screen.
 - **Copy:**
-  - every Pro screen carries "Testnet only. Partial margin: payouts can be reduced; any deficit is shown.";
+  - every Margin screen carries "Partial margin: payouts can be reduced; any deficit is shown.";
   - never "guaranteed", "insured", "safe", "fully backed" or "fully collateralized";
   - a build without `VITE_PRO_CONTRACT_ID` runs on fixtures and says "simulated, not on-chain"; the hosted build runs on the live contract.
 - **Ownership:** Dev 3 owns the UI. Financial formulas come from Dev 1 (the model and `packages/payoff`) and the contract views, never from custom logic in components.
@@ -119,7 +119,7 @@
 ## Project layout
 
 - `Cargo.toml`, `contracts/options/src/`: Soroban Rust, `#![no_std]`, tests under contract crate.
-- `contracts/pro/`: experimental StellSec Pro contract (Dev 2), soroban-sdk 28, `#![no_std]`; `tests/fixtures.rs` replays `packages/risk/fixtures/pro_v0.json`, `tests/negative.rs` holds the brief §7 negative and footprint tests; deploy with `scripts/deploy/deploy-pro.sh`, evidence run with `scripts/deploy/pro-demo.sh` (see `docs/pro-testnet-runbook.md`). On `main` since PR #54. `frontend/src/pro/`: the flagged Margin UI (Dev 3), on `main` since PR #53. `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
+- `contracts/pro/`: experimental StellSec Pro contract (Dev 2), soroban-sdk 28, `#![no_std]`; `tests/fixtures.rs` replays `packages/risk/fixtures/pro_v0.json`, `tests/negative.rs` holds the brief §7 negative and footprint tests; deploy with `scripts/deploy/deploy-pro.sh`, evidence run with `scripts/deploy/pro-demo.sh` (see `docs/pro-testnet-runbook.md`). On `main` since PR #54. `frontend/src/features/margin/` (logic in `frontend/src/core/pro/`): the flagged Margin UI (Dev 3), on `main` since PR #53; design rules in `frontend/DESIGN.md`. `packages/risk/`: Pro margin engine, integer reference model and fixtures (Dev 1, Python 3 + numpy). `docs/pro-architecture.md`, `docs/pro-v0-brief-dev2.md`: Pro design and build brief.
 - `scripts/`: Testnet asset creation/issuer permissions, deployment, funding demo accounts, repeatable integration steps.
 - `frontend/`: Vite + React + TypeScript, Stellar SDK and Freighter, app and transaction UI, generated bindings.
 - `packages/payoff/` (TypeScript payoff previews used by the frontend) and `packages/risk/` (Python margin model and fixtures): Dev 1's shared modules. `packages/rfq/` was never built; the on-chain funded offer or bid is the only executable quote.

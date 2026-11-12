@@ -1,102 +1,89 @@
-import { useEffect, useId, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { Dialog as BaseDialog } from '@base-ui/react/dialog'
+import { useId } from 'react'
 import type { ReactNode, RefObject } from 'react'
-import { Icon } from './Icon'
+import { cx } from './internal/cx'
+import { OverlayFrame } from './internal/OverlayFrame'
+import { resolveInitialFocus } from './internal/overlayFocus'
+import type { InitialFocus } from './internal/overlayFocus'
+import styles from './Dialog.module.css'
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+export type { InitialFocus } from './internal/overlayFocus'
+
+export interface OverlayProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: ReactNode
+  /** One or two sentences under the title. Linked to the dialog as its description. */
+  description?: ReactNode
+  children?: ReactNode
+  /** Actions. The primary action comes last in the markup; on phones they stack full width in that order, the primary at the bottom, by the thumb. */
+  footer?: ReactNode
+  /** Where focus goes on open. Focus is trapped while open and returns to the opener on close. */
+  initialFocus?: InitialFocus
+  /**
+   * Where focus returns on close, when the opener is gone (a row that was removed). `false` leaves focus alone:
+   * the caller moves it itself (to a result region that holds a button, where a ref would land on the button).
+   */
+  finalFocus?: RefObject<HTMLElement | null> | false
+  /** `false` stops a press outside from closing it (a typed confirmation). Escape and the close button still work. */
+  dismissible?: boolean
+  closeLabel?: string
+  className?: string
+}
+
+export interface DialogProps extends OverlayProps {
+  size?: 'sm' | 'md' | 'lg'
+  /** `alertdialog` for a confirmation that interrupts (clawback, liquidation). */
+  role?: 'dialog' | 'alertdialog'
+}
 
 /**
- * Modal dialog. Centered on desktop, bottom sheet on <= 640px (CSS only). The body opens scrolled to the top.
- * Escape and backdrop click call `onClose`; focus moves inside on open, is trapped with Tab, and is restored on close.
- * Mount it conditionally: `{open && <Dialog ...>}`.
+ * A modal dialog. One per flow, never stacked. Focus is trapped, the page behind is inert, Escape closes it
+ * and focus returns to what opened it.
  */
 export function Dialog({
+  open,
+  onOpenChange,
   title,
-  onClose,
+  description,
   children,
   footer,
-  width = 440,
-  initialFocusRef,
-}: {
-  title: ReactNode
-  onClose: () => void
-  children: ReactNode
-  /** Sticky action row (buttons). */
-  footer?: ReactNode
-  /** Max width in px on desktop. */
-  width?: number
-  /** Element to focus first; defaults to the close button. */
-  initialFocusRef?: RefObject<HTMLElement | null>
-}) {
+  size = 'md',
+  role = 'dialog',
+  initialFocus = 'title',
+  finalFocus,
+  dismissible = true,
+  closeLabel = 'Close',
+  className,
+}: DialogProps) {
   const titleId = useId()
-  const panelRef = useRef<HTMLDivElement>(null)
-  const closeRef = useRef<HTMLButtonElement>(null)
-  const bodyRef = useRef<HTMLDivElement>(null)
-  const onCloseRef = useRef(onClose)
-  useEffect(() => {
-    onCloseRef.current = onClose
-  })
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
-    ;(initialFocusRef?.current ?? closeRef.current ?? panelRef.current)?.focus({ preventScroll: true })
-    // Open at the top of the body even when the first focusable element sits further down.
-    if (bodyRef.current) bodyRef.current.scrollTop = 0
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onCloseRef.current()
-        return
-      }
-      if (e.key !== 'Tab' || !panelRef.current) return
-      const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
-      if (items.length === 0) return
-      const first = items[0]
-      const last = items[items.length - 1]
-      const active = document.activeElement
-      if (e.shiftKey && (active === first || !panelRef.current.contains(active))) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && (active === last || !panelRef.current.contains(active))) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', onKey)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-      previous?.focus?.()
-    }
-  }, [initialFocusRef])
-
-  // Portal to <body> so a sticky/stacked ancestor (the top bar) cannot trap the dialog under the tab bar.
-  return createPortal(
-    <div className="ui-dialog-backdrop" onClick={() => onClose()}>
-      <div
-        ref={panelRef}
-        className="ui-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        style={{ maxWidth: width }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="ui-dialog-head">
-          <h2 id={titleId} className="ui-dialog-title">
-            {title}
-          </h2>
-          <button ref={closeRef} type="button" className="ui-dialog-close" aria-label="Close" onClick={() => onClose()}>
-            <Icon name="close" />
-          </button>
-        </div>
-        <div ref={bodyRef} className="ui-dialog-body">{children}</div>
-        {footer && <div className="ui-dialog-footer">{footer}</div>}
-      </div>
-    </div>,
-    document.body,
+  const bodyId = useId()
+  return (
+    <BaseDialog.Root open={open} onOpenChange={(next) => onOpenChange(next)} disablePointerDismissal={!dismissible}>
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className={styles.backdrop} />
+        <BaseDialog.Viewport className={styles.viewport}>
+          <BaseDialog.Popup
+            className={cx(styles.popup, className)}
+            data-size={size}
+            role={role}
+            initialFocus={resolveInitialFocus(initialFocus, titleId, bodyId)}
+            finalFocus={finalFocus}
+          >
+            <OverlayFrame
+              parts={{ Title: BaseDialog.Title, Description: BaseDialog.Description, Close: BaseDialog.Close }}
+              title={title}
+              description={description}
+              footer={footer}
+              closeLabel={closeLabel}
+              titleId={titleId}
+              bodyId={bodyId}
+            >
+              {children}
+            </OverlayFrame>
+          </BaseDialog.Popup>
+        </BaseDialog.Viewport>
+      </BaseDialog.Portal>
+    </BaseDialog.Root>
   )
 }

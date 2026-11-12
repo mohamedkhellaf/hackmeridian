@@ -1,0 +1,100 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    padding-top: var(--s-12);
+  }
+
+  .group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .groupHead {
+    padding-bottom: var(--s-6);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding-block: var(--s-12) var(--s-4);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 var(--s-12);
+  }
+
+  .label {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .what {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .note {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  /* Time and hash on the left, the link on the right; the link keeps a 44 px target. */
+  .foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 var(--s-12);
+    min-height: var(--touch);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .proof {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-12);
+    color: var(--text-2);
+  }
+
+  .target {
+    margin-inline-start: auto;
+  }
+
+  .target :where(a) {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+  }
+
+  .check {
+    align-self: flex-start;
+    min-height: var(--touch);
+    margin-bottom: var(--s-8);
+  }
+}

@@ -1,0 +1,7 @@
+@layer features {
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+}

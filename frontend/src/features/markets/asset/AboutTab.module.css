@@ -1,0 +1,69 @@
+@layer features {
+  /*
+   * One column: access first (it decides whether the rest is actionable), then the facts. Two measures: prose at
+   * --measure, and the facts list and the powers table at the column's one width, so the blocks end on one edge.
+   */
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    max-width: 40rem;
+    min-width: 0;
+  }
+
+  .section {
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  .line {
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .note {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  /* The issuer sentence: a plain paragraph in the text colour, read before trading (ruling A2). */
+  .issuer {
+    max-width: var(--measure);
+    margin-top: var(--s-16);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text);
+  }
+
+  .means {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    max-width: var(--measure);
+    margin: 0;
+    padding-inline-start: var(--s-20);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text-2);
+
+    & > li::marker {
+      color: var(--muted);
+    }
+  }
+}

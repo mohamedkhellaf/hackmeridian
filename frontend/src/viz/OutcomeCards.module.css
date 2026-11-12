@@ -1,0 +1,184 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .wrap {
+    container-type: inline-size;
+    min-width: 0;
+    font-family: var(--font-sans);
+    color: var(--text);
+  }
+
+  /*
+   * Every card has inline padding, so its hover ground and focus ring clear the text; the list takes the same
+   * amount back with a negative margin, so the text keeps the column's edge. The rules are drawn inset by it.
+   */
+  .cards {
+    --card-pad: var(--s-8);
+
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 0 calc(var(--card-pad) * -1);
+    padding: 0;
+    list-style: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      inset-inline: var(--card-pad);
+      border-top: 1px solid var(--rule);
+    }
+  }
+
+  .card {
+    position: relative;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+    margin: 0;
+    padding: var(--s-12) var(--card-pad);
+    border-radius: var(--r-tag);
+    background-image: linear-gradient(var(--hairline), var(--hairline));
+    background-position: center bottom;
+    background-size: calc(100% - 2 * var(--card-pad)) 1px;
+    background-repeat: no-repeat;
+  }
+
+  /* The scenario under the price handle: an ink rule over the card, not a colour. */
+  .card[data-current='true']::before {
+    content: '';
+    position: absolute;
+    inset-inline: var(--card-pad);
+    top: 0;
+    height: 2px;
+    background: var(--text);
+  }
+
+  .label,
+  .select {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .select {
+    cursor: pointer;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  /* The whole card is the target; the ring is drawn around the card. */
+  .select::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .card:has(.select:focus-visible) {
+    box-shadow: var(--focus-ring);
+  }
+
+  .card[data-selectable='true']:hover {
+    background-color: var(--sunken);
+  }
+
+  .figure {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  /* The unit as Amount sets it beside a serif figure: sans 500 at UI size, muted, never on its own line. */
+  .unit {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* The signed amount takes the gain or loss colour and stays on one line; the words after it are text-2. */
+  .delta {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .deltaAmount {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .delta[data-direction='gain'] .deltaAmount {
+    color: var(--gain);
+  }
+
+  .delta[data-direction='loss'] .deltaAmount {
+    color: var(--loss);
+  }
+
+  .sentence {
+    margin: var(--s-2) 0 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+
+
+  @container (min-width: 30rem) {
+    .cards {
+      --card-pad: var(--s-16);
+
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        inset-inline: var(--card-pad);
+        border-bottom: 1px solid var(--hairline);
+      }
+    }
+
+    .cards[data-count='2'] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cards[data-count='1'] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .card {
+      background-image: none;
+    }
+
+    .card + .card {
+      border-left: 1px solid var(--hairline);
+      border-radius: 0;
+    }
+  }
+}

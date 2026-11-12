@@ -1,0 +1,42 @@
+@layer features {
+  .card {
+    container-type: inline-size;
+  }
+
+  .blocks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+  }
+
+  .blockTitle {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+
+  /* On a wide sheet (the single-column layout of a tablet) the facts and the trustlines sit side by side. */
+  @container (min-width: 40rem) {
+    .blocks {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: var(--s-40);
+      align-items: start;
+    }
+
+    .block {
+      padding-top: 0;
+      border-top: 0;
+    }
+  }
+}

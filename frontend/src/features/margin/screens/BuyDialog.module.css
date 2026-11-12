@@ -1,0 +1,87 @@
+@layer features {
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    gap: var(--s-32);
+    align-items: start;
+  }
+
+  .terms {
+    min-width: 0;
+  }
+
+  .payout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+    padding: var(--s-16);
+    border-radius: var(--r-card);
+    background: var(--sunken);
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+
+  /* The order of payment is a sequence, so it is numbered. */
+  .order {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    margin: 0;
+    padding-inline-start: var(--s-20);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+
+    & li::marker {
+      font-variant-numeric: tabular-nums lining-nums;
+      color: var(--muted);
+    }
+  }
+
+  .source {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .cover {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+  }
+
+  /* The drawing keeps the height of its tallest state (three key rows and the paid line), so the dialog does not
+     move while the slider does. */
+  .figure {
+    min-height: 7.5rem;
+  }
+
+  /* What is agreed to, directly above the action. Last in the footer's markup: the phone footer stacks in
+     reverse, which puts it on top; wide, it is moved to a line of its own above the buttons. */
+  .line {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  @media (min-width: 768px) {
+    .line {
+      flex-basis: 100%;
+      order: -1;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .columns {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-20);
+    }
+  }
+}

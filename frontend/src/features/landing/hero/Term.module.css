@@ -1,0 +1,118 @@
+@layer features {
+  .term {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+  }
+
+  .label {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .value {
+    position: relative;
+    display: inline-flex;
+    align-items: baseline;
+    align-self: flex-start;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding-block: 0 var(--s-2);
+    border-bottom: 1px solid transparent;
+    border-radius: var(--r-tag) var(--r-tag) 0 0;
+    white-space: nowrap;
+  }
+
+  .figure {
+    font-family: var(--font-serif);
+    font-size: var(--landing-term-size);
+    line-height: var(--landing-term-line);
+    font-weight: 560;
+    letter-spacing: var(--h2-track);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  /* An amount takes the size of the terms; its unit is drawn by Amount, as everywhere else. */
+  .amount {
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+  }
+
+  /* The time after a date ("08:00 UTC"), set as Amount sets a unit beside a serif figure, so the three terms read
+     alike. */
+  .rest {
+    margin-inline-start: 0.3em;
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* A term that can be changed carries a caret; the rule of a blank on a form appears under it on hover. One cue
+     at rest, not two. */
+  .value[data-editable] {
+    border-bottom-color: transparent;
+    transition: border-color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover {
+        border-bottom-color: var(--control);
+      }
+    }
+
+    &:has(.native:focus-visible) {
+      border-bottom-color: transparent;
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  .caret {
+    align-self: center;
+    margin-inline-start: var(--s-6);
+    color: var(--muted);
+  }
+
+  /* The real control: invisible, over the whole term, tall enough for a finger. */
+  .native {
+    position: absolute;
+    inset: calc(var(--s-6) * -1) calc(var(--s-4) * -1);
+    width: calc(100% + var(--s-8));
+    min-height: var(--touch);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 1rem;
+    opacity: 0;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .native:focus-visible {
+    box-shadow: none;
+  }
+
+  /* A narrow note sets each term on one ruled line: the label on the left, the value on the right. */
+  @container (max-width: 30rem) {
+    .term {
+      flex-direction: row;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--s-16);
+      min-height: var(--touch);
+      padding-block: var(--s-6);
+    }
+
+    .value {
+      align-self: baseline;
+    }
+  }
+}

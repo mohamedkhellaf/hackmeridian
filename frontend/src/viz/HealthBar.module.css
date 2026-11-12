@@ -1,0 +1,72 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .health {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+    font-family: var(--font-sans);
+    color: var(--text);
+  }
+
+  .trackBox {
+    fill: none;
+    stroke: var(--control);
+    stroke-width: 1;
+  }
+
+  .zoneLiquidation {
+    fill: var(--loss-fill);
+  }
+
+  .zoneWarn {
+    fill: var(--warn-tint);
+  }
+
+  .threshold {
+    stroke: var(--text-2);
+    stroke-width: 1;
+  }
+
+  .marker {
+    stroke: var(--text);
+    stroke-width: 2;
+  }
+
+  .status {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .state {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .health[data-state='liquidatable'] .state {
+    color: var(--loss);
+  }
+
+  .health[data-state='restricted'] .state {
+    color: var(--warn);
+  }
+
+  .health[data-state='unknown'] .state {
+    color: var(--muted);
+  }
+
+  @media (forced-colors: active) {
+    .trackBox,
+    .threshold,
+    .marker {
+      stroke: CanvasText;
+    }
+  }
+}

@@ -1,0 +1,188 @@
+@layer features {
+  /* A settlement ledger: five ruled rows, the same four columns in each. The step's title names who acts. */
+  .ledger {
+    --ledger-columns: minmax(0, 1.6fr) minmax(0, 1.35fr) minmax(0, 1.8fr) minmax(0, 0.95fr);
+
+    border-top: 1px solid var(--rule);
+  }
+
+  .heads {
+    display: none;
+  }
+
+  .steps {
+    margin: 0;
+  }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding-block: var(--s-24);
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+  }
+
+  .title {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .number {
+    flex: none;
+    width: var(--s-32);
+    font-family: var(--font-serif);
+    font-size: var(--landing-fact-size);
+    line-height: var(--landing-h3-line);
+    font-weight: 500;
+    font-variant-numeric: lining-nums;
+    color: var(--muted);
+  }
+
+  /* "or": the word, not a numeral, at the size of the step titles. */
+  .step[data-branch] .number {
+    font-size: var(--landing-h3-size);
+  }
+
+  .name {
+    min-width: 0;
+    font-family: var(--font-serif);
+    font-size: var(--landing-h3-size);
+    line-height: var(--landing-h3-line);
+    font-weight: 600;
+    letter-spacing: var(--h2-track);
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-12);
+    margin: 0;
+    padding-inline-start: calc(var(--s-32) + var(--s-16));
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: var(--s-12);
+    min-width: 0;
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+
+    & dt {
+      font-size: var(--label-size);
+      line-height: var(--body-line);
+      font-weight: var(--label-weight);
+      color: var(--muted);
+    }
+
+    & dd {
+      margin: 0;
+      min-width: 0;
+      color: var(--text-2);
+      text-wrap: pretty;
+    }
+  }
+
+  .recorded {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+
+    & + & {
+      margin-top: var(--s-12);
+    }
+
+    /* A finger-sized row for each transaction link on a touch screen. */
+    @media (pointer: coarse) {
+      & a {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--s-32);
+      }
+    }
+  }
+
+  .recordedLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .noTx {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  .foot {
+    max-width: 72ch;
+    margin-top: var(--s-24);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  @media (max-width: 599.98px) {
+    .facts {
+      padding-inline-start: 0;
+    }
+  }
+
+  @media (min-width: 600px) {
+    .fact {
+      grid-template-columns: 8rem minmax(0, 1fr);
+    }
+  }
+
+  /* Wide screens: the list becomes a ledger. The labels move to one row of column heads. */
+  @media (min-width: 1100px) {
+    .heads {
+      display: grid;
+      grid-template-columns: var(--ledger-columns);
+      column-gap: var(--s-32);
+      padding-block: var(--s-8);
+      border-bottom: 1px solid var(--rule);
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      color: var(--muted);
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: var(--ledger-columns);
+      column-gap: var(--s-32);
+      align-items: start;
+    }
+
+    .facts {
+      grid-column: 2 / -1;
+      grid-template-columns: subgrid;
+      column-gap: var(--s-32);
+      padding-inline-start: 0;
+    }
+
+    .fact {
+      display: block;
+
+      & dt {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+    }
+  }
+}

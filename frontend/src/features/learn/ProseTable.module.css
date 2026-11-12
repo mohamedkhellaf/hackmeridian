@@ -1,0 +1,69 @@
+@layer features {
+  /*
+   * The naming column: just wide enough for its longest name, in rem (a percentage is only a hint to an automatic
+   * table, which then gives the room to the long sentences). A label of the row, in the interface's voice.
+   */
+  .rowHeader {
+    width: 11rem;
+    font-family: var(--font-sans);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 550;
+  }
+
+  [data-first='wide'] .rowHeader {
+    width: 17rem;
+  }
+
+  /* Shown only when the row is stacked, where the column headers are out of sight. */
+  .cellLabel {
+    display: none;
+  }
+
+  /*
+   * A narrow column: each row stacks, its name on one line above its sentences, and the header row leaves the
+   * screen (it stays for assistive technology, with the roles set in ProseTable.tsx).
+   */
+  @container (max-width: 30rem) {
+    .table,
+    .table tbody,
+    .row,
+    .rowHeader,
+    .cell,
+    .table[data-first] .rowHeader {
+      display: block;
+      width: auto;
+    }
+
+    .head {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .row {
+      padding-block: var(--s-8);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .rowHeader,
+    .cell {
+      height: auto;
+      padding: 0;
+      border: 0;
+    }
+
+    .cell + .cell {
+      margin-top: var(--s-4);
+    }
+
+    .cellLabel {
+      display: inline;
+      font-weight: 550;
+      color: var(--text);
+    }
+  }
+}

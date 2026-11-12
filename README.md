@@ -20,7 +20,7 @@ Tokenized funds, bonds and equities exist on Stellar. Many are regulated: the is
 
 A market maker writes a put or a call on an eligible asset and locks the full collateral in the contract: the total strike for a put, the total underlying for a call. An investor buys it, paying the premium to the writer. The holder may exercise any time before expiry; the contract swaps tokens for payment in one transaction. If any leg fails, nothing moves.
 
-Two ways to back a call live in the same product. **Covered** (default): the writer locks the full strike or the full underlying before the sale; the holder's only risk is issuer action. **Margin** (experimental, separate contract): the writer posts partial margin in USDx, the option settles in cash at a published price, and a vault funded by liquidity providers backstops liquidations. Choosing Margin when posting an offer opens a risk warning the user must acknowledge, and every margin screen repeats it:  that payouts can be reduced and any deficit is shown. The two contracts share no storage or balance, so a margin loss can never touch covered collateral.
+Two ways to back a call live in the same product. **Covered** (default): the writer locks the full strike or the full underlying before the sale, so the holder does not depend on the writer to settle; issuer action can still block or reduce settlement. **Margin** (experimental, separate contract): the writer posts partial margin in USDx, the option settles in cash at a published price, and a vault funded by liquidity providers backstops liquidations. Margin opens with a risk warning the user must acknowledge, and every Margin screen repeats that payouts can be reduced and any deficit is shown. The two contracts share no storage or balance, so a margin loss can never touch covered collateral.
 
 - Eligibility is the asset's own trustline authorization, read from the Stellar Asset Contract. An issuer that sets `AUTH_REQUIRED` approves holders one by one; one that does not gets automatic authorization; either way the issuer keeps freeze and clawback. The contract checks the issuer's decision, it does not replace it.
 - Anyone can list a classic asset by `(code, issuer)`. The contract derives the canonical SAC. The issuer still decides who may hold it, including the escrow.
@@ -74,7 +74,7 @@ Earlier versions v1 to v1.4: [AGENTS.md](AGENTS.md#deployed-contracts-testnet-on
 
 ## Try it
 
-Without a wallet: Markets, Collateral and every option's history in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
+Without a wallet: Markets, Requests, Reserves and every option's page in the [app](https://hackmeridian-psi.vercel.app) read from the chain.
 
 With a wallet, self-service, about two minutes, no approval from us:
 
@@ -101,7 +101,7 @@ Full Testnet reproduction: `scripts/setup-testnet/` (issuers, flags, trustlines)
 
 ## App
 
-Markets: one book per series. Bids from buyers on the left, offers from makers and resale asks on the right, best price on top; prices are limits set by users. Two actions per series: **Buy** (take the best offer, or post a bid at your price with the premium escrowed) and **Sell** (fill the best bid, or post an offer at your price with the collateral locked). Posting an offer asks for the collateral mode, Full collateral by default or Margin, and Margin opens a risk warning that must be acknowledged. Positions: exercise, claim, reclaim, cancel, list for resale, cancel sale, open requests, with countdowns. Collateral: owed vs held per token, read at a ledger. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Margin section: the uncovered-call book on its own contract. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
+Markets: each asset with its reference price and what is open on it. An asset page has two modes: **Guided** asks what you want to do (set a floor, get paid to sell higher, get paid to buy lower, lock a buy price) and shows the matching offer or request; **Chain** lists every strike and deadline with the best offer and the best request, and one book per series, offers above and requests below; prices are limits set by users. The order ticket buys an offer, writes one at your price with the collateral locked, posts a request with the premium escrowed, fills a request, or buys a resale listing; the write ticket links to Margin for partial margin. Portfolio: exercise, claim, reclaim, cancel, list for resale, cancel sale, with countdowns. Requests: open requests and your own. Reserves: owed vs held per token, read at a ledger. Activity: the transactions sent from this browser. Issuer: authorize, freeze, claw back on accounts or on the escrow, as real `SetTrustLineFlags` and `Clawback` operations. Margin section: the uncovered-call book on its own contract. Amounts are exact integer units; floating point appears only in the hypothetical payoff chart.
 
 ## Contract
 
@@ -158,7 +158,7 @@ Started from an empty scaffold at 11:00 on 25 October. Idea chosen on site after
 ## Next
 
 - Position tokens. Resale exists on-chain; a token would make options tradable on the Stellar DEX and usable as collateral elsewhere.
-- Margin (uncovered calls; the contract crate is called `pro`): experimental. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, 24 negative tests), deployed on Testnet and run end to end with every amount matching the model ([docs/pro-testnet-evidence.md](docs/pro-testnet-evidence.md)). In the app under Margin (`#/pro`) behind a build flag, against the live contract, with the warning that payouts can be reduced and any deficit is shown. The price feed and settlement price are published by the team; it is a demo oracle, not a market. It shares no storage or balance with the options contract. Next: show covered and uncovered offers in one Markets list with the badge and warning in the buy dialog, a real oracle, liquidation incentives, audit.
+- Margin (uncovered calls; the contract crate is called `pro`): experimental. Specified in `docs/pro-*.md`, modelled in `packages/risk/`, implemented in `contracts/pro/` (replays all 691 fixture steps, 24 negative tests), deployed on Testnet and run end to end with every amount matching the model ([docs/pro-testnet-evidence.md](docs/pro-testnet-evidence.md)). In the app under Margin (`/margin`) behind a build flag, against the live contract, with the warning that payouts can be reduced and any deficit is shown. The price feed and settlement price are published by the team; it is a demo oracle, not a market. It shares no storage or balance with the options contract. Next: show covered and uncovered offers in one Markets list with the badge and warning in the buy dialog, a real oracle, liquidation incentives, audit.
 - Issuer onboarding for real tokenized assets. The contract already respects their rules; the rest is legal and operational.
 - An RFQ layer for makers; the on-chain funded offer stays the only executable quote.
 

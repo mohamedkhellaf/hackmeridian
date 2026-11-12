@@ -1,0 +1,11 @@
+@layer features {
+  .banners {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--s-16) max(var(--gutter), env(safe-area-inset-right, 0px)) 0 max(var(--gutter), env(safe-area-inset-left, 0px));
+  }
+}

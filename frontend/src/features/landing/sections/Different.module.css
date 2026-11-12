@@ -1,0 +1,35 @@
+@layer features {
+  .list {
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-8);
+    padding-block: var(--s-24);
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    font-size: var(--landing-h3-size);
+    line-height: var(--landing-h3-line);
+    font-weight: 600;
+    letter-spacing: var(--h2-track);
+  }
+
+  /* The explanation under each property: the landing's reading size, in the secondary ink, at a reading measure. */
+  .text {
+    max-width: 34rem;
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+}

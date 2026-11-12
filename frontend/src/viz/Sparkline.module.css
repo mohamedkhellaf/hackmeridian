@@ -1,0 +1,30 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .spark {
+    min-width: 0;
+    line-height: 0;
+  }
+
+  .line {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1.25;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .none {
+    stroke: var(--control);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+  }
+
+  @media (forced-colors: active) {
+    .line,
+    .none {
+      stroke: CanvasText;
+    }
+  }
+}

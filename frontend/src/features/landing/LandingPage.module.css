@@ -1,0 +1,388 @@
+/*
+ * Layout of the landing page: status line (chain builds only), navigation, hero, closing band, footer.
+ *
+ * The landing has a type scale of its own, set here on the page root and read by every landing module
+ * (`--landing-*`). The app's tokens stop at a 44 px display size; a public first screen needs a larger headline,
+ * a lede and a reading size. Colours, spacing and families are the design system's tokens, unchanged.
+ */
+@layer features {
+  .page {
+    --landing-gutter: clamp(1rem, 4.4vw, 4rem);
+    --landing-max: 82rem;
+    --landing-section-gap: clamp(3.5rem, 2.2rem + 4.6vw, 6rem);
+
+    /* 38 px on a 390 px phone and 35 px on a 360 px one (two lines each), 64 px from 650 px in one column. Two
+       columns: see .h1. */
+    --landing-h1-size: clamp(2.125rem, 10vw - 0.0625rem, 4rem);
+    --landing-h1-line: 1.1;
+    --landing-h2-size: clamp(1.75rem, 1.42rem + 1.2vw, 2.25rem);
+    --landing-h2-line: 1.14;
+    --landing-h3-size: 1.25rem;
+    --landing-h3-line: 1.625rem;
+    --landing-lede-size: clamp(1.0625rem, 0.99rem + 0.3vw, 1.1875rem);
+    --landing-lede-line: 1.58;
+    --landing-body-size: 1rem;
+    --landing-body-line: 1.625rem;
+    --landing-term-size: 1.625rem;
+    --landing-term-line: 1.875rem;
+    --landing-figure-size: 1.5rem;
+    --landing-figure-line: 1.875rem;
+    --landing-fact-size: 1.75rem;
+    --landing-fact-line: 2rem;
+    /* The sticky bar; anchors land under it. */
+    --landing-nav-h: var(--s-72);
+
+    @media (max-width: 767.98px) {
+      --landing-nav-h: var(--s-56);
+    }
+
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ---- Status rule ------------------------------------------------------------------------------------- */
+
+  .status {
+    padding-inline: var(--landing-gutter);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--sunken);
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+    color: var(--muted);
+  }
+
+  .statusInner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-24);
+    max-width: var(--landing-max);
+    min-height: var(--s-32);
+    margin-inline: auto;
+    padding-block: var(--s-6);
+  }
+
+  .statusState {
+    font-weight: 500;
+    color: var(--text-2);
+  }
+
+  .statusRight {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-24);
+
+    & > * {
+      white-space: nowrap;
+    }
+  }
+
+  .statusLink {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 0.2em;
+    border-radius: var(--r-tag);
+
+    @media (hover: hover) {
+      &:hover {
+        color: var(--text);
+        text-decoration-color: currentColor;
+      }
+    }
+  }
+
+  /* ---- Navigation -------------------------------------------------------------------------------------- */
+
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    padding-inline: var(--landing-gutter);
+    border-bottom: 1px solid var(--hairline);
+    background: var(--bg);
+  }
+
+  .topInner {
+    display: flex;
+    align-items: center;
+    gap: var(--s-32);
+    max-width: var(--landing-max);
+    min-height: var(--landing-nav-h);
+    margin-inline: auto;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+    margin-inline-end: auto;
+    border-radius: var(--r-control);
+    text-decoration: none;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: var(--s-32);
+
+    @media (max-width: 767.98px) {
+      display: none;
+    }
+  }
+
+  /* Phones: the same three links, one quiet row under the bar. */
+  .phoneNav {
+    display: none;
+
+    @media (max-width: 767.98px) {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0 var(--s-24);
+      padding-inline: var(--landing-gutter);
+      border-bottom: 1px solid var(--hairline);
+
+      & .navLink {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--touch);
+      }
+    }
+  }
+
+  .navLink {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 500;
+  }
+
+  /* ---- Hero -------------------------------------------------------------------------------------------- */
+
+  .hero {
+    padding-inline: var(--landing-gutter);
+  }
+
+  /* Phones read the text, then the note. From 1100 px the two sit side by side: the note keeps at least 35rem, so
+     its three terms stay on one row, and the text block is centred on it. */
+  .heroInner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-40);
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--s-32) var(--landing-section-gap);
+
+    @media (min-width: 1100px) {
+      grid-template-columns: minmax(0, 38rem) minmax(35rem, 1fr);
+      align-items: center;
+      gap: var(--s-56);
+      padding-top: var(--s-40);
+    }
+
+    /* A short laptop screen: the note's outcomes and its action stay on the first screen. */
+    @media (min-width: 1100px) and (max-height: 800px) {
+      padding-top: var(--s-16);
+    }
+  }
+
+  .heroText {
+    min-width: 0;
+  }
+
+  /* The headline is text and the largest thing painted on the first screen. Beside the note it grows from 40 px
+     at 1100 px (two lines in a 24rem column) to 52 px at 1280 px and 64 px at 1440 px. */
+  .h1 {
+    font-family: var(--font-serif);
+    font-size: var(--landing-h1-size);
+    line-height: var(--landing-h1-line);
+    font-weight: 600;
+    letter-spacing: var(--display-track);
+    text-wrap: balance;
+
+    @media (min-width: 1100px) {
+      font-size: clamp(2.5rem, 7.5vw - 2.75rem, 4rem);
+    }
+  }
+
+  .lede {
+    max-width: 33rem;
+    margin-top: var(--s-24);
+    font-size: var(--landing-lede-size);
+    line-height: var(--landing-lede-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-12) var(--s-24);
+    margin-top: var(--s-32);
+  }
+
+  .cta {
+    --button-h: var(--touch);
+    --button-px: var(--s-20);
+
+    font-size: var(--body-size);
+  }
+
+  .secondary {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 500;
+  }
+
+  .heroWidget {
+    min-width: 0;
+
+    @media (min-width: 768px) and (max-width: 1099.98px) {
+      max-width: 44rem;
+    }
+  }
+
+  /* ---- Closing band ------------------------------------------------------------------------------------ */
+
+  .closing {
+    padding-inline: var(--landing-gutter);
+  }
+
+  /* One sentence and the button: one column on a phone, one line from 768 px. */
+  .closingInner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-16);
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--s-40) var(--landing-section-gap);
+    border-top: 1px solid var(--rule);
+
+    @media (min-width: 768px) {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--s-16) var(--s-32);
+    }
+  }
+
+  .closingBody {
+    font-size: var(--landing-lede-size);
+    line-height: var(--landing-lede-line);
+    color: var(--text-2);
+  }
+
+  /* ---- Footer ------------------------------------------------------------------------------------------ */
+
+  .footer {
+    padding-inline: var(--landing-gutter);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid var(--rule);
+    background: var(--sunken);
+  }
+
+  .footerInner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-40);
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--s-56) var(--s-40);
+
+    @media (min-width: 1000px) {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    }
+  }
+
+  .footerBrand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .footerContract {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    margin-top: var(--s-12);
+  }
+
+  .footerLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  /* Two link groups, set against the right edge on a wide screen. */
+  .footerNav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-32) var(--s-24);
+
+    @media (min-width: 1000px) {
+      grid-template-columns: repeat(2, minmax(0, 14rem));
+      justify-content: end;
+    }
+  }
+
+  .footerGroup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+
+    & ul {
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      font-size: var(--ui-size);
+      line-height: var(--ui-line);
+    }
+
+    /* Rows a finger can hit: the link fills a 44 px row on touch screens, a compact one elsewhere. */
+    & li a {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--s-32);
+
+      @media (pointer: coarse) {
+        min-height: var(--touch);
+      }
+    }
+  }
+
+  .legal {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    padding-top: var(--s-20);
+    border-top: 1px solid var(--hairline);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+
+    & p {
+      max-width: 96ch;
+      text-wrap: pretty;
+    }
+  }
+}

@@ -1,0 +1,184 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  /* Each card hugs its content: a one-line claim is not stretched to the height of an exercise. */
+  .list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+    align-items: start;
+    gap: var(--s-12);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    /* On a phone each item is a compact ruled row, so the positions start within the first screen. */
+    @media (max-width: 767.98px) {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+      border-top: 1px solid var(--rule);
+    }
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+    padding: var(--s-16) var(--s-20) var(--s-20);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--surface);
+
+    /* The card with a clock running on an in-the-money exercise carries the ink rule on top: its one mark. */
+    &[data-tone='urgent'] {
+      border-top-color: var(--text);
+      box-shadow: inset 0 1px 0 var(--text);
+    }
+
+    @media (max-width: 767.98px) {
+      gap: var(--s-4);
+      padding: var(--s-12) 0;
+      border: 0;
+      border-bottom: 1px solid var(--hairline);
+      border-radius: 0;
+      background: transparent;
+
+      &[data-tone='urgent'] {
+        box-shadow: inset 0 var(--s-2) 0 var(--text);
+      }
+    }
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+    text-wrap: balance;
+  }
+
+  .body {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .value {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding-block: var(--s-6);
+    border-block: 1px solid var(--hairline);
+
+    @media (max-width: 767.98px) {
+      padding-block: var(--s-2);
+      border: 0;
+    }
+  }
+
+  .valueRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-12);
+
+    @media (max-width: 767.98px) {
+      justify-content: flex-start;
+    }
+  }
+
+  .valueHint {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .valueLabel {
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .lastMinutes {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-6);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--warn);
+
+    /* The icon box is one line tall, so the glyph centres on the first line of the sentence. */
+    & > svg {
+      flex: none;
+      height: var(--caption-line);
+    }
+  }
+
+  .when {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-2) var(--s-12);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+  }
+
+  .left {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    font-weight: 500;
+  }
+
+  .date {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .short {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--warn);
+  }
+
+  .action {
+    display: flex;
+    padding-top: var(--s-8);
+
+    @media (max-width: 767.98px) {
+      padding-top: var(--s-4);
+    }
+  }
+
+  /* A link that stands alone on a card is a 44 px target on a touch screen. */
+  .link {
+    @media (pointer: coarse) {
+      display: inline-flex;
+      align-items: center;
+      min-height: var(--touch);
+    }
+  }
+}

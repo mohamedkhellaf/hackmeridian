@@ -1,0 +1,93 @@
+@layer ui {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .back {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-12) var(--s-24);
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    font-size: var(--h1-size);
+    line-height: var(--h1-line);
+    font-weight: var(--h1-weight);
+    letter-spacing: var(--h1-track);
+    color: var(--text);
+    /* The ring of a title focused after navigation hugs the words, not the width of the page. */
+    width: fit-content;
+    max-width: calc(100% + 2 * var(--s-6));
+    margin-inline: calc(var(--s-6) * -1);
+    padding-inline: var(--s-6);
+    border-radius: var(--r-control);
+
+    /* Focus is moved here by script after navigation; no ring unless the keyboard is in use. */
+    &:focus:not(:focus-visible) {
+      box-shadow: none;
+    }
+  }
+
+  .description {
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-6) var(--s-20);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .skip {
+    position: fixed;
+    top: var(--s-8);
+    inset-inline-start: var(--s-8);
+    z-index: var(--z-toast);
+    padding: var(--s-8) var(--s-16);
+    border-radius: var(--r-control);
+    background: var(--primary);
+    color: var(--primary-fg);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 550;
+    text-decoration: none;
+    transform: translateY(calc(-100% - var(--s-16)));
+
+    &:focus-visible {
+      transform: none;
+    }
+  }
+}

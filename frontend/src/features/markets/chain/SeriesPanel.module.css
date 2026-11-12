@@ -1,0 +1,93 @@
+@layer features {
+  .root {
+    container-type: inline-size;
+    display: grid;
+    gap: var(--s-16);
+    min-width: 0;
+    padding-top: var(--s-24);
+    border-top: 1px solid var(--rule);
+  }
+
+  /* Title and actions on one line; the sentence of terms under both. */
+  .head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s-8) var(--s-16);
+  }
+
+  .title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  /* Brought into view after a press below 1200 px: a little air above it. */
+  .heading {
+    scroll-margin-top: var(--s-16);
+  }
+
+  .glyph {
+    display: inline-flex;
+    color: var(--text);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-8);
+  }
+
+  .terms,
+  .deadline,
+  .own {
+    grid-column: 1 / -1;
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .deadline {
+    margin-top: calc(var(--s-4) * -1);
+  }
+
+  .keep {
+    white-space: nowrap;
+  }
+
+  .local {
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    white-space: nowrap;
+  }
+
+  .own {
+    color: var(--text);
+  }
+
+  .note {
+    max-width: var(--measure);
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .empty {
+    color: var(--text-2);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  /* Phones: the actions take a line of their own, full width. */
+  @container (max-width: 34rem) {
+    .head {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .actions > * {
+      flex: 1 1 auto;
+    }
+  }
+}

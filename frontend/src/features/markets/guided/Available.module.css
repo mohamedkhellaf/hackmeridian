@@ -1,0 +1,189 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--rule);
+  }
+
+  /* What the wallet already has at these terms: said first, in the body face, with its link. */
+  .mine {
+    padding-bottom: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  /* The heading and, right-aligned on the same line, the order's number or the read time. */
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-16);
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    text-wrap: pretty;
+
+    &:focus:not(:focus-visible) {
+      outline: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  .aside {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .sentence {
+    max-width: var(--measure);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .terms {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .subheading {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+
+  .body {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .suggestions {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* One suggestion: what differs, the price as a right-aligned column, the action. */
+  .suggestion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--s-4) var(--s-16);
+    padding-block: var(--s-8);
+    border-top: 1px solid var(--hairline);
+
+    &:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+  }
+
+  .suggestionTerms {
+    min-width: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .suggestionPrice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-family: var(--font-serif);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .suggestionTotal {
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .use {
+    justify-self: end;
+  }
+
+  /* The premium field and, on its baseline, the one-tap price of the lowest offer. */
+  .priceRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-8) var(--s-12);
+    margin-top: var(--s-4);
+  }
+
+  .premium {
+    flex: 0 1 16rem;
+    min-width: 0;
+  }
+
+  /* Level with the input, not with its label or hint. */
+  .match {
+    margin-bottom: var(--s-4);
+  }
+
+  .reference {
+    max-width: var(--measure);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  @container (max-width: 35.99rem) {
+    .suggestion {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .use {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+}

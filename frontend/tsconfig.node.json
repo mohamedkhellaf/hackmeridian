@@ -1,13 +1,17 @@
 {
+  /* Node-side files: the Vite, Vitest and Playwright configs and the end-to-end suite. A spec may import a pure
+     module of src/core (disclosures, demo accounts) without an extension; it must not import one that reads
+     import.meta.env at load, which only exists inside Vite. */
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "module": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",

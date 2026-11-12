@@ -1,0 +1,42 @@
+@layer features {
+  .root {
+    min-width: 0;
+  }
+
+  /* The row that opens and closes. The padding and the matching negative margin keep the focus ring off the words. */
+  .summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-16);
+    min-height: var(--touch);
+    margin-inline: calc(var(--s-6) * -1);
+    padding: var(--s-8) var(--s-6);
+    border-radius: var(--r-control);
+    color: var(--text);
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  .chevron {
+    flex: none;
+    color: var(--muted);
+    transition:
+      rotate var(--dur-hover) var(--ease-enter),
+      color var(--dur-hover) var(--ease-enter);
+  }
+
+  @media (hover: hover) {
+    .summary:hover .chevron {
+      color: var(--text);
+    }
+  }
+
+  .root[open] > .summary .chevron {
+    rotate: 180deg;
+  }
+}

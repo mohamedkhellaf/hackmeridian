@@ -1,0 +1,69 @@
+@layer features {
+  .what {
+    display: inline;
+  }
+
+  .label {
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  /* The terms follow the label on its line and wrap, if they must, only between their parts. */
+  .terms {
+    margin-inline-start: var(--s-12);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 420;
+    color: var(--muted);
+  }
+
+  .what[data-stacked] .terms {
+    display: block;
+    margin-inline-start: 0;
+  }
+
+  .state {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+
+  .stateLine {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    gap: 0 var(--s-8);
+  }
+
+  .ledger {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 420;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+  }
+
+  .note {
+    max-width: 30rem;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 420;
+    color: var(--text-2);
+    white-space: normal;
+    text-wrap: pretty;
+  }
+
+  .time {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+  }
+
+  .local {
+    color: var(--muted);
+  }
+}

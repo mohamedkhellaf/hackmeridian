@@ -1,0 +1,74 @@
+@layer features {
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+    /* Anything focused inside a scrolling container stays clear of its edges and of a sticky bar. */
+    scroll-margin-block: var(--s-24);
+  }
+
+  .flow :focus-visible {
+    scroll-margin-block: var(--s-24) calc(var(--actionbar-h) + var(--s-12));
+  }
+
+  .terms {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  /* The one primary action takes the room that is left; on touch screens it is 48 px tall. */
+  .primary {
+    flex: 1 1 auto;
+    width: auto;
+
+    @media (pointer: coarse) {
+      min-height: calc(var(--touch) + var(--s-4));
+    }
+  }
+
+  /* Why the action is disabled, on every pointer type: a tooltip is never the only place a reason lives. */
+  .reason {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  /* The number of the order being taken. Mono belongs to the serial line of a contract note only. */
+  .serial {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  /* The required sentences of the review are plain paragraphs: no tint, no icon, no label. */
+  .issuer,
+  .outcome {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .checks {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .summary {
+    min-width: 0;
+  }
+
+  .fix {
+    display: flex;
+  }
+}

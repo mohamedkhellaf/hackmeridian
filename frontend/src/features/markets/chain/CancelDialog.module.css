@@ -1,0 +1,7 @@
+@layer features {
+  .progress {
+    margin-top: var(--s-16);
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--hairline);
+  }
+}

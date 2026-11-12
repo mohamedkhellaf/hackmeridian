@@ -1,0 +1,135 @@
+@layer ui {
+  .root {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+  }
+
+  /* Label and figure share the first line; a hint takes a line of its own across the whole row. */
+  .item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-2) var(--s-16);
+    padding-block: var(--s-8);
+  }
+
+  .root[data-variant='ruled'] .item + .item {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .root[data-variant='plain'] .item {
+    padding-block: var(--s-4);
+  }
+
+  .label {
+    flex: none;
+    max-width: 55%;
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 450;
+    color: var(--muted);
+  }
+
+  /* The dd keeps its place in the structure (dl > div > dt + dd); its two parts lay out in the row. */
+  .value {
+    display: contents;
+  }
+
+  .figure {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-inline-start: auto;
+    text-align: end;
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  /* A marked figure in a right-aligned column: the wash ends on the text, so it never runs past the column edge. */
+  .figure > mark {
+    margin-inline-end: 0;
+    padding-inline-end: 0;
+  }
+
+  .root[data-figures='sans'] .figure {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+  }
+
+  /* One line: flush right under the figure. Longer: the inner box fills the row and its text runs from the left. */
+  .hint {
+    flex: 1 0 100%;
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-align: end;
+  }
+
+  .hintText {
+    display: inline-block;
+    max-width: 100%;
+    text-align: start;
+    text-wrap: pretty;
+  }
+
+  /* The closing figure of a term sheet: a section rule above it when it follows other terms, a larger figure. */
+  .item[data-size='lg'] {
+    & .label {
+      font-weight: 500;
+      color: var(--text-2);
+    }
+
+    & .figure {
+      font-size: var(--figure-lg-size);
+      line-height: var(--figure-lg-line);
+      overflow-wrap: normal;
+      white-space: nowrap;
+    }
+  }
+
+  .root[data-variant='ruled'] .item + .item[data-size='lg'] {
+    margin-top: var(--s-4);
+    padding-top: var(--s-12);
+    border-top-color: var(--rule);
+  }
+
+  .root[data-layout='stacked'] {
+    & .item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--s-2);
+    }
+
+    & .label {
+      max-width: none;
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+    }
+
+    & .figure {
+      margin-inline-start: 0;
+      text-align: start;
+    }
+
+    & .figure > mark {
+      margin-inline: 0 -0.18em;
+      padding-inline: 0 0.18em;
+    }
+
+    & .hint {
+      flex: none;
+      text-align: start;
+    }
+  }
+}

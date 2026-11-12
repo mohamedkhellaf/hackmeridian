@@ -1,0 +1,38 @@
+@layer features {
+  /* The navigation note: one row per page, the page's name then what it holds, ruled like the kit's terms. */
+  .terms {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+
+    & > div {
+      display: grid;
+      grid-template-columns: 4.25rem minmax(0, 1fr);
+      column-gap: var(--s-12);
+      padding-block: var(--s-6);
+    }
+
+    & > div + div {
+      border-top: 1px solid var(--hairline);
+    }
+
+    & > div:first-child {
+      padding-top: 0;
+    }
+
+    & > div:last-child {
+      padding-bottom: 0;
+    }
+
+    & dt {
+      font-weight: 550;
+      color: var(--text);
+    }
+
+    & dd {
+      margin: 0;
+      font-weight: 420;
+      color: var(--text-2);
+    }
+  }
+}

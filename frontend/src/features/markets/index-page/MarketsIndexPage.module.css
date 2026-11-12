@@ -1,0 +1,99 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    min-width: 0;
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .sectionHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-24);
+  }
+
+  .headMain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-4) var(--s-16);
+    min-width: 0;
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+    border-radius: var(--r-control);
+    scroll-margin-top: var(--s-24);
+
+    &:focus:not(:focus-visible) {
+      box-shadow: none;
+      outline: none;
+    }
+  }
+
+  .count,
+  .cash {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .cash {
+    margin-top: calc(var(--s-8) * -1);
+  }
+
+  .stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--warn);
+  }
+
+  /* What a tier word means, under the table that uses it; only when the rows differ in tier. */
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+
+    & > div {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--s-2) var(--s-8);
+    }
+
+    & dt {
+      color: var(--text-2);
+      font-weight: 500;
+    }
+
+    & dd {
+      margin: 0;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .page {
+      gap: var(--s-32);
+    }
+  }
+}

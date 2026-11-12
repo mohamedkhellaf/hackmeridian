@@ -1,0 +1,54 @@
+@layer features {
+  /* Tight above and below the tabs: the trade flow and the ticket start as high as the header allows. */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-32);
+    align-items: start;
+    min-width: 0;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+    min-width: 0;
+  }
+
+  .loading {
+    min-width: 0;
+  }
+
+  /* Below 1200 px, and wherever the rail is not a column, the ticket is a drawer or a page: the box takes no room. */
+  .rail {
+    display: contents;
+  }
+
+  @media (min-width: 1200px) {
+    .body[data-rail] {
+      grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    }
+
+    /* The rail: sticky under the top of the viewport, scrolling by itself when the ticket is taller. Before the
+       page reaches the sticky top, the column still ends at the bottom of the screen (--rail-top, set by the page),
+       so the ticket's action bar is in view when it opens. */
+    .body[data-rail] > .rail {
+      display: block;
+      position: sticky;
+      top: var(--s-24);
+      min-width: 0;
+      max-height: calc(100dvh - max(var(--rail-top, var(--s-24)), var(--s-24)) - var(--s-24));
+      overflow-y: auto;
+      /* The column scrolls, so it clips: this margin keeps the focus rings of the ticket's controls whole. */
+      margin: calc(var(--s-4) * -1);
+      padding: var(--s-4);
+    }
+  }
+}

@@ -1,0 +1,27 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8) var(--s-12);
+  }
+
+  .line {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .figure {
+    font-weight: 550;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  /* 44 px targets on touch screens. */
+  @media (max-width: 767.98px) {
+    .root :where(button) {
+      min-height: var(--touch);
+    }
+  }
+}

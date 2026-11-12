@@ -1,0 +1,46 @@
+@layer features {
+  .root {
+    border-radius: var(--r-card);
+    scroll-margin-top: var(--s-72);
+
+    /* Always in the page so focus can be sent to it; it takes no room while there is nothing to say. */
+    &[data-empty] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+
+    /* Focus is moved here by script after a call; the ring shows only for keyboard users. */
+    &:focus:not(:focus-visible) {
+      box-shadow: none;
+    }
+  }
+
+  .receipt {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    margin-top: var(--s-4);
+  }
+
+  /* A receipt reads at the width of a term sheet, not across the page. */
+  .facts,
+  .split {
+    max-width: 34rem;
+  }
+
+  .note {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+  }
+
+  .progress {
+    padding: var(--s-12) var(--s-16);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--surface);
+  }
+}

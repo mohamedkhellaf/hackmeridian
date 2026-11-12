@@ -1,0 +1,111 @@
+@layer features {
+  .review,
+  .progress,
+  .receipt {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .progress,
+  .receipt {
+    outline: none;
+    border-radius: var(--r-card);
+
+    &:focus-visible {
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  /* What signing does, in the serif: the sentence a user must read before the button. */
+  .lead {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .caveat,
+  .progressLead {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .aside {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .checks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+  }
+
+  .checksSentence {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .checkList {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .check {
+    --check-ink: var(--text-2);
+
+    display: grid;
+    grid-template-columns: var(--s-20) minmax(0, auto) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--s-8);
+    padding-block: var(--s-8);
+    border-bottom: 1px solid var(--hairline);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    &[data-status='fail'] {
+      --check-ink: var(--danger);
+    }
+
+    &[data-status='unknown'],
+    &[data-status='pending'] {
+      --check-ink: var(--muted);
+    }
+  }
+
+  .checkMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--ui-line);
+    color: var(--check-ink);
+  }
+
+  .checkLabel {
+    color: var(--muted);
+  }
+
+  .checkText {
+    text-align: end;
+    font-weight: 500;
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .check[data-status='fail'] .checkText {
+    color: var(--danger);
+  }
+}

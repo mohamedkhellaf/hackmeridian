@@ -1,0 +1,77 @@
+@layer ui {
+  .root {
+    --callout-ink: var(--text-2);
+    --callout-bg: var(--sunken);
+
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-12);
+    padding: var(--s-12) var(--s-16);
+    border-radius: var(--r-card);
+    background: var(--callout-bg);
+    color: var(--text);
+
+    &[data-variant='warning'] {
+      --callout-ink: var(--warn);
+      --callout-bg: var(--warn-tint);
+    }
+
+    &[data-variant='danger'] {
+      --callout-ink: var(--danger);
+      --callout-bg: var(--danger-tint);
+    }
+  }
+
+  .icon {
+    display: inline-flex;
+    flex: none;
+    color: var(--callout-ink);
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-2) var(--s-8);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .title {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .body {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text);
+    text-wrap: pretty;
+    max-width: var(--measure);
+
+    & > * + * {
+      margin-top: var(--s-6);
+    }
+
+    & ul,
+    & ol {
+      padding-inline-start: var(--s-20);
+    }
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-8);
+    margin-top: var(--s-6);
+  }
+}

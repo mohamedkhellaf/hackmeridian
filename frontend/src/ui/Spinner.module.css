@@ -1,0 +1,23 @@
+@layer ui {
+  .root {
+    display: inline-block;
+    flex: none;
+    width: var(--s-12);
+    height: var(--s-12);
+    border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 720ms linear infinite;
+
+    &[data-size='md'] {
+      width: var(--s-20);
+      height: var(--s-20);
+    }
+  }
+
+  @keyframes spin {
+    to {
+      rotate: 1turn;
+    }
+  }
+}

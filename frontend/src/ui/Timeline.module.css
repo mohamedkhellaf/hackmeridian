@@ -1,0 +1,118 @@
+@layer ui {
+  .root {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .item {
+    position: relative;
+    display: flex;
+    gap: var(--s-16);
+    padding-bottom: var(--s-20);
+
+    &:last-child {
+      padding-bottom: 0;
+    }
+
+    &:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      top: var(--s-16);
+      bottom: calc(var(--s-4) * -1);
+      inset-inline-start: calc(var(--s-12) / 2);
+      width: 1px;
+      margin-inline-start: -0.5px;
+      background: var(--rule);
+    }
+
+    &[data-status='done']:not(:last-child)::before {
+      background: var(--text);
+    }
+  }
+
+  /* Done is a filled point, now is a ringed point, later is an open one. */
+  .mark {
+    flex: none;
+    width: var(--s-12);
+    height: var(--s-12);
+    margin-top: var(--s-4);
+    border: 1px solid var(--control);
+    border-radius: 50%;
+    background: var(--bg);
+  }
+
+  .item[data-status='done'] .mark,
+  .item[data-status='neutral'] .mark {
+    border-color: var(--text);
+    background: var(--text);
+  }
+
+  .item[data-status='current'] .mark {
+    border-color: var(--text);
+    background: var(--text);
+    box-shadow:
+      0 0 0 2px var(--bg),
+      0 0 0 calc(var(--s-2) + 1px) var(--text);
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-8);
+    font-size: var(--label-size);
+    line-height: var(--s-20);
+    color: var(--muted);
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .time {
+    font-weight: 500;
+    color: var(--text-2);
+  }
+
+  /* The actor follows the time on the same line, next to the step it belongs to, behind a short rule. */
+  .actor {
+    font-weight: 500;
+
+    .time + & {
+      padding-inline-start: var(--s-8);
+      border-inline-start: 1px solid var(--rule);
+      line-height: var(--label-line);
+    }
+  }
+
+  .title {
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: 550;
+    color: var(--text);
+  }
+
+  .item[data-status='upcoming'] .title {
+    font-weight: 450;
+  }
+
+  .description {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 420;
+    color: var(--text-2);
+    text-wrap: pretty;
+    max-width: var(--measure);
+  }
+}

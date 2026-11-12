@@ -1,0 +1,14 @@
+@layer features {
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+
+    & p {
+      max-width: var(--measure);
+    }
+  }
+}

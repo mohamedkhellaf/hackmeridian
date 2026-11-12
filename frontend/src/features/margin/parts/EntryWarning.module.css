@@ -1,0 +1,16 @@
+@layer features {
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    margin: 0 0 var(--s-16);
+    padding-inline-start: var(--s-20);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    color: var(--text);
+
+    & li::marker {
+      color: var(--muted);
+    }
+  }
+}

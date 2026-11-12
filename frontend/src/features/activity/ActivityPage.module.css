@@ -1,0 +1,72 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  /* Live builds: where the full record of the account is. */
+  .explorer {
+    max-width: 44rem;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4) var(--s-16);
+    min-height: var(--control-h-sm);
+  }
+
+  .count {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  /* What Clear finished did, with its Undo, kept in the toolbar until the page is left. */
+  .cleared {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-8);
+    margin-inline-start: auto;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    border-radius: var(--r-control);
+  }
+
+  .cleared:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  /* When the count line takes the whole row, the action keeps to the right edge, as on a wide screen. */
+  .action {
+    margin-inline-start: auto;
+  }
+
+  .cleared .action {
+    margin-inline-start: 0;
+  }
+
+  @media (max-width: 767.98px) {
+    .action {
+      min-height: var(--touch);
+    }
+  }
+}

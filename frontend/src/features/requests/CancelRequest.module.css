@@ -1,0 +1,50 @@
+@layer features {
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
+  /*
+   * At rest and after the outcome the stage takes the room its content needs. While the transaction runs, a centred
+   * dialog holds the stepper's height (four stages, a two-line help and the hash line beneath), so it does not grow
+   * from one stage to the next. On phones the dialog is a bottom sheet: its actions stay at the thumb, so it takes
+   * only the room it needs throughout.
+   */
+  .stage {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
+  @media (min-width: 768px) {
+    .stage:not([data-phase='idle'], [data-phase='confirmed']) {
+      min-height: calc(var(--s-40) * 5);
+    }
+  }
+
+  .note {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .outcome {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+  }
+
+  .tx {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+}

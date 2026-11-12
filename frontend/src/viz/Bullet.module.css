@@ -1,0 +1,55 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .bullet {
+    min-width: 0;
+    line-height: 0;
+  }
+
+  .svg {
+    display: block;
+    overflow: visible;
+  }
+
+  .track {
+    stroke: var(--rule);
+    stroke-width: 1;
+  }
+
+  .bar {
+    fill: var(--text);
+  }
+
+  .gain {
+    fill: var(--gain);
+  }
+
+  .neutral {
+    fill: var(--control);
+  }
+
+  .shortfall {
+    fill: none;
+    stroke: var(--loss);
+    stroke-width: 1;
+  }
+
+  .tick {
+    stroke: var(--text);
+    stroke-width: 2;
+  }
+
+  @media (forced-colors: active) {
+    .bar,
+    .gain,
+    .neutral {
+      fill: CanvasText;
+    }
+
+    .tick,
+    .shortfall {
+      stroke: CanvasText;
+    }
+  }
+}

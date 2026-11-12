@@ -1,0 +1,35 @@
+@layer ui {
+  .root {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--s-16);
+  }
+
+  .root[data-tone='working'] {
+    color: var(--text-2);
+  }
+
+  .root[data-tone='failed'] {
+    color: var(--danger);
+  }
+
+  .root[data-tone='unknown'] {
+    color: var(--warn);
+  }
+
+  .root[data-tone='stopped'] {
+    color: var(--muted);
+  }
+}

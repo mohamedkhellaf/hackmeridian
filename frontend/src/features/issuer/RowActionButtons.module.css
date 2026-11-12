@@ -1,0 +1,15 @@
+@layer features {
+  /* The button and the menu, sitting on the first text line of a table row. The buttons of every row start at
+     the same place, so Authorize and Freeze line up down the column. */
+  .buttons {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: var(--s-8);
+    margin-block: calc(var(--s-4) * -1);
+
+    &[data-size='md'] {
+      margin-block: 0;
+    }
+  }
+}

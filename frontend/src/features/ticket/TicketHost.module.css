@@ -1,0 +1,160 @@
+@layer features {
+  /* The rail: an inline sheet beside the page. The asset page makes the column sticky and scrolls it. */
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+    padding: var(--s-20) var(--s-16) var(--s-16);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  /* What the rail shows with no ticket open (the guided closing block): the box only listens for the press that
+     opens a ticket, it takes no room of its own. */
+  .idle {
+    display: contents;
+  }
+
+  .railHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-12);
+  }
+
+  .railTitle {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+    text-wrap: balance;
+    border-radius: var(--r-control);
+    /* When the title is scrolled into view (only when it is out of sight), it keeps the rail's own resting offset above it. */
+    scroll-margin-top: var(--s-24);
+
+    /* Focus lands here when the ticket opens and on every step; the ring is for keyboard users only. */
+    &:focus {
+      outline: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  .railClose {
+    flex: none;
+    margin-top: calc(var(--s-2) * -1);
+    margin-inline-end: calc(var(--s-4) * -1);
+  }
+
+  .railBody,
+  .overlayBody {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  /* The Buy tab of a series nobody sells: one sentence and the way on, on the sheet itself. */
+  .noOffer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+  }
+
+  .noOfferText {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .flowSlot {
+    min-width: 0;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  /* The action bar. In the rail it closes the sheet; in the drawer and on phones it is the footer that stays in view. */
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8);
+    flex: 1 1 auto;
+    min-width: 0;
+
+    &:empty,
+    &[data-emptybuy] {
+      display: none;
+    }
+
+    & > p {
+      flex: 1 0 100%;
+    }
+  }
+
+  /* In the rail the action bar is pinned to the bottom of the scrolling column, as it is in the drawer and on
+     phones: the action of a long review stays in view. */
+  .rail > .actions {
+    flex: none;
+    position: sticky;
+    bottom: calc(var(--s-4) * -1);
+    margin: 0 calc(var(--s-16) * -1) calc(var(--s-16) * -1);
+    padding: var(--s-12) var(--s-16) var(--s-16);
+    border-top: 1px solid var(--hairline);
+    border-radius: 0 0 var(--r-card) var(--r-card);
+    background: var(--surface);
+  }
+
+  /* The receipt: the printed contract note is the one card. The sheet around it dissolves into the page. */
+  .rail[data-step='receipt'] {
+    border-color: transparent;
+    background: none;
+    padding-inline: 0;
+  }
+
+  /* Still pinned when the receipt is taller than the column: it takes the page ground, so the receipt scrolls
+     under it instead of showing through. */
+  .rail[data-step='receipt'] > .actions {
+    margin-inline: 0;
+    padding-inline: 0;
+    border-top: 0;
+    background: var(--bg);
+  }
+
+  .overlayTitle {
+    display: inline-block;
+    border-radius: var(--r-control);
+
+    &:focus {
+      outline: none;
+    }
+
+    &:focus-visible {
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      box-shadow: var(--focus-ring);
+    }
+  }
+
+  /* Phones: the drawer is a full page (the kit's `presentation="page"`): its footer is the 64 px action bar and
+     the page scrolls above it, so no control can sit underneath. A disabled action's reason takes a line of its
+     own above the buttons. */
+  @media (max-width: 767.98px) {
+    .actions[data-container='page']:not(:has(> p)) {
+      flex-wrap: nowrap;
+    }
+  }
+}

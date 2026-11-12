@@ -1,70 +1,37 @@
-import type { ReactNode } from 'react'
-import { Button } from './Button'
-import { Banner, PageHeader } from './Surfaces'
-import './skeleton.css'
+import type { CSSProperties } from 'react'
+import { cx } from './internal/cx'
+import styles from './Skeleton.module.css'
 
-/** Placeholder table with the same row heights and columns as a real `.ui-table`; shown until the first load finishes. */
-export function TableSkeleton({ columns = 6, rows = 5, className }: { columns?: number; rows?: number; className?: string }) {
-  return (
-    <div className={['ui-table-wrap', 'ui-skel-wrap', className].filter(Boolean).join(' ')} aria-hidden="true">
-      <table className="ui-table">
-        <thead>
-          <tr>
-            {Array.from({ length: columns }, (_, c) => (
-              <th key={c}>
-                <span className="ui-skel" style={{ width: c === 0 ? 48 : 64 }} />
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: rows }, (_, r) => (
-            <tr key={r}>
-              {Array.from({ length: columns }, (_, c) => (
-                <td key={c}>
-                  <span className="ui-skel" style={{ width: c === 0 ? 56 : 40 + ((r * 7 + c * 13) % 5) * 10 }} />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
+export interface SkeletonProps {
+  /** `text` is one or more lines, `block` is a box (a chart, a note), `rows` is a ruled list (a table loading). */
+  variant?: 'text' | 'block' | 'rows'
+  /** Number of lines or rows. */
+  lines?: number
+  /** A CSS length. Text lines default to full width with a shorter last line. */
+  width?: string
+  /** A CSS length, for `block`. */
+  height?: string
+  className?: string
 }
 
 /**
- * First-load stand-in for a view: the page title, no counts, and skeleton content in place of the real one.
- * If the first load failed it shows one error line with Retry instead.
+ * A content-shaped placeholder for the first load of a view. It is hidden from assistive technology: set
+ * `aria-busy="true"` on the container and announce "Loading Markets" once. Later refreshes keep the stale data
+ * on screen and do not show a skeleton.
  */
-export function ViewSkeleton({
-  title,
-  error,
-  onRetry,
-  children,
-}: {
-  title: string
-  error?: string | null
-  onRetry?: () => void
-  children?: ReactNode
-}) {
+export function Skeleton({ variant = 'text', lines = 1, width, height, className }: SkeletonProps) {
+  if (variant === 'block') {
+    return <span className={cx(styles.bone, styles.block, className)} style={{ width, height } as CSSProperties} aria-hidden="true" />
+  }
+  const count = Math.max(1, lines)
   return (
-    <div className="ui-view-skel" role="status" aria-busy={error ? undefined : 'true'} aria-label={error ? undefined : `Loading ${title}`}>
-      <PageHeader title={title} />
-      {error ? (
-        <Banner tone="danger">
-          <span className="ui-skel-err">
-            Could not load data: {error}
-            {onRetry && (
-              <Button size="sm" variant="secondary" onClick={onRetry}>
-                Retry
-              </Button>
-            )}
-          </span>
-        </Banner>
-      ) : (
-        (children ?? <TableSkeleton />)
-      )}
-    </div>
+    <span className={cx(styles.stack, className)} data-variant={variant} style={{ width } as CSSProperties} aria-hidden="true">
+      {Array.from({ length: count }, (_, i) => (
+        <span key={i} className={variant === 'rows' ? styles.row : styles.line}>
+          <span className={styles.bone} data-last={count > 1 && i === count - 1 ? '' : undefined} />
+          {variant === 'rows' ? <span className={cx(styles.bone, styles.rowEnd)} /> : null}
+        </span>
+      ))}
+    </span>
   )
 }

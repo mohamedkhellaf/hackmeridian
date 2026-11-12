@@ -1,0 +1,28 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .note {
+    max-width: var(--measure);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .more {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    @media (pointer: coarse) {
+      & a {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--touch);
+      }
+    }
+  }
+}

@@ -1,0 +1,320 @@
+/*
+ * Base layer: reset, document typography, focus, selection, motion preferences, scrollbars and the few global
+ * helpers (`.ui-*`) that features may use. Everything reads semantic tokens; no raw colour here.
+ */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  * {
+    margin: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule) transparent;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    background: var(--bg);
+  }
+
+  body {
+    /* iOS 26: absolutely positioned backdrops must be able to cover the whole visual viewport. */
+    position: relative;
+    min-height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Portalled popups (Base UI) are appended to <body>; the app stays in its own stacking context below them. */
+  #root {
+    isolation: isolate;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-serif);
+    color: var(--text);
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: var(--h1-size);
+    line-height: var(--h1-line);
+    font-weight: var(--h1-weight);
+    letter-spacing: var(--h1-track);
+  }
+
+  h2 {
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  h3,
+  h4 {
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+  }
+
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  ul[role='list'],
+  ol[role='list'] {
+    list-style: none;
+    padding: 0;
+  }
+
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+    color: var(--text);
+  }
+
+  /* Focus: a 2 px accent ring with a 2 px gap, for keyboard users only. The transparent outline keeps the ring
+     visible in forced-colours mode, where box-shadow is dropped. */
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
+  }
+
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline-color: Highlight;
+    }
+  }
+
+  /* Phones: 16 px in every text entry, or iOS zooms the page on focus. */
+  @media (max-width: 767.98px) {
+    input,
+    select,
+    textarea {
+      font-size: 1rem;
+    }
+  }
+
+  /* Reduced motion: nothing travels. Opacity changes resolve at once. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0s !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      transition-delay: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* ---- Global helpers ------------------------------------------------------------------------------------ */
+
+  /*
+   * Horizontal scroll stays inside the table, never on the page. The wrapper is a scroll container only while the
+   * table really overflows (TableWrap sets data-scrolls, and the wrapper is then focusable): otherwise it clips,
+   * which is not a scroll container, so the sticky header sticks to the page as it scrolls.
+   */
+  .ui-table-wrap {
+    position: relative;
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
+  .ui-table-wrap[data-scrolls] {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ui-table-wrap:focus-visible {
+    outline-offset: 0;
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  .ui-display {
+    font-family: var(--font-serif);
+    font-size: var(--display-size);
+    line-height: var(--display-line);
+    font-weight: var(--display-weight);
+    letter-spacing: var(--display-track);
+    text-wrap: balance;
+  }
+
+  .ui-h1 {
+    font-family: var(--font-serif);
+    font-size: var(--h1-size);
+    line-height: var(--h1-line);
+    font-weight: var(--h1-weight);
+    letter-spacing: var(--h1-track);
+  }
+
+  .ui-h2 {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  .ui-h3 {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .ui-body {
+    font-family: var(--font-sans);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+  }
+
+  .ui-text {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+  }
+
+  .ui-label {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    font-stretch: var(--label-stretch);
+    color: var(--muted);
+  }
+
+  .ui-caption {
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .ui-mono {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-feature-settings: 'zero';
+  }
+
+  .ui-figure {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .ui-figure-lg {
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .ui-muted {
+    color: var(--muted);
+  }
+
+  .ui-secondary {
+    color: var(--text-2);
+  }
+
+  .ui-measure {
+    max-width: var(--measure);
+  }
+
+  .ui-vh {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}

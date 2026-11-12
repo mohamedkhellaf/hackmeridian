@@ -1,0 +1,160 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    min-width: 0;
+  }
+
+  /* The table and, above it, which positions are shown and why an early exercise can be refused. */
+  .positions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-8) var(--s-16);
+
+    /* The explanation sits at the right, also when nothing is listed to its left. */
+    & > :last-child {
+      margin-inline-start: auto;
+    }
+  }
+
+  .count {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  .hint,
+  .waiting {
+    color: var(--muted);
+  }
+
+  /* Under the account a book belongs to: a second line, so the column stays narrow. */
+  .hint {
+    display: block;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  .waiting {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+  }
+
+  /* A long settlement line wraps instead of widening the table past its column. */
+  .wrap {
+    display: inline-block;
+    min-width: 6.5rem;
+    max-width: 13rem;
+    white-space: normal;
+  }
+
+  /* The action and, under it, why the model expects a refusal. */
+  .act {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+  }
+
+  .actRow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .why {
+    max-width: 13rem;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+    white-space: normal;
+  }
+
+  /* In the replay a recorded step of another account can be run: the button says whose. */
+  .as {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .reasons {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  /* The contract's name and number for a refusal: a quiet reference after the sentence. */
+  .code {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    line-height: var(--mono-line);
+    font-weight: 400;
+    font-feature-settings: 'zero';
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* After expiry: one block per series, side by side when there is room. */
+  .expired {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    gap: var(--s-24) var(--s-40);
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .blockTitle {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .stepLine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8) var(--s-12);
+  }
+
+  @media (max-width: 767.98px) {
+    .act,
+    .actRow {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--s-4);
+    }
+
+    .why {
+      max-width: none;
+    }
+
+    .expired {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

@@ -1,0 +1,72 @@
+@layer features {
+  .section {
+    padding-inline: var(--landing-gutter);
+    /* An anchor link lands with the rule just under the sticky bar. */
+    scroll-margin-top: var(--landing-nav-h);
+  }
+
+  /* One column until there is room for the margin heading; twelve from there on. */
+  .inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: var(--s-32);
+    row-gap: var(--s-32);
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding-block: var(--landing-section-gap);
+    border-top: 1px solid var(--rule);
+  }
+
+  .head {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .body {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--landing-h2-size);
+    line-height: var(--landing-h2-line);
+    font-weight: 560;
+    letter-spacing: var(--h1-track);
+    text-wrap: balance;
+  }
+
+  .lead {
+    max-width: 34rem;
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  @media (min-width: 1000px) {
+    .inner {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .section[data-layout='split'] {
+      & .head {
+        grid-column: 1 / span 4;
+        align-self: start;
+        position: sticky;
+        top: calc(var(--landing-nav-h) + var(--s-32));
+      }
+
+      & .body {
+        grid-column: 5 / -1;
+      }
+    }
+
+    .section[data-layout='stack'] .head {
+      grid-column: 1 / span 8;
+    }
+  }
+}

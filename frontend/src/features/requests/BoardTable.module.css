@@ -1,0 +1,181 @@
+@layer features {
+  /*
+   * Two lines per row: the figure, then what qualifies it. Every cell sits on its first line, so the figures of a
+   * row read as one line with their captions beneath; only the action is centred. Rows grow from the kit's 40 px.
+   */
+  .table :is(td, th[scope='row']) {
+    padding-block: var(--s-8);
+    vertical-align: baseline;
+  }
+
+  .table td[data-pinned] {
+    vertical-align: middle;
+  }
+
+  /*
+   * Fixed columns, sized for their longest expected content at 1200 px (the narrowest width the table is shown at),
+   * so nothing moves when the wallet connects or a figure changes. The cells keep the kit's padding.
+   */
+  .colAsset {
+    width: 12.5%;
+  }
+
+  .colKind {
+    width: 8%;
+  }
+
+  .colStrike {
+    width: 11.5%;
+  }
+
+  .colQty {
+    width: 11%;
+  }
+
+  .colDeadline {
+    width: 17%;
+  }
+
+  .colPremium {
+    width: 13%;
+  }
+
+  .colBuyer {
+    width: 14%;
+  }
+
+  .colAction {
+    width: 13%;
+  }
+
+  /* My requests: the state and its one line ("Premium still in the contract") take the buyer's room and more. */
+  .colState {
+    width: 21%;
+  }
+
+  .table[data-variant='mine'] {
+    & .colAsset {
+      width: 11.5%;
+    }
+
+    & .colKind {
+      width: 7.5%;
+    }
+
+    & .colStrike {
+      width: 10.5%;
+    }
+
+    & .colQty {
+      width: 10%;
+    }
+
+    & .colDeadline {
+      width: 16%;
+    }
+
+    & .colPremium {
+      width: 10.5%;
+    }
+  }
+
+  .asset {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    min-width: 0;
+  }
+
+  .code {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--ui-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .kind {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    font-weight: 500;
+  }
+
+  .stack {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 100%;
+
+    &[data-align='end'] {
+      align-items: flex-end;
+    }
+
+    &[data-align='center'] {
+      align-items: center;
+    }
+  }
+
+  /*
+   * A caption line keeps one height, also when it carries the clock of a countdown, so rows stay even. It is set in
+   * the sans whatever its cell (the strike cell is serif).
+   */
+  .sub,
+  .warn,
+  .stranded {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    height: var(--caption-line);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .warn {
+    font-weight: 500;
+    color: var(--warn);
+  }
+
+  /*
+   * The warnings in words (15 minutes left, a premium still in the contract) may take two lines in a narrow column:
+   * then they run as text, the glyph on the first line.
+   */
+  .wraps {
+    display: block;
+    height: auto;
+    white-space: normal;
+    text-wrap: pretty;
+
+    & svg {
+      display: inline-block;
+      margin-inline-end: var(--s-4);
+      vertical-align: text-bottom;
+    }
+
+    .stack[data-align='end'] > & {
+      text-align: end;
+    }
+  }
+
+  /* The one state of "My requests" that asks for an action: in ink, with the warning glyph. */
+  .stranded {
+    font-weight: 500;
+    color: var(--text);
+
+    & svg {
+      color: var(--warn);
+    }
+  }
+
+  /* Cancelled and returned requests, shown on request: secondary ink. */
+  .closed :is(td, th) {
+    color: var(--text-2);
+  }
+
+  .closed .code {
+    color: var(--text-2);
+  }
+}

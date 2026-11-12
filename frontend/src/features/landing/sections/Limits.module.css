@@ -1,0 +1,17 @@
+@layer features {
+  /* A ruled list: a rule above the first sentence, a hairline under each. */
+  .list {
+    max-width: 46rem;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .item {
+    padding-block: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+}

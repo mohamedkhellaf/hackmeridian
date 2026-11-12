@@ -1,0 +1,24 @@
+@layer ui {
+  .root {
+    display: inline-flex;
+    align-items: center;
+    height: var(--s-20);
+    padding-inline: var(--s-6);
+    border: 1px solid var(--text);
+    border-radius: var(--r-tag);
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: 500;
+    white-space: nowrap;
+    vertical-align: middle;
+
+    &[data-appearance='done'],
+    &[data-appearance='ended'] {
+      border-color: var(--hairline);
+      color: var(--muted);
+    }
+  }
+}

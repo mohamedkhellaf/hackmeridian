@@ -1,0 +1,135 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding-top: var(--s-20);
+    min-width: 0;
+  }
+
+  /* The first load: the toolbar's controls and four rows at the height of the real ones, so nothing moves on arrival. */
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+  }
+
+  .loadingBar {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--s-12) var(--s-20);
+  }
+
+  .boneAsset {
+    width: 12rem;
+    height: calc(var(--label-line) + var(--s-4) + var(--control-h));
+  }
+
+  .boneKind {
+    width: 8.5rem;
+    height: calc(var(--label-line) + var(--s-4) + var(--control-h));
+  }
+
+  .boneSort {
+    width: 15rem;
+    height: calc(var(--label-line) + var(--s-4) + var(--control-h));
+    margin-inline-start: auto;
+  }
+
+  .loadingRows {
+    border-top: 1px solid var(--rule);
+  }
+
+  .loadingRow {
+    display: flex;
+    align-items: center;
+    height: calc(var(--ui-line) + var(--caption-line) + var(--s-8) * 2 + 1px);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .loading[data-layout='list'] .loadingRow {
+    height: calc(var(--figure-line) + var(--ui-line) * 2 + var(--s-2) * 3 + var(--s-8) + var(--touch) + var(--s-12) * 2 + 1px);
+  }
+
+  @media (max-width: 767.98px) {
+    .loadingBar {
+      gap: var(--s-8);
+    }
+
+    .boneAsset {
+      flex: 1;
+      width: auto;
+      height: var(--touch);
+    }
+
+    .boneKind {
+      height: var(--touch);
+    }
+
+    .boneSort {
+      width: 4.5rem;
+      height: var(--touch);
+    }
+  }
+
+  /* As the toolbar: under 400 px the asset select takes the first line whole. */
+  @media (max-width: 399.98px) {
+    .loadingBar {
+      flex-wrap: wrap;
+    }
+
+    .boneAsset {
+      flex-basis: 100%;
+    }
+  }
+
+  .summary,
+  .notice,
+  .stale,
+  .funds {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .notice,
+  .funds {
+    color: var(--text-2);
+  }
+
+  .funds {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  /* Glyph, sentence and retry on one line; on a phone the sentence wraps beside them. */
+  .stale {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    color: var(--warn);
+
+    & > span {
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+
+    & > svg,
+    & > button {
+      flex: none;
+    }
+  }
+
+  .mineBar {
+    display: flex;
+    justify-content: flex-end;
+  }
+}

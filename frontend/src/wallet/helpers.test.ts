@@ -43,7 +43,8 @@ describe('wallet helpers', () => {
     expect(walletErrorKind(new Error('User declined access'))).toBe('rejected')
     expect(walletErrorKind({ code: -1, message: 'Freighter is not connected' })).toBe('not-installed')
     expect(walletErrorKind(new Error('boom'))).toBe('other')
-    expect(describeWalletError({ code: -4, message: 'x' }, 'xBull')).toContain('rejected')
+    expect(describeWalletError({ code: -4, message: 'x' }, 'xBull')).toBe('You declined to sign in xBull.')
+    expect(describeWalletError({ code: -4, message: 'x' }, 'xBull', 'connect')).toBe('You declined the connection in xBull.')
     expect(describeWalletError(new Error('xBull is not installed'), 'xBull')).toContain('not installed')
   })
 

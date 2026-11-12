@@ -1,0 +1,5 @@
+@layer features {
+  .none {
+    color: var(--muted);
+  }
+}

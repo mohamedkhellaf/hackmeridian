@@ -1,0 +1,200 @@
+@layer features {
+  .root {
+    min-width: 0;
+  }
+
+  .note {
+    --note-pad: var(--s-24);
+
+    @media (max-width: 767.98px) {
+      --note-pad: var(--s-16);
+    }
+  }
+
+  /* A narrow note has no room for the heading and a long aside on one line ("Recorded example" wraps, "Mock data"
+     would not). The aside always takes the line under the heading, and the head keeps that line in every state,
+     so nothing below moves when the open offer replaces the example. */
+  @container (max-width: 30rem) {
+    .note > header {
+      min-height: calc(var(--s-16) + var(--h2-line) + var(--s-8) + var(--ui-line) + var(--s-8));
+      align-content: flex-start;
+
+      & > div {
+        flex-basis: 100%;
+      }
+    }
+  }
+
+  /* The three terms: typeset like the blanks of a form. */
+  /* Each term takes the width it needs and the three are spread across the note, so a long deadline
+     ("26 Oct 2026, 01:56 UTC") never runs past the edge while a short asset code leaves room. */
+  .terms {
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    justify-content: space-between;
+    gap: var(--s-16) var(--s-20);
+    margin: 0;
+    padding-block: var(--s-12) var(--s-12);
+    border-top: 1px solid var(--hairline);
+
+    @container (max-width: 30rem) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+      padding-block: var(--s-4) 0;
+    }
+  }
+
+  /* The lot and premium line. It keeps two lines in a narrow note, so the recorded example and an open offer
+     are the same height and nothing below jumps when one replaces the other. */
+  .meta {
+    min-height: var(--caption-line);
+    padding-bottom: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+
+    @container (max-width: 30rem) {
+      min-height: calc(var(--caption-line) * 2 + var(--s-8) + var(--s-12));
+      padding-top: var(--s-8);
+      border-top: 1px solid var(--hairline);
+    }
+  }
+
+  /* A lot that changed with the visitor's own pick: it fades in under the marker flash. */
+  .changed {
+    animation: lot-in var(--dur-fade) var(--ease-enter);
+  }
+
+  @keyframes lot-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .moved {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .chart {
+    padding-top: var(--s-12);
+  }
+
+  /* The two outcomes, equal in size: with the put, and without. Their label, figure and note rows are shared
+     (subgrid), so the two figures sit on one baseline whatever the labels need. */
+  .outcomes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    margin: var(--s-12) 0 0;
+    border-top: 1px solid var(--hairline);
+
+    @container (max-width: 30rem) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .outcome {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    row-gap: var(--s-2);
+    align-items: start;
+    min-width: 0;
+    padding: var(--s-12) var(--s-16) var(--s-12) 0;
+
+    & + & {
+      padding-inline: var(--s-16) 0;
+      border-inline-start: 1px solid var(--hairline);
+    }
+
+    @container (max-width: 30rem) {
+      padding-inline: 0;
+
+      & + & {
+        padding-inline: 0;
+        border-inline-start: 0;
+        border-top: 1px solid var(--hairline);
+      }
+    }
+  }
+
+  .outcomeLabel {
+    align-self: end;
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .outcomeFigure {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--landing-figure-size);
+    line-height: var(--landing-figure-line);
+    font-weight: 560;
+    letter-spacing: var(--h2-track);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    white-space: nowrap;
+
+    &[data-secondary] {
+      color: var(--text-2);
+    }
+  }
+
+  /* The figure keeps the size of the outcome row; Amount draws the unit. */
+  .outcomeAmount {
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+  }
+
+  /* Two lines are kept, so the note does not change height while the price is dragged. */
+  .outcomeNote {
+    min-height: calc(var(--caption-line) * 2);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .verdict {
+    font-weight: 500;
+    color: var(--text-2);
+
+    &[data-direction='more'] {
+      color: var(--gain);
+    }
+
+    &[data-direction='less'] {
+      color: var(--loss);
+    }
+  }
+
+  .source {
+    flex: 1 1 16rem;
+    min-width: 0;
+    min-height: calc(var(--caption-line) * 2);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .sourceLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-h);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+}

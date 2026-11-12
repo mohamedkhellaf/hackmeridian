@@ -1,0 +1,501 @@
+/*
+ * Shared styles of the chart kit ("engraved" figures): ink lines, a tinted gain area, a hatched loss area,
+ * dotted rules, open circles, direct labels. Semantic tokens only, so both themes and the gain / loss schemes
+ * work without a line of chart code.
+ */
+
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .figure {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .plot {
+    position: relative;
+    min-width: 0;
+    line-height: 0;
+  }
+
+  .plot[data-interactive='true'] {
+    touch-action: pan-y;
+    cursor: ew-resize;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .svg {
+    display: block;
+    overflow: visible;
+  }
+
+  /* ---- Text. `.t` and `.tStrong` are also the two classes text is measured with. ---- */
+
+  .t,
+  .tStrong {
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    font-variant-numeric: tabular-nums lining-nums;
+    fill: var(--text-2);
+  }
+
+  .t {
+    font-weight: 500;
+  }
+
+  .tStrong {
+    font-weight: 600;
+  }
+
+  .muted {
+    fill: var(--muted);
+  }
+
+  .ink {
+    fill: var(--text);
+  }
+
+  .gain {
+    fill: var(--gain);
+  }
+
+  .loss {
+    fill: var(--loss);
+  }
+
+  /* ---- Marks ---- */
+
+  .line {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1.5;
+    stroke-linejoin: miter;
+    stroke-miterlimit: 6;
+    stroke-linecap: butt;
+  }
+
+  .lineAlt {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.25;
+    stroke-dasharray: 5 4;
+    stroke-linecap: butt;
+  }
+
+  .zero {
+    fill: none;
+    stroke: var(--control);
+    stroke-width: 1;
+  }
+
+  .axis {
+    fill: none;
+    stroke: var(--rule);
+    stroke-width: 1;
+  }
+
+  .dotted {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 0.01 4;
+    stroke-linecap: round;
+  }
+
+  .rule {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1;
+  }
+
+  .tick {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1.5;
+    stroke-linecap: butt;
+  }
+
+  .gainArea {
+    fill: var(--gain-fill);
+    stroke: none;
+  }
+
+  .lossTint {
+    fill: var(--loss-fill);
+    stroke: none;
+  }
+
+  .hatchStripe {
+    fill: var(--loss-hatch);
+  }
+
+  .hatchStripeInk {
+    fill: var(--muted);
+  }
+
+  .dot {
+    fill: var(--text);
+    stroke: none;
+  }
+
+  .openDot {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1.5;
+  }
+
+  .openDotAlt {
+    fill: none;
+    stroke: var(--muted);
+    stroke-width: 1.5;
+  }
+
+  .gainMark {
+    fill: var(--gain);
+  }
+
+  .lossMark {
+    fill: var(--loss);
+  }
+
+  .inkMark {
+    fill: var(--text);
+  }
+
+  /* ---- The assumed-price handle: a real slider, drawn as an ink flag under the plot. ---- */
+
+  .handle {
+    position: absolute;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-4);
+    height: var(--s-20);
+    margin: 0;
+    padding: 0 var(--s-6);
+    border-radius: var(--r-tag);
+    background: var(--text);
+    color: var(--surface);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: 1;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+    cursor: ew-resize;
+    touch-action: pan-y;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  /* 44 px target on every pointer. */
+  .handle::before {
+    content: '';
+    position: absolute;
+    inset: calc(var(--s-12) * -1) calc(var(--s-4) * -1);
+  }
+
+  .handle:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+
+  .handle[data-static='true'] {
+    cursor: default;
+  }
+
+  .grip {
+    flex: none;
+    width: 4px;
+    height: 8px;
+    fill: currentColor;
+    opacity: 0.7;
+  }
+
+  /* ---- Read-out above the plot: a sentence and one signed serif figure. Never a tooltip. ---- */
+
+  .readout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s-2) var(--s-12);
+    min-width: 0;
+  }
+
+  .readoutLabel {
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+  }
+
+  .readoutValue {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .readoutValue[data-direction='gain'] {
+    color: var(--gain);
+  }
+
+  .readoutValue[data-direction='loss'] {
+    color: var(--loss);
+  }
+
+  .readoutUnit,
+  .readoutWord {
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+  }
+
+  .readoutUnit {
+    color: var(--text-2);
+  }
+
+  /* A maximum or minimum the plotted range does not reach: said in words, never pinned to the corner of the line. */
+  .offScale {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .offScale + .offScale {
+    margin-top: calc(-1 * var(--s-4));
+  }
+
+  .offScaleFigure[data-direction='gain'] {
+    color: var(--gain);
+    font-weight: 600;
+  }
+
+  .offScaleFigure[data-direction='loss'] {
+    color: var(--loss);
+    font-weight: 600;
+  }
+
+  .readoutBlock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+  }
+
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-2) var(--s-16);
+    margin: 0;
+  }
+
+  .pair > div {
+    min-width: 0;
+  }
+
+  .pair dt {
+    margin: 0;
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .pair dd {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: var(--figure-weight);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  .pair dd[data-secondary='true'] {
+    color: var(--text-2);
+  }
+
+  .difference {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-6);
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    color: var(--text-2);
+  }
+
+  .difference[data-direction='gain'] {
+    color: var(--gain);
+  }
+
+  .difference[data-direction='loss'] {
+    color: var(--loss);
+  }
+
+  /* ---- Under the plot ---- */
+
+  .axisTitle {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .caption {
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-4) var(--s-16);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--text-2);
+  }
+
+  .key li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+    margin: 0;
+  }
+
+  .keySwatch {
+    flex: none;
+    display: block;
+  }
+
+  /* The table twin, when a caller chooses to show it. A table ignores a width smaller than its content, so the
+     wrapper is what gets hidden or scrolled. */
+  .tableWrap {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-variant-numeric: tabular-nums lining-nums;
+    color: var(--text);
+  }
+
+  .table caption {
+    padding: 0 0 var(--s-6);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-align: left;
+  }
+
+  .table th,
+  .table td {
+    padding: var(--s-6) var(--s-8);
+    border-bottom: 1px solid var(--hairline);
+    font-weight: var(--body-weight);
+    text-align: left;
+  }
+
+  .table thead th {
+    border-bottom-color: var(--rule);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--muted);
+  }
+
+  .table [data-numeric='true'] {
+    text-align: right;
+  }
+
+  .table tr[aria-current='true'] > * {
+    font-weight: 600;
+  }
+
+  .vh {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (forced-colors: active) {
+    .line,
+    .rule,
+    .tick,
+    .openDot {
+      stroke: CanvasText;
+    }
+
+    .zero,
+    .axis,
+    .dotted,
+    .lineAlt,
+    .openDotAlt {
+      stroke: GrayText;
+    }
+
+    .dot,
+    .inkMark,
+    .gainMark,
+    .lossMark,
+    .hatchStripe,
+    .hatchStripeInk {
+      fill: CanvasText;
+    }
+
+    .t,
+    .tStrong {
+      fill: CanvasText;
+    }
+
+    .handle {
+      forced-color-adjust: none;
+      background: CanvasText;
+      color: Canvas;
+    }
+
+    .handle:focus-visible {
+      outline-color: Highlight;
+    }
+  }
+}

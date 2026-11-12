@@ -1,0 +1,152 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    min-width: 0;
+  }
+
+  /* No live series: said once, at the top. */
+  .dormant {
+    max-width: var(--measure);
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    color: var(--text);
+  }
+
+  /* From 1200 px: the offers in the main column, the write ticket in the sticky rail, as on Account and Vault. */
+  .desk {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+    gap: var(--s-32);
+    align-items: start;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-40);
+    min-width: 0;
+  }
+
+  .write {
+    position: sticky;
+    top: var(--s-72);
+    scroll-margin-top: var(--s-72);
+  }
+
+  /* In the rail the ticket is one column: fields, then the margin figures. */
+  .writeGrid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    min-width: 0;
+  }
+
+  .preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+    padding-top: var(--s-16);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .previewTitle {
+    font-family: var(--font-serif);
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+    color: var(--text);
+  }
+
+  /* A row action and, under it, which recorded steps a press runs first. */
+  .act {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-2);
+  }
+
+  .muted {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  /* A long snapshot line wraps instead of widening the table past its column. */
+  .wrap {
+    display: inline-block;
+    min-width: 7rem;
+    max-width: 11rem;
+    white-space: normal;
+  }
+
+  .lapsed {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-8);
+
+    & > div {
+      align-self: stretch;
+    }
+  }
+
+  /* The link to the ticket is only needed where the ticket is not in view beside the table. */
+  @media (min-width: 1200px) {
+    .toWrite {
+      display: none;
+    }
+  }
+
+  @media (max-width: 1199.98px) {
+    .desk {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-40);
+    }
+
+    .write {
+      position: static;
+    }
+
+    .writeGrid {
+      display: grid;
+      grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+      gap: var(--s-40);
+      align-items: start;
+    }
+
+    .preview {
+      max-width: 34rem;
+      padding-top: 0;
+      border-top: 0;
+    }
+  }
+
+  @media (max-width: 767.98px) {
+    .root,
+    .desk,
+    .main {
+      gap: var(--s-32);
+    }
+
+    .writeGrid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-24);
+    }
+
+    .preview {
+      padding-top: var(--s-16);
+      border-top: 1px solid var(--hairline);
+    }
+  }
+}

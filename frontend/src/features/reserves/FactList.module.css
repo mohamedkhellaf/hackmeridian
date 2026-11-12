@@ -1,0 +1,74 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .fact {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: var(--s-12);
+    padding-block: var(--s-8);
+    border-top: 1px solid var(--hairline);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+  }
+
+  .fact:last-child {
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .fact dt {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .fact dd {
+    min-width: 0;
+    margin: 0;
+    max-width: var(--measure);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  /* A contract's record: longer terms ("Deploy transaction") and ids printed in full, on one line from 768 px. */
+  .root[data-variant='record'] .fact {
+    grid-template-columns: 10rem minmax(0, 1fr);
+    align-items: baseline;
+  }
+
+  .root[data-variant='record'] .fact dd {
+    max-width: 40rem;
+  }
+
+  .source {
+    display: block;
+    margin-top: var(--s-4);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .source code {
+    color: var(--text-2);
+    overflow-wrap: anywhere;
+  }
+
+  /* On a phone a record's term sits over its value, so an id in full keeps the width of the column. */
+  @media (max-width: 767.98px) {
+    .root[data-variant='record'] .fact {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-2);
+    }
+
+    .root[data-variant='record'] .fact dt {
+      font-size: var(--label-size);
+      line-height: var(--label-line);
+      font-weight: var(--label-weight);
+      font-stretch: var(--label-stretch);
+      color: var(--muted);
+    }
+  }
+}

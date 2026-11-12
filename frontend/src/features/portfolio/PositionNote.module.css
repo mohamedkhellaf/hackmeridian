@@ -1,0 +1,14 @@
+@layer features {
+  /* A slip keeps the width of a slip, however wide the column. */
+  .note {
+    max-width: 34rem;
+  }
+
+  .contract {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-4) var(--s-8);
+    color: var(--muted);
+  }
+}

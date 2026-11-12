@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest'
+import { FLAG_LABELS, POWER_STATE, describeFlagChange, describeFlags, parseAssetsResponse, parseHolderStatus, parseIssuerAccount, parseSacName } from './assetFacts'
+
+const ISSUER = 'GDSX2WUFUT7KCMTUNG3IUQWIUQSC4XNKQ5NTGEZRKLTMLCSJTCUVBEVG'
+const ME = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7'
+
+const assets = {
+  _embedded: {
+    records: [
+      {
+        asset_code: 'RWA',
+        num_contracts: 2,
+        accounts: { authorized: 3, authorized_to_maintain_liabilities: 1, unauthorized: 2 },
+        flags: { auth_required: true, auth_revocable: true, auth_immutable: false, auth_clawback_enabled: true },
+      },
+    ],
+  },
+}
+
+describe('parseSacName', () => {
+  it('parses CODE:ISSUER and native', () => {
+    expect(parseSacName(`RWA:${ISSUER}`)).toEqual({ kind: 'issued', code: 'RWA', issuer: ISSUER })
+    expect(parseSacName('native')).toEqual({ kind: 'native' })
+  })
+  it('rejects anything else', () => {
+    expect(parseSacName('RWA')).toBeNull()
+    expect(parseSacName(42)).toBeNull()
+    expect(parseSacName('RWA:GBAD')).toBeNull()
+  })
+})
+
+describe('parseAssetsResponse', () => {
+  it('reads flags and trustline counts', () => {
+    const r = parseAssetsResponse(assets)!
+    expect(r.flags).toEqual({ authRequired: true, authRevocable: true, clawback: true, authImmutable: false })
+    expect(r.trustlines).toEqual({ authorized: 3, maintainOnly: 1, unauthorized: 2, total: 6 })
+    expect(r.contracts).toBe(2)
+  })
+  it('returns null for an empty or malformed response', () => {
+    expect(parseAssetsResponse({ _embedded: { records: [] } })).toBeNull()
+    expect(parseAssetsResponse(null)).toBeNull()
+  })
+})
+
+describe('parseIssuerAccount', () => {
+  it('detects a locked issuer (all signers weight 0)', () => {
+    const r = parseIssuerAccount({ home_domain: 'x.io', signers: [{ weight: 0 }], flags: { auth_clawback_enabled: true } })!
+    expect(r.locked).toBe(true)
+    expect(r.homeDomain).toBe('x.io')
+    expect(r.flags.clawback).toBe(true)
+  })
+  it('is unlocked when a signer has weight', () => {
+    expect(parseIssuerAccount({ signers: [{ weight: 1 }], flags: {} })!.locked).toBe(false)
+  })
+  it('returns null without signers', () => {
+    expect(parseIssuerAccount({})).toBeNull()
+  })
+})
+
+describe('parseHolderStatus', () => {
+  const acct = (line: object) => ({ balances: [{ asset_type: 'native' }, { asset_code: 'RWA', asset_issuer: ISSUER, ...line }] })
+  it('maps authorization states', () => {
+    expect(parseHolderStatus(acct({ is_authorized: true }), 'RWA', ISSUER, ME)).toBe('authorized')
+    expect(parseHolderStatus(acct({ is_authorized: false, is_authorized_to_maintain_liabilities: true }), 'RWA', ISSUER, ME)).toBe('maintain-only')
+    expect(parseHolderStatus(acct({ is_authorized: false, is_authorized_to_maintain_liabilities: false }), 'RWA', ISSUER, ME)).toBe('unauthorized')
+    expect(parseHolderStatus({ balances: [] }, 'RWA', ISSUER, ME)).toBe('no-trustline')
+    expect(parseHolderStatus({}, 'RWA', ISSUER, ISSUER)).toBe('issuer')
+  })
+})
+
+describe('describeFlags', () => {
+  it('states the clawback consequence only when enabled', () => {
+    const on = describeFlags({ authRequired: false, authRevocable: false, clawback: true, authImmutable: false })
+    expect(on.find((f) => f.key === 'clawback')!.consequence).toMatch(/take tokens back, including from the Covered contract/)
+    const off = describeFlags({ authRequired: false, authRevocable: false, clawback: false, authImmutable: false })
+    expect(off.find((f) => f.key === 'clawback')!.on).toBe(false)
+  })
+})
+
+describe('describeFlagChange', () => {
+  it('says whether the issuer can still change the flags, in the words both pages use', () => {
+    const base = { authRequired: true, authRevocable: true, clawback: true }
+    expect(describeFlagChange({ ...base, authImmutable: false })).toEqual({ key: 'change', label: 'Can change these', on: true, state: 'Yes', consequence: 'The issuer can turn any of these on or off later.' })
+    expect(describeFlagChange({ ...base, authImmutable: true })).toEqual({ key: 'change', label: 'Can change these', on: false, state: 'No', consequence: 'Fixed. The issuer can never change them.' })
+  })
+})
+
+describe('one vocabulary for the issuer powers (ruling F16)', () => {
+  it('labels the four powers in plain words, never with a Stellar flag name', () => {
+    expect(FLAG_LABELS).toEqual({ required: 'Approval required', revocable: 'Can freeze', clawback: 'Can claw back', change: 'Can change these' })
+    const all = { authRequired: true, authRevocable: true, clawback: true, authImmutable: false }
+    expect(describeFlags(all).map((f) => f.label)).toEqual(['Approval required', 'Can freeze', 'Can claw back'])
+    expect(describeFlagChange(all).label).toBe('Can change these')
+    for (const label of Object.values(FLAG_LABELS)) expect(label).not.toMatch(/AUTH_|Authorization|Clawback enabled/)
+  })
+
+  it('answers each power with Yes or No', () => {
+    expect(POWER_STATE).toEqual({ on: 'Yes', off: 'No' })
+  })
+})

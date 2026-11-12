@@ -1,0 +1,8 @@
+@layer features {
+  /* After a retry that failed: one line, in ink, so it reads as news and not as part of the description. */
+  .again {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text);
+  }
+}

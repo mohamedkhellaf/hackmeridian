@@ -1,0 +1,203 @@
+@layer features {
+  /*
+   * One card per request, the same card as on the asset page's Requests tab (ruling F15): what is wanted and the
+   * premium per unit, the strike and the total, the deadline and the time left, then the buyer and the action.
+   */
+  .list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--rule);
+    container-type: inline-size;
+  }
+
+  /* From 768 px up to the table's 1200 px: two ruled columns, read left to right like the table's rows. */
+  @media (min-width: 768px) {
+    .list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--s-32);
+    }
+
+    .item:nth-last-child(2):nth-child(odd) {
+      border-bottom-color: var(--rule);
+    }
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding-block: var(--s-12);
+    border-bottom: 1px solid var(--hairline);
+
+    &:last-child {
+      border-bottom-color: var(--rule);
+    }
+
+    /* Cancelled and returned requests, shown on request: secondary ink. */
+    &[data-closed] .title,
+    &[data-closed] .premium {
+      color: var(--text-2);
+    }
+
+    /* The request the ticket is showing: the same tint as a selected table row. */
+    &[data-selected] {
+      margin-inline: calc(var(--s-8) * -1);
+      padding-inline: var(--s-8);
+      background: var(--accent-tint);
+    }
+  }
+
+  /*
+   * A line of the card: a term on the left, its figure on the right. The right-hand figure keeps its line; the left
+   * side wraps inside (the demo price drops under the strike on a narrow phone). Only the title line lets the
+   * premium drop beneath it.
+   */
+  .line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 var(--s-12);
+    min-width: 0;
+
+    &:first-child {
+      flex-wrap: wrap;
+    }
+
+    & > .terms {
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+  }
+
+  .title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-8);
+    min-width: 0;
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .glyph {
+    flex: none;
+    align-self: center;
+  }
+
+  .premium {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--s-4);
+    margin: 0;
+    margin-inline-start: auto;
+    white-space: nowrap;
+  }
+
+  .per {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .terms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--s-6);
+    margin: 0;
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+  }
+
+  .label {
+    color: var(--muted);
+  }
+
+  .reference {
+    font-size: var(--caption-size);
+    color: var(--muted);
+  }
+
+  .warn {
+    display: flex;
+    align-items: center;
+    gap: var(--s-4);
+    margin: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    color: var(--warn);
+  }
+
+  .aside {
+    flex: none;
+    margin: 0;
+    margin-inline-start: auto;
+    font-size: var(--caption-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-12);
+    margin-top: var(--s-8);
+  }
+
+  .facts {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  /* The one state of "My requests" that asks for an action: in ink, with the warning glyph. */
+  .stranded {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    font-weight: 500;
+    color: var(--text);
+
+    & svg {
+      color: var(--warn);
+    }
+  }
+
+  .ids {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--s-12);
+  }
+
+  .buyer {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-6);
+  }
+
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-8);
+  }
+
+  .action {
+    flex: none;
+  }
+}

@@ -1,0 +1,207 @@
+@layer ui {
+  .root {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+  }
+
+  .labelRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-12);
+  }
+
+  .label {
+    font-family: var(--font-sans);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: var(--label-weight);
+    color: var(--text-2);
+  }
+
+  .optional {
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .aside {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-align: end;
+  }
+
+  .hint {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .error {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-6);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--danger);
+  }
+
+  .errorIcon {
+    margin-top: 1px;
+    width: var(--s-12);
+    height: var(--s-12);
+  }
+
+  /* The well: a sunken input with a 3:1 border. The ring goes on the well, not on the bare input. */
+  .well {
+    display: flex;
+    align-items: center;
+    gap: var(--s-8);
+    height: var(--control-h);
+    padding-inline: var(--s-12);
+    border: 1px solid var(--control);
+    border-radius: var(--r-control);
+    background: var(--sunken);
+    color: var(--text);
+    transition: border-color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover:not(:has(:disabled)) {
+        border-color: var(--text-2);
+      }
+    }
+
+    /* The ring is a shadow; the transparent outline is what forced-colours mode paints instead. */
+    &:has(.input:focus-visible) {
+      border-color: var(--accent);
+      box-shadow: var(--focus-ring);
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+
+    &:has(.input[data-invalid]) {
+      border-color: var(--danger);
+    }
+
+    &:has(.input:disabled) {
+      border-color: var(--hairline);
+      color: var(--disabled-fg);
+      cursor: not-allowed;
+    }
+
+    @media (pointer: coarse) {
+      height: var(--touch);
+    }
+  }
+
+  .input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 450;
+    font-variant-numeric: tabular-nums lining-nums;
+
+    &::placeholder {
+      color: var(--muted);
+      opacity: 1;
+    }
+
+    /* An empty amount must not read as a typed figure: its placeholder is set in the sans. */
+    .well[data-amount] &::placeholder {
+      font-family: var(--font-sans);
+      font-size: var(--ui-size);
+      font-weight: 450;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+
+    /* 16 px on phones so iOS does not zoom the page. */
+    @media (max-width: 767.98px) {
+      font-size: 1rem;
+    }
+  }
+
+  .well[data-mono] .input {
+    font-family: var(--font-mono);
+    font-size: var(--mono-size);
+    font-feature-settings: 'zero';
+
+    @media (max-width: 767.98px) {
+      font-size: 1rem;
+    }
+  }
+
+  /* Amounts are figures: serif, 16 px everywhere. */
+  .well[data-amount] .input {
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: var(--figure-weight);
+  }
+
+  .adornment {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    color: var(--muted);
+  }
+
+  .unit {
+    flex: none;
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .max {
+    position: relative;
+    flex: none;
+    height: var(--s-24);
+    padding-inline: var(--s-8);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-tag);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--label-size);
+    line-height: var(--label-line);
+    font-weight: 550;
+    transition: border-color var(--dur-hover) var(--ease-enter);
+
+    @media (hover: hover) {
+      &:hover:not(:disabled) {
+        border-color: var(--control);
+      }
+    }
+
+    &:disabled {
+      color: var(--disabled-fg);
+    }
+
+    /* Touch: the 24 px chip keeps its look; its hit area is 44 px high. */
+    @media (pointer: coarse) {
+      &::after {
+        content: '';
+        position: absolute;
+        inset-block: calc((100% - var(--touch)) / 2);
+        inset-inline: calc(var(--s-4) * -1);
+      }
+    }
+  }
+}

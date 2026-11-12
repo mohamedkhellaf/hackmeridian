@@ -1,0 +1,89 @@
+@layer features {
+  .section {
+    padding-inline: var(--landing-gutter);
+    padding-bottom: var(--landing-section-gap);
+  }
+
+  /* The fence: a panel on the sunken ground. Nothing else on the page looks like this. From 1000 px its grid is the
+     page's own (no inline padding), so the text starts on the fifth column line like the tables beside it. */
+  .fence {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: var(--s-32);
+    row-gap: var(--s-20);
+    max-width: var(--landing-max);
+    margin-inline: auto;
+    padding: var(--s-40) var(--s-32);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    background: var(--sunken);
+
+    @media (max-width: 767.98px) {
+      padding: var(--s-24) var(--s-16);
+    }
+  }
+
+  .heading {
+    grid-column: 1 / -1;
+    font-family: var(--font-serif);
+    font-size: var(--landing-h2-size);
+    line-height: var(--landing-h2-line);
+    font-weight: 560;
+    letter-spacing: var(--h1-track);
+  }
+
+  .text {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+    max-width: 34rem;
+    font-size: var(--landing-body-size);
+    line-height: var(--landing-body-line);
+    color: var(--text);
+    text-wrap: pretty;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-8) var(--s-24);
+    margin-top: var(--s-4);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: 500;
+
+    @media (pointer: coarse) {
+      gap: 0 var(--s-24);
+
+      & a {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--touch);
+      }
+    }
+  }
+
+  .off {
+    color: var(--muted);
+    font-weight: var(--body-weight);
+  }
+
+  @media (min-width: 1000px) {
+    .fence {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      padding-inline: 0;
+    }
+
+    .heading {
+      grid-column: 1 / span 4;
+      align-self: start;
+      padding-inline-start: var(--s-32);
+    }
+
+    .text {
+      grid-column: 5 / -1;
+    }
+  }
+}

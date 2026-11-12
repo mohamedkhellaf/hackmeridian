@@ -1,0 +1,156 @@
+/* Same order as ui/tokens: repeated so it holds whichever stylesheet loads first. */
+@layer tokens, base, ui, features;
+
+@layer ui {
+  .wrap {
+    container-type: inline-size;
+    min-width: 0;
+    font-family: var(--font-sans);
+    color: var(--text);
+  }
+
+  .steps {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .step {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--s-12) minmax(0, 1fr);
+    column-gap: var(--s-12);
+    margin: 0;
+    padding: 0 0 var(--s-16);
+    min-width: 0;
+  }
+
+  .step:last-child {
+    padding-bottom: 0;
+  }
+
+  /* The connector to the next step: solid once the step is done, dotted while it is still to come. */
+  .step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: calc(var(--s-6) - 0.5px);
+    top: var(--s-16);
+    bottom: 0;
+    border-left: 1px solid var(--text);
+  }
+
+  .step:not([data-state='done']):not(:last-child)::before {
+    border-left: 1px dotted var(--control);
+  }
+
+  .dot {
+    box-sizing: border-box;
+    width: var(--s-12);
+    height: var(--s-12);
+    margin-top: var(--s-4);
+    border: 1.5px solid var(--text);
+    border-radius: 50%;
+    background: transparent;
+  }
+
+  .step[data-state='done'] .dot {
+    background: var(--text);
+  }
+
+  /* A ring around a filled dot. Drawn with an offset outline, so it needs no knowledge of the ground colour. */
+  .step[data-state='current'] .dot {
+    width: var(--s-8);
+    height: var(--s-8);
+    margin: var(--s-6) var(--s-2) 0;
+    border: 0;
+    background: var(--text);
+    outline: 1.5px solid var(--text);
+    outline-offset: 2px;
+  }
+
+  .step[data-state='upcoming'] .dot {
+    border-color: var(--control);
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+
+  .label {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    font-weight: var(--ui-weight);
+    color: var(--text);
+  }
+
+  .step[data-state='current'] .label {
+    font-weight: 600;
+  }
+
+  .step[data-state='upcoming'] .label {
+    color: var(--text-2);
+  }
+
+  .detail {
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  /* A row once there is room: the rule runs through the dots, the text hangs under each. */
+  @container (min-width: 34rem) {
+    .wrap[data-orientation='auto'] .steps {
+      flex-direction: row;
+    }
+
+    .wrap[data-orientation='auto'] .step {
+      flex: 1 1 0;
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--s-8);
+      padding: 0 var(--s-12) 0 0;
+    }
+
+    .wrap[data-orientation='auto'] .step:last-child {
+      padding-right: 0;
+    }
+
+    .wrap[data-orientation='auto'] .step:not(:last-child)::before {
+      left: var(--s-16);
+      right: calc(var(--s-4) * -1 + var(--s-4));
+      top: calc(var(--s-6) - 0.5px);
+      bottom: auto;
+      border-left: 0;
+      border-top: 1px solid var(--text);
+    }
+
+    .wrap[data-orientation='auto'] .step:not([data-state='done']):not(:last-child)::before {
+      border-left: 0;
+      border-top: 1px dotted var(--control);
+    }
+
+    .wrap[data-orientation='auto'] .dot {
+      margin-top: 0;
+    }
+
+    .wrap[data-orientation='auto'] .step[data-state='current'] .dot {
+      margin: var(--s-2);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .dot {
+      forced-color-adjust: none;
+      border-color: CanvasText;
+    }
+
+    .step[data-state='done'] .dot {
+      background: CanvasText;
+    }
+  }
+}

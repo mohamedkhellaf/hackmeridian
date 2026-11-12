@@ -1,0 +1,90 @@
+@layer features {
+  .root {
+    --loading-chart-h: 22rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+    min-width: 0;
+    container: guided / inline-size;
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-24);
+  }
+
+  .loadingNote {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-16);
+    padding: var(--s-20);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+  }
+
+  .loadingFigures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-24);
+  }
+
+  .note {
+    min-width: 0;
+  }
+
+  .lead {
+    max-width: var(--measure);
+    padding-bottom: var(--s-12);
+    font-size: var(--body-size);
+    line-height: var(--body-line);
+    font-weight: var(--body-weight);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .near {
+    margin-bottom: var(--s-20);
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  .heading {
+    font-family: var(--font-serif);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+  }
+
+  .premiumNote {
+    max-width: var(--measure);
+    margin-top: calc(var(--s-4) * -1);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--text-2);
+    text-wrap: pretty;
+  }
+
+  .whenNeed {
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    color: var(--muted);
+  }
+
+  @media (max-width: 767.98px) {
+    .root {
+      --loading-chart-h: 18rem;
+      gap: var(--s-24);
+    }
+
+    .loadingFigures {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}

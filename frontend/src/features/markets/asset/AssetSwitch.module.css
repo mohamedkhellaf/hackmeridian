@@ -1,0 +1,18 @@
+@layer features {
+  .code {
+    font-family: var(--font-serif);
+    font-weight: 600;
+  }
+
+  .meta {
+    color: var(--muted);
+  }
+
+  .price {
+    margin-inline-start: auto;
+    padding-inline-start: var(--s-16);
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;
+  }
+}

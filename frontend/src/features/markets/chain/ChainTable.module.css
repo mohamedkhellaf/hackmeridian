@@ -1,0 +1,335 @@
+@layer features {
+  .wrap {
+    /* The focus ring of a half is drawn inside it, so nothing is clipped by the scroll container. The chain takes
+       the whole main column; the rail beside it stays reserved, so a press never moves it. */
+    overflow-y: hidden;
+  }
+
+  .table {
+    --strike-w: calc(var(--s-72) + var(--s-24));
+    /* A half: its figure (a premium up to 99.99) and its size (up to ×9,999.00), in rem, so the header labels and
+       the figures (two type sizes) share one grid. The offer half hugs the strike at this width; the request half
+       takes the rest of the side, out to its edge. */
+    --fig-w: 2.75rem;
+    --size-w: 3.5rem;
+    --half-px: var(--s-8);
+    --half-gap: var(--s-6);
+    --half-w: calc(var(--fig-w) + var(--half-gap) + var(--size-w) + var(--half-px) * 2);
+  }
+
+  .strikeCol {
+    width: var(--strike-w);
+  }
+
+  /* ---- A side: the offer half next to the strike, the request half further out ---- */
+
+  .halves,
+  .headSlots {
+    display: grid;
+    grid-template-columns: var(--half-w) minmax(0, 1fr);
+  }
+
+  /* The call side is the mirror. */
+  .halves[data-kind='call'],
+  .headSlots[data-kind='call'] {
+    grid-template-columns: minmax(0, 1fr) var(--half-w);
+  }
+
+  /* A contract without requests: the offer half alone fills the side. */
+  .halves[data-one],
+  .headSlots[data-one] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Inside a half, the figure then its size; on the call side the pair keeps to the strike's side of the half. */
+  .half,
+  .headHalf {
+    display: grid;
+    grid-template-columns: var(--fig-w) var(--size-w);
+    column-gap: var(--half-gap);
+    align-items: baseline;
+    align-content: center;
+    justify-content: start;
+    padding-inline: var(--half-px);
+  }
+
+  .halves[data-kind='call'] > .half,
+  .headSlots[data-kind='call'] > .headHalf {
+    justify-content: end;
+  }
+
+  /* ---- Header: the kind over its two halves ---- */
+
+  .head {
+    padding-inline: 0;
+    vertical-align: bottom;
+  }
+
+  .headKind {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+    padding-inline: var(--half-px);
+    color: var(--text-2);
+  }
+
+  .head[data-kind='call'] .headKind {
+    justify-content: flex-end;
+  }
+
+  /* Each label ends where its figures end. */
+  .headLabel {
+    grid-column: 1;
+    text-align: end;
+  }
+
+  /* The strike column is set apart from the in-the-money cells, which share its tone, by a rule on each side. */
+  .strikeHead,
+  .strike,
+  .ruleMid {
+    border-inline: 1px solid var(--rule);
+  }
+
+  .strikeHead {
+    color: var(--text-2);
+  }
+
+  /* ---- Cells ---- */
+
+  .cell {
+    position: relative;
+    padding: 0;
+
+    &[data-itm] {
+      background: var(--cell-tone);
+    }
+  }
+
+  .strike {
+    padding-inline: var(--s-8);
+    background: var(--cell-tone);
+    font-family: var(--font-serif);
+    font-size: var(--figure-size);
+    line-height: var(--figure-line);
+    font-weight: 600;
+    text-align: center;
+
+    &[data-selected] {
+      background: var(--accent-tint);
+    }
+  }
+
+  /* Right-aligned in a box of one width, centred: the decimal point does not move from 99.00 to 100.00. */
+  .strikeFigure {
+    display: inline-block;
+    min-inline-size: 4.25rem;
+    text-align: end;
+  }
+
+  /* The reference equals this strike: its label sits under the figure, and no rule is drawn. */
+  .atTag {
+    display: block;
+    color: var(--text-2);
+    font-family: var(--font-sans);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+  }
+
+  /* A half is a button the height of the row. Its hover tone covers that half alone. */
+  .half {
+    position: relative;
+    width: 100%;
+    min-height: calc(var(--row-h) - 1px);
+    border-radius: 0;
+    color: var(--text);
+    text-align: start;
+    white-space: nowrap;
+    transition:
+      background-color var(--dur-hover) var(--ease-enter),
+      color var(--dur-hover) var(--ease-enter);
+
+    &[aria-pressed='true'] {
+      background: var(--accent-tint);
+    }
+
+    /* A quiet hover: the chain is dense and the pointer crosses it constantly. The wash lies over the tone of an
+       in-the-money cell, so it is a step stronger there. */
+    @media (hover: hover) {
+      &:hover:not([aria-pressed='true']) {
+        background: var(--hover);
+      }
+    }
+
+    &:focus-visible {
+      z-index: 1;
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      box-shadow: none;
+    }
+  }
+
+  /* The figures the table exists for: the offer is the loudest thing in a row, the request a step quieter. */
+  .figure {
+    line-height: var(--ui-line);
+    font-weight: 550;
+    text-align: end;
+  }
+
+  .half[data-half='request'] .figure {
+    color: var(--text-2);
+    font-weight: 450;
+  }
+
+  /* The size of the order, beside its figure (under it on a phone). */
+  .half[data-size]::after {
+    content: attr(data-size);
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--ui-line);
+    font-weight: 450;
+    text-overflow: ellipsis;
+  }
+
+  /* An empty half shows nothing at rest. Pointed at or focused, it says what a press does (ruling F2). */
+  .hint {
+    grid-column: 1 / -1;
+    color: var(--accent);
+    line-height: var(--ui-line);
+    font-weight: 450;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    opacity: 0;
+    transition: opacity var(--dur-hover) var(--ease-enter);
+  }
+
+  .halves[data-kind='call'] .hint {
+    text-align: end;
+  }
+
+  .half:focus-visible .hint {
+    opacity: 1;
+  }
+
+  @media (hover: hover) {
+    .half:hover .hint {
+      opacity: 1;
+    }
+  }
+
+  /* "yours": just past the request's figure and size, over the outer part of the side, transparent to the pointer. */
+  .mark {
+    position: absolute;
+    z-index: 2;
+    inset-block: 0;
+    inset-inline-start: calc(var(--half-w) * 2);
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 450;
+    white-space: nowrap;
+    pointer-events: none;
+
+    &[data-kind='call'] {
+      inset-inline: auto calc(var(--half-w) * 2);
+    }
+  }
+
+  /* ---- The reference price: a quiet dashed rule between two strikes, with its label on the strike column ---- */
+
+  .ruleSide,
+  .ruleMid {
+    position: relative;
+    height: var(--s-20);
+    padding: 0;
+    border-bottom: 1px solid var(--hairline);
+    line-height: 0;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset-inline: 0;
+      top: 50%;
+      border-top: 1px dashed var(--control);
+    }
+  }
+
+  /* Centred on the strike column; a long label (the faucet price) reaches over the side cells. */
+  .tag {
+    position: absolute;
+    z-index: 3;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0 var(--s-8);
+    background: var(--bg);
+    color: var(--text-2);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* ---- A phone: the four halves keep their places; each prints its size under its figure ---- */
+
+  .table[data-compact] {
+    --strike-w: calc(var(--s-72) + var(--s-8));
+    --half-px: var(--s-4);
+
+    & .halves,
+    & .headSlots,
+    & .halves[data-kind='call'],
+    & .headSlots[data-kind='call'] {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    & .halves[data-one],
+    & .headSlots[data-one] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* One box per half, its figure over its size, both ending at the same edge. */
+    & .half,
+    & .headHalf {
+      grid-template-columns: minmax(0, var(--size-w));
+    }
+
+    & .figure,
+    & .half[data-size]::after {
+      text-align: end;
+    }
+
+    & .half[data-size]::after {
+      line-height: var(--caption-line);
+    }
+
+    & .hint {
+      font-size: var(--caption-size);
+      line-height: var(--caption-line);
+      text-align: start;
+      white-space: normal;
+    }
+
+    & .halves[data-kind='call'] .hint {
+      text-align: end;
+    }
+
+    /* No room for the word: the highlighter marks the figure, and the half's name says it. */
+    & .mark {
+      display: none;
+    }
+
+    & .strikeFigure {
+      min-inline-size: 3.5rem;
+    }
+
+    @media (pointer: coarse) {
+      & .half {
+        min-height: var(--touch);
+      }
+    }
+  }
+}

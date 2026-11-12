@@ -1,0 +1,169 @@
+@layer features {
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-32);
+    min-width: 0;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-24);
+    min-width: 0;
+  }
+
+  /* From 1200 px the section list sits in its own column and stays in view. */
+  @media (min-width: 1200px) {
+    .layout {
+      grid-template-columns: 13rem minmax(0, 1fr);
+      gap: var(--s-56);
+      align-items: start;
+    }
+  }
+
+  /* The article fills its column, so section rules and tables meet the page edge; prose keeps its own measure. */
+  .article {
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-56);
+    min-width: 0;
+  }
+
+  /* A section opens with an ink rule and its number, like a clause of a term sheet. */
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-20);
+    min-width: 0;
+    padding-top: var(--s-12);
+    border-top: 1px solid var(--text);
+    /* Where a jump to the section lands: under the section select, which stays at the top below 1200 px. */
+    scroll-margin-top: var(--s-72);
+  }
+
+  /* The same for anything that takes focus in the text: the select must never hide what has focus. */
+  .article :where(a, button, summary, [tabindex]) {
+    scroll-margin-top: var(--s-72);
+  }
+
+  @media (min-width: 1200px) {
+    .section,
+    .article :where(a, button, summary, [tabindex]) {
+      scroll-margin-top: var(--s-16);
+    }
+  }
+
+  /* The heading hugs its words, so the focus ring it gets from the section list is drawn around them only. */
+  .heading {
+    display: flex;
+    align-items: baseline;
+    align-self: flex-start;
+    gap: var(--s-12);
+    margin-inline: calc(var(--s-6) * -1);
+    padding-inline: var(--s-6);
+    border-radius: var(--r-control);
+    font-size: var(--h2-size);
+    line-height: var(--h2-line);
+    font-weight: var(--h2-weight);
+    letter-spacing: var(--h2-track);
+
+    /* Focus is moved here by script; no ring unless the keyboard is in use. */
+    &:focus:not(:focus-visible) {
+      box-shadow: none;
+    }
+  }
+
+  .number {
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* Three sentences set large: the whole product before any detail. */
+  .standfirst {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    max-width: 44rem;
+    font-family: var(--font-serif);
+    font-size: var(--figure-lg-size);
+    line-height: var(--figure-lg-line);
+    font-weight: 420;
+    color: var(--text);
+  }
+
+  /* Phones: one step down, so the two sentences fit a screen. */
+  @container (max-width: 36rem) {
+    .standfirst {
+      font-size: var(--h2-size);
+      line-height: var(--h2-line);
+    }
+  }
+
+  .prose {
+    max-width: var(--measure);
+    color: var(--text-2);
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+    padding-top: var(--s-12);
+  }
+
+  .subheading {
+    font-size: var(--h3-size);
+    line-height: var(--h3-line);
+    font-weight: var(--h3-weight);
+  }
+
+  .note {
+    max-width: var(--measure);
+    font-size: var(--caption-size);
+    line-height: var(--caption-line);
+    color: var(--muted);
+  }
+
+  .callout {
+    max-width: var(--measure);
+  }
+
+  /* The four examples, one ruled row each: closed, a list of four names. */
+  .examples {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* Requests and resale: two paragraphs, side by side when each keeps a readable measure. */
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-24);
+  }
+
+  @container (min-width: 46rem) {
+    .columns {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--s-40);
+    }
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-8);
+    min-width: 0;
+    max-width: var(--measure);
+    color: var(--text-2);
+  }
+
+  .action {
+    display: flex;
+    margin-top: var(--s-8);
+  }
+}

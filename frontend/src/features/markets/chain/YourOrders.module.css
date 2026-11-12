@@ -1,0 +1,9 @@
+@layer features {
+  .root {
+    display: grid;
+    gap: var(--s-12);
+    min-width: 0;
+    padding-top: var(--s-24);
+    border-top: 1px solid var(--rule);
+  }
+}

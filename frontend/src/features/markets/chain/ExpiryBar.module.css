@@ -1,0 +1,31 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-8) var(--s-16);
+    min-width: 0;
+  }
+
+  /* A date with no order: quieter than the others, until it is the one chosen. */
+  .date[data-quiet] {
+    color: var(--muted);
+  }
+
+  :where([data-checked]) .date[data-quiet] {
+    color: inherit;
+  }
+
+  .other {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-h-sm);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+}

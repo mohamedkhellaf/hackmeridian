@@ -1,0 +1,14 @@
+@layer features {
+  .back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-4);
+    min-height: var(--s-24);
+    font-size: var(--ui-size);
+    line-height: var(--ui-line);
+
+    @media (pointer: coarse) {
+      min-height: var(--touch);
+    }
+  }
+}

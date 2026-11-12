@@ -1,0 +1,50 @@
+@layer features {
+  .root {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-12) var(--s-20);
+  }
+
+  .asset {
+    flex: 0 1 12rem;
+  }
+
+  .kind {
+    flex: none;
+  }
+
+  .sort {
+    flex: 0 1 15rem;
+    margin-inline-start: auto;
+  }
+
+  /*
+   * Phones: the labels are kept for screen readers (each control names its own choice). From 400 px the three
+   * controls share one line and the asset select takes what is left, at least the width of "All assets". Narrower
+   * than that, the asset select takes the first line whole and the kind switch and the order share the second, so
+   * the chosen asset is never cut short.
+   */
+  .root[data-compact] {
+    gap: var(--s-8);
+
+    & .asset {
+      flex: 1 1 8.5rem;
+      min-width: 0;
+    }
+
+    & .sortButton {
+      margin-inline-start: auto;
+    }
+  }
+
+  @media (max-width: 399.98px) {
+    .root[data-compact] .asset {
+      flex-basis: 100%;
+    }
+  }
+
+  .sortButton {
+    flex: none;
+  }
+}
