@@ -470,7 +470,7 @@ export const CALENDAR = {
   downloaded: 'Calendar file downloaded.',
 } as const
 
-/** `Exercise deadline: FUND 10.40 put (10.00 FUND)`. */
+/** `Exercise deadline: RWA 10.40 put (10.00 RWA)`. */
 export const calendarTitle = (o: OptionOffer): string => `Exercise deadline: ${o.underlying.code} ${strikeText(o)} ${o.kind} (${money(qtyOf(o))})`
 
 export function calendarDescription(o: OptionOffer): string {

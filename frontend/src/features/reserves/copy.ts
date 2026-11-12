@@ -114,8 +114,6 @@ export const ROLES_HEADING = 'Contracts and roles'
 
 /** Mock builds read no chain: the deployment shown is the recorded Testnet one. */
 export const ROLES_MOCK_NOTE = 'The Testnet deployment is listed here as recorded on 26 Oct 2026.'
-/** `Its fund token is RWA, shown above as FUND.`: a token the mock market names differently. */
-export const renamedTokenNote = (kind: string, recorded: string, shown: string): string => `Its ${kind} token is ${recorded}, shown above as ${shown}.`
 /** Margin on fixtures, Covered live. */
 export const MARGIN_FIXTURE_NOTE = 'This build replays recorded scenarios for Margin and calls no Margin contract. The Testnet deployment is listed here as recorded on 26 Oct 2026.'
 /** A contract id this app has no record for. */

@@ -8,7 +8,7 @@ const assets = {
   _embedded: {
     records: [
       {
-        asset_code: 'FUND',
+        asset_code: 'RWA',
         num_contracts: 2,
         accounts: { authorized: 3, authorized_to_maintain_liabilities: 1, unauthorized: 2 },
         flags: { auth_required: true, auth_revocable: true, auth_immutable: false, auth_clawback_enabled: true },
@@ -19,13 +19,13 @@ const assets = {
 
 describe('parseSacName', () => {
   it('parses CODE:ISSUER and native', () => {
-    expect(parseSacName(`FUND:${ISSUER}`)).toEqual({ kind: 'issued', code: 'FUND', issuer: ISSUER })
+    expect(parseSacName(`RWA:${ISSUER}`)).toEqual({ kind: 'issued', code: 'RWA', issuer: ISSUER })
     expect(parseSacName('native')).toEqual({ kind: 'native' })
   })
   it('rejects anything else', () => {
-    expect(parseSacName('FUND')).toBeNull()
+    expect(parseSacName('RWA')).toBeNull()
     expect(parseSacName(42)).toBeNull()
-    expect(parseSacName('FUND:GBAD')).toBeNull()
+    expect(parseSacName('RWA:GBAD')).toBeNull()
   })
 })
 
@@ -58,13 +58,13 @@ describe('parseIssuerAccount', () => {
 })
 
 describe('parseHolderStatus', () => {
-  const acct = (line: object) => ({ balances: [{ asset_type: 'native' }, { asset_code: 'FUND', asset_issuer: ISSUER, ...line }] })
+  const acct = (line: object) => ({ balances: [{ asset_type: 'native' }, { asset_code: 'RWA', asset_issuer: ISSUER, ...line }] })
   it('maps authorization states', () => {
-    expect(parseHolderStatus(acct({ is_authorized: true }), 'FUND', ISSUER, ME)).toBe('authorized')
-    expect(parseHolderStatus(acct({ is_authorized: false, is_authorized_to_maintain_liabilities: true }), 'FUND', ISSUER, ME)).toBe('maintain-only')
-    expect(parseHolderStatus(acct({ is_authorized: false, is_authorized_to_maintain_liabilities: false }), 'FUND', ISSUER, ME)).toBe('unauthorized')
-    expect(parseHolderStatus({ balances: [] }, 'FUND', ISSUER, ME)).toBe('no-trustline')
-    expect(parseHolderStatus({}, 'FUND', ISSUER, ISSUER)).toBe('issuer')
+    expect(parseHolderStatus(acct({ is_authorized: true }), 'RWA', ISSUER, ME)).toBe('authorized')
+    expect(parseHolderStatus(acct({ is_authorized: false, is_authorized_to_maintain_liabilities: true }), 'RWA', ISSUER, ME)).toBe('maintain-only')
+    expect(parseHolderStatus(acct({ is_authorized: false, is_authorized_to_maintain_liabilities: false }), 'RWA', ISSUER, ME)).toBe('unauthorized')
+    expect(parseHolderStatus({ balances: [] }, 'RWA', ISSUER, ME)).toBe('no-trustline')
+    expect(parseHolderStatus({}, 'RWA', ISSUER, ISSUER)).toBe('issuer')
   })
 })
 

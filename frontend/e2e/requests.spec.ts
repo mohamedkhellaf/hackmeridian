@@ -3,8 +3,8 @@
  * (or taking back the premium of an expired request) as a staged transaction, and the two tickets the page opens
  * (post a request, fill a request).
  *
- * The mock market seeds four open requests: No. 0 by wallet A (put on BOND), No. 1 by wallet B (put on FUND), No. 2
- * (put on FUND) and No. 3 (call on EQTY) by two fictional hedgers. Ids are printed unpadded (ruling F1).
+ * The mock market seeds four open requests: No. 0 by wallet A (put on BOND), No. 1 by wallet B (put on RWA), No. 2
+ * (put on RWA) and No. 3 (call on EQTY) by two fictional hedgers. Ids are printed unpadded (ruling F1).
  *
  * Figures and their units, dates and times are joined by no-break spaces (ruling F7): patterns match them with `\s`.
  *
@@ -107,15 +107,18 @@ test.describe('Requests board', () => {
     // page) with the labelled reference price, quantity, deadline with countdown, premium per unit with the total
     // beneath, buyer. What a maker locks is in the accessible name of the action and in the ticket.
     const fund = row(page, '2')
-    await expect(fund.getByRole('rowheader')).toContainText('FUND')
+    await expect(fund.getByRole('rowheader')).toContainText('RWA')
     await expect(fund.getByRole('rowheader')).toContainText('Fund share')
     await expect(fund).toContainText('Put')
     await expect(fund).toContainText('No. 2')
-    await expect(fund).toContainText('10.00 FUND')
+    await expect(fund).toContainText('10.00 RWA')
     const strike = fund.locator('td[data-strike]')
     await expect(strike).toContainText(/Demo price\s\d+\.\d{2}/)
     expect(await strike.evaluate((td) => getComputedStyle(td).fontFamily)).toMatch(/Serif/)
     await expect(fund).toContainText(/USDx\s*in total/)
+    // The seeded figures (end-to-end builds price at fixed leads): 0.32 per unit, 3.20 USDx in total.
+    await expect(fund).toContainText('0.32')
+    await expect(fund).toContainText('3.20')
     await expect(fund.locator('time')).toHaveText(/^\d{1,2}\s[A-Z][a-z]{2}\s\d{4},\s08:00\sUTC$/)
     await expect(fund.getByRole('timer')).toHaveAttribute('aria-label', /^Time left: /)
     await expect(fund).toContainText('GHED…AAAA')
@@ -123,7 +126,7 @@ test.describe('Requests board', () => {
     // The buyer's address carries no copy button on the board.
     await expect(fund.getByRole('button', { name: /copy/i })).toHaveCount(0)
     const fill = fund.getByRole('button', { name: /^Fill request/ })
-    await expect(fill).toHaveAccessibleName(/^Fill request: put on 10\.00\sFUND at [\d.]+\sUSDx, until .+\sUTC, premium [\d.]+\sUSDx, you lock [\d,.]+\sUSDx$/)
+    await expect(fill).toHaveAccessibleName(/^Fill request: put on 10\.00\sRWA at [\d.]+\sUSDx, until .+\sUTC, premium [\d.]+\sUSDx, you lock [\d,.]+\sUSDx$/)
 
     // A call locks the asset itself.
     await expect(row(page, '3').getByRole('button', { name: /^Fill request/ })).toHaveAccessibleName(/you lock 4\.00\sEQTY$/)
@@ -153,9 +156,9 @@ test.describe('Requests board', () => {
     // From 1200 px the table headers set the order; the toolbar has no order control.
     await expect(page.getByRole('combobox', { name: 'Sort by' })).toHaveCount(0)
 
-    await chooseOption(page, 'Asset', /^FUND/)
+    await chooseOption(page, 'Asset', /^RWA/)
     await expect(rows(page)).toHaveCount(2)
-    expect(search(page).get('asset')).toBe('fund')
+    expect(search(page).get('asset')).toBe('rwa')
     await expect(page.getByTestId('board-summary')).toContainText('2 of 4 open requests shown')
 
     await page.getByRole('radiogroup', { name: 'Kind' }).getByRole('radio', { name: 'Call' }).click()
@@ -178,12 +181,12 @@ test.describe('Requests board', () => {
 
     // The whole state is in the link: a fresh load of it shows the same board.
     await page.getByRole('radiogroup', { name: 'Kind' }).getByRole('radio', { name: 'Put' }).click()
-    await chooseOption(page, 'Asset', /^FUND/)
+    await chooseOption(page, 'Asset', /^RWA/)
     const url = new URL(page.url())
-    expect(Object.fromEntries(url.searchParams)).toEqual({ asset: 'fund', kind: 'put', sort: 'premium' })
+    expect(Object.fromEntries(url.searchParams)).toEqual({ asset: 'rwa', kind: 'put', sort: 'premium' })
     await page.goto(url.pathname + url.search)
     await expect(rows(page)).toHaveCount(2)
-    await expect(page.getByRole('combobox', { name: 'Asset' })).toContainText('FUND')
+    await expect(page.getByRole('combobox', { name: 'Asset' })).toContainText('RWA')
     await expect(page.getByRole('radiogroup', { name: 'Kind' }).getByRole('radio', { name: 'Put' })).toBeChecked()
     await expect(page.getByRole('columnheader', { name: /^Premium per unit/ })).toHaveAttribute('aria-sort', 'descending')
     const filtered = await perUnitFigures(page)
@@ -463,12 +466,12 @@ test.describe('Requests tickets', () => {
   test('the asset chosen for a request survives a reload and goes back with Back', async ({ page }) => {
     await openApp(page, '/requests')
     await postButton(page).click()
-    await page.getByRole('dialog', { name: 'Post a request' }).getByRole('button', { name: /^FUND/ }).click()
+    await page.getByRole('dialog', { name: 'Post a request' }).getByRole('button', { name: /^RWA/ }).click()
     const ticket = page.getByRole('dialog')
-    await expect(ticket).toContainText('Request a put on FUND')
+    await expect(ticket).toContainText('Request a put on RWA')
 
     await page.reload()
-    await expect(page.getByRole('dialog')).toContainText('Request a put on FUND')
+    await expect(page.getByRole('dialog')).toContainText('Request a put on RWA')
 
     await page.goBack()
     await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -541,7 +544,7 @@ test.describe('Requests tickets', () => {
     await openApp(page, '/requests')
     await row(page, '2').getByRole('button', { name: /^Fill request/ }).click()
     const ticket = page.getByRole('dialog')
-    await expect(ticket).toContainText('Fill a request for a put on FUND')
+    await expect(ticket).toContainText('Fill a request for a put on RWA')
     await expect(ticket.getByRole('button', { name: 'Connect wallet' })).toBeVisible()
     await ticket.getByRole('button', { name: 'Close' }).click()
     await expect(ticket).toBeHidden()
@@ -562,7 +565,7 @@ test.describe('Requests on a phone @phone', () => {
     // strike and the total, the deadline and the time left, the buyer and the number.
     const first = rows(page).first()
     await expect(first).toContainText(/(Put|Call) on [\d.]+\s[A-Z]+/)
-    await expect(first).toContainText(/per (EQTY|FUND|BOND)/)
+    await expect(first).toContainText(/per (EQTY|RWA|BOND)/)
     await expect(first).toContainText(/Strike\s*[\d.]+\sUSDx/)
     await expect(first).toContainText(/Demo price\s[\d.]+/)
     await expect(first).toContainText('in total')
@@ -623,28 +626,28 @@ test.describe('Requests on a phone @phone', () => {
 
 test.describe('the same drawing on both pages (ruling F15) @both', () => {
   test('/requests and the asset Requests tab draw an open request with the same columns, figures and card', async ({ page }) => {
-    await openApp(page, '/requests?asset=fund')
+    await openApp(page, '/requests?asset=rwa')
     await expect(rows(page)).toHaveCount(2)
     const board = row(page, '2')
     const boardText = ((await board.textContent()) ?? '').replace(/\s+/g, ' ')
     const fillName = (await board.getByRole('button', { name: /^Fill request/ }).getAttribute('aria-label')) ?? ''
     expect(fillName).toMatch(/^Fill request: /)
 
-    await page.goto('/markets/fund?tab=requests')
+    await page.goto('/markets/rwa?tab=requests')
     const main = page.getByRole('main')
     if (isPhone(page)) {
       // One card on both pages: the same lines, the same action.
-      const card = main.getByRole('list', { name: 'Open requests on FUND' }).getByRole('listitem').filter({ has: page.getByRole('link', { name: fillName, exact: true }) })
+      const card = main.getByRole('list', { name: 'Open requests on RWA' }).getByRole('listitem').filter({ has: page.getByRole('link', { name: fillName, exact: true }) })
       await expect(card).toContainText('No. 2')
-      await expect(card).toContainText(/Put on 10\.00\sFUND/)
-      await expect(card).toContainText('per FUND')
+      await expect(card).toContainText(/Put on 10\.00\sRWA/)
+      await expect(card).toContainText('per RWA')
       await expect(card).toContainText('in total')
       await expect(card).toContainText('Buyer')
       await expect(card.getByRole('link', { name: /^Fill request/ })).toHaveAccessibleName(fillName)
-      for (const text of ['Put on 10.00', 'per FUND', 'in total', 'Buyer', 'No. 2']) expect(boardText).toContain(text)
+      for (const text of ['Put on 10.00', 'per RWA', 'in total', 'Buyer', 'No. 2']) expect(boardText).toContain(text)
       return
     }
-    const table = main.getByRole('table', { name: 'Open requests on FUND' })
+    const table = main.getByRole('table', { name: 'Open requests on RWA' })
     await expect(table.getByRole('columnheader')).toHaveText(['Kind', 'Strike', 'Quantity', 'Deadline', 'Premium per unit', 'Buyer', 'Action'])
     const tabRow = table.locator('tbody tr').filter({ has: page.getByRole('link', { name: fillName, exact: true }) })
     await expect(tabRow).toContainText('No. 2')
@@ -653,7 +656,7 @@ test.describe('the same drawing on both pages (ruling F15) @both', () => {
     await expect(tabRow).toContainText(/USDx\s*in total/)
     expect(await tabRow.locator('td[data-strike]').evaluate((td) => getComputedStyle(td).fontFamily)).toMatch(/Serif/)
     await expect(tabRow.getByRole('link', { name: /^Fill request/ })).toHaveAccessibleName(fillName)
-    for (const text of ['Put', 'No. 2', '10.00 FUND', 'in total']) expect(boardText).toContain(text)
+    for (const text of ['Put', 'No. 2', '10.00 RWA', 'in total']) expect(boardText).toContain(text)
     await expect(tabRow.getByRole('link', { name: /^Fill request/ })).toHaveAttribute('data-variant', 'secondary')
   })
 })

@@ -6,7 +6,7 @@ const UNIT = 10_000_000n
 const assets: SupportedAssets = {
   quote: { contractId: 'CQ', code: 'USDx', decimals: 7 },
   underlyings: [
-    { contractId: 'CF', code: 'FUND', decimals: 7 },
+    { contractId: 'CF', code: 'RWA', decimals: 7 },
     { contractId: 'CB', code: 'BOND', decimals: 2 },
   ],
 }

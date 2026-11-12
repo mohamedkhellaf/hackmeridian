@@ -63,7 +63,7 @@ const TESTNET_ISSUER = 'GCNWQR5OA24X7LPTCXUEL4V4ZLSIFKUNIEZEO3UVCVXECPPGX7ERFDGM
 /** In list order. The first entry is the default asset of its network. */
 export const REFERENCE_ASSETS: Record<AssetNetwork, readonly ReferenceAsset[]> = {
   mock: [
-    entry('mock', 'FUND', 'fund', MOCK_ISSUER, 'C_MOCK_FUND'),
+    entry('mock', 'RWA', 'fund', MOCK_ISSUER, 'C_MOCK_RWA'),
     entry('mock', 'BOND', 'bond', MOCK_ISSUER, 'C_MOCK_BOND'),
     entry('mock', 'EQTY', 'equity', MOCK_ISSUER, 'C_MOCK_EQTY'),
   ],

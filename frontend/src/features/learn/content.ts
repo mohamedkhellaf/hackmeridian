@@ -314,7 +314,7 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
     sameAs: 'the same as just holding',
     levelLabel: (x) => `Sell at ${x.strikePerUnitText}`,
     openAt: 12,
-    action: 'Earn on what you hold in Markets',
+    action: 'Get paid to sell higher in Markets',
   },
   'earn-buy': {
     statement: 'You set USDx aside and agree to buy an asset at a lower price if a holder asks before the deadline. You are paid a premium for it.',
@@ -341,7 +341,7 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
     sameAs: 'the same as keeping the cash',
     levelLabel: (x) => `Buy at ${x.strikePerUnitText}`,
     openAt: 8,
-    action: 'Earn while waiting to buy in Markets',
+    action: 'Get paid to buy lower in Markets',
   },
   'lock-buy': {
     statement: 'You want a highest price you can buy an asset at, until a date you choose. You pay a premium, once.',

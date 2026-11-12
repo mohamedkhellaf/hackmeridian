@@ -341,7 +341,7 @@ export default function Gallery() {
         <Specimen title="Set a floor" note="5.00 BOND and a put at 10.00 for 1.80 USDx. Selecting a scenario moves the handle." wide>
           <GuidedOutcome />
         </Specimen>
-        <Specimen title="Earn on what you hold" note="5.00 BOND with a call written at 11.00 for 2.10 USDx: more below the cap, less above it.">
+        <Specimen title="Get paid to sell higher" note="5.00 BOND with a call written at 11.00 for 2.10 USDx: more below the cap, less above it.">
           <CoveredCall />
         </Specimen>
         <Specimen title="320 px container" width={320}>

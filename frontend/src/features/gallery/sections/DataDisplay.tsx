@@ -37,7 +37,7 @@ const CHAIN = [
 
 const POSITIONS = [
   { id: '184', asset: 'BOND', kind: 'Long put', glyph: 'long-put' as const, strike: '10.00', qty: '5.00', premium: '1.80', state: 'Active' },
-  { id: '171', asset: 'FUND', kind: 'Short call', glyph: 'short-call' as const, strike: '11.00', qty: '20.00', premium: '3.80', state: 'Offered' },
+  { id: '171', asset: 'RWA', kind: 'Short call', glyph: 'short-call' as const, strike: '11.00', qty: '20.00', premium: '3.80', state: 'Offered' },
   { id: '150', asset: 'EQTY', kind: 'Long call', glyph: 'long-call' as const, strike: '24.00', qty: '2.00', premium: '0.90', state: 'Exercised' },
   { id: '122', asset: 'BOND', kind: 'Short put', glyph: 'short-put' as const, strike: '9.50', qty: '10.00', premium: '2.40', state: 'Expired' },
 ]

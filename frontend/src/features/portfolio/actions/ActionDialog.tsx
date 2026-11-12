@@ -47,7 +47,7 @@ export interface ActionDialogProps {
   receiptTerms: ReadonlyArray<NoteTerm>
   /** The contract state the option is in once the transaction confirmed. */
   receiptState?: string
-  /** The heading of the receipt's note: the position and asset ("Long put, FUND"). The dialog's title says what was done. */
+  /** The heading of the receipt's note: the position and asset ("Long put, RWA"). The dialog's title says what was done. */
   receiptKind?: ReactNode
   /** A link under the receipt, for example to the position. */
   receiptAction?: ReactNode

@@ -25,9 +25,9 @@ describe('readBalances', () => {
   it('never touches the network for mock tokens', async () => {
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
-    expect(isMockToken('C_MOCK_FUND')).toBe(true)
-    expect(await readBalances([{ contractId: 'C_MOCK_FUND', code: 'FUND' }], G('GME'))).toEqual([{ contractId: 'C_MOCK_FUND', status: 'mock', balance: null }])
-    await expect(readBalance('C_MOCK_FUND', G('GME'))).rejects.toThrow('mock token')
+    expect(isMockToken('C_MOCK_RWA')).toBe(true)
+    expect(await readBalances([{ contractId: 'C_MOCK_RWA', code: 'RWA' }], G('GME'))).toEqual([{ contractId: 'C_MOCK_RWA', status: 'mock', balance: null }])
+    await expect(readBalance('C_MOCK_RWA', G('GME'))).rejects.toThrow('mock token')
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -81,6 +81,6 @@ describe('horizon over fetch', () => {
   it('finds a trustline by code and issuer', () => {
     const lines = [{ asset_code: 'BOND', asset_issuer: 'GX' }, { asset_code: 'BOND', asset_issuer: ISSUER, is_authorized: false }]
     expect(trustlineOf(lines, 'BOND', ISSUER)).toEqual(lines[1])
-    expect(trustlineOf(lines, 'FUND', ISSUER)).toBeUndefined()
+    expect(trustlineOf(lines, 'RWA', ISSUER)).toBeUndefined()
   })
 })

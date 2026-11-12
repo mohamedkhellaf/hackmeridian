@@ -43,8 +43,8 @@ test.describe('Issuer on mock data', () => {
     // The Covered contract as a statement: what it holds and owes, and how many options depend on it. The mock
     // chain has no authorization model, so no authorization is shown.
     await expect(statement(page)).toBeVisible()
-    await expect(fact(statement(page), 'Held')).toHaveText(/^[\d,]+\.\d{2} FUND/)
-    await expect(fact(statement(page), 'Reserved for open options')).toHaveText(/^[\d,]+\.\d{2} FUND/)
+    await expect(fact(statement(page), 'Held')).toHaveText(/^[\d,]+\.\d{2} RWA/)
+    await expect(fact(statement(page), 'Reserved for open options')).toHaveText(/^[\d,]+\.\d{2} RWA/)
     await expect(fact(statement(page), 'Open options')).toContainText(/\d/)
     await expect(statement(page).getByText('Authorization', { exact: true })).toHaveCount(0)
 
@@ -57,7 +57,7 @@ test.describe('Issuer on mock data', () => {
 
     // The asset's identity, with no explorer link: mock ids never reach the network.
     const card = main(page).getByRole('complementary', { name: 'Asset' })
-    await expect(fact(card, 'Code')).toHaveText('FUND')
+    await expect(fact(card, 'Code')).toHaveText('RWA')
     await expect(card.getByRole('link')).toHaveCount(0)
   })
 

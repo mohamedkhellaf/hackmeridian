@@ -66,7 +66,7 @@ const positive = (b: TokenBalance | undefined): boolean => b !== undefined && b.
 /**
  * The one obvious asset for an intent, or null when the user has to choose (brief 4.2).
  * Obvious means: a single asset is listed; or, for an intent that starts from the asset itself (set a floor,
- * earn on what you hold), the connected wallet holds exactly one of the listed assets.
+ * get paid to sell higher), the connected wallet holds exactly one of the listed assets.
  */
 export function obviousAsset(intent: Intent, rows: readonly MarketIndexRow[], balances: Readonly<Record<string, TokenBalance>> | null | undefined): MarketIndexRow | null {
   if (rows.length === 1) return rows[0]

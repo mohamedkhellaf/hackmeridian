@@ -51,7 +51,7 @@ async function openOffer(page: Page, kind: 'put' | 'call' = 'put'): Promise<stri
   const id = /Buy offer (\d+):/.exec((await offer.textContent()) ?? '')?.[1]
   expect(id, 'an open offer to buy').toBeTruthy()
   await offer.click()
-  await expect(heading(page, `Buy a ${kind} on FUND`)).toBeVisible()
+  await expect(heading(page, `Buy a ${kind} on RWA`)).toBeVisible()
   return id!
 }
 
@@ -109,13 +109,13 @@ test.describe('buy an offer', () => {
     await expect(button(page, 'Back')).toHaveCount(0)
 
     // The checks that passed are one sentence with the read time; on mock data it says mock data, not a contract.
-    await expect(review.getByTestId('checks')).toHaveText(/^Mock data, \d\d:\d\d:\d\d\sUTC: the offer is open, the FUND issuer has authorized your account, and you hold [\d,.]+\sUSDx\.$/)
+    await expect(review.getByTestId('checks')).toHaveText(/^Mock data, \d\d:\d\d:\d\d\sUTC: the offer is open, the RWA issuer has authorized your account, and you hold [\d,.]+\sUSDx\.$/)
     // The required sentences at their home, as plain paragraphs.
     await expect(row(review, 'You pay')).toContainText(PREMIUM_DISCLOSURE)
     await expect(review.getByText(ISSUER_DISCLOSURE)).toBeVisible()
     await expect(review.getByText('Issuer control', { exact: true })).toHaveCount(0)
     await expect(review.getByTestId('outcome')).toContainText(COMMITMENT.buy)
-    await expect(review.getByTestId('outcome')).toContainText(/If FUND is below [\d.]+\sUSDx, exercising pays: you deliver/)
+    await expect(review.getByTestId('outcome')).toContainText(/If RWA is below [\d.]+\sUSDx, exercising pays: you deliver/)
 
     // The payoff figure is closed until asked for; its caption is inside with it.
     await expect(review.getByTestId('payoff-chart')).toBeHidden()
@@ -130,10 +130,10 @@ test.describe('buy an offer', () => {
     await expect(heading(page, 'Put bought')).toBeFocused()
     await expect(ticket(page)).toHaveAttribute('data-step', 'receipt')
     const receipt = flow(page)
-    await expect(receipt.getByRole('heading', { name: 'Long put, FUND' })).toBeVisible()
+    await expect(receipt.getByRole('heading', { name: 'Long put, RWA' })).toBeVisible()
     await expect(receipt.getByText('Active', { exact: true })).toBeVisible()
     await expect(receipt.getByTestId('receipt-tx')).toContainText('confirmed')
-    await expect(receipt.getByText(/^Until .+\sUTC you can sell [\d.]+\sFUND for [\d,.]+\sUSDx\. Use it only if FUND is worth less than [\d.]+\sUSDx then: exercise from Portfolio before the deadline\.$/)).toBeVisible()
+    await expect(receipt.getByText(/^Until .+\sUTC you can sell [\d.]+\sRWA for [\d,.]+\sUSDx\. Use it only if RWA is worth less than [\d.]+\sUSDx then: exercise from Portfolio before the deadline\.$/)).toBeVisible()
     await expect(receipt.getByRole('link', { name: /Open in Google Calendar instead/ })).toHaveAttribute('href', /^https:\/\/calendar\.google\.com\//)
 
     const download = page.waitForEvent('download')
@@ -188,15 +188,15 @@ test.describe('buy an offer', () => {
     const id = await openOffer(page)
     const strike = /put ([\d.]+)\sUSDx/.exec((await offersList(page).getByRole('button', { name: new RegExp(`^Buy offer ${id}:`) }).textContent()) ?? '')?.[1]
     await page.getByRole('radio', { name: 'Write' }).click()
-    await expect(heading(page, 'Write a put on FUND')).toBeVisible()
+    await expect(heading(page, 'Write a put on RWA')).toBeVisible()
     await expect(page).toHaveURL(/side=write/)
     // Opened on a series: the series is three rows, and the pickers wait behind "Change terms".
     await expect(row(flow(page), 'Strike')).toContainText(`${strike} USDx`)
     await expect(changeTerms(flow(page))).not.toHaveAttribute('open', '')
     await page.getByRole('radio', { name: 'Request' }).click()
-    await expect(heading(page, 'Request a put on FUND')).toBeVisible()
+    await expect(heading(page, 'Request a put on RWA')).toBeVisible()
     await page.getByRole('radio', { name: 'Buy', exact: true }).click()
-    await expect(heading(page, 'Buy a put on FUND')).toBeVisible()
+    await expect(heading(page, 'Buy a put on RWA')).toBeVisible()
     await expect(page).toHaveURL(/offer=\d+/)
   })
 })
@@ -231,7 +231,7 @@ test.describe('the transaction states', () => {
     await expect(ticket(page)).toHaveCount(0)
     // Another offer than the one sent.
     await offersList(page).locator('button[data-kind="put"][data-maker]').nth(1).click()
-    await expect(heading(page, 'Buy a put on FUND')).toBeVisible()
+    await expect(heading(page, 'Buy a put on RWA')).toBeVisible()
     await expect(pay(page)).toBeDisabled()
     await expect(page.getByTestId('action-reason')).toHaveText(/^A transaction sent at \d\d:\d\d:\d\d\sUTC is not confirmed yet and can still go through until \d\d:\d\d:\d\d\sUTC\./)
     // Looking it up releases the review once the ledger has it.
@@ -292,7 +292,7 @@ test.describe('write an offer', () => {
     await openHarness(page)
     await connectAs(page, 'A')
     await button(page, 'Write a put').click()
-    await expect(heading(page, 'Write a put on FUND')).toBeVisible()
+    await expect(heading(page, 'Write a put on RWA')).toBeVisible()
 
     // Opened without a series: a listed deadline and the strike nearest the reference, shown as rows; the pickers
     // wait behind "Change terms", so the quantity and the premium come first.
@@ -304,23 +304,23 @@ test.describe('write an offer', () => {
     const strike = await form.getByRole('radiogroup', { name: /^Strike/ }).getByRole('radio', { checked: true }).getAttribute('value')
     expect(Number(strike)).toBeGreaterThan(0)
     await expect(button(page, 'Review')).toBeDisabled()
-    await expect(page.getByTestId('action-reason')).toHaveText('Enter a quantity of FUND. Enter the premium per FUND, in USDx.')
+    await expect(page.getByTestId('action-reason')).toHaveText('Enter a quantity of RWA. Enter the premium per RWA, in USDx.')
     await expect(form.getByRole('radiogroup', { name: 'Collateral' })).toHaveCount(0)
     await expect(form.getByRole('link', { name: 'Write with partial margin instead' })).toHaveAttribute('href', /\/margin\/trade$/)
 
     // The premium is typed per unit; the total is computed exactly.
     await form.getByRole('textbox', { name: /^Quantity/ }).fill('5')
-    await form.getByRole('textbox', { name: 'Premium per FUND' }).fill('0.36')
+    await form.getByRole('textbox', { name: 'Premium per RWA' }).fill('0.36')
     const locks = `${(Number(strike) * 5).toFixed(2)} USDx`
     await expect(row(form, 'You lock')).toContainText(locks)
     await expect(row(form, 'Lowest open offer in this series')).toBeVisible()
     await expect(row(form, 'USDx balance after')).toBeVisible()
     expect(await totalOf(page)).toBe('1.80 USDx')
-    await form.getByRole('textbox', { name: 'Premium per FUND' }).blur()
+    await form.getByRole('textbox', { name: 'Premium per RWA' }).blur()
     await expect(page).toHaveURL(/premium=1\.8(&|$)/)
 
     // Enter in a field goes to the review.
-    await form.getByRole('textbox', { name: 'Premium per FUND' }).press('Enter')
+    await form.getByRole('textbox', { name: 'Premium per RWA' }).press('Enter')
     await expect(heading(page, 'Review your offer')).toBeVisible()
     const review = flow(page)
     await expect(row(review, 'You lock')).toContainText(locks)
@@ -340,10 +340,10 @@ test.describe('write an offer', () => {
 
     // "Write another" starts the next offer from the same terms.
     await button(page, 'Write another').click()
-    await expect(heading(page, 'Write a put on FUND')).toBeVisible()
+    await expect(heading(page, 'Write a put on RWA')).toBeVisible()
     await expect(flow(page)).toHaveAttribute('data-step', 'terms')
     await expect(flow(page).getByRole('textbox', { name: /^Quantity/ })).toHaveValue('5')
-    await expect(flow(page).getByRole('textbox', { name: 'Premium per FUND' })).toHaveValue('0.36')
+    await expect(flow(page).getByRole('textbox', { name: 'Premium per RWA' })).toHaveValue('0.36')
   })
 
   test('validates with exact reasons and warns on implausible terms', async ({ page }) => {
@@ -352,16 +352,16 @@ test.describe('write an offer', () => {
     await button(page, 'Write a call').click()
     const form = flow(page)
     const qty = form.getByRole('textbox', { name: /^Quantity/ })
-    const premium = form.getByRole('textbox', { name: 'Premium per FUND' })
+    const premium = form.getByRole('textbox', { name: 'Premium per RWA' })
 
     // More than the wallet holds: the field says so, and the reason under the action names both figures, once,
     // with the way to test funds beside it (no notice repeats it).
     await qty.fill('500')
     await premium.fill('1')
     await premium.blur()
-    await expect(form.getByText(/^This locks more than the 120\.00\sFUND you have\.$/)).toBeVisible()
-    await expect(page.getByTestId('action-reason')).toHaveText(/^You have 120\.00\sFUND; this locks 500\.00\sFUND\./)
-    await expect(form.getByText(/You have 120\.00\sFUND; this locks/)).toHaveCount(0)
+    await expect(form.getByText(/^This locks more than the 120\.00\sRWA you have\.$/)).toBeVisible()
+    await expect(page.getByTestId('action-reason')).toHaveText(/^You have 120\.00\sRWA; this locks 500\.00\sRWA\./)
+    await expect(form.getByText(/You have 120\.00\sRWA; this locks/)).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'How to get test funds' })).toHaveAttribute('href', /^\/markets\?funds=1&from=/)
     await expect(button(page, 'Review')).toBeDisabled()
 
@@ -380,7 +380,7 @@ test.describe('write an offer', () => {
     // Custom terms: a strike off the ladder and a date beyond the two-year tenor.
     await changeTerms(form).locator('summary').first().click()
     await form.locator('summary', { hasText: 'Custom terms' }).click()
-    await form.getByRole('textbox', { name: /^Strike, USDx per FUND/ }).fill('10.33')
+    await form.getByRole('textbox', { name: /^Strike, USDx per RWA/ }).fill('10.33')
     await expect(form.getByRole('radiogroup', { name: /^Strike/ }).getByRole('radio', { checked: true })).toHaveCount(0)
     const far = `${new Date().getUTCFullYear() + 3}-01-15`
     await form.getByRole('textbox', { name: 'Deadline date, UTC' }).fill(far)
@@ -396,11 +396,11 @@ test.describe('write an offer', () => {
     await button(page, 'Write a call').click()
     const form = flow(page)
     await form.getByRole('textbox', { name: /^Quantity/ }).fill('3')
-    await form.getByRole('textbox', { name: 'Premium per FUND' }).fill('0.4')
+    await form.getByRole('textbox', { name: 'Premium per RWA' }).fill('0.4')
     await button(page, 'Review').click()
     const review = flow(page)
-    await expect(row(review, 'You give up')).toContainText(/Every rise above [\d.]+\sUSDx per FUND/)
-    await expect(row(review, 'You give up')).toContainText('You cannot owe more than the 3.00 FUND you lock; it can still fall in price.')
+    await expect(row(review, 'You give up')).toContainText(/Every rise above [\d.]+\sUSDx per RWA/)
+    await expect(row(review, 'You give up')).toContainText('You cannot owe more than the 3.00 RWA you lock; it can still fall in price.')
     await expect(row(review, 'Most you can lose')).toHaveCount(0)
     await openFigure(page)
     const text = await review.innerText()
@@ -416,10 +416,10 @@ test.describe('requests', () => {
     await openHarness(page)
     await connectAs(page, 'A')
     await button(page, 'Request a put').click()
-    await expect(heading(page, 'Request a put on FUND')).toBeVisible()
+    await expect(heading(page, 'Request a put on RWA')).toBeVisible()
     const form = flow(page)
     await form.getByRole('textbox', { name: /^Quantity/ }).fill('5')
-    await form.getByRole('textbox', { name: 'Premium per FUND' }).fill('0.4')
+    await form.getByRole('textbox', { name: 'Premium per RWA' }).fill('0.4')
     await expect(page.getByTestId('escrow-line')).toHaveText(bidEscrowDisclosure('2.00 USDx'))
     expect(await totalOf(page)).toBe('2.00 USDx')
 
@@ -444,12 +444,12 @@ test.describe('requests', () => {
   test('fill a request from the second wallet', async ({ page }) => {
     await openHarness(page)
     await connectAs(page, 'B')
-    const open = page.getByTestId('harness-bids').locator('button:not([data-mine])', { hasText: 'FUND' }).first()
+    const open = page.getByTestId('harness-bids').locator('button:not([data-mine])', { hasText: 'RWA' }).first()
     const text = (await open.textContent()) ?? ''
     const kind = /: (put|call) on/.exec(text)![1]
     const premium = /premium ([\d.,]+\sUSDx)/.exec(text)![1].replace(/\s/g, ' ')
     await open.click()
-    await expect(heading(page, `Fill a request for a ${kind} on FUND`)).toBeVisible()
+    await expect(heading(page, `Fill a request for a ${kind} on RWA`)).toBeVisible()
 
     const review = flow(page)
     await expect(review).toHaveAttribute('data-step', 'review')
@@ -460,7 +460,7 @@ test.describe('requests', () => {
     await expect(review.getByText(ISSUER_DISCLOSURE)).toBeVisible()
     await button(page, /^Lock [\d.,]+ [A-Za-z]+ and fill$/).click()
     await expect(heading(page, 'Request filled')).toBeVisible()
-    await expect(flow(page).getByRole('heading', { name: `Short ${kind}, FUND` })).toBeVisible()
+    await expect(flow(page).getByRole('heading', { name: `Short ${kind}, RWA` })).toBeVisible()
     await expect(page.getByRole('link', { name: 'View position' })).toHaveAttribute('href', /\/portfolio\/\d+$/)
   })
 
@@ -580,9 +580,9 @@ test.describe('guest', () => {
 
   test('sees the form of a request with its terms kept after connecting', async ({ page }) => {
     await openHarness(page, 'side=bid&kind=call&qty=3&premium=1.5')
-    await expect(heading(page, 'Request a call on FUND')).toBeVisible()
+    await expect(heading(page, 'Request a call on RWA')).toBeVisible()
     await expect(page.getByTestId('escrow-line')).toHaveText(bidEscrowDisclosure('1.50 USDx'))
-    await expect(flow(page).getByRole('textbox', { name: 'Premium per FUND' })).toHaveValue('0.5')
+    await expect(flow(page).getByRole('textbox', { name: 'Premium per RWA' })).toHaveValue('0.5')
     await ticket(page).getByRole('button', { name: 'Connect wallet' }).click()
     await expect(flow(page).getByRole('textbox', { name: /^Quantity/ })).toHaveValue('3')
     await expect(button(page, 'Review')).toBeEnabled()
@@ -609,7 +609,7 @@ test.describe('keyboard', () => {
     await page.keyboard.press('Enter')
 
     // Opening the ticket moves focus to its heading and says so.
-    await expect(heading(page, 'Buy a put on FUND')).toBeFocused()
+    await expect(heading(page, 'Buy a put on RWA')).toBeFocused()
 
     // The figure opens from its summary; the assumed price moves with the arrow keys and reads its outcome.
     const summary = flow(page).locator('summary', { hasText: 'Payoff at the deadline' })
@@ -660,7 +660,7 @@ test.describe('drawer, 768 to 1199 px', () => {
     await openHarness(page)
     await connectAs(page, 'A')
     await openOffer(page)
-    const dialog = page.getByRole('dialog', { name: 'Buy a put on FUND' })
+    const dialog = page.getByRole('dialog', { name: 'Buy a put on RWA' })
     await expect(dialog).toBeVisible()
     await expect(ticket(page)).toHaveAttribute('data-container', 'drawer')
     await expect(dialog.getByRole('button', { name: /^Pay / })).toBeVisible()
@@ -691,7 +691,7 @@ test.describe('phone, 390 px @phone', () => {
     await openHarness(page)
     await connectAs(page, 'A')
     await openOffer(page)
-    const dialog = page.getByRole('dialog', { name: 'Buy a put on FUND' })
+    const dialog = page.getByRole('dialog', { name: 'Buy a put on RWA' })
     await expect(ticket(page)).toHaveAttribute('data-container', 'page')
 
     // A full page: the whole viewport, nothing sideways.
@@ -730,7 +730,7 @@ test.describe('phone, 390 px @phone', () => {
       await connectAs(page, 'B')
       const cases: [string, Locator][] = [
         ['buy', offersList(page).locator('button[data-kind="put"][data-maker]').first()],
-        ['fill', page.getByTestId('harness-bids').locator('button:not([data-mine])', { hasText: 'FUND' }).first()],
+        ['fill', page.getByTestId('harness-bids').locator('button:not([data-mine])', { hasText: 'RWA' }).first()],
         ['resale buy', page.getByTestId('harness-asks').getByRole('button').first()],
       ]
       for (const [name, opener] of cases) {
@@ -756,13 +756,13 @@ test.describe('phone, 390 px @phone', () => {
     await expectNoAxeViolations(page, { include: '[role="dialog"]' })
     await button(page, 'Close ticket').click()
     await button(page, 'Request a put').click()
-    await expect(page.getByRole('dialog', { name: 'Request a put on FUND' })).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Request a put on RWA' })).toBeVisible()
     await expectNoAxeViolations(page, { include: '[role="dialog"]' })
   })
 
   test('the write form fits the phone: inputs at 16 px, chips at 44 px', async ({ page }) => {
     await openHarness(page, 'side=write&kind=put')
-    const dialog = page.getByRole('dialog', { name: 'Write a put on FUND' })
+    const dialog = page.getByRole('dialog', { name: 'Write a put on RWA' })
     await expect(dialog).toBeVisible()
     await expectNoHorizontalOverflow(page)
     const qty = dialog.getByRole('textbox', { name: /^Quantity/ })
@@ -798,10 +798,10 @@ test.describe('accessibility', () => {
     await connectAs(page, 'A')
     await button(page, 'Write a call').click()
     await flow(page).getByRole('textbox', { name: /^Quantity/ }).fill('500')
-    await flow(page).getByRole('textbox', { name: 'Premium per FUND' }).fill('1')
+    await flow(page).getByRole('textbox', { name: 'Premium per RWA' }).fill('1')
     await changeTerms(flow(page)).locator('summary').first().click()
     await flow(page).locator('summary', { hasText: 'Custom terms' }).click()
-    await expect(flow(page).getByText(/^This locks more than the 120\.00\sFUND you have\.$/)).toBeVisible()
+    await expect(flow(page).getByText(/^This locks more than the 120\.00\sRWA you have\.$/)).toBeVisible()
     await expectNoAxeViolations(page, { include: '[data-testid="ticket"]' })
 
     await button(page, 'Close ticket').click()
@@ -826,14 +826,14 @@ test.describe('through the asset route', () => {
   test.use({ viewport: DESKTOP })
 
   test('a link opens the write ticket in the rail of the asset page, for a guest too', async ({ page }) => {
-    await openApp(page, '/markets/fund?side=write&kind=put')
+    await openApp(page, '/markets/rwa?side=write&kind=put')
     const rail = page.getByRole('complementary', { name: 'Order ticket' })
-    await expect(rail.getByRole('heading', { name: 'Write a put on FUND', level: 2 })).toBeVisible()
+    await expect(rail.getByRole('heading', { name: 'Write a put on RWA', level: 2 })).toBeVisible()
     await expect(rail.getByRole('button', { name: 'Connect wallet' })).toBeVisible()
     // The quantity and the premium are on the rail's first screen, above its action bar; the pickers wait behind
     // "Change terms".
     const bar = rail.getByRole('button', { name: 'Connect wallet' })
-    const premium = rail.getByRole('textbox', { name: 'Premium per FUND' })
+    const premium = rail.getByRole('textbox', { name: 'Premium per RWA' })
     await expect(premium).toBeInViewport({ ratio: 1 })
     expect((await premium.boundingBox())!.y + (await premium.boundingBox())!.height).toBeLessThanOrEqual((await bar.boundingBox())!.y)
     await changeTerms(rail).locator('summary').first().click()
@@ -887,12 +887,12 @@ test.describe('through the asset route', () => {
   })
 
   test('new terms from the page after a written offer start a new form, and the receipt keeps what was signed', async ({ page }) => {
-    await openApp(page, '/markets/fund?side=write&kind=put', { connect: true })
+    await openApp(page, '/markets/rwa?side=write&kind=put', { connect: true })
     const rail = page.getByRole('complementary', { name: 'Order ticket' })
     const form = rail.getByTestId('ticket-flow')
     await form.getByRole('textbox', { name: /^Quantity/ }).fill('1')
-    await form.getByRole('textbox', { name: 'Premium per FUND' }).fill('0.5')
-    await form.getByRole('textbox', { name: 'Premium per FUND' }).blur()
+    await form.getByRole('textbox', { name: 'Premium per RWA' }).fill('0.5')
+    await form.getByRole('textbox', { name: 'Premium per RWA' }).blur()
     await expect(page).toHaveURL(/premium=0\.5/)
     await rail.getByRole('button', { name: 'Review', exact: true }).click()
     const strike = await figureOf(form, 'Strike')
@@ -904,7 +904,7 @@ test.describe('through the asset route', () => {
     const path = await currentPath(page)
     const other = (Number(/strike=([\d.]+)/.exec(path)![1]) + 0.2).toFixed(1)
     await routeTo(page, path.replace(/strike=[\d.]+/, `strike=${other}`))
-    await expect(rail.getByRole('heading', { name: 'Write a put on FUND', level: 2 })).toBeVisible()
+    await expect(rail.getByRole('heading', { name: 'Write a put on RWA', level: 2 })).toBeVisible()
     await expect(form).toHaveAttribute('data-step', 'terms')
     await expect(row(form, 'Strike')).toContainText(`${Number(other).toFixed(2)} USDx`)
   })

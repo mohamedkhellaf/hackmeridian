@@ -54,7 +54,7 @@ const cached = () => ({
   assets: keys.assets(),
   balancesA: keys.balancesFor(A),
   balancesB: keys.balancesFor(B),
-  eligibility: keys.eligibility('C_MOCK_FUND', A),
+  eligibility: keys.eligibility('C_MOCK_RWA', A),
   writerCount: keys.writerOpenCount(A),
   buyerCount: keys.buyerOpenCount(B),
 })
@@ -89,12 +89,12 @@ beforeEach(async () => {
       qc.fetchQuery(coveredQueries.buyerOpenCount(getClient, B)),
     ]),
   )
-  expect(underlying).toBe('C_MOCK_FUND')
+  expect(underlying).toBe('C_MOCK_RWA')
   expect(stale()).toEqual([])
 })
 
 const option = (id: bigint) => flush(client.getOption(id))
-const makerOffer = async (): Promise<OptionOffer> => (await flush(client.listOptions())).find((o) => o.state === 'offered' && o.writer !== A && o.writer !== B && o.underlying.code === 'FUND' && o.kind === 'put')!
+const makerOffer = async (): Promise<OptionOffer> => (await flush(client.listOptions())).find((o) => o.state === 'offered' && o.writer !== A && o.writer !== B && o.underlying.code === 'RWA' && o.kind === 'put')!
 
 describe('Covered writes through the transaction layer, on the mock contract', () => {
   it('buy: the buyer becomes the holder; the book, reserves, balances and the open count go stale', async () => {
@@ -106,7 +106,7 @@ describe('Covered writes through the transaction layer, on the mock contract', (
     expect(stale()).toEqual(['balancesA', 'balancesB', 'collateral', 'health', 'options', 'writerCount'])
     const entry = deps.activity.get(B, run.entryId!)!
     expect(entry).toMatchObject({ action: 'buy', done: 'Bought', subject: `option:${offer.id}`, phase: 'confirmed', mock: true, hash: run.result!.hash })
-    expect(entry.label).toMatch(new RegExp(`^Buy put on ${Number(offer.underlyingQty / 10n ** 7n)}\\.00\u00A0FUND for \\d+\\.\\d\\d\u00A0USDx$`))
+    expect(entry.label).toMatch(new RegExp(`^Buy put on ${Number(offer.underlyingQty / 10n ** 7n)}\\.00\u00A0RWA for \\d+\\.\\d\\d\u00A0USDx$`))
   })
 
   it('exercise, claim delivery and reclaim each move their option one state on', async () => {
@@ -134,7 +134,7 @@ describe('Covered writes through the transaction layer, on the mock contract', (
     const written = await send(W.writeOffer, A, terms)
     expect(written.state.phase).toBe('confirmed')
     expect(typeof written.result!.id).toBe('bigint')
-    expect(deps.activity.get(A, written.entryId!)).toMatchObject({ label: 'Write call on 3.00\u00A0FUND', done: 'Offer written', subject: null })
+    expect(deps.activity.get(A, written.entryId!)).toMatchObject({ label: 'Write call on 3.00\u00A0RWA', done: 'Offer written', subject: null })
     expect(stale()).toEqual(['balancesA', 'balancesB', 'collateral', 'health', 'options', 'writerCount'])
     const created = await option(written.result!.id)
     expect(created).toMatchObject({ state: 'offered', writer: A })
@@ -180,7 +180,7 @@ describe('Covered writes through the transaction layer, on the mock contract', (
     const filled = await send(W.fillBid, A, theirs)
     expect(filled.state.phase).toBe('confirmed')
     expect(await option(filled.result!.optionId)).toMatchObject({ state: 'active', writer: A, holder: DEMO_HEDGERS.a })
-    expect(deps.activity.get(A, filled.entryId!)).toMatchObject({ label: 'Fill request for put on 10.00\u00A0FUND, locking 104.00\u00A0USDx, receiving 2.80\u00A0USDx', subject: 'bid:2' })
+    expect(deps.activity.get(A, filled.entryId!)).toMatchObject({ label: 'Fill request for put on 10.00\u00A0RWA, locking 104.00\u00A0USDx, receiving 2.80\u00A0USDx', subject: 'bid:2' })
     expect(stale()).toContain('options')
   })
 
@@ -254,20 +254,20 @@ describe('labels of the twelve writes', () => {
       'Exercise put on 2.00\u00A0BOND',
       'Claim 98.00\u00A0USDx',
       'Reclaim 48.00\u00A0USDx',
-      'Cancel offer of put on 5.00\u00A0FUND',
+      'Cancel offer of put on 5.00\u00A0RWA',
       'Write put on 2.00\u00A0BOND',
       'List put on 2.00\u00A0BOND for 2.50\u00A0USDx',
       'Cancel listing of put on 2.00\u00A0BOND',
       'Buy put on 2.00\u00A0BOND from its holder for 2.50\u00A0USDx',
-      'Request put on 10.00\u00A0FUND',
-      'Cancel request for put on 10.00\u00A0FUND',
-      'Fill request for put on 10.00\u00A0FUND, locking 104.00\u00A0USDx, receiving 2.80\u00A0USDx',
+      'Request put on 10.00\u00A0RWA',
+      'Cancel request for put on 10.00\u00A0RWA',
+      'Fill request for put on 10.00\u00A0RWA, locking 104.00\u00A0USDx, receiving 2.80\u00A0USDx',
     ])
     // A new offer or request says what it locks or escrows once the contract's quote token is known (review findings 36, 47).
     expect(W.writeOffer.label!(held, held.quote)).toBe('Write put on 2.00\u00A0BOND, locking 194.00\u00A0USDx, asking 0.30\u00A0USDx')
     expect(W.writeOffer.label!({ ...held, kind: 'call' }, held.quote)).toBe('Write call on 2.00\u00A0BOND, locking 2.00\u00A0BOND, asking 0.30\u00A0USDx')
     expect(W.writeOffer.label!(held, null)).toBe('Write put on 2.00\u00A0BOND')
-    expect(W.createBid.label!(bid, bid.quote)).toBe('Request put on 10.00\u00A0FUND, escrowing 2.80\u00A0USDx')
+    expect(W.createBid.label!(bid, bid.quote)).toBe('Request put on 10.00\u00A0RWA, escrowing 2.80\u00A0USDx')
     expect(labels.map((l) => l.done)).toEqual(['Bought', 'Exercised', 'Delivery claimed', 'Reclaimed', 'Offer cancelled', 'Offer written', 'Listed for sale', 'Listing cancelled', 'Bought from holder', 'Request posted', 'Request cancelled', 'Request filled'])
     // The second line of the Activity entry: the series, exactly. New orders get theirs from the contract's quote token.
     const quote = held.quote
@@ -277,14 +277,14 @@ describe('labels of the twelve writes', () => {
       'Strike 97.00\u00A0USDx per BOND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
       'Call on 1.00\u00A0BOND, strike 98.00\u00A0USDx per BOND, deadline 13\u00A0Nov\u00A02026, 08:00\u00A0UTC',
       'Put on 2.00\u00A0EQTY, strike 24.00\u00A0USDx per EQTY, deadline 6\u00A0Nov\u00A02026, 08:00\u00A0UTC',
-      'Strike 9.80\u00A0USDx per FUND, deadline 27\u00A0Nov\u00A02026, 08:00\u00A0UTC',
+      'Strike 9.80\u00A0USDx per RWA, deadline 27\u00A0Nov\u00A02026, 08:00\u00A0UTC',
       'Strike 97.00\u00A0USDx per BOND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
       'Strike 97.00\u00A0USDx per BOND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
       'Strike 97.00\u00A0USDx per BOND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
       'Strike 97.00\u00A0USDx per BOND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
-      'Strike 10.40\u00A0USDx per FUND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
-      'Strike 10.40\u00A0USDx per FUND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
-      'Strike 10.40\u00A0USDx per FUND, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
+      'Strike 10.40\u00A0USDx per RWA, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
+      'Strike 10.40\u00A0USDx per RWA, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
+      'Strike 10.40\u00A0USDx per RWA, deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC',
     ])
     // Without the asset list a new order still says when it ends; an uneven strike is given as the total, never rounded.
     expect(W.writeOffer.detail!(held, null)).toBe('Deadline 20\u00A0Nov\u00A02026, 08:00\u00A0UTC')

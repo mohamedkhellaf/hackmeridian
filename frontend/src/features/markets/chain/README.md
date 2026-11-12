@@ -45,8 +45,8 @@ through `searchFromTicketIntent` of `features/ticket`; the asset page turns them
   half. Before any movement the tab stop is the selected series' offer, else the call offer on the row at the
   reference price. Both halves of the selected series are `aria-pressed`.
 - A half's accessible name is a sentence that starts with its figure and ends with what a press does:
-  `Offer 0.36 at 10.00, put, 27 Nov, for 5.00 FUND, 2 offers, 2 makers. Buy.`,
-  `Request 0.13 at 10.00, put, 27 Nov, for 5.00 FUND, 1 request. Fill request.`,
+  `Offer 0.36 at 10.00, put, 27 Nov, for 5.00 RWA, 2 offers, 2 makers. Buy.`,
+  `Request 0.13 at 10.00, put, 27 Nov, for 5.00 RWA, 1 request. Fill request.`,
   `Your request 0.46 at 98.00, put, 27 Nov, for 2.00 BOND, 1 request.`, and for an empty half
   `No offer at 102.00, call, 13 Nov. Post a request.` (ruling F2). Moneyness at the reference and what the wallet
   has in the series follow the counts. The maker count lives only there.

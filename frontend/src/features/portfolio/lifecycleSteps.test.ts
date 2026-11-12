@@ -38,11 +38,11 @@ describe('lifecycleSteps', () => {
 
   it('speaks to the viewer about its own steps and states the exact legs', () => {
     const holder = lifecycleSteps(opt(), { role: 'holder' }).find((s) => s.id === 'window')!
-    expect(holder.text).toBe('You can exercise at any time: deliver 5.00\u00A0FUND and receive 50.00\u00A0USDx in the same transaction.')
+    expect(holder.text).toBe('You can exercise at any time: deliver 5.00\u00A0RWA and receive 50.00\u00A0USDx in the same transaction.')
     const viewer = lifecycleSteps(opt()).find((s) => s.id === 'window')!
-    expect(viewer.text).toBe('The holder can exercise at any time: deliver 5.00\u00A0FUND and receive 50.00\u00A0USDx in the same transaction.')
+    expect(viewer.text).toBe('The holder can exercise at any time: deliver 5.00\u00A0RWA and receive 50.00\u00A0USDx in the same transaction.')
     const call = lifecycleSteps(opt({ kind: 'call' }), { role: 'holder' }).find((s) => s.id === 'window')!
-    expect(call.text).toContain('pay 50.00\u00A0USDx and receive 5.00\u00A0FUND')
+    expect(call.text).toContain('pay 50.00\u00A0USDx and receive 5.00\u00A0RWA')
     const maker = lifecycleSteps(opt({ writer: ME, holder: MAKER }), { role: 'writer' })
     expect(maker[0].text).toBe('You locked 50.00\u00A0USDx in the contract and asked a premium of 1.80\u00A0USDx.')
     expect(maker.find((s) => s.id === 'after')!.text).toContain('You claim what an exercise left')
@@ -59,7 +59,7 @@ describe('lifecycleSteps', () => {
   })
 
   it('tells both kinds of maker what waits to be claimed', () => {
-    expect(lifecycleSteps(opt({ state: 'exercised', writer: MAKER })).at(-1)!.text).toBe('5.00\u00A0FUND waits in the contract until the maker claims it.')
+    expect(lifecycleSteps(opt({ state: 'exercised', writer: MAKER })).at(-1)!.text).toBe('5.00\u00A0RWA waits in the contract until the maker claims it.')
     expect(lifecycleSteps(opt({ kind: 'call', state: 'exercised' }), { role: 'writer' }).at(-1)!.text).toBe('50.00\u00A0USDx waits in the contract until you claim it.')
   })
 

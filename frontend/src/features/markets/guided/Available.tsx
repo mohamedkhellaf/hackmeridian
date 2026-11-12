@@ -25,6 +25,7 @@ import {
   OWN,
   PAID_AT_SIGN,
   PER_UNIT,
+  PREMIUM_NOT_EXACT,
   READ_AT,
   RETRY,
   SERIAL_LABEL,
@@ -277,14 +278,20 @@ function Suggestion({ alt, model, onUse }: { alt: GuidedAlternative; model: Guid
   )
 }
 
-/** Terms of one's own: a request for a buyer, an offer for a seller, at a premium the user names. */
+/**
+ * Terms of one's own: a request for a buyer, an offer for a seller, at a premium the user names. A buyer types the
+ * total; a seller types the premium per unit and reads its exact total in a row under it, as in the ticket's write
+ * form (E18, H4).
+ */
 function Fallback({ model }: { model: GuidedModel }) {
-  const { side, qty, words, asset, quote, lowestOffer, ownPremium, kind } = { ...model, kind: model.info.optionKind }
+  const { side, qty, words, asset, quote, lowestOffer, ownPremium, kind, premiumPerUnit, premiumInexact } = { ...model, kind: model.info.optionKind }
   const fallback = FALLBACK[side]
   const collateral = qty === null ? '' : kind === 'put' ? `${words.strikeTotal}\u00a0${words.q}` : `${words.qty}\u00a0${words.a}`
   const lowestPerUnit = lowestOffer ? premiumUnits(lowestOffer) : null
   const ownPerUnit = ownPremium !== null && qty !== null ? perUnit(ownPremium, { underlyingQty: qty, underlying: asset }) : null
   const suggested = lowestPerUnit !== null && qty !== null ? premiumAt(lowestPerUnit, qty, asset.decimals, quote.decimals) : null
+  // The one-tap price: per unit, the lowest offer's own figure as shown; in total, that figure for the quantity.
+  const matchText = lowestPerUnit === null ? null : premiumPerUnit ? formatUnits(lowestPerUnit, quote.decimals, { group: false }) : suggested !== null && suggested > 0n ? formatUnits(suggested, quote.decimals, { group: false }) : null
   return (
     <div className={styles.block} data-testid="guided-fallback">
       {side === 'buy' ? <h4 className={styles.subheading}>{fallback.heading}</h4> : null}
@@ -296,15 +303,29 @@ function Fallback({ model }: { model: GuidedModel }) {
           value={model.premiumDraft.text}
           onValueChange={model.typePremium}
           unit={quote.code}
-          decimals={2}
-          hint={ownPerUnit !== null ? perUnitHint(formatUnits(ownPerUnit, quote.decimals), quote.code) : undefined}
+          decimals={premiumPerUnit ? quote.decimals : 2}
+          hint={!premiumPerUnit && ownPerUnit !== null ? perUnitHint(formatUnits(ownPerUnit, quote.decimals), quote.code) : undefined}
+          error={premiumInexact ? PREMIUM_NOT_EXACT : undefined}
         />
-        {lowestPerUnit !== null && suggested !== null && suggested > 0n ? (
-          <Button size="sm" variant="secondary" className={styles.match} onClick={() => model.typePremium(formatUnits(suggested, quote.decimals, { group: false }))}>
+        {lowestPerUnit !== null && matchText !== null ? (
+          <Button size="sm" variant="secondary" className={styles.match} onClick={() => model.typePremium(matchText)}>
             {matchPrice(formatUnits(lowestPerUnit, quote.decimals))}
           </Button>
         ) : null}
       </div>
+      {premiumPerUnit ? (
+        <KeyValue className={styles.terms}>
+          <KeyValueItem label={FIELD.receiveWhenBought} size="lg">
+            {ownPremium !== null ? (
+              <span data-testid="guided-own-total">
+                <Amount value={formatUnits(ownPremium, quote.decimals)} exact={formatExact(ownPremium, quote.decimals)} unit={quote.code} figure="serif" size="lg" />
+              </span>
+            ) : (
+              '–'
+            )}
+          </KeyValueItem>
+        </KeyValue>
+      ) : null}
       <p className={styles.reference}>
         {lowestOffer && lowestPerUnit !== null
           ? LOWEST_OFFER(formatUnits(lowestPerUnit, quote.decimals), quote.code, formatUnits(lowestOffer.underlyingQty, asset.decimals), asset.code)

@@ -20,7 +20,7 @@ export function MoneyText({ money, size, unit = money.token.code }: { money: Mon
   return <Amount value={shown} exact={exact} unit={unit} figure="serif" size={size} />
 }
 
-/** A price per unit of underlying, with its exact value on request; `per` names the unit inside the figure ("USDx per FUND"). */
+/** A price per unit of underlying, with its exact value on request; `per` names the unit inside the figure ("USDx per RWA"). */
 export function PriceText({ units, quote, per }: { units: bigint | null; quote: TokenInfo; per?: string }) {
   if (units === null) return <span>–</span>
   return <MoneyText money={{ token: quote, amount: units }} unit={per ? `${quote.code} per ${per}` : undefined} />

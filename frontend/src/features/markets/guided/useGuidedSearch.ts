@@ -80,10 +80,13 @@ export function shownDraft(draft: Draft | undefined, url: string | undefined, fa
   return owns(draft, url) ? { text: draft.text, edited: true } : { text: url ?? fallback, edited: false }
 }
 
-/** The draft after a keystroke, while the URL holds `url`. Pure. */
-export function typedDraft(prev: Draft | undefined, url: string | undefined, next: string): Draft {
+/**
+ * The draft after a keystroke, while the URL holds `url`. `canon` writes a typed text the way the value the input
+ * is compared with is written (by default the decimal as a link carries it). Pure.
+ */
+export function typedDraft(prev: Draft | undefined, url: string | undefined, next: string, canon: (text: string) => string | undefined = normalizeDecimal): Draft {
   const pending = owns(prev, url) && url !== prev.expect ? [...prev.pending, prev.expect] : [url]
-  return { text: next, expect: normalizeDecimal(next), pending }
+  return { text: next, expect: canon(next), pending }
 }
 
 /** The draft once the URL holds its last value: the earlier writes have landed and are forgotten. Pure. */
@@ -99,8 +102,11 @@ export function landedDraft(draft: Draft | undefined, url: string | undefined): 
  * the user typed is kept, with the URL values its writes may still meet on the way. The input shows the typed
  * text while the URL holds one of those values, and the URL's own value (or `fallback` when it has none) as soon
  * as it names anything else: a link, Back, a suggestion, the ticket. Nothing is ever written back to the URL.
+ *
+ * `urlValue` need not be the param itself: a premium typed per unit is compared with the URL's total over the
+ * quantity, written by `canon` (a stable function) the same way as the typed text.
  */
-export function useDraftParam(key: string, urlValue: string | undefined, fallback: string): DraftParam {
+export function useDraftParam(key: string, urlValue: string | undefined, fallback: string, canon?: (text: string) => string | undefined): DraftParam {
   const draft = useSyncExternalStore(subscribe, () => drafts.get(key))
   const { text, edited } = shownDraft(draft, urlValue, fallback)
 
@@ -124,12 +130,12 @@ export function useDraftParam(key: string, urlValue: string | undefined, fallbac
 
   const type = useCallback(
     (next: string) => {
-      const draft = typedDraft(drafts.get(key), url.current, next)
+      const draft = typedDraft(drafts.get(key), url.current, next, canon)
       drafts.set(key, draft)
       emit()
       return draft.expect
     },
-    [key],
+    [key, canon],
   )
   const reset = useCallback(() => {
     if (drafts.delete(key)) emit()

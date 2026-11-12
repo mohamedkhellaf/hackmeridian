@@ -20,7 +20,7 @@ test.describe('markets index', () => {
     await openApp(page, '/markets')
     await expect(pageHeading(page)).toHaveText('Markets')
     const table = assetsTable(page)
-    await expect(table.getByRole('row')).toHaveCount(4) // the header and FUND, BOND, EQTY
+    await expect(table.getByRole('row')).toHaveCount(4) // the header and RWA, BOND, EQTY
 
     const bond = table.getByRole('row', { name: /BOND/ })
     // The type is the label alone: no hedge word in a caption (what the token is, is said on its About tab).
@@ -30,7 +30,7 @@ test.describe('markets index', () => {
     await expect(table.getByRole('columnheader', { name: 'Tier' })).toHaveCount(0)
     await expect(table.getByRole('columnheader', { name: /^Demo price/ })).toContainText('USDx')
     await expect(bond).toContainText('99.40')
-    await expect(table.getByRole('row', { name: /FUND/ })).toContainText('10.20')
+    await expect(table.getByRole('row', { name: /RWA/ })).toContainText('10.20')
     await expect(table.getByRole('row', { name: /EQTY/ })).toContainText('24.60')
     await expect(page.getByRole('main')).not.toContainText(/market price|oracle price|live price/i)
 
@@ -42,7 +42,7 @@ test.describe('markets index', () => {
     await expect(bond.getByRole('cell').nth(1)).toHaveText(/^\d+$/)
     await expect(bond.getByRole('cell').nth(3)).toContainText(/^[\d,.]+at 99\.00, \d+\s[A-Z][a-z]{2}$/)
     await expect(bond.getByRole('cell').nth(4)).toContainText(/^(None|[\d,.]+at 99\.00, \d+\s[A-Z][a-z]{2})$/)
-    await expect(table.getByRole('row', { name: /FUND/ }).getByRole('cell').nth(3)).toContainText(/at 10\.20, /)
+    await expect(table.getByRole('row', { name: /RWA/ }).getByRole('cell').nth(3)).toContainText(/at 10\.20, /)
     await expect(bond.getByRole('link', { name: 'Trade BOND' })).toHaveAttribute('href', /\/markets\/bond$/)
 
     // Nothing is hidden, so there is no count line, no tier legend and no note about the list.
@@ -68,8 +68,8 @@ test.describe('markets index', () => {
     // Four equal rows, each saying in two words who pays the premium (when is said at the ticket).
     await expect(intents.getByRole('listitem')).toHaveCount(4)
     await expect(intents.getByRole('link', { name: /^Set a floor/ })).toContainText(/You pay$/)
-    await expect(intents.getByRole('link', { name: /^Earn on what you hold/ })).toContainText(/You are paid$/)
-    await expect(intents.getByRole('link', { name: /^Earn while waiting to buy/ })).toContainText(/You are paid$/)
+    await expect(intents.getByRole('link', { name: /^Get paid to sell higher/ })).toContainText(/You are paid$/)
+    await expect(intents.getByRole('link', { name: /^Get paid to buy lower/ })).toContainText(/You are paid$/)
     await expect(intents.getByRole('link', { name: /^Lock a buy price/ })).toContainText(/You pay$/)
     await expect(intents).not.toContainText(/once, when you buy|when one takes your terms/)
     // The sentences of the rows start at one edge, whatever the length of who pays.
@@ -99,7 +99,7 @@ test.describe('markets index', () => {
     await openApp(page, '/markets?intent=earn-hold', { connect: true })
     const table = assetsTable(page)
     await expect(table.getByRole('columnheader', { name: 'You hold' })).toBeVisible()
-    await expect(table.getByRole('row', { name: /FUND/ })).toContainText('120.00')
+    await expect(table.getByRole('row', { name: /RWA/ })).toContainText('120.00')
     await expect(table.getByRole('row', { name: /BOND/ })).toContainText('12.00')
     await page.getByRole('main').getByRole('link', { name: 'Choose something else' }).click()
     await expect(page).toHaveURL(/\/markets$/)
@@ -164,12 +164,12 @@ test.describe('asset page', () => {
     await expect(modeSwitch(page).getByRole('radio', { name: 'Chain' })).toBeChecked()
 
     // Without the param the remembered choice applies: it is a setting, not only a URL.
-    await page.goto('/markets/fund')
-    await expect(pageHeading(page)).toHaveText('FUND')
+    await page.goto('/markets/rwa')
+    await expect(pageHeading(page)).toHaveText('RWA')
     await expect(modeSwitch(page).getByRole('radio', { name: 'Chain' })).toBeChecked()
 
     // A link that names a mode wins over the setting, without changing it.
-    await page.goto('/markets/fund?mode=guided')
+    await page.goto('/markets/rwa?mode=guided')
     await expect(modeSwitch(page).getByRole('radio', { name: 'Guided' })).toBeChecked()
   })
 
@@ -219,7 +219,7 @@ test.describe('asset page', () => {
     await expect(main).not.toContainText('nosuchasset')
     await expect(main.getByRole('link', { name: 'Go to Markets' })).toHaveAttribute('href', /\/markets$/)
     const listed = main.getByRole('navigation', { name: 'Assets you can open' })
-    await expect(listed.getByRole('link')).toHaveText(['FUND', 'BOND', 'EQTY'])
+    await expect(listed.getByRole('link')).toHaveText(['RWA', 'BOND', 'EQTY'])
     await listed.getByRole('link', { name: 'EQTY' }).click()
     await expect(pageHeading(page)).toHaveText('EQTY')
   })
@@ -246,8 +246,8 @@ test.describe('asset page', () => {
 
   test('closing the ticket never leaves an entry that reopens it', async ({ page }) => {
     await openApp(page, '/markets')
-    await assetsTable(page).getByRole('link', { name: 'Trade FUND' }).click()
-    await expect(pageHeading(page)).toHaveText('FUND')
+    await assetsTable(page).getByRole('link', { name: 'Trade RWA' }).click()
+    await expect(pageHeading(page)).toHaveText('RWA')
     await tabs(page).getByRole('link', { name: /^Requests/ }).click()
     await requestsTable(page).locator('tbody tr').first().getByRole('link', { name: /^Fill request/ }).click()
     await expect(page).toHaveURL(/[?&]bid=\d+/)
@@ -263,7 +263,7 @@ test.describe('asset page', () => {
 
 test.describe('requests tab', () => {
   test('lists the funded requests of the asset with what a maker needs to decide', async ({ page }) => {
-    await openApp(page, '/markets/fund?tab=requests')
+    await openApp(page, '/markets/rwa?tab=requests')
     // The tab says "Requests": the heading is for screen readers, the definition leads.
     await expect(page.getByRole('heading', { name: 'Requests', level: 2 })).toBeAttached()
     await expect(page.getByRole('main')).toContainText("A request is a buyer's premium already escrowed in the contract, waiting for a maker.")
@@ -276,7 +276,7 @@ test.describe('requests tab', () => {
     await expect(rows).toHaveCount(2)
     for (const row of await rows.all()) {
       await expect(row).toContainText('Put')
-      await expect(row).toContainText('FUND')
+      await expect(row).toContainText('RWA')
       await expect(row).toContainText('USDx')
       await expect(row.getByRole('link', { name: /^Fill request/ })).toBeVisible()
     }
@@ -291,7 +291,7 @@ test.describe('requests tab', () => {
   })
 
   test('"Fill request" and "Post a request" open the ticket through the URL', async ({ page }) => {
-    await openApp(page, '/markets/fund?tab=requests')
+    await openApp(page, '/markets/rwa?tab=requests')
     const first = requestsTable(page).locator('tbody tr').first()
     await first.getByRole('link', { name: /^Fill request/ }).click()
     await expect(page).toHaveURL(/[?&]bid=\d+/)
@@ -357,7 +357,7 @@ test.describe('about tab', () => {
 })
 
 test.describe('accessibility and layout', () => {
-  const routes = ['/markets', '/markets?intent=floor', '/markets/bond', '/markets/fund?tab=requests', '/markets/bond?tab=about', '/markets/nosuchasset']
+  const routes = ['/markets', '/markets?intent=floor', '/markets/bond', '/markets/rwa?tab=requests', '/markets/bond?tab=about', '/markets/nosuchasset']
 
   for (const path of routes) {
     test(`axe is clean in both themes on ${path}`, async ({ page }) => {
@@ -394,9 +394,9 @@ test.describe('accessibility and layout', () => {
   })
 
   test('on a phone the requests are a list, and the mode switch sits on the tab row @phone', async ({ page }) => {
-    await openApp(page, '/markets/fund?tab=requests')
+    await openApp(page, '/markets/rwa?tab=requests')
     await expect(requestsTable(page)).toBeHidden()
-    const items = page.getByRole('list', { name: 'Open requests on FUND' }).getByRole('listitem')
+    const items = page.getByRole('list', { name: 'Open requests on RWA' }).getByRole('listitem')
     await expect(items).toHaveCount(2)
     const sell = await items.first().getByRole('link', { name: /^Fill request/ }).boundingBox()
     expect(sell?.height ?? 0).toBeGreaterThanOrEqual(44)
@@ -430,12 +430,13 @@ test.describe('first run: a wallet that holds none of the tokens', () => {
     await expect(page.getByRole('heading', { name: 'Get test funds' })).toHaveCount(0)
   })
 
-  test('names the tokens as this page does, and ends with the way back to the order that sent the wallet here @both', async ({ page }) => {
+  test('names the tokens by their Testnet codes, and ends with the way back to the order that sent the wallet here @both', async ({ page }) => {
     const order = '/markets/bond?mode=guided&intent=floor&strike=99.00&expiry=2026-11-20'
     await openApp(page, `/markets?funds=1&from=${encodeURIComponent(order)}`, { connect: DEMO_WALLETS.c })
     const strip = page.getByRole('region', { name: 'Get test funds' })
-    // Mock data calls the fund token FUND; on Testnet its code is RWA.
-    await expect(strip).toContainText('FUND (RWA on Testnet), BOND or EQTY')
+    // One asset, one code: the mock market and Testnet both call the fund token RWA.
+    await expect(strip).toContainText('RWA, BOND or EQTY')
+    await expect(strip).not.toContainText('on Testnet)')
     const back = strip.getByRole('link', { name: 'Back to your order' })
     // The test wallet's `as=` may ride along; the order's own terms are all there.
     await expect(back).toHaveAttribute('href', new RegExp(`^${order.replace(/[.?]/g, '\\$&')}(&as=\\w+)?$`))

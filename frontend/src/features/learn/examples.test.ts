@@ -11,8 +11,8 @@ describe('the worked examples of the Learn page', () => {
   it('covers the four intents once each, main ones first', () => {
     expect(workedExamples().map((x) => [x.intent, x.name])).toEqual([
       ['floor', 'Set a floor'],
-      ['earn-hold', 'Earn on what you hold'],
-      ['earn-buy', 'Earn while waiting to buy'],
+      ['earn-hold', 'Get paid to sell higher'],
+      ['earn-buy', 'Get paid to buy lower'],
       ['lock-buy', 'Lock a buy price'],
     ])
   })

@@ -6,7 +6,7 @@ The app at https://hackmeridian-psi.vercel.app reads Testnet state without a wal
 
 - `/`: what the product is and how one option moves from offer to settlement.
 - `/markets`: the listed assets, each with its reference price and its open offers.
-- `/markets/<asset>`: one asset, where `<asset>` is a slug (`bond`), `CODE-ISSUER` or the asset contract id. Two modes: guided (pick an outcome: set a floor on a sale price, earn on what you hold, earn while waiting to buy, lock a buy price) and chain (strikes by deadline, the two-sided book of offers and requests). Optional query params select terms: `mode`, `intent`, `expiry` (YYYY-MM-DD), `kind` (put or call), `strike`, `side`, `offer`, `bid`, `ask`.
+- `/markets/<asset>`: one asset, where `<asset>` is a slug (`bond`), `CODE-ISSUER` or the asset contract id. Two modes: guided (pick an outcome: set a floor on a sale price, get paid to sell higher, get paid to buy lower, lock a buy price) and chain (strikes by deadline, the two-sided book of offers and requests). Optional query params select terms: `mode`, `intent`, `expiry` (YYYY-MM-DD), `kind` (put or call), `strike`, `side`, `offer`, `bid`, `ask`.
 - `/portfolio` and `/portfolio/<option id>`: the connected account's options, offers and requests, and what is waiting to be done (exercise, claim delivery, reclaim collateral).
 - `/requests`: requests to buy (the contract calls them bids). A buyer escrows a premium in the contract and waits for a maker to fill it.
 - `/reserves`: collateral locked against collateral held, per token, with contract ids and roles.

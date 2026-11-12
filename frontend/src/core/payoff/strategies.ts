@@ -7,8 +7,8 @@
 // Each intent is one option leg seen from the user's side:
 //
 //   floor      Set a floor                 hold the asset, buy a put    protectivePut
-//   earn-hold  Earn on what you hold       hold the asset, write a call coveredCall
-//   earn-buy   Earn while waiting to buy   set cash aside, write a put  cashSecuredPut
+//   earn-hold  Get paid to sell higher     hold the asset, write a call coveredCall
+//   earn-buy   Get paid to buy lower       set cash aside, write a put  cashSecuredPut
 //   lock-buy   Lock a buy price            set cash aside, buy a call   longCall
 //
 // "With" and "without" are the value at expiry of what the user would hold, in quote units, with and without the
@@ -44,8 +44,8 @@ export interface IntentInfo {
 /** The four intents, main ones first, in display order. */
 export const GUIDED_INTENTS: readonly IntentInfo[] = [
   { id: 'floor', name: 'Set a floor', optionKind: 'put', side: 'buy', starts: 'asset', main: true },
-  { id: 'earn-hold', name: 'Earn on what you hold', optionKind: 'call', side: 'write', starts: 'asset', main: true },
-  { id: 'earn-buy', name: 'Earn while waiting to buy', optionKind: 'put', side: 'write', starts: 'cash', main: true },
+  { id: 'earn-hold', name: 'Get paid to sell higher', optionKind: 'call', side: 'write', starts: 'asset', main: true },
+  { id: 'earn-buy', name: 'Get paid to buy lower', optionKind: 'put', side: 'write', starts: 'cash', main: true },
   { id: 'lock-buy', name: 'Lock a buy price', optionKind: 'call', side: 'buy', starts: 'cash', main: false },
 ]
 
@@ -246,9 +246,9 @@ export function guidedOutcome(intent: GuidedIntent, terms: GuidedTerms, price: n
 
 /** Set a floor: hold `qty`, buy a put at `strike`. */
 export const setFloor = (terms: GuidedTerms, price: number, curve?: CurveOptions) => guidedOutcome('floor', terms, price, curve)
-/** Earn on what you hold: hold `qty`, write a call at `strike`. */
+/** Get paid to sell higher: hold `qty`, write a call at `strike`. */
 export const earnOnHolding = (terms: GuidedTerms, price: number, curve?: CurveOptions) => guidedOutcome('earn-hold', terms, price, curve)
-/** Earn while waiting to buy: set `qty x strike` aside, write a put at `strike`. */
+/** Get paid to buy lower: set `qty x strike` aside, write a put at `strike`. */
 export const earnWhileWaiting = (terms: GuidedTerms, price: number, curve?: CurveOptions) => guidedOutcome('earn-buy', terms, price, curve)
 /** Lock a buy price: set `qty x strike` aside, buy a call at `strike`. */
 export const lockBuyPrice = (terms: GuidedTerms, price: number, curve?: CurveOptions) => guidedOutcome('lock-buy', terms, price, curve)

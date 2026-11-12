@@ -28,8 +28,8 @@ describe('to-do cards', () => {
     const t = todo(opt({ expiry: NOW + DAY }), reference(982))
     const c = todoCopy(t)
     expect(t.tone).toBe('urgent')
-    expect(c.title).toBe('Exercise your put on 5.00\u00A0FUND')
-    expect(c.body).toBe('In the money at the demo price 9.82. You deliver 5.00\u00A0FUND and receive 50.00\u00A0USDx.')
+    expect(c.title).toBe('Exercise your put on 5.00\u00A0RWA')
+    expect(c.body).toBe('In the money at the demo price 9.82. You deliver 5.00\u00A0RWA and receive 50.00\u00A0USDx.')
     expect(c.action).toBe('exercise')
   })
 
@@ -41,31 +41,31 @@ describe('to-do cards', () => {
     const t = todo(opt(), reference(1040))
     const c = todoCopy(t)
     expect(t.tone).toBe('neutral')
-    expect(c.title).toBe('Your put on 5.00\u00A0FUND')
-    expect(c.body).toBe('Exercise only if FUND falls below 10.00 before the deadline. At the demo price 10.40 it is out of the money.')
+    expect(c.title).toBe('Your put on 5.00\u00A0RWA')
+    expect(c.body).toBe('Exercise only if RWA falls below 10.00 before the deadline. At the demo price 10.40 it is out of the money.')
     expect(c.body).not.toContain('unless you exercise')
     expect(c.action).toBeNull()
   })
 
   it('says "expires soon" in the title inside 48 hours', () => {
-    expect(todoCopy(todo(opt({ expiry: NOW + DAY }), reference(1040))).title).toBe('Your put on 5.00\u00A0FUND expires soon')
+    expect(todoCopy(todo(opt({ expiry: NOW + DAY }), reference(1040))).title).toBe('Your put on 5.00\u00A0RWA expires soon')
   })
 
   it('words a call the other way round', () => {
     const call = opt({ kind: 'call' })
-    expect(todoCopy(todo(call, reference(1040))).body).toBe('In the money at the demo price 10.40. You pay 50.00\u00A0USDx and receive 5.00\u00A0FUND.')
-    expect(todoCopy(todo(call, reference(982))).body).toBe('Exercise only if FUND rises above 10.00 before the deadline. At the demo price 9.82 it is out of the money.')
+    expect(todoCopy(todo(call, reference(1040))).body).toBe('In the money at the demo price 10.40. You pay 50.00\u00A0USDx and receive 5.00\u00A0RWA.')
+    expect(todoCopy(todo(call, reference(982))).body).toBe('Exercise only if RWA rises above 10.00 before the deadline. At the demo price 9.82 it is out of the money.')
   })
 
   it('never guesses without a reference price', () => {
     const c = todoCopy(todo(opt(), NO_REFERENCE))
-    expect(c.body).toBe('No reference price for FUND. Exercising pays only if FUND is below 10.00 when you do it.')
+    expect(c.body).toBe('No reference price for RWA. Exercising pays only if RWA is below 10.00 when you do it.')
     expect(c.action).toBeNull()
   })
 
   it('tells both kinds of maker to claim, once', () => {
     const put = todoCopy(todo(opt({ writer: ME, holder: MAKER, state: 'exercised' })))
-    expect(put.title).toBe('Claim 5.00\u00A0FUND from your exercised put')
+    expect(put.title).toBe('Claim 5.00\u00A0RWA from your exercised put')
     // The title and the button say it all: no sentence restates them.
     expect(put.body).toBe('')
     expect(put.action).toBe('claim')
@@ -84,23 +84,23 @@ describe('to-do cards', () => {
 
   it('names an option that expired unexercised in one line, with no action', () => {
     const c = todoCopy(todo(opt({ state: 'expired', expiry: 1_794_556_800 }), reference(982), ME, 1_794_556_800 + DAY))
-    expect(c.title).toBe('Your put on 5.00\u00A0FUND expired on 13\u00A0Nov\u00A02026, 08:00\u00A0UTC without being exercised.')
+    expect(c.title).toBe('Your put on 5.00\u00A0RWA expired on 13\u00A0Nov\u00A02026, 08:00\u00A0UTC without being exercised.')
     expect(c.action).toBeNull()
   })
 
   it('asks the buyer of an expired request to take its premium back', () => {
-    const c = expiredRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0FUND')
+    const c = expiredRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0RWA')
     expect(c.title).toBe('Take back 2.00\u00A0USDx from your expired request')
-    expect(c.body).toBe('No maker filled your request for a put on 5.00\u00A0FUND.')
+    expect(c.body).toBe('No maker filled your request for a put on 5.00\u00A0RWA.')
   })
 
   it('says what the wallet holds of what an exercise takes', () => {
-    expect(copy.exerciseCover(opt(), { token: opt().underlying, amount: U }, { token: opt().underlying, amount: 5n * U })).toBe('You hold 1.00 of the 5.00\u00A0FUND this exercise delivers.')
+    expect(copy.exerciseCover(opt(), { token: opt().underlying, amount: U }, { token: opt().underlying, amount: 5n * U })).toBe('You hold 1.00 of the 5.00\u00A0RWA this exercise delivers.')
     expect(copy.exerciseCover(opt({ kind: 'call' }), { token: USDX, amount: 40n * U }, { token: USDX, amount: 50n * U })).toBe('You have 40.00 of the 50.00\u00A0USDx the strike costs.')
   })
 
   it('gives a row its value: the exercise value of a holding in the money, what a written option locks', () => {
-    // A put on 5.00 FUND at 10.00 against a demo price of 9.20: exercising delivers 46.00 of FUND for 50.00 USDx.
+    // A put on 5.00 RWA at 10.00 against a demo price of 9.20: exercising delivers 46.00 of RWA for 50.00 USDx.
     expect(copy.exerciseValueLine(view(opt(), reference(920)))).toBe('Exercise value 4.00 at the demo price 9.20')
     expect(copy.exerciseValueLine(view(opt(), reference(1040)))).toBeNull()
     expect(copy.exerciseValueLine(view(opt(), NO_REFERENCE))).toBeNull()
@@ -117,27 +117,27 @@ describe('to-do cards', () => {
 
 describe('sentences of the position page and the dialogs', () => {
   it('states both legs of an exercise', () => {
-    expect(deliverySentence(opt())).toBe('You deliver 5.00\u00A0FUND and receive 50.00\u00A0USDx.')
-    expect(deliverySentence(opt({ kind: 'call' }))).toBe('You pay 50.00\u00A0USDx and receive 5.00\u00A0FUND.')
+    expect(deliverySentence(opt())).toBe('You deliver 5.00\u00A0RWA and receive 50.00\u00A0USDx.')
+    expect(deliverySentence(opt({ kind: 'call' }))).toBe('You pay 50.00\u00A0USDx and receive 5.00\u00A0RWA.')
   })
 
   it('keeps every digit of an amount in a sentence about what moves', () => {
-    expect(deliverySentence(opt({ underlyingQty: 51_234_567n }))).toBe('You deliver 5.1234567\u00A0FUND and receive 50.00\u00A0USDx.')
+    expect(deliverySentence(opt({ underlyingQty: 51_234_567n }))).toBe('You deliver 5.1234567\u00A0RWA and receive 50.00\u00A0USDx.')
   })
 
   it('describes the option from the side of whoever looks', () => {
-    expect(positionSentence(opt(), 'holder')).toBe('Exercise to sell 5.00\u00A0FUND for 50.00\u00A0USDx, at any time before the deadline.')
-    expect(positionSentence(opt({ kind: 'call' }), 'holder')).toBe('Exercise to buy 5.00\u00A0FUND for 50.00\u00A0USDx, at any time before the deadline.')
+    expect(positionSentence(opt(), 'holder')).toBe('Exercise to sell 5.00\u00A0RWA for 50.00\u00A0USDx, at any time before the deadline.')
+    expect(positionSentence(opt({ kind: 'call' }), 'holder')).toBe('Exercise to buy 5.00\u00A0RWA for 50.00\u00A0USDx, at any time before the deadline.')
     expect(positionSentence(opt(), 'writer')).toBe(
-      'If the holder exercises, you buy 5.00\u00A0FUND for 50.00\u00A0USDx. Your 50.00\u00A0USDx stays in the contract until you claim after an exercise or reclaim after the deadline.',
+      'If the holder exercises, you buy 5.00\u00A0RWA for 50.00\u00A0USDx. Your 50.00\u00A0USDx stays in the contract until you claim after an exercise or reclaim after the deadline.',
     )
     expect(positionSentence(opt({ kind: 'call' }), 'writer')).toBe(
-      'If the holder exercises, you sell 5.00\u00A0FUND for 50.00\u00A0USDx. Your 5.00\u00A0FUND stays in the contract until you claim after an exercise or reclaim after the deadline.',
+      'If the holder exercises, you sell 5.00\u00A0RWA for 50.00\u00A0USDx. Your 5.00\u00A0RWA stays in the contract until you claim after an exercise or reclaim after the deadline.',
     )
-    expect(positionSentence(opt(), null)).toBe('The right to sell 5.00\u00A0FUND for 50.00\u00A0USDx until the deadline.')
+    expect(positionSentence(opt(), null)).toBe('The right to sell 5.00\u00A0RWA for 50.00\u00A0USDx until the deadline.')
     expect(positionSentence(opt({ state: 'expired' }), null)).toBe('This option expired without being exercised.')
-    expect(positionSentence(opt({ kind: 'call', state: 'settled' }), null)).toBe('This call was exercised: its holder bought 5.00\u00A0FUND for 50.00\u00A0USDx.')
-    expect(positionSentence(opt({ state: 'exercised' }), 'writer')).toBe('The holder exercised. 5.00\u00A0FUND waits in the contract until you claim it.')
+    expect(positionSentence(opt({ kind: 'call', state: 'settled' }), null)).toBe('This call was exercised: its holder bought 5.00\u00A0RWA for 50.00\u00A0USDx.')
+    expect(positionSentence(opt({ state: 'exercised' }), 'writer')).toBe('The holder exercised. 5.00\u00A0RWA waits in the contract until you claim it.')
     expect(positionSentence(opt(), 'holder', { token: USDX, amount: 2n * U })).toContain('It is listed for resale at 2.00\u00A0USDx.')
   })
 
@@ -145,7 +145,7 @@ describe('sentences of the position page and the dialogs', () => {
     expect(statusLine(view(opt()))).toBe('Exercisable until the deadline')
     expect(statusLine(view(opt({ writer: ME, holder: MAKER })))).toBe('Sold. Collateral locked until exercise or the deadline')
     expect(statusLine(view(opt({ writer: ME, holder: null, state: 'offered' })))).toBe('For sale in Markets')
-    expect(statusLine(view(opt({ writer: ME, holder: MAKER, state: 'exercised' })))).toBe('Exercised. 5.00\u00A0FUND waits for your claim')
+    expect(statusLine(view(opt({ writer: ME, holder: MAKER, state: 'exercised' })))).toBe('Exercised. 5.00\u00A0RWA waits for your claim')
     expect(statusLine(view(opt({ writer: ME, holder: MAKER, state: 'expired' })))).toBe('Expired. 50.00\u00A0USDx waits for your reclaim')
     expect(statusLine(view(opt({ state: 'expired' })))).toBe('Expired without exercise')
     expect(statusLine(view(opt({ writer: ME, holder: null, state: 'cancelled' })))).toBe('Offer cancelled. Collateral returned')
@@ -158,15 +158,15 @@ describe('sentences of the position page and the dialogs', () => {
   })
 
   it('keeps the name of an action from the button to the receipt', () => {
-    expect(exerciseCopy(opt())).toMatchObject({ title: 'Exercise put on 5.00\u00A0FUND', confirm: 'Exercise', done: 'Exercised: put on 5.00\u00A0FUND' })
-    expect(claimCopy(opt({ state: 'exercised' }))).toMatchObject({ title: 'Claim delivery', confirm: 'Claim delivery', done: 'Delivery claimed: put on 5.00\u00A0FUND' })
-    expect(reclaimCopy(opt({ state: 'expired' }))).toMatchObject({ confirm: 'Reclaim', done: 'Reclaimed: put on 5.00\u00A0FUND' })
+    expect(exerciseCopy(opt())).toMatchObject({ title: 'Exercise put on 5.00\u00A0RWA', confirm: 'Exercise', done: 'Exercised: put on 5.00\u00A0RWA' })
+    expect(claimCopy(opt({ state: 'exercised' }))).toMatchObject({ title: 'Claim delivery', confirm: 'Claim delivery', done: 'Delivery claimed: put on 5.00\u00A0RWA' })
+    expect(reclaimCopy(opt({ state: 'expired' }))).toMatchObject({ confirm: 'Reclaim', done: 'Reclaimed: put on 5.00\u00A0RWA' })
     expect(cancelOfferCopy(opt({ holder: null, state: 'offered' }))).toMatchObject({ confirm: 'Cancel offer', dismiss: 'Keep offer' })
     expect(cancelListingCopy(opt(), { token: USDX, amount: 2n * U })).toMatchObject({ confirm: 'Cancel listing', dismiss: 'Keep listing' })
-    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0FUND', false).body).toBe('Your escrowed 2.00\u00A0USDx goes back to your wallet.')
-    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0FUND', false).caveat).toContain('the cancellation is refused and you hold the option')
-    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0FUND', true).caveat).toBeUndefined()
-    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0FUND', true).body).toContain('This request expired without a maker.')
+    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0RWA', false).body).toBe('Your escrowed 2.00\u00A0USDx goes back to your wallet.')
+    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0RWA', false).caveat).toContain('the cancellation is refused and you hold the option')
+    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0RWA', true).caveat).toBeUndefined()
+    expect(cancelRequestCopy({ token: USDX, amount: 2n * U }, 'put on 5.00\u00A0RWA', true).body).toContain('This request expired without a maker.')
   })
 
   it('warns that a cancellation can lose the race against a buyer', () => {
@@ -191,11 +191,11 @@ describe('read errors', () => {
 describe('calendar entry', () => {
   it('says what ends, what is needed, and that nothing happens by itself', () => {
     const o = opt({ expiry: 1_794_556_800 }) // 13 Nov 2026, 08:00 UTC
-    expect(calendarTitle(o)).toBe('Exercise deadline: FUND 10.00 put (5.00\u00A0FUND)')
+    expect(calendarTitle(o)).toBe('Exercise deadline: RWA 10.00 put (5.00\u00A0RWA)')
     const text = calendarDescription(o)
-    expect(text).toContain('Your right to sell 5.00\u00A0FUND for 50.00\u00A0USDx ends at 13\u00A0Nov\u00A02026, 08:00\u00A0UTC.')
+    expect(text).toContain('Your right to sell 5.00\u00A0RWA for 50.00\u00A0USDx ends at 13\u00A0Nov\u00A02026, 08:00\u00A0UTC.')
     expect(text).toContain('Nothing happens automatically.')
-    expect(text).toContain('To exercise you need 5.00\u00A0FUND in your wallet.')
+    expect(text).toContain('To exercise you need 5.00\u00A0RWA in your wallet.')
     expect(text).toContain('does not update if you sell or exercise')
     expect(calendarDescription(opt({ kind: 'call' }))).toContain('To exercise you need 50.00\u00A0USDx in your wallet.')
     for (const entry of [text, calendarDescription(opt({ kind: 'call' }))]) expect(findBannedWords(entry, BANNED_TAGLINES), entry).toEqual([])
@@ -229,11 +229,11 @@ describe('honest wording', () => {
     collect(noActionNote(view(o)) ?? '')
     collect(strikeAgainst(view(o)) ?? '')
   }
-  collect(cancelRequestCopy({ token: bid().quote, amount: bid().totalPremium }, 'put on 5.00\u00A0FUND', false))
-  collect(cancelRequestCopy({ token: bid().quote, amount: bid().totalPremium }, 'put on 5.00\u00A0FUND', true))
+  collect(cancelRequestCopy({ token: bid().quote, amount: bid().totalPremium }, 'put on 5.00\u00A0RWA', false))
+  collect(cancelRequestCopy({ token: bid().quote, amount: bid().totalPremium }, 'put on 5.00\u00A0RWA', true))
   for (const action of ['exercise', 'claim', 'reclaim', 'cancel', 'sell', 'unlist'] as const) collect(staleLink(action))
   collect(outOfTheMoneyConsent('demo price'))
-  collect(expiredRequestCopy({ token: bid().quote, amount: bid().totalPremium }, 'put on 5.00\u00A0FUND'))
+  collect(expiredRequestCopy({ token: bid().quote, amount: bid().totalPremium }, 'put on 5.00\u00A0RWA'))
 
   it('collected the copy', () => {
     expect(samples.length).toBeGreaterThan(120)

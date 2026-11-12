@@ -11,23 +11,23 @@ const NOW = Date.UTC(2026, 10, 11, 12) / 1000
 const E1 = Date.UTC(2026, 10, 13, 8) / 1000
 const E2 = Date.UTC(2026, 10, 20, 8) / 1000
 const USDX: TokenInfo = { contractId: 'CQ', code: 'USDx', decimals: 7 }
-const FUND: TokenInfo = { contractId: 'CF', code: 'FUND', decimals: 7 }
+const RWA: TokenInfo = { contractId: 'CF', code: 'RWA', decimals: 7 }
 const BOND: TokenInfo = { contractId: 'CB', code: 'BOND', decimals: 7 }
-/** Same code as FUND, another contract: a look-alike asset. */
-const FAKE: TokenInfo = { contractId: 'CX', code: 'FUND', decimals: 7 }
+/** Same code as RWA, another contract: a look-alike asset. */
+const FAKE: TokenInfo = { contractId: 'CX', code: 'RWA', decimals: 7 }
 const ME = 'GME'
 
 let n = 0n
 const opt = (o: Partial<OptionOffer> & { strike?: string; premium?: string; lot?: bigint }): OptionOffer => {
   const lot = o.lot ?? 5n
   return {
-    id: n++, kind: 'put', underlying: FUND, quote: USDX, underlyingQty: lot * U,
+    id: n++, kind: 'put', underlying: RWA, quote: USDX, underlyingQty: lot * U,
     totalStrike: parseAmount(o.strike ?? '10', 7)! * lot, totalPremium: parseAmount(o.premium ?? '0.40', 7)! * lot,
     expiry: E1, writer: 'GA', holder: null, state: 'offered', ...o,
   }
 }
 const bid = (o: Partial<Bid> & { strike?: string; premium?: string }): Bid => ({
-  id: n++, buyer: 'GBUYER', kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U,
+  id: n++, buyer: 'GBUYER', kind: 'put', underlying: RWA, quote: USDX, underlyingQty: 5n * U,
   totalStrike: parseAmount(o.strike ?? '10', 7)! * 5n, totalPremium: parseAmount(o.premium ?? '0.30', 7)! * 5n,
   expiry: E1, state: 'open', optionId: null, ...o,
 })
@@ -49,7 +49,7 @@ function market(me: string | null = null): MarketInputs & { ids: Record<string, 
 }
 
 describe('exact series: chainCells and seriesBook', () => {
-  const put10 = { underlyingId: FUND.contractId, expiry: E1, kind: 'put' as const, strikePerUnit: 10n * U }
+  const put10 = { underlyingId: RWA.contractId, expiry: E1, kind: 'put' as const, strikePerUnit: 10n * U }
 
   it('derives the series of an order from its exact terms, or none when the strike per unit is not exact', () => {
     expect(seriesRefOf(opt({ strike: '10' }))).toEqual(put10)
@@ -60,7 +60,7 @@ describe('exact series: chainCells and seriesBook', () => {
 
   it('summarises each series: best offer, best bid, makers, counts', () => {
     const m = market()
-    const cells = chainCells(m, FUND.contractId)
+    const cells = chainCells(m, RWA.contractId)
     const c = cells.get(cellKey(put10))!
     // Offers GA 0.40, GB 0.36, ME 0.45 and the resale listing at 0.30: the listing is the cheapest.
     expect(c.offers).toBe(4)
@@ -77,18 +77,18 @@ describe('exact series: chainCells and seriesBook', () => {
 
   it('keeps assets apart by contract id: a look-alike code gets its own cells', () => {
     const m = market()
-    expect([...chainCells(m, FUND.contractId).values()].some((c) => c.best?.counterparty === 'GEVIL')).toBe(false)
+    expect([...chainCells(m, RWA.contractId).values()].some((c) => c.best?.counterparty === 'GEVIL')).toBe(false)
     expect(chainCells(m, FAKE.contractId).size).toBe(1)
     expect(chainCells(m, BOND.contractId).size).toBe(1)
   })
 
   it('marks what belongs to the connected wallet', () => {
-    const cells = chainCells(market(ME), FUND.contractId)
+    const cells = chainCells(market(ME), RWA.contractId)
     expect(cells.get(cellKey(put10))).toMatchObject({ mine: true, holding: false, wrote: false })
     // A held position on a series with no order still gets a cell, so the chain can highlight it.
     const position = cells.get(cellKey({ expiry: E1, kind: 'put', strikePerUnit: (102n * U) / 10n }))!
     expect(position).toMatchObject({ holding: true, offers: 0, bids: 0 })
-    expect(chainCells(market(null), FUND.contractId).get(cellKey(put10))?.mine).toBe(false)
+    expect(chainCells(market(null), RWA.contractId).get(cellKey(put10))?.mine).toBe(false)
   })
 
   it('builds the two-sided book of a series and picks what the wallet can trade against', () => {
@@ -107,7 +107,7 @@ describe('exact series: chainCells and seriesBook', () => {
 
   it('finds the lowest premium per kind and the nearest expiry of an asset for the markets index', () => {
     const m = market()
-    const low = lowestPremiums(m.offers, FUND.contractId)
+    const low = lowestPremiums(m.offers, RWA.contractId)
     expect(low.put?.id).toBe(m.ids.b)
     expect(low.call?.id).toBe(m.ids.call)
     expect(low.nearestExpiry).toBe(E1)
@@ -164,7 +164,7 @@ describe('selectMarket: the order-driven view', () => {
 describe('prefill', () => {
   it('fills a form from the series, with the size and premium of the row to match', () => {
     const m = market(ME)
-    const book = seriesBook(m, { underlyingId: FUND.contractId, expiry: E1, kind: 'put', strikePerUnit: 10n * U })
+    const book = seriesBook(m, { underlyingId: RWA.contractId, expiry: E1, kind: 'put', strikePerUnit: 10n * U })
     const { buy, sell } = prefillsOf(book)
     // Buy side: post a bid next to the best offer (the listing at 0.30 per unit for 5 units).
     expect(buy).toEqual({ kind: 'put', underlyingId: 'CF', qty: '5', strike: '10', premium: '1.5', expiryMs: E1 * 1000 })
@@ -181,7 +181,7 @@ describe('prefill', () => {
 describe('bookRowAction', () => {
   it('decides what each row lets the wallet do', () => {
     const m = market(ME)
-    const book = seriesBook(m, { underlyingId: FUND.contractId, expiry: E1, kind: 'put', strikePerUnit: 10n * U })
+    const book = seriesBook(m, { underlyingId: RWA.contractId, expiry: E1, kind: 'put', strikePerUnit: 10n * U })
     const [resale, gb, , mine] = book.offers
     expect(bookRowAction(resale, ME)).toEqual({ kind: 'buy-resale' })
     expect(bookRowAction(resale, 'GSELLER')).toEqual({ kind: 'none', note: 'Yours' })

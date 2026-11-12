@@ -19,9 +19,9 @@ beforeAll(async () => {
 })
 afterAll(() => vi.useRealTimers())
 
-const fund = () => w.assets.FUND
+const fund = () => w.assets.RWA
 const match = (me: string | null, terms: Parameters<typeof matchGuided>[4], limit?: number) => matchGuided(w.source(me), fund(), w.quote, w.reference(fund()), terms, limit)
-/** A put series of FUND that at least two makers quote, with the lot they quote. */
+/** A put series of RWA that at least two makers quote, with the lot they quote. */
 const busyPut = () => {
   const m = buildMarket(w.source(null), fund(), w.quote, w.reference(fund()))
   const cell = [...m.cells.values()].filter((c) => c.ref.kind === 'put' && c.makers >= 2)[0]
@@ -113,7 +113,7 @@ describe('matchGuided: buying intents match funded offers', () => {
   })
 
   it('leaves off-grid offers out: the guided chips come from the standard grid', () => {
-    const off = w.source(null).options.find((o) => o.state === 'offered' && o.underlying.code === 'FUND' && o.expiry % 604_800 !== 115_200)!
+    const off = w.source(null).options.find((o) => o.state === 'offered' && o.underlying.code === 'RWA' && o.expiry % 604_800 !== 115_200)!
     const m = match(B, { intent: 'floor', qty: off.underlyingQty, strikePerUnit: perUnitStrike(off), expiry: off.expiry })
     expect(m.exact).toBeNull()
     expect([...m.sameSeries, ...m.nearby].some((a) => a.row.offer?.id === off.id)).toBe(false)
@@ -130,7 +130,7 @@ describe('matchGuided: buying intents match funded offers', () => {
 
 describe('matchGuided: earning intents match funded bids', () => {
   it('finds the buyer who has escrowed a premium for exactly these terms', () => {
-    // Request 2: a put on 10 FUND at 10.40, second expiry, escrowed by a hedger.
+    // Request 2: a put on 10 RWA at 10.40, second expiry, escrowed by a hedger.
     const bid = w.source(null).bids!.find((b) => b.id === 2n)!
     const m = match(A, { intent: 'earn-buy', qty: bid.underlyingQty, strikePerUnit: units(10.4), expiry: bid.expiry })
     expect(m.side).toBe('write')
@@ -154,7 +154,7 @@ describe('matchGuided: earning intents match funded bids', () => {
     expect(asA.exact?.bid?.id).toBe(1n)
   })
 
-  it('has no call bid on FUND: the fallback is to post an offer', () => {
+  it('has no call bid on RWA: the fallback is to post an offer', () => {
     const m = match(A, { intent: 'earn-hold', qty: 5n * 10n ** 7n, strikePerUnit: units(10.4), expiry: busyPut().market.expiries[1] })
     expect(m.kind).toBe('call')
     expect(m.exact).toBeNull()

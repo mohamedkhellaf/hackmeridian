@@ -6,9 +6,9 @@ const EXPIRY = Date.UTC(2026, 10, 13, 8, 0, 0) / 1000 // Friday 13 Nov 2026, 08:
 const NOW = Date.UTC(2026, 10, 11, 1, 30, 0) / 1000
 
 const event: DeadlineEvent = {
-  title: 'Exercise deadline: FUND 10.00 put (5.00 FUND)',
+  title: 'Exercise deadline: RWA 10.00 put (5.00 RWA)',
   description:
-    'Your right to sell 5.00 FUND at 10.00 USDx each ends at 08:00 UTC on 13 Nov 2026.\nNothing happens by itself. To exercise you need 5.00 FUND in your wallet.\nThis entry does not update if you sell or exercise the option. Testnet only.',
+    'Your right to sell 5.00 RWA at 10.00 USDx each ends at 08:00 UTC on 13 Nov 2026.\nNothing happens by itself. To exercise you need 5.00 RWA in your wallet.\nThis entry does not update if you sell or exercise the option. Testnet only.',
   expiryTs: EXPIRY,
   url: 'https://app.example/portfolio/12',
   uid: 'option-12',
@@ -35,21 +35,21 @@ describe('buildDeadlineIcs', () => {
       'DTSTAMP:20261111T013000Z',
       'DTSTART:20261113T060000Z',
       'DTEND:20261113T080000Z',
-      'SUMMARY:Exercise deadline: FUND 10.00 put (5.00 FUND)',
-      'DESCRIPTION:Your right to sell 5.00 FUND at 10.00 USDx each ends at 08:00 U',
-      ' TC on 13 Nov 2026.\\nNothing happens by itself. To exercise you need 5.00 F',
-      ' UND in your wallet.\\nThis entry does not update if you sell or exercise th',
-      ' e option. Testnet only.\\nhttps://app.example/portfolio/12',
+      'SUMMARY:Exercise deadline: RWA 10.00 put (5.00 RWA)',
+      'DESCRIPTION:Your right to sell 5.00 RWA at 10.00 USDx each ends at 08:00 UT',
+      ' C on 13 Nov 2026.\\nNothing happens by itself. To exercise you need 5.00 RW',
+      ' A in your wallet.\\nThis entry does not update if you sell or exercise the ',
+      ' option. Testnet only.\\nhttps://app.example/portfolio/12',
       'URL:https://app.example/portfolio/12',
       'TRANSP:TRANSPARENT',
       'BEGIN:VALARM',
       'ACTION:DISPLAY',
-      'DESCRIPTION:48 h left. Exercise deadline: FUND 10.00 put (5.00 FUND)',
+      'DESCRIPTION:48 h left. Exercise deadline: RWA 10.00 put (5.00 RWA)',
       'TRIGGER:-PT46H',
       'END:VALARM',
       'BEGIN:VALARM',
       'ACTION:DISPLAY',
-      'DESCRIPTION:2 h left. Exercise deadline: FUND 10.00 put (5.00 FUND)',
+      'DESCRIPTION:2 h left. Exercise deadline: RWA 10.00 put (5.00 RWA)',
       'TRIGGER:PT0S',
       'END:VALARM',
       'END:VEVENT',
@@ -105,7 +105,7 @@ describe('buildDeadlineIcs', () => {
     const ics = buildDeadlineIcs(event)
     for (const line of physical(ics)) expect(octets(line), line).toBeLessThanOrEqual(75)
     expect(valueOf(ics, 'DESCRIPTION')).toBe(
-      'Your right to sell 5.00 FUND at 10.00 USDx each ends at 08:00 UTC on 13 Nov 2026.\\nNothing happens by itself. To exercise you need 5.00 FUND in your wallet.\\nThis entry does not update if you sell or exercise the option. Testnet only.\\nhttps://app.example/portfolio/12',
+      'Your right to sell 5.00 RWA at 10.00 USDx each ends at 08:00 UTC on 13 Nov 2026.\\nNothing happens by itself. To exercise you need 5.00 RWA in your wallet.\\nThis entry does not update if you sell or exercise the option. Testnet only.\\nhttps://app.example/portfolio/12',
     )
   })
 
@@ -228,7 +228,7 @@ describe('googleCalendarUrl', () => {
     const url = new URL(googleCalendarUrl(event))
     expect(url.origin + url.pathname).toBe('https://calendar.google.com/calendar/render')
     expect(url.searchParams.get('action')).toBe('TEMPLATE')
-    expect(url.searchParams.get('text')).toBe('Exercise deadline: FUND 10.00 put (5.00 FUND)')
+    expect(url.searchParams.get('text')).toBe('Exercise deadline: RWA 10.00 put (5.00 RWA)')
     expect(url.searchParams.get('dates')).toBe('20261113T060000Z/20261113T080000Z')
     expect(url.searchParams.get('details')).toBe(`${event.description}\nhttps://app.example/portfolio/12`)
     expect([...url.searchParams.keys()]).toEqual(['action', 'text', 'dates', 'details'])

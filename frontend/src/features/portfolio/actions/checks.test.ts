@@ -10,8 +10,8 @@ describe('the checks sentence', () => {
     const o = written({ kind: 'call', state: 'exercised' })
     const c = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o })
     expect(checksSentence('14:32:16\u00A0UTC', c.lines)).toBe('Read from the contract at 14:32:16\u00A0UTC: the option is exercised and 50.00\u00A0USDx waits in the contract.')
-    expect(checksSentence(null, [{ label: 'Option', status: 'ok', text: 'Active' }, { label: 'FUND balance', status: 'ok', text: '120.00\u00A0FUND' }])).toBe(
-      'Read from the contract: the option is active and you hold 120.00\u00A0FUND.',
+    expect(checksSentence(null, [{ label: 'Option', status: 'ok', text: 'Active' }, { label: 'RWA balance', status: 'ok', text: '120.00\u00A0RWA' }])).toBe(
+      'Read from the contract: the option is active and you hold 120.00\u00A0RWA.',
     )
     expect(checksSentence(null, [{ label: 'Option', status: 'pending', text: 'Checking' }])).toBeNull()
     // Mock data is not read from a contract, and the line says so.
@@ -63,10 +63,10 @@ describe('simpleCheck', () => {
     const o = written({ state: 'exercised' })
     const ok = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o, eligible: true })
     expect(ok.blocked).toBe(false)
-    expect(ok.lines[1]).toMatchObject({ label: 'Your account', status: 'ok', text: 'Authorized by the FUND issuer' })
+    expect(ok.lines[1]).toMatchObject({ label: 'Your account', status: 'ok', text: 'Authorized by the RWA issuer' })
     const no = simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o, eligible: false })
     expect(no.blocked).toBe(true)
-    expect(no.problem).toContain('The FUND issuer has not authorized your account')
+    expect(no.problem).toContain('The RWA issuer has not authorized your account')
     expect(simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o, eligible: 'unknown' }).blocked).toBe(false)
     expect(simpleCheck('claim', o, { me: ME, nowSec: NOW, option: o, eligible: undefined }).pending).toBe(true)
   })

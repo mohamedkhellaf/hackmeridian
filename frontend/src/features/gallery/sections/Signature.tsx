@@ -49,14 +49,14 @@ export function SignatureSection() {
           ledger="58,331,204"
           serialLabel="Offer No."
           glyph="short-call"
-          kind="Short call, FUND"
+          kind="Short call, RWA"
           state="Offered"
           terms={[
             { label: 'Strike', value: <Amount value="11.00" unit="USDx" figure="serif" /> },
-            { label: 'Quantity', value: <Amount value="20.00" unit="FUND" figure="serif" /> },
+            { label: 'Quantity', value: <Amount value="20.00" unit="RWA" figure="serif" /> },
             { label: 'Premium asked', value: <Amount value="3.80" unit="USDx" figure="serif" />, marked: true },
             { label: 'Deadline', value: <DateTime value={SAMPLE_DEADLINE} /> },
-            { label: 'Collateral', value: <Amount value="20.00" unit="FUND" figure="serif" />, hint: 'In the contract' },
+            { label: 'Collateral', value: <Amount value="20.00" unit="RWA" figure="serif" />, hint: 'In the contract' },
           ]}
           footer={
             <Button size="sm" variant="secondary">

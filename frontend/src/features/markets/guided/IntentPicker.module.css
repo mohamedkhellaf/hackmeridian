@@ -41,9 +41,19 @@
       border-color: var(--control);
     }
 
+    /* The chosen intent: the selection tint and a 1 px accent edge, as Segmented and ChoiceChips (ruling F5). One
+       weight in both states. */
     &[data-selected] {
-      border-color: var(--text);
-      outline: 1px solid var(--text);
+      border-color: var(--accent);
+      background: var(--accent-tint);
+      color: var(--text);
+
+      @media (forced-colors: active) {
+        border-color: Highlight;
+        background: Highlight;
+        color: HighlightText;
+        forced-color-adjust: none;
+      }
     }
 
     /* The ring is a box-shadow; the transparent outline is what forced colours paints instead. */
@@ -66,7 +76,7 @@
 
   .glyph {
     flex: none;
-    color: var(--text);
+    color: inherit;
   }
 
   .name {
@@ -76,10 +86,6 @@
     line-height: var(--ui-line);
     font-weight: var(--ui-weight);
     text-wrap: balance;
-  }
-
-  .option[data-selected] .name {
-    font-weight: var(--h3-weight);
   }
 
   @container (max-width: 39.99rem) {

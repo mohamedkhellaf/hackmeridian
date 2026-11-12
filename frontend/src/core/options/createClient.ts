@@ -25,7 +25,9 @@ export const isMockMode = (): boolean => !import.meta.env.VITE_OPTIONS_CONTRACT_
 export function createOptionsClient(wallet: WalletSigner): Promise<OptionsClient> {
   if (!import.meta.env.VITE_OPTIONS_CONTRACT_ID) {
     if (mock === null) {
-      const loading = import('./mockClient').then((m): OptionsClient => new m.MockOptionsClient())
+      // End-to-end builds price the demo market at fixed leads, so a spec can pin a premium (mockSeed fixedPricing).
+      const fixedPricing = import.meta.env.VITE_E2E === '1'
+      const loading = import('./mockClient').then((m): OptionsClient => new m.MockOptionsClient(fixedPricing ? m.demoSeed(undefined, { fixedPricing }) : undefined))
       mock = loading
       // A failed load of the chunk is not kept: the next call tries again, so "Try again" on a page can recover.
       loading.catch(() => {

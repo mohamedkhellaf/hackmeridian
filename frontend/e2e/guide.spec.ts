@@ -631,8 +631,8 @@ test.describe('the note on the mode switch @both', () => {
 
   test('does not open over an order ticket, and is not recorded then', async ({ page }) => {
     await seedTourTaken(page)
-    await openApp(page, '/markets/fund?side=write&kind=put')
-    await expect(page.getByRole('heading', { name: 'Write a put on FUND' })).toBeVisible()
+    await openApp(page, '/markets/rwa?side=write&kind=put')
+    await expect(page.getByRole('heading', { name: 'Write a put on RWA' })).toBeVisible()
     await page.waitForTimeout(800)
     await expect(guideNote(page)).toHaveCount(0)
     await expect(ringed(page)).toHaveCount(0)
@@ -653,7 +653,7 @@ test.describe('the note on the mode switch @both', () => {
     expect(await page.evaluate(() => window.scrollY)).toBe(0)
 
     await page.setViewportSize({ width: 1440, height: 900 })
-    await routeTo(page, '/markets/fund')
+    await routeTo(page, '/markets/rwa')
     await expect(noteTitle(page)).toHaveText('Guided and Chain')
   })
 
@@ -682,14 +682,14 @@ test.describe('the note on the mode switch and other overlays', () => {
 
     await page.keyboard.press('Escape')
     await expect(page.getByRole('menu')).toHaveCount(0)
-    await routeTo(page, '/markets/fund')
+    await routeTo(page, '/markets/rwa')
     await expect(noteTitle(page)).toHaveText('Guided and Chain')
   })
 
   test('a tour started beside an open order never puts a note on it', async ({ page }) => {
-    await openApp(page, '/markets/fund?side=write&kind=put')
+    await openApp(page, '/markets/rwa?side=write&kind=put')
     const rail = page.getByRole('complementary', { name: 'Order ticket' })
-    await expect(rail.getByRole('heading', { name: 'Write a put on FUND' })).toBeVisible()
+    await expect(rail.getByRole('heading', { name: 'Write a put on RWA' })).toBeVisible()
     await replay(page)
     for (const [i, title] of ASSET_TOUR.entries()) {
       await expect(noteTitle(page)).toHaveText(title)
@@ -698,7 +698,7 @@ test.describe('the note on the mode switch and other overlays', () => {
     }
     // The order is as it was: same address, same ticket.
     await expect(page).toHaveURL(/side=write/)
-    await expect(rail.getByRole('heading', { name: 'Write a put on FUND' })).toBeVisible()
+    await expect(rail.getByRole('heading', { name: 'Write a put on RWA' })).toBeVisible()
   })
 })
 

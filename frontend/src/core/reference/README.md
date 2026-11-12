@@ -17,11 +17,11 @@ Import from `core/reference` (the index).
 
 | Export | What it does |
 |---|---|
-| `demoReference(asset, quoteDecimals = 7)` | Mock mode: the demo price of FUND, BOND or EQTY; `none` otherwise. |
+| `demoReference(asset, quoteDecimals = 7)` | Mock mode: the demo price of RWA, BOND or EQTY; `none` otherwise. |
 | `faucetReference(asset, quoteDecimals = 7)` | Live mode: 10 USDx per unit for RWA, BOND and EQTY. Pass the token (not just the code) so a look-alike from another issuer gets `none`. |
 | `referenceFor(asset, 'mock' \| 'testnet')` | Picks the provider for the mode. |
 | `noReference()` | The `none` state. |
-| `DEMO_PRICES`, `demoPerUnit(code, quoteDecimals)` | The demo table (`FUND 10.20`, `BOND 99.40`, `EQTY 24.60`) and one entry in quote units. The mock seed prices around it. |
+| `DEMO_PRICES`, `demoPerUnit(code, quoteDecimals)` | The demo table (`RWA 10.20`, `BOND 99.40`, `EQTY 24.60`) and one entry in quote units. The mock seed prices around it. |
 | `FAUCET_PRICE`, `FAUCET_SOURCE`, `DEMO_SOURCE` | The fixed rate and the source lines. |
 | Type | `ReferenceSubject` (a code, or `{ code, contractId }`). |
 

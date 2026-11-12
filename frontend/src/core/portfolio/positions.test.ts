@@ -20,11 +20,11 @@ import type { RowAction } from './positions'
 
 const U = 10_000_000n
 const USDX: TokenInfo = { contractId: 'Q', code: 'USDx', decimals: 7 }
-const FUND: TokenInfo = { contractId: 'F', code: 'FUND', decimals: 7 }
+const RWA: TokenInfo = { contractId: 'F', code: 'RWA', decimals: 7 }
 const ME = 'GME'
 const OTHER = 'GOTHER'
 const opt = (over: Partial<OptionOffer> = {}): OptionOffer => ({
-  id: 1n, kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: 2n * U,
+  id: 1n, kind: 'put', underlying: RWA, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: 2n * U,
   expiry: 2_000_000_000, writer: ME, holder: null, state: 'offered', ...over,
 })
 
@@ -66,10 +66,10 @@ describe('actions', () => {
     expect(actionKindOf(opt({ state: 'active' }), 'writer')).toBeNull()
   })
   it('labels carry the exact payout', () => {
-    expect(actionLabel(opt(), 'claim')).toBe('Claim 5.00\u00A0FUND') // put writer receives the underlying
+    expect(actionLabel(opt(), 'claim')).toBe('Claim 5.00\u00A0RWA') // put writer receives the underlying
     expect(actionLabel(opt({ kind: 'call' }), 'claim')).toBe('Claim 50.00\u00A0USDx') // call writer receives the strike
     expect(actionLabel(opt(), 'reclaim')).toBe('Reclaim 50.00\u00A0USDx')
-    expect(actionLabel(opt({ kind: 'call' }), 'reclaim')).toBe('Reclaim 5.00\u00A0FUND')
+    expect(actionLabel(opt({ kind: 'call' }), 'reclaim')).toBe('Reclaim 5.00\u00A0RWA')
     expect(actionLabel(opt(), 'exercise')).toBe('Exercise')
   })
 })
@@ -103,20 +103,20 @@ describe('claim delivery applies to puts and calls alike', () => {
   })
 
   it('a put writer claims the delivered underlying, a call writer the strike paid', () => {
-    expect(claimAmount(exercisedPut)).toEqual({ token: FUND, amount: 5n * U })
+    expect(claimAmount(exercisedPut)).toEqual({ token: RWA, amount: 5n * U })
     expect(claimAmount(exercisedCall)).toEqual({ token: USDX, amount: 50n * U })
-    expect(actionLabel(exercisedPut, 'claim')).toBe('Claim 5.00\u00A0FUND')
+    expect(actionLabel(exercisedPut, 'claim')).toBe('Claim 5.00\u00A0RWA')
     expect(actionLabel(exercisedCall, 'claim')).toBe('Claim 50.00\u00A0USDx')
   })
 
   it('both show up as waiting actions and as unclaimed proceeds', () => {
     expect(todoItems([exercisedPut, exercisedCall], ME, 0).map((t) => [t.kind, t.amount])).toEqual([
-      ['claim', { token: FUND, amount: 5n * U }],
+      ['claim', { token: RWA, amount: 5n * U }],
       ['claim', { token: USDX, amount: 50n * U }],
     ])
     const s = portfolioSummary([exercisedPut, exercisedCall], ME)
     expect(s.unclaimed).toEqual([
-      { token: FUND, amount: 5n * U },
+      { token: RWA, amount: 5n * U },
       { token: USDX, amount: 50n * U },
     ])
   })
@@ -159,7 +159,7 @@ describe('todoItems', () => {
     )
     expect(items.map((t) => [t.kind, t.actionable])).toEqual([['claim', true], ['claim', true], ['reclaim', true], ['reclaim', true]])
     expect(items[0].amount).toEqual({ token: USDX, amount: 50n * U }) // the call writer claims the strike
-    expect(items[1].amount).toEqual({ token: FUND, amount: 5n * U }) // the put writer claims the underlying
+    expect(items[1].amount).toEqual({ token: RWA, amount: 5n * U }) // the put writer claims the underlying
     expect(items[2].amount).toEqual({ token: USDX, amount: 50n * U }) // collateral of a put
     expect(actionsWaiting(items)).toBe(4)
   })
@@ -203,7 +203,7 @@ describe('portfolioSummary', () => {
       opt({ id: 1n, writer: OTHER, holder: ME, state: 'active' }), // paid 2
       opt({ id: 2n, writer: OTHER, holder: ME, state: 'active', totalPremium: 3n * U }), // bought on resale
       opt({ id: 3n, holder: OTHER, state: 'active' }), // earned 2, locks 50 USDx
-      opt({ id: 4n, kind: 'call', state: 'offered' }), // locks 5 FUND, nothing earned yet
+      opt({ id: 4n, kind: 'call', state: 'offered' }), // locks 5 RWA, nothing earned yet
       opt({ id: 5n, state: 'settled', holder: OTHER }), // earned 2, closed
       opt({ id: 6n, writer: OTHER, holder: 'GX' }), // not mine
     ]
@@ -213,7 +213,7 @@ describe('portfolioSummary', () => {
     expect(s.premiumEarned).toEqual([{ token: USDX, amount: 4n * U }])
     expect(s.locked).toEqual([
       { token: USDX, amount: 50n * U },
-      { token: FUND, amount: 5n * U },
+      { token: RWA, amount: 5n * U },
     ])
     expect(s.unclaimed).toEqual([])
     expect(portfolioSummary(options, null).open).toBe(0)
@@ -222,7 +222,7 @@ describe('portfolioSummary', () => {
 
 describe('expired requests: a premium to take back', () => {
   const bid = (over: Partial<Bid> = {}): Bid => ({
-    id: 1n, buyer: ME, kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: (9n * U) / 10n,
+    id: 1n, buyer: ME, kind: 'put', underlying: RWA, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: (9n * U) / 10n,
     expiry: 1_900_000_000, state: 'expired', optionId: null, ...over,
   })
 
@@ -242,20 +242,20 @@ describe('expired requests: a premium to take back', () => {
   it('splits the totals into locked now and ready to take back (ruling E20)', () => {
     const options = [
       opt({ id: 1n, holder: OTHER, state: 'active' }), // 50 USDx locked
-      opt({ id: 2n, kind: 'call', state: 'offered' }), // 5 FUND locked
+      opt({ id: 2n, kind: 'call', state: 'offered' }), // 5 RWA locked
       opt({ id: 3n, state: 'expired' }), // 50 USDx to reclaim
     ]
     const s = portfolioSummary(options, ME, new Set(), [bid({ id: 1n, state: 'open', totalPremium: 2n * U }), bid({ id: 2n }), bid({ id: 3n, buyer: OTHER, state: 'open' }), bid({ id: 4n, state: 'filled' })])
     expect(s.escrowed).toEqual([{ token: USDX, amount: 2n * U }])
     expect(s.lockedNow).toEqual([
       { token: USDX, amount: 52n * U },
-      { token: FUND, amount: 5n * U },
+      { token: RWA, amount: 5n * U },
     ])
     expect(s.readyToTakeBack).toEqual([{ token: USDX, amount: 50n * U + 9_000_000n }])
     // Without requests the older fields keep their meaning.
     expect(portfolioSummary(options, ME).locked).toEqual([
       { token: USDX, amount: 100n * U },
-      { token: FUND, amount: 5n * U },
+      { token: RWA, amount: 5n * U },
     ])
     expect(portfolioSummary(options, ME).readyToTakeBack).toEqual([{ token: USDX, amount: 50n * U }])
   })

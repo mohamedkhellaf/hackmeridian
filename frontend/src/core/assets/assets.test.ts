@@ -39,12 +39,12 @@ const OTHER_ISSUER = StrKey.encodeEd25519PublicKey(Buffer.alloc(32, 7))
 const OTHER_BOND = new Asset('BOND', OTHER_ISSUER).contractId(Networks.TESTNET)
 
 describe('reference list', () => {
-  it('lists FUND, BOND, EQTY for the mock and RWA, BOND, EQTY for Testnet, in that order', () => {
-    expect(referenceAssets('mock').map((a) => a.code)).toEqual(['FUND', 'BOND', 'EQTY'])
+  it('lists RWA, BOND, EQTY on both networks, in that order: one asset, one code', () => {
+    expect(referenceAssets('mock').map((a) => a.code)).toEqual(['RWA', 'BOND', 'EQTY'])
     expect(referenceAssets('testnet').map((a) => a.code)).toEqual(['RWA', 'BOND', 'EQTY'])
-    expect(referenceAssets('mock').map((a) => a.slug)).toEqual(['fund', 'bond', 'eqty'])
+    expect(referenceAssets('mock').map((a) => a.slug)).toEqual(['rwa', 'bond', 'eqty'])
     expect(referenceAssets('testnet').map((a) => a.slug)).toEqual(['rwa', 'bond', 'eqty'])
-    expect(defaultReferenceAsset('mock').code).toBe('FUND')
+    expect(defaultReferenceAsset('mock').code).toBe('RWA')
     expect(defaultReferenceAsset('testnet').code).toBe('RWA')
     for (const n of NETWORKS) expect(referenceAssets(n)).toBe(REFERENCE_ASSETS[n])
   })
@@ -79,7 +79,7 @@ describe('reference list', () => {
   })
 
   it('uses mock placeholders that can never be mistaken for real ids', () => {
-    expect(referenceAssets('mock').map((a) => a.contractId)).toEqual(['C_MOCK_FUND', 'C_MOCK_BOND', 'C_MOCK_EQTY'])
+    expect(referenceAssets('mock').map((a) => a.contractId)).toEqual(['C_MOCK_RWA', 'C_MOCK_BOND', 'C_MOCK_EQTY'])
     expect(QUOTE_ASSETS.mock.contractId).toBe('C_MOCK_USDX')
     for (const g of [MOCK_ISSUER, MOCK_QUOTE_ISSUER]) {
       expect(g).toHaveLength(56)
@@ -118,8 +118,9 @@ describe('reference list', () => {
     expect(findReferenceBySlug('testnet', 'bond')?.contractId).toBe(BOND)
     expect(findReferenceBySlug('testnet', 'BOND')?.contractId).toBe(BOND)
     expect(findReferenceBySlug('mock', 'bond')?.contractId).toBe('C_MOCK_BOND')
-    expect(findReferenceBySlug('testnet', 'fund')).toBeNull()
-    expect(findReferenceBySlug('mock', 'rwa')).toBeNull()
+    expect(findReferenceBySlug('mock', 'rwa')?.contractId).toBe('C_MOCK_RWA')
+    expect(findReferenceBySlug('testnet', 'rwa')?.contractId).toBe(RWA)
+    expect(findReferenceBySlug('testnet', 'gold')).toBeNull()
   })
 })
 
@@ -173,7 +174,7 @@ describe('tiers', () => {
 
   it('gives Reference only to assets in the list', () => {
     expect(tierOf({ contractId: BOND })).toBe('Reference')
-    expect(tierOf({ contractId: 'C_MOCK_FUND' })).toBe('Reference')
+    expect(tierOf({ contractId: 'C_MOCK_RWA' })).toBe('Reference')
     expect(tierOf({ contractId: OTHER_BOND })).toBe('No domain link')
     expect(tierOf({ contractId: OTHER_BOND }, { domainLinked: true })).toBe('Domain-linked')
     expect(tierOf({ contractId: OTHER_BOND }, { domainLinked: false })).toBe('No domain link')
@@ -182,7 +183,7 @@ describe('tiers', () => {
 
   it('keys an asset by its contract id', () => {
     expect(assetKey({ contractId: BOND })).toBe(BOND)
-    expect(assetKey(referenceAssets('mock')[0])).toBe('C_MOCK_FUND')
+    expect(assetKey(referenceAssets('mock')[0])).toBe('C_MOCK_RWA')
     expect(assetKey({ contractId: OTHER_BOND })).not.toBe(assetKey({ contractId: BOND })) // same code, two assets
   })
 })
@@ -250,7 +251,7 @@ describe('assetParam and assetPath', () => {
     expect(assetPath({ contractId: BOND, code: 'BOND' })).toBe('/markets/bond')
     expect(assetPath({ contractId: BOND, code: 'BOND', issuer: TESTNET_ISSUER })).toBe('/markets/bond')
     expect(assetPath({ contractId: RWA, code: 'RWA' })).toBe('/markets/rwa')
-    expect(assetPath({ contractId: 'C_MOCK_FUND', code: 'FUND' })).toBe('/markets/fund')
+    expect(assetPath({ contractId: 'C_MOCK_RWA', code: 'RWA' })).toBe('/markets/rwa')
     expect(assetPath(referenceAssets('testnet')[2])).toBe('/markets/eqty')
   })
 
@@ -290,7 +291,7 @@ describe('resolveAssetParam', () => {
       canonical: 'bond',
       isCanonical: true,
     })
-    expect(resolveAssetParam('fund', 'mock')).toMatchObject({ status: 'found', contractId: 'C_MOCK_FUND', canonical: 'fund' })
+    expect(resolveAssetParam('rwa', 'mock')).toMatchObject({ status: 'found', contractId: 'C_MOCK_RWA', canonical: 'rwa' })
   })
 
   it('marks aliases of a reference asset as not canonical', () => {
@@ -338,8 +339,8 @@ describe('resolveAssetParam', () => {
   })
 
   it('does not resolve a reference asset of the other network', () => {
-    expect(resolveAssetParam('rwa', 'mock')).toMatchObject({ status: 'unknown' })
-    expect(resolveAssetParam('fund', 'testnet')).toMatchObject({ status: 'unknown' })
+    // The slugs are the same on both networks; each resolves to its own network's contract.
+    expect(resolveAssetParam('rwa', 'testnet')).toMatchObject({ status: 'found', contractId: RWA })
     expect(resolveAssetParam(BOND, 'mock')).toMatchObject({ status: 'unknown' })
     expect(resolveAssetParam('C_MOCK_BOND', 'testnet')).toEqual({ status: 'invalid' })
   })
@@ -388,7 +389,7 @@ describe('similar codes', () => {
 
   it('does not call short unrelated codes near', () => {
     expect(codeResemblance('RWB', 'RWA')).toBeNull() // one edit, but the reference has only 3 characters
-    expect(codeResemblance('FUND', 'BOND')).toBeNull()
+    expect(codeResemblance('RWA', 'BOND')).toBeNull()
     expect(codeResemblance('BO', 'BOND')).toBeNull()
     expect(codeResemblance('', 'BOND')).toBeNull()
   })
@@ -404,7 +405,7 @@ describe('similar codes', () => {
     expect(similarCodeFlag({ code: 'BOND', contractId: OTHER_BOND }, 'testnet')).toEqual({ reference: 'BOND', level: 'same' })
     expect(similarCodeFlag({ code: 'B0ND', contractId: OTHER_BOND }, 'testnet')).toEqual({ reference: 'BOND', level: 'same' })
     expect(similarCodeFlag({ code: 'USDX', contractId: OTHER_BOND }, 'testnet')).toEqual({ reference: 'USDx', level: 'same' })
-    expect(similarCodeFlag({ code: 'FUND', contractId: 'C_FIXTURE_FUND_TWIN' }, 'mock')).toEqual({ reference: 'FUND', level: 'same' })
+    expect(similarCodeFlag({ code: 'RWA', contractId: 'C_FIXTURE_RWA_TWIN' }, 'mock')).toEqual({ reference: 'RWA', level: 'same' })
   })
 
   it('flags near codes, and prefers an exact resemblance over a near one', () => {
@@ -415,8 +416,8 @@ describe('similar codes', () => {
     expect(similarCodeFlag({ code: 'WASM', contractId: OTHER_BOND }, 'testnet')).toBeNull()
   })
 
-  it('compares against the codes of its own network', () => {
-    expect(similarCodeFlag({ code: 'RWA', contractId: 'C_FIXTURE_RWA' }, 'mock')).toBeNull() // RWA is not a mock reference code
-    expect(similarCodeFlag({ code: 'FUND', contractId: OTHER_BOND }, 'testnet')).toBeNull()
+  it('flags a look-alike the same way on both networks, which share their codes', () => {
+    expect(similarCodeFlag({ code: 'RWA', contractId: 'C_FIXTURE_RWA' }, 'mock')).toEqual({ reference: 'RWA', level: 'same' })
+    expect(similarCodeFlag({ code: 'RWA', contractId: OTHER_BOND }, 'testnet')).toEqual({ reference: 'RWA', level: 'same' })
   })
 })

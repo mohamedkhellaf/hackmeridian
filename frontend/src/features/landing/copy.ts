@@ -131,13 +131,13 @@ export const INTENTS = {
     },
     {
       id: 'earn-hold',
-      name: 'Earn on what you hold',
+      name: 'Get paid to sell higher',
       statement: 'Lock what you hold and agree to sell it at a higher price if a buyer asks before the deadline.',
       flowLabel: 'You are paid',
     },
     {
       id: 'earn-buy',
-      name: 'Earn while waiting to buy',
+      name: 'Get paid to buy lower',
       statement: 'Lock USDx and agree to buy at a lower price if a holder asks before the deadline.',
       flowLabel: 'You are paid',
     },

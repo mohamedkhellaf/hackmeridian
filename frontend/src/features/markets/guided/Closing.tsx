@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect } from 'react'
 import { formatExact, formatUnits, serialOf } from '../../../core/format'
 import { Amount, Button, Link } from '../../../ui'
 import { useWallet } from '../../../wallet'
-import { ACTION, ACTION_REGION, BAR_FIGURE, CANNOT_PAY, GET_FUNDS, NEED_QTY_ACTION, OWN_SHORT, VIEW } from './copy'
+import { ACTION, ACTION_REGION, BAR_FIGURE, CANNOT_PAY, GET_FUNDS, OWN_SHORT, VIEW } from './copy'
 import type { GuidedModel, OwnItem } from './useGuidedModel'
 import { useGuidedModel } from './useGuidedModel'
 import { registerRailClosing } from './railClosing'
@@ -34,45 +34,47 @@ export function GuidedClosing({ assetId, placement = 'rail' }: GuidedClosingProp
 export function ClosingBlock({ model, placement }: { model: GuidedModel; placement: 'rail' | 'page' }) {
   const wallet = useWallet()
   const location = useLocation()
-  const { me, mine, primary, primaryLabel, ownTerms, side, summary, shortfall, quote } = model
+  const { me, mine, primary, primaryLabel, primaryReason, ownTerms, side, summary, shortfall, quote } = model
   const money = (units: bigint) => formatUnits(units, quote.decimals)
   // The funds strip links back here, so the order is one press away once the wallet is funded.
   const from = `${location.pathname}${location.searchStr}`
   return (
     <section className={styles.root} data-placement={placement} aria-label={ACTION_REGION} data-testid="guided-closing">
-      {/* What the wallet already has here comes first, with the way to it; the sentence and the action under it
-          are then about another order, and say so. A second order is never the block's primary action. */}
+      {/* What the wallet already has here: one quiet line above the block, with the way to it (flow-9). The block
+          under it keeps its own sentence and its one primary action, about the next order, and says so. */}
       {me !== null && mine ? (
         <p className={styles.own} data-testid="guided-closing-own">
           {OWN_SHORT[mine.kind](serialOf(mine.id))} <OwnLink item={mine} />
         </p>
       ) : null}
-      {summary ? (
-        <p className={styles.summary} data-testid="guided-summary">
-          {summary}
-        </p>
-      ) : null}
-      {shortfall ? (
-        <p className={styles.short}>
-          {CANNOT_PAY(money(shortfall.have), money(shortfall.need), quote.code)}{' '}
-          <Link render={<RouterLink to="/markets" search={{ funds: '1', from }} />}>{GET_FUNDS}</Link>
-        </p>
-      ) : null}
-      <div className={styles.buttons}>
-        {me === null ? (
-          <Button variant="primary" onClick={() => void wallet.connect()}>
-            {ACTION.connect}
-          </Button>
-        ) : (
-          <Button variant={mine ? 'secondary' : 'primary'} disabled={primary === null} disabledReason={NEED_QTY_ACTION} onClick={() => primary && model.open(primary.ticket, primary.step)}>
-            {primaryLabel}
-          </Button>
-        )}
-        {me !== null && ownTerms ? (
-          <Button variant="quiet" onClick={() => model.open(ownTerms, 'terms')}>
-            {side === 'buy' ? ACTION.ownPriceRequest : ACTION.ownPriceOffer}
-          </Button>
+      <div className={styles.block}>
+        {summary ? (
+          <p className={styles.summary} data-testid="guided-summary">
+            {summary}
+          </p>
         ) : null}
+        {shortfall ? (
+          <p className={styles.short}>
+            {CANNOT_PAY(money(shortfall.have), money(shortfall.need), quote.code)}{' '}
+            <Link render={<RouterLink to="/markets" search={{ funds: '1', from }} />}>{GET_FUNDS}</Link>
+          </p>
+        ) : null}
+        <div className={styles.buttons}>
+          {me === null ? (
+            <Button variant="primary" onClick={() => void wallet.connect()}>
+              {ACTION.connect}
+            </Button>
+          ) : (
+            <Button variant="primary" disabled={primary === null} disabledReason={primaryReason} onClick={() => primary && model.open(primary.ticket, primary.step)}>
+              {primaryLabel}
+            </Button>
+          )}
+          {me !== null && ownTerms ? (
+            <Button variant="quiet" onClick={() => model.open(ownTerms, 'terms')}>
+              {side === 'buy' ? ACTION.ownPriceRequest : ACTION.ownPriceOffer}
+            </Button>
+          ) : null}
+        </div>
       </div>
     </section>
   )
@@ -107,7 +109,7 @@ function usePublishedBar(): void {
 export function ActionBar({ model, hidden }: { model: GuidedModel; hidden: boolean }) {
   const wallet = useWallet()
   usePublishedBar()
-  const { me, primary, primaryLabel, exact, side, premium, quote } = model
+  const { me, primary, primaryLabel, primaryReason, exact, side, premium, quote } = model
   const figureLabel = exact ? (side === 'buy' ? BAR_FIGURE.pay : BAR_FIGURE.paid) : side === 'buy' ? BAR_FIGURE.escrow : BAR_FIGURE.ask
   return (
     <div className={styles.bar} data-hidden={hidden || undefined} data-testid="guided-action-bar">
@@ -123,7 +125,7 @@ export function ActionBar({ model, hidden }: { model: GuidedModel; hidden: boole
           {ACTION.connect}
         </Button>
       ) : (
-        <Button variant="primary" size="sm" disabled={primary === null} disabledReason={NEED_QTY_ACTION} onClick={() => primary && model.open(primary.ticket, primary.step)}>
+        <Button variant="primary" size="sm" disabled={primary === null} disabledReason={primaryReason} onClick={() => primary && model.open(primary.ticket, primary.step)}>
           {primaryLabel}
         </Button>
       )}

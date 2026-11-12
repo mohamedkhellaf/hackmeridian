@@ -17,7 +17,7 @@ describe('deadline calendar entry', () => {
     expect(file.name).toBe('stellsec-deadline-20261113.ics')
     expect(file.type).toContain('text/calendar')
     expect(file.text).toContain('BEGIN:VEVENT')
-    expect(file.text).toContain('SUMMARY:Exercise deadline: FUND 10.00 put (5.00 FUND)')
+    expect(file.text).toContain('SUMMARY:Exercise deadline: RWA 10.00 put (5.00 RWA)')
     expect(file.text).toContain('DTEND:20261113T080000Z')
     expect(file.text).toContain('URL:https://stellsec.example/portfolio/184?do=exercise')
     expect(file.text.match(/BEGIN:VALARM/g)).toHaveLength(2)
@@ -38,11 +38,11 @@ describe('deadline calendar entry', () => {
 
   it('gives the maker its own entry: what to claim or reclaim after the deadline, linked to the position', () => {
     const event = deadlineEvent(opt({ expiry: EXPIRY }), ORIGIN, 'writer')
-    expect(event.title).toBe('Reclaim 50.00\u00A0USDx, or claim the FUND delivered')
-    expect(event.description).toContain('claim the 5.00\u00A0FUND it left in the contract; if not, reclaim your 50.00\u00A0USDx.')
+    expect(event.title).toBe('Reclaim 50.00\u00A0USDx, or claim the RWA delivered')
+    expect(event.description).toContain('claim the 5.00\u00A0RWA it left in the contract; if not, reclaim your 50.00\u00A0USDx.')
     expect(event.url).toBe('https://stellsec.example/portfolio/184')
     expect(event.uid).toBe('option-184-1794556800-maker')
-    expect(deadlineEvent(opt({ kind: 'call', expiry: EXPIRY }), ORIGIN, 'writer').title).toBe('Reclaim 5.00\u00A0FUND, or claim the USDx paid')
+    expect(deadlineEvent(opt({ kind: 'call', expiry: EXPIRY }), ORIGIN, 'writer').title).toBe('Reclaim 5.00\u00A0RWA, or claim the USDx paid')
   })
 
   it('gives nothing for a deadline that is not a usable timestamp', () => {

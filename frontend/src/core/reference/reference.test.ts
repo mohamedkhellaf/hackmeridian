@@ -34,7 +34,7 @@ const q = (text: string): bigint => {
 }
 
 const USDX = { contractId: 'C_MOCK_USDX', code: 'USDx', decimals: 7 }
-const FUND = { contractId: 'C_MOCK_FUND', code: 'FUND', decimals: 7 }
+const MOCK_RWA = { contractId: 'C_MOCK_RWA', code: 'RWA', decimals: 7 }
 const [RWA, BOND, EQTY] = referenceAssets('testnet')
 
 describe('labels and notes', () => {
@@ -72,19 +72,19 @@ describe('labels and notes', () => {
 
 describe('demoReference (mock mode)', () => {
   it('exports the table the mock seed prices around', () => {
-    expect(DEMO_PRICES).toEqual({ FUND: '10.20', BOND: '99.40', EQTY: '24.60' })
+    expect(DEMO_PRICES).toEqual({ RWA: '10.20', BOND: '99.40', EQTY: '24.60' })
     expect(Object.keys(DEMO_PRICES).sort()).toEqual(referenceAssets('mock').map((a) => a.code).sort())
-    expect(demoPerUnit('FUND')).toBe(q('10.2'))
+    expect(demoPerUnit('RWA')).toBe(q('10.2'))
     expect(demoPerUnit('BOND')).toBe(q('99.4'))
     expect(demoPerUnit('EQTY')).toBe(q('24.6'))
-    expect(demoPerUnit('FUND', 2)).toBe(1020n)
+    expect(demoPerUnit('RWA', 2)).toBe(1020n)
     expect(demoPerUnit('GOLD')).toBeNull()
     expect(demoPerUnit('toString')).toBeNull()
     expect(demoPerUnit('constructor')).toBeNull()
   })
 
   it('gives a labelled demo price for each mock asset', () => {
-    expect(demoReference('FUND')).toEqual({
+    expect(demoReference('RWA')).toEqual({
       kind: 'demo',
       perUnit: q('10.2'),
       label: 'Demo price',
@@ -92,14 +92,14 @@ describe('demoReference (mock mode)', () => {
       asOf: null,
       source: 'Mock data.',
     })
-    expect(demoReference(FUND).perUnit).toBe(q('10.2'))
+    expect(demoReference(MOCK_RWA).perUnit).toBe(q('10.2'))
     expect(demoReference('BOND').perUnit).toBe(q('99.4'))
     expect(demoReference('EQTY', 7).perUnit).toBe(q('24.6'))
   })
 
   it('has no price for other codes or for a Testnet token', () => {
     expect(demoReference('GOLD')).toEqual(noReference())
-    expect(demoReference('fund')).toEqual(noReference())
+    expect(demoReference('rwa')).toEqual(noReference())
     expect(demoReference(BOND)).toEqual(noReference()) // a Testnet contract id is not mock data
     expect(demoReference({ code: 'BOND', contractId: 'C_FIXTURE_BOND_TWIN' }).kind).toBe('demo') // keyed by code in mock data
   })
@@ -145,8 +145,7 @@ describe('faucetReference (live mode)', () => {
 
   it('has no price for unlisted codes, mock assets or the quote token', () => {
     expect(faucetReference('GOLD')).toEqual(noReference())
-    expect(faucetReference('FUND')).toEqual(noReference())
-    expect(faucetReference(FUND)).toEqual(noReference())
+    expect(faucetReference(MOCK_RWA)).toEqual(noReference())
     expect(faucetReference('USDx')).toEqual(noReference())
     expect(faucetReference('bond')).toEqual(noReference())
   })
@@ -154,8 +153,8 @@ describe('faucetReference (live mode)', () => {
 
 describe('referenceFor and noReference', () => {
   it('picks the provider for the mode', () => {
-    expect(referenceFor('FUND', 'mock').kind).toBe('demo')
-    expect(referenceFor('FUND', 'testnet').kind).toBe('none')
+    expect(referenceFor('RWA', 'mock').kind).toBe('demo')
+    expect(referenceFor(MOCK_RWA, 'testnet').kind).toBe('none')
     expect(referenceFor(RWA, 'testnet').kind).toBe('fixed')
     expect(referenceFor(RWA, 'mock').kind).toBe('none')
     expect(referenceFor('BOND', 'mock').perUnit).toBe(q('99.4'))
@@ -247,7 +246,7 @@ describe('intrinsicPerUnit', () => {
 const option = (over: Partial<OptionOffer> = {}): OptionOffer => ({
   id: 1n,
   kind: 'put',
-  underlying: FUND,
+  underlying: MOCK_RWA,
   quote: USDX,
   underlyingQty: 5n * UNIT,
   totalStrike: q('50'),
@@ -261,7 +260,7 @@ const option = (over: Partial<OptionOffer> = {}): OptionOffer => ({
 
 describe('exerciseValue', () => {
   it('is what a put holder receives minus what the delivered asset is worth', () => {
-    expect(exerciseValue(option(), q('7'))).toBe(q('15')) // 50 received for 5 FUND worth 35
+    expect(exerciseValue(option(), q('7'))).toBe(q('15')) // 50 received for 5 RWA worth 35
     expect(exerciseValue(option(), q('10'))).toBe(0n)
     expect(exerciseValue(option(), q('10.2'))).toBe(-q('1')) // would give up 51 of value for 50
     expect(exerciseValue(option(), ref(q('9.64')))).toBe(q('1.8'))
@@ -279,11 +278,11 @@ describe('exerciseValue', () => {
   })
 
   it('truncates the exact difference toward zero, so neither a gain nor a loss is overstated', () => {
-    // 0.3333333 FUND at 10.0000001 is worth 3.33333303333333 USDx; against a strike of 3.5 that is 0.16666696666667
+    // 0.3333333 RWA at 10.0000001 is worth 3.33333303333333 USDx; against a strike of 3.5 that is 0.16666696666667
     const sliver = option({ underlyingQty: 3_333_333n, totalStrike: q('3.5') })
     expect(exerciseValue(sliver, q('10') + 1n)).toBe(1_666_669n)
     expect(exerciseValue(option({ ...sliver, kind: 'call' }), q('10') + 1n)).toBe(-1_666_669n)
-    // the smallest lot: 0.0000001 FUND is worth 0.000001 USDx at 10, against a strike of 0.0000001
+    // the smallest lot: 0.0000001 RWA is worth 0.000001 USDx at 10, against a strike of 0.0000001
     expect(exerciseValue(option({ underlyingQty: 1n, totalStrike: 1n }), q('10'))).toBe(-9n)
     expect(exerciseValue(option({ kind: 'call', underlyingQty: 1n, totalStrike: 1n }), q('10'))).toBe(9n)
     // a difference below one unit truncates to zero from either side
@@ -373,7 +372,7 @@ describe('describeReference', () => {
   })
 
   it('never uses the banned price terms', () => {
-    for (const r of [faucetReference(RWA), demoReference('FUND'), none]) {
+    for (const r of [faucetReference(RWA), demoReference('RWA'), none]) {
       const line = describeReference(r, { quoteCode: 'USDx', quoteDecimals: 7, underlyingCode: 'X' })
       expect(findBannedWords(line, BANNED_PRICE_TERMS)).toEqual([])
       expect(findBannedWords(line, BANNED_WORDS)).toEqual([])

@@ -67,7 +67,7 @@ describe('action helpers', () => {
     expect(optionIdOf(buy)).toBe(6n)
     expect(optionIdOf(exercise)).toBe(0n)
     expect(optionIdOf(write)).toBeNull()
-    expect(underlyingOf(buy).code).toBe('FUND')
+    expect(underlyingOf(buy).code).toBe('RWA')
     expect(needsEligibility(buy)).toBe(true)
     expect(needsEligibility(exercise)).toBe(false)
     expect(needsEligibility({ type: 'list-for-sale', option: options[0], askTotal: 1n })).toBe(false)
@@ -75,7 +75,7 @@ describe('action helpers', () => {
 })
 
 describe('readFreshFacts: the pre-trade re-check through the cache', () => {
-  const maker = () => options.find((o) => o.state === 'offered' && o.writer !== A && o.writer !== B && o.underlying.code === 'FUND' && o.kind === 'put')!
+  const maker = () => options.find((o) => o.state === 'offered' && o.writer !== A && o.writer !== B && o.underlying.code === 'RWA' && o.kind === 'put')!
 
   it('reads the same facts as core readPreTradeFacts and reaches the same verdict', async () => {
     const action: PreTradeAction = { type: 'buy', offer: maker() }

@@ -7,7 +7,7 @@ import { classifyOffer, isStandardExpiry, standardExpiries, strikeLadder } from 
 import { perUnit } from '../units'
 import { collateralLines, reservedOf } from './abi'
 import { DEMO_HEDGERS, DEMO_MAKERS, DEMO_WALLETS } from './demoAccounts'
-import { MOCK_QUOTE, MOCK_UNDERLYINGS, bareSeed, demoExpiries, demoPremiumPerUnit, demoSeed, demoStrikes } from './mockSeed'
+import { MOCK_QUOTE, MOCK_UNDERLYINGS, bareSeed, demoExpiries, demoPremiumPerUnit, demoSeed, demoStrikes, fixedLead } from './mockSeed'
 import { MAX_OPEN_PER_WRITER } from './types'
 import type { OptionOffer } from './types'
 
@@ -28,15 +28,21 @@ const makers = Object.values(DEMO_MAKERS) as string[]
 const refOf = (o: OptionOffer) => demoReference(o.underlying)
 const live = (o: OptionOffer, at: number): OptionOffer => ((o.state === 'offered' || o.state === 'active') && o.expiry <= at ? { ...o, state: 'expired' } : o)
 
-describe.each(MOMENTS)('demoSeed at %i', (at) => {
-  const seed = demoSeed(at)
+// Every rule holds in both pricing modes: from the clock, and at fixed leads (end-to-end builds).
+const CASES = MOMENTS.flatMap((at) => [
+  [at, false],
+  [at, true],
+] as const)
+
+describe.each(CASES)('demoSeed at %i, fixed pricing %s', (at, fixedPricing) => {
+  const seed = demoSeed(at, { fixedPricing })
   const options = seed.options.map((o) => live(o, at))
   const open = options.filter((o) => o.state === 'offered')
   const expiries = standardExpiries(at)
   const ladderOf = (o: OptionOffer) => strikeLadder(demoReference(o.underlying).perUnit, MOCK_QUOTE.decimals)
 
-  it('lists FUND, BOND and EQTY against USDx', () => {
-    expect(seed.underlyings.map((t) => t.code)).toEqual(['FUND', 'BOND', 'EQTY'])
+  it('lists RWA, BOND and EQTY against USDx', () => {
+    expect(seed.underlyings.map((t) => t.code)).toEqual(['RWA', 'BOND', 'EQTY'])
     expect(seed.quote.code).toBe('USDx')
     for (const t of [seed.quote, ...seed.underlyings]) expect(t.contractId).toMatch(/^C_MOCK_/)
   })
@@ -239,5 +245,31 @@ describe('the empty test wallet', () => {
     const seed = demoSeed()
     expect(seed.options.some((o) => o.holder === DEMO_WALLETS.c || o.writer === DEMO_WALLETS.c)).toBe(false)
     expect(seed.bids.some((b) => b.buyer === DEMO_WALLETS.c)).toBe(false)
+  })
+})
+
+describe('fixed pricing (end-to-end builds)', () => {
+  const premiums = (at: number) => {
+    const seed = demoSeed(at, { fixedPricing: true })
+    return { options: seed.options.map((o) => o.totalPremium), bids: seed.bids.map((b) => b.totalPremium), asks: seed.asks.map((a) => a.askTotal) }
+  }
+
+  it('gives the same premiums at every moment, while the deadlines move with the clock', () => {
+    const first = premiums(MOMENTS[0])
+    for (const at of MOMENTS.slice(1)) expect(premiums(at)).toEqual(first)
+    expect(demoSeed(MOMENTS[0], { fixedPricing: true }).options[20].expiry).not.toBe(demoSeed(MOMENTS[7], { fixedPricing: true }).options[20].expiry)
+  })
+
+  it('prices a listed deadline by its place in the list, any other as the listed one before it', () => {
+    const expiries = [100, 200, 300]
+    expect(fixedLead(100, expiries)).toBe(7 * 86_400)
+    expect(fixedLead(300, expiries)).toBe(21 * 86_400)
+    expect(fixedLead(50, expiries)).toBe(7 * 86_400)
+    expect(fixedLead(150, expiries)).toBe(7 * 86_400)
+    expect(fixedLead(400, expiries)).toBe(21 * 86_400)
+  })
+
+  it('leaves the clock pricing of a normal build as it was', () => {
+    expect(demoSeed(MOMENTS[0]).options.map((o) => o.totalPremium)).not.toEqual(demoSeed(MOMENTS[1]).options.map((o) => o.totalPremium))
   })
 })

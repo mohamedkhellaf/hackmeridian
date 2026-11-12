@@ -204,7 +204,7 @@ export function cancelBidCheck(f: BidFacts): SimpleCheck {
 
 /**
  * The words of a passed status line in the checks sentence. Lines of this module carry their own; the exercise's
- * lines come from core/options/preTrade, whose texts are short labels ("Active"; "120.00 FUND" under "FUND balance").
+ * lines come from core/options/preTrade, whose texts are short labels ("Active"; "120.00 RWA" under "RWA balance").
  */
 export function passedPhrase(l: CheckLine): string {
   if (l.phrase) return l.phrase

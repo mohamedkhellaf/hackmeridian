@@ -79,7 +79,7 @@ export interface RequestRow {
   mine: boolean
   /** Set once the request was filled. */
   optionId: bigint | null
-  /** Every term in one phrase, for accessible names: "put on 5.00 FUND at 10.00 USDx, until 13 Nov 2026, 08:00 UTC, premium 2.00 USDx". */
+  /** Every term in one phrase, for accessible names: "put on 5.00 RWA at 10.00 USDx, until 13 Nov 2026, 08:00 UTC, premium 2.00 USDx". */
   terms: string
 }
 
@@ -169,11 +169,11 @@ export const LAPSE_LINE = 'A fill may land too late'
 
 /** `No. 3`: the contract's id of the request, unpadded (ruling F1). */
 export const serialText = (serial: string): string => `No. ${serial}`
-/** The title of a phone card, what is wanted: `Put on 10.00 FUND`. */
+/** The title of a phone card, what is wanted: `Put on 10.00 RWA`. */
 export const requestTitle = (row: Pick<RequestRow, 'kindWord' | 'quantity'>): string => `${row.kindWord} on ${figureText(row.quantity)}`
 /** After the total under the premium per unit (`2.80 USDx in total`); the figure is an Amount. */
 export const IN_TOTAL = 'in total'
-/** After the premium per unit on a phone card, where no column header names the unit: `per FUND`. */
+/** After the premium per unit on a phone card, where no column header names the unit: `per RWA`. */
 export const perAsset = (row: Pick<RequestRow, 'assetCode'>): string => `per ${row.assetCode}`
 
 /** Accessible names: the visible label first, then the data it acts on. */

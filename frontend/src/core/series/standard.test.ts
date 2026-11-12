@@ -374,7 +374,7 @@ describe('strike ladder', () => {
 })
 
 const USDX = { contractId: 'C_MOCK_USDX', code: 'USDx', decimals: 7 }
-const FUND = { contractId: 'C_MOCK_FUND', code: 'FUND', decimals: 7 }
+const RWA = { contractId: 'C_MOCK_RWA', code: 'RWA', decimals: 7 }
 const NOW = at(2026, 11, 11, 12)
 const EXPIRIES = standardExpiries(NOW)
 const LADDER = strikeLadder(q('10.20'), 7)
@@ -382,7 +382,7 @@ const LADDER = strikeLadder(q('10.20'), 7)
 const offer = (over: Partial<OptionOffer> = {}): OptionOffer => ({
   id: 1n,
   kind: 'put',
-  underlying: FUND,
+  underlying: RWA,
   quote: USDX,
   underlyingQty: 5n * UNIT,
   totalStrike: q('50'),
@@ -488,7 +488,7 @@ describe('classifyOffer', () => {
       id: 7n,
       buyer: 'GBUYER',
       kind: 'put',
-      underlying: FUND,
+      underlying: RWA,
       quote: USDX,
       underlyingQty: 5n * UNIT,
       totalStrike: q('50'),
@@ -546,13 +546,13 @@ describe('series names', () => {
 
   it('names a series as in the brief', () => {
     expect(seriesName({ code: 'BOND', expiry: at(2026, 12, 18, 8), strikePerUnit: q('100'), decimals: 7, kind: 'put' })).toBe('BOND-20261218-100-P')
-    expect(seriesName({ code: 'FUND', expiry: at(2026, 11, 13, 8), strikePerUnit: q('10.2'), decimals: 7, kind: 'call' })).toBe('FUND-20261113-10.2-C')
+    expect(seriesName({ code: 'RWA', expiry: at(2026, 11, 13, 8), strikePerUnit: q('10.2'), decimals: 7, kind: 'call' })).toBe('RWA-20261113-10.2-C')
     expect(seriesName({ code: 'EQTY', expiry: at(2027, 1, 29, 8), strikePerUnit: q('24.5'), decimals: 7, kind: 'put' })).toBe('EQTY-20270129-24.5-P')
   })
 
   it('names the series of an offer, or nothing when its strike per unit is not exact', () => {
-    expect(seriesNameOf(offer({ expiry: at(2026, 11, 13, 8) }))).toBe('FUND-20261113-10-P')
-    expect(seriesNameOf(offer({ kind: 'call', underlyingQty: 3n * UNIT, totalStrike: q('30.6'), expiry: at(2026, 12, 25, 8) }))).toBe('FUND-20261225-10.2-C')
+    expect(seriesNameOf(offer({ expiry: at(2026, 11, 13, 8) }))).toBe('RWA-20261113-10-P')
+    expect(seriesNameOf(offer({ kind: 'call', underlyingQty: 3n * UNIT, totalStrike: q('30.6'), expiry: at(2026, 12, 25, 8) }))).toBe('RWA-20261225-10.2-C')
     expect(seriesNameOf(offer({ underlyingQty: 3n * UNIT, totalStrike: q('10') }))).toBeNull()
     expect(seriesNameOf(offer({ underlyingQty: 0n }))).toBeNull()
   })
@@ -566,10 +566,10 @@ describe('series names', () => {
 
   it('parses its own names back', () => {
     expect(parseSeriesName('BOND-20261218-100-P')).toEqual({ code: 'BOND', day: '2026-12-18', expiry: at(2026, 12, 18, 8), strike: '100', kind: 'put' })
-    expect(parseSeriesName('FUND-20261113-10.2-C')).toEqual({ code: 'FUND', day: '2026-11-13', expiry: at(2026, 11, 13, 8), strike: '10.2', kind: 'call' })
+    expect(parseSeriesName('RWA-20261113-10.2-C')).toEqual({ code: 'RWA', day: '2026-11-13', expiry: at(2026, 11, 13, 8), strike: '10.2', kind: 'call' })
     for (const expiry of EXPIRIES) {
       for (const strikePerUnit of LADDER) {
-        const id = { code: 'FUND', expiry, strikePerUnit, decimals: 7, kind: 'put' as const }
+        const id = { code: 'RWA', expiry, strikePerUnit, decimals: 7, kind: 'put' as const }
         const parsed = parseSeriesName(seriesName(id))!
         expect(parsed.expiry).toBe(expiry)
         expect(q(parsed.strike)).toBe(strikePerUnit)

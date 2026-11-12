@@ -32,14 +32,14 @@ describe('names and glyphs', () => {
   })
 
   it('names the note by side', () => {
-    expect(noteKind(opt(), 'holder')).toBe('Long put, FUND')
-    expect(noteKind(opt({ kind: 'call' }), 'writer')).toBe('Short call, FUND')
-    expect(noteKind(opt(), null)).toBe('Put, FUND')
+    expect(noteKind(opt(), 'holder')).toBe('Long put, RWA')
+    expect(noteKind(opt({ kind: 'call' }), 'writer')).toBe('Short call, RWA')
+    expect(noteKind(opt(), null)).toBe('Put, RWA')
   })
 
   it('names the option in a sentence and as a title', () => {
-    expect(optionPhrase(opt())).toBe('put on 5.00\u00A0FUND')
-    expect(optionTitle(opt({ kind: 'call' }))).toBe('Call on 5.00\u00A0FUND')
+    expect(optionPhrase(opt())).toBe('put on 5.00\u00A0RWA')
+    expect(optionTitle(opt({ kind: 'call' }))).toBe('Call on 5.00\u00A0RWA')
   })
 
   it('prints the serial unpadded, as the contract numbers it', () => {
@@ -69,7 +69,7 @@ describe('figures', () => {
 
   it('gives the strike per unit, floored, and a dash for a zero quantity', () => {
     expect(strikeText(opt())).toBe('10.00')
-    // 50 USDx for 3 FUND is 16.666... per unit: never rounded up.
+    // 50 USDx for 3 RWA is 16.666... per unit: never rounded up.
     expect(strikeText(opt({ underlyingQty: 30_000_000n }))).toBe('16.66')
     expect(strikeExact(opt({ underlyingQty: 30_000_000n }))).toBe('16.6666666')
     expect(strikeText(opt({ underlyingQty: 0n }))).toBe('–')
@@ -149,7 +149,7 @@ describe('showsCard', () => {
 
 describe('premium per unit and the rank of an open offer', () => {
   it('prints the premium per unit of underlying', () => {
-    expect(premiumPerUnitLine(opt())).toBe('0.36\u00A0per\u00A0FUND')
+    expect(premiumPerUnitLine(opt())).toBe('0.36\u00A0per\u00A0RWA')
     expect(premiumPerUnitLine(opt({ underlyingQty: 0n }))).toBeNull()
   })
 

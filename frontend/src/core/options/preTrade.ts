@@ -117,7 +117,7 @@ export type PreTradeIssue = IssueDetail & {
 
 export type LineStatus = 'pending' | 'ok' | 'fail' | 'unknown'
 
-/** One status row of a review step ("Offer: Open", "Your account: Authorized by the FUND issuer"). */
+/** One status row of a review step ("Offer: Open", "Your account: Authorized by the RWA issuer"). */
 export interface PreTradeLine {
   label: string
   status: LineStatus

@@ -13,7 +13,7 @@ export const FIXED_SEC = FIXED_MS / 1000
 export interface DemoWorld {
   client: MockOptionsClient
   quote: TokenInfo
-  assets: Record<'FUND' | 'BOND' | 'EQTY', TokenInfo>
+  assets: Record<'RWA' | 'BOND' | 'EQTY', TokenInfo>
   source: (me: string | null) => MarketSource
   reference: (asset: TokenInfo) => ReferencePrice
 }
@@ -26,7 +26,7 @@ export async function demoWorld(): Promise<DemoWorld> {
   return {
     client,
     quote: listed.quote,
-    assets: { FUND: byCode('FUND'), BOND: byCode('BOND'), EQTY: byCode('EQTY') },
+    assets: { RWA: byCode('RWA'), BOND: byCode('BOND'), EQTY: byCode('EQTY') },
     source: (me) => ({ options, asks, bids, me, nowSec: FIXED_SEC }),
     reference: (asset) => referenceFor(asset, 'mock', listed.quote.decimals),
   }

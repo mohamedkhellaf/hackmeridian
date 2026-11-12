@@ -13,7 +13,7 @@ describe('intentFigure', () => {
     expect(f.points.map((p) => p.x)).toContain(10)
   })
 
-  it('earn on what you hold: the premium is kept and the rise is capped at the strike', () => {
+  it('get paid to sell higher: the premium is kept and the rise is capped at the strike', () => {
     const f = intentFigure('earn-hold', RECORDED_CALL)
     expect(f.strikeText).toBe('10.00')
     for (const p of f.points) {
@@ -22,7 +22,7 @@ describe('intentFigure', () => {
     }
   })
 
-  it('earn while waiting to buy: the cash set aside is the comparison', () => {
+  it('get paid to buy lower: the cash set aside is the comparison', () => {
     const f = intentFigure('earn-buy', RECORDED_PUT)
     for (const p of f.points) {
       expect(p.with).toBeCloseTo(5 * Math.min(p.x, 10) + 1, 9)

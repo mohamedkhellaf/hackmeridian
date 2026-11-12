@@ -24,10 +24,10 @@ import {
 
 const U = 10_000_000n
 const USDX = { contractId: 'C_MOCK_USDX', code: 'USDx', decimals: 7 }
-const FUND = { contractId: 'C_MOCK_FUND', code: 'FUND', decimals: 7 }
+const RWA = { contractId: 'C_MOCK_RWA', code: 'RWA', decimals: 7 }
 const DEADLINE = Date.UTC(2026, 10, 13, 8) / 1000
 const bid = (over: Partial<Bid> = {}): Bid => ({
-  id: 3n, buyer: 'GBUYER', kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: (14n * U) / 10n,
+  id: 3n, buyer: 'GBUYER', kind: 'put', underlying: RWA, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: (14n * U) / 10n,
   expiry: DEADLINE, state: 'open', optionId: null, ...over,
 })
 /** A figure never parts from its unit and a date never breaks inside (ruling F7): read the no-break spaces as spaces. */
@@ -36,16 +36,16 @@ const plain = (text: string): string => text.replaceAll(' ', ' ')
 describe('request rows (one model for the board, the asset page and the portfolio)', () => {
   it('reads every term exactly, with one deadline format and the units as suffixes', () => {
     const r = requestRow(bid(), 'GBUYER', 'mock')
-    expect(r).toMatchObject({ key: '3', serial: '3', assetCode: 'FUND', kindWord: 'Put', glyph: 'long-put', state: 'open', stateName: 'Open', escrow: 'escrowed', mine: true })
-    expect(plain(figureText(r.quantity))).toBe('5.00 FUND')
+    expect(r).toMatchObject({ key: '3', serial: '3', assetCode: 'RWA', kindWord: 'Put', glyph: 'long-put', state: 'open', stateName: 'Open', escrow: 'escrowed', mine: true })
+    expect(plain(figureText(r.quantity))).toBe('5.00 RWA')
     expect(plain(figureText(r.strike))).toBe('10.00 USDx')
     expect(plain(figureText(r.premium))).toBe('1.40 USDx')
     expect(plain(figureText(r.premiumPerUnit))).toBe('0.28 USDx')
     expect(plain(figureText(r.lock))).toBe('50.00 USDx')
     expect(plain(r.deadlineText)).toBe('13 Nov 2026, 08:00 UTC')
     expect(r.reference).toEqual({ label: 'Demo price', text: '10.20' })
-    expect(plain(r.terms)).toBe('put on 5.00 FUND at 10.00 USDx, until 13 Nov 2026, 08:00 UTC, premium 1.40 USDx')
-    expect(requestRow(bid({ kind: 'call' }), null).lock.code).toBe('FUND')
+    expect(plain(r.terms)).toBe('put on 5.00 RWA at 10.00 USDx, until 13 Nov 2026, 08:00 UTC, premium 1.40 USDx')
+    expect(requestRow(bid({ kind: 'call' }), null).lock.code).toBe('RWA')
     expect(requestRow(bid(), null).reference).toBeNull()
   })
 
@@ -78,15 +78,15 @@ describe('how an open request is drawn on /requests and on the asset page (rulin
 
   it('writes the id unpadded and the card lines from the same figures', () => {
     expect(serialText(r.serial)).toBe('No. 26')
-    expect(plain(requestTitle(r))).toBe('Put on 5.00 FUND')
+    expect(plain(requestTitle(r))).toBe('Put on 5.00 RWA')
     expect(IN_TOTAL).toBe('in total')
-    expect(perAsset(r)).toBe('per FUND')
+    expect(perAsset(r)).toBe('per RWA')
   })
 
   it('starts each accessible name with the visible label and ends the fill with what a maker locks', () => {
     expect(fillRequestLabel(r).startsWith(FILL_REQUEST)).toBe(true)
     expect(plain(fillRequestLabel(r))).toMatch(/, you lock 50\.00 USDx$/)
-    expect(plain(cancelRequestLabel(r))).toBe(`${CANCEL_REQUEST} No. 26: put on 5.00 FUND at 10.00 USDx, until 13 Nov 2026, 08:00 UTC, premium 1.40 USDx`)
+    expect(plain(cancelRequestLabel(r))).toBe(`${CANCEL_REQUEST} No. 26: put on 5.00 RWA at 10.00 USDx, until 13 Nov 2026, 08:00 UTC, premium 1.40 USDx`)
   })
 
   it('warns on the wallet own request, and says in words when a fill may land too late', () => {

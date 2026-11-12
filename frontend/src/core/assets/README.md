@@ -11,7 +11,7 @@ A code is a label, never a key.
 
 | Export | What it does |
 |---|---|
-| `REFERENCE_ASSETS`, `referenceAssets(network)` | The entries per network, in list order: mock `FUND`, `BOND`, `EQTY`; Testnet `RWA`, `BOND`, `EQTY` (ids from AGENTS.md "Deployed contracts"). |
+| `REFERENCE_ASSETS`, `referenceAssets(network)` | The entries per network, in list order: mock `RWA`, `BOND`, `EQTY`; Testnet `RWA`, `BOND`, `EQTY` (ids from AGENTS.md "Deployed contracts"). |
 | `QUOTE_ASSETS` | The quote token (USDx) of each network. |
 | `defaultReferenceAsset(network)` | The first entry: the asset a network opens on. |
 | `findReferenceAsset(contractId)`, `isReferenceAsset(contractId)` | Lookup by contract id. |

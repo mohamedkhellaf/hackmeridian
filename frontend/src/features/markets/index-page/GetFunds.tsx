@@ -7,7 +7,7 @@ import { formatList } from '../../../core/format'
 import { FAUCET_SOURCE } from '../../../core/reference'
 import type { TokenBalance } from '../../../core/stellar/tokens'
 import { Address, Button, Card, IconCheck, Link } from '../../../ui'
-import { FUNDS_BACK, FUNDS_CHECK, FUNDS_LEAD, FUNDS_MOCK_NOTE, FUNDS_STEPS, FUNDS_TITLE, STEP_DONE, shownAs } from '../copy'
+import { FUNDS_BACK, FUNDS_CHECK, FUNDS_LEAD, FUNDS_MOCK_NOTE, FUNDS_STEPS, FUNDS_TITLE, STEP_DONE } from '../copy'
 import { fundingProgress, fundsLead } from '../model'
 import type { FundingStep, StepState } from '../model'
 import type { ReactNode } from 'react'
@@ -53,15 +53,7 @@ export function GetFunds({ address, balances, quoteId, mock, onCheck, checking, 
   const assets = referenceAssets('testnet')
   // Mock balances cannot move with these steps, so no step is marked done or next there.
   const progress: Record<FundingStep, StepState> = mock ? { fund: 'later', trust: 'later', swap: 'later' } : fundingProgress(balances, quoteId)
-  // On mock data the page shows its own codes: a Testnet code that differs is named with it, "FUND (RWA on Testnet)".
-  const shown = mock ? referenceAssets('mock') : []
-  const codes = formatList(
-    assets.map((a) => {
-      const here = shown.find((m) => m.type === a.type)
-      return here && here.code !== a.code ? shownAs(here.code, a.code) : a.code
-    }),
-    'disjunction',
-  )
+  const codes = formatList(assets.map((a) => a.code), 'disjunction')
   const lead = fundsLead(balances, quoteId)
   return (
     <Card as="section" title={FUNDS_TITLE} headingLevel={2} aria-label={FUNDS_TITLE} className={styles.root}>

@@ -3,7 +3,7 @@ import { longCall, longPut, shortCall, shortPut } from '../../../../packages/pay
 import { NO_REFERENCE, U, opt, reference } from './fixtures.testhelper'
 import { breakevenText, drawsPayoff, makerPayoff, positionPayoff } from './payoff'
 
-// A put and a call on 5.00 FUND at 10.00 for a premium of 1.80: the leg the package computes.
+// A put and a call on 5.00 RWA at 10.00 for a premium of 1.80: the leg the package computes.
 const LEG = { qty: 5, strikeTotal: 50, premiumTotal: 1.8 }
 const PRICES = [0, 6, 9.64, 10, 10.36, 12, 20]
 
@@ -11,7 +11,7 @@ describe('positionPayoff', () => {
   it('draws the holder of a put as the long put of the payoff package', () => {
     const m = positionPayoff(opt(), reference(982))!
     expect(m.side).toBe('long')
-    expect(m.title).toBe('Payoff at the deadline, long put on 5.00\u00A0FUND')
+    expect(m.title).toBe('Payoff at the deadline, long put on 5.00\u00A0RWA')
     for (const s of PRICES) expect(m.pnlAt(s)).toBeCloseTo(longPut(LEG, s).total, 9)
     expect(m.strike).toEqual({ value: 10, label: '10.00' })
     expect(m.breakevens).toEqual([{ value: expect.closeTo(9.64, 9), label: '9.64' }])
@@ -21,7 +21,7 @@ describe('positionPayoff', () => {
     expect(m.defaultPrice).toBe(9.82)
     expect(m.premium).toBe(1.8)
     expect(m.unit).toBe('USDx')
-    expect(m.asset).toBe('FUND')
+    expect(m.asset).toBe('RWA')
   })
 
   it('says what exercising pays at a price, premium not counted', () => {
@@ -77,7 +77,7 @@ describe('positionPayoff', () => {
 })
 
 describe('makerPayoff', () => {
-  it('draws a written put as the guided "earn while waiting to buy": the cash set aside with the agreement and without', () => {
+  it('draws a written put as the guided "get paid to buy lower": the cash set aside with the agreement and without', () => {
     const m = makerPayoff(opt(), reference(982))!
     expect(m.intent).toBe('earn-buy')
     expect(m.level).toEqual({ value: 10, label: 'Buy at 10.00' })
@@ -89,7 +89,7 @@ describe('makerPayoff', () => {
     expect(m.reference).toEqual({ value: 9.82, label: 'Demo price 9.82' })
   })
 
-  it('draws a written call as the guided "earn on what you hold": the rise above the strike is given up, not lost', () => {
+  it('draws a written call as the guided "get paid to sell higher": the rise above the strike is given up, not lost', () => {
     const m = makerPayoff(opt({ kind: 'call' }), reference(982))!
     expect(m.intent).toBe('earn-hold')
     expect(m.level.label).toBe('Sell at 10.00')

@@ -16,7 +16,7 @@ export const ICS_MIME_TYPE = 'text/calendar;charset=utf-8'
 export const ICS_PRODID = '-//StellSec//Exercise deadline 1.0//EN'
 
 export interface DeadlineEvent {
-  /** One line, for example `Exercise deadline: FUND 10.00 put (5.00 FUND)`. */
+  /** One line, for example `Exercise deadline: RWA 10.00 put (5.00 RWA)`. */
   title: string
   /** Plain text. Line breaks are kept. Say that the entry does not update if the option is sold or exercised. */
   description: string

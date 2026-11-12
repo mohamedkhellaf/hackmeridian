@@ -48,13 +48,13 @@ export function strikeExact(o: StrikeTerms): string {
   return perUnit === null ? NO_VALUE : formatExact(perUnit, o.quote.decimals)
 }
 
-/** `put on 10.00 FUND`: the option inside a sentence. */
+/** `put on 10.00 RWA`: the option inside a sentence. */
 export const optionPhrase = (o: Pick<OptionOffer, 'kind' | 'underlying' | 'underlyingQty'>): string => `${o.kind} on ${money(qtyOf(o))}`
 
-/** `Put on 10.00 FUND`: the option as a title. */
+/** `Put on 10.00 RWA`: the option as a title. */
 export const optionTitle = (o: Pick<OptionOffer, 'kind' | 'underlying' | 'underlyingQty'>): string => `${KIND_WORD[o.kind]} on ${money(qtyOf(o))}`
 
-/** The heading of the contract note: `Long put, FUND` for the holder, `Short put, FUND` for the writer, `Put, FUND` otherwise. */
+/** The heading of the contract note: `Long put, RWA` for the holder, `Short put, RWA` for the writer, `Put, RWA` otherwise. */
 export function noteKind(o: Pick<OptionOffer, 'kind' | 'underlying'>, role: Role | null): string {
   if (role === 'holder') return `Long ${o.kind}, ${o.underlying.code}`
   if (role === 'writer') return `Short ${o.kind}, ${o.underlying.code}`
@@ -162,7 +162,7 @@ export function showsCard(t: TodoView): boolean {
   return t.kind === 'exercise' && ((t.urgency !== null && t.urgency !== 'far') || t.moneyness === 'unknown')
 }
 
-/** The premium per whole unit of underlying as text (`0.43 per FUND`, on one line), or null when the quantity is zero. */
+/** The premium per whole unit of underlying as text (`0.43 per RWA`, on one line), or null when the quantity is zero. */
 export function premiumPerUnitLine(o: Pick<OptionOffer, 'underlying' | 'quote' | 'underlyingQty' | 'totalPremium'>): string | null {
   const unit = premiumUnits(o)
   return unit === null ? null : noBreak(`${formatUnits(unit, o.quote.decimals)} per ${o.underlying.code}`)

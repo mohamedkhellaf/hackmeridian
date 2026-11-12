@@ -11,6 +11,9 @@ import { collateralLines, deliveryAmount, reservedOf } from './abi'
 import type { OptionsClient } from './client'
 import { demoSeed } from './mockSeed'
 import type { MockSeed } from './mockSeed'
+
+/** Re-exported so the lazy chunk of the mock client carries the seed builder with it (core/options/createClient). */
+export { demoSeed }
 import { MAX_OPEN_PER_WRITER, MAX_TENOR_SECONDS, requiredCollateral } from './types'
 import type { Ask, CollateralHealth, NewOffer, OptionOffer, TokenInfo, TxResult } from './types'
 

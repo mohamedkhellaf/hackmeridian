@@ -2,15 +2,16 @@
  * Portfolio (`/portfolio`) and one position (`/portfolio/$id`), on the mock chain with the test wallet.
  *
  * The default test wallet starts with seeded positions (src/core/options/mockSeed.ts). Their terms follow from
- * the demo prices (FUND 10.20, BOND 99.40, EQTY 24.60) and do not move with the clock:
- *   0  put it holds, 10 FUND at 10.60: in the money, deadline inside 48 hours
+ * the demo prices (RWA 10.20, BOND 99.40, EQTY 24.60) and do not move with the clock:
+ *   0  put it holds, 10 RWA at 10.60: in the money, deadline inside 48 hours
  *   1  put it holds, 2 BOND at 97.00: out of the money
  *   2  call it wrote and sold, 4 EQTY at 25.50
  *   3  call it wrote, exercised: 98.00 USDx waits for its claim
  *   4  put it wrote, expired: 48.00 USDx waits for its reclaim
  *   5  call it held, expired unexercised
- *   6  open offer it wrote, put on 5 FUND at 9.80 (49.00 USDx locked)
- * and one request (bid 0). Premiums depend on the time to the deadline, so no test asserts one.
+ *   6  open offer it wrote, put on 5 RWA at 9.80 (49.00 USDx locked)
+ * and one request (bid 0). An end-to-end build prices the seed at fixed leads before each deadline (mockSeed
+ * fixedPricing), so its premiums are the same on every run: position 0 cost 0.43 per RWA, request 0 escrows 1.18 USDx.
  */
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
@@ -70,8 +71,8 @@ test.describe('Portfolio', () => {
     await openApp(page, '/portfolio', { connect: true })
 
     const urgent = page.getByTestId('todo-exercise-0')
-    await expect(urgent.getByRole('heading', { name: 'Exercise your put on 10.00 FUND' })).toBeVisible()
-    await expect(urgent).toContainText('In the money at the demo price 10.20. You deliver 10.00 FUND and receive 106.00 USDx.')
+    await expect(urgent.getByRole('heading', { name: 'Exercise your put on 10.00 RWA' })).toBeVisible()
+    await expect(urgent).toContainText('In the money at the demo price 10.20. You deliver 10.00 RWA and receive 106.00 USDx.')
     // The exercise value is a value, not a gain: no plus sign, and the premium is said to be left out.
     await expect(urgent).toContainText('Exercise value')
     await expect(urgent).toContainText('4.00 USDx')
@@ -98,7 +99,7 @@ test.describe('Portfolio', () => {
     expect(claimHeight).toBeLessThan(exerciseHeight - 40)
     // An option that lapsed this week is one plain line, not a card.
     await expect(page.getByTestId('todo-expired-unexercised-5')).toHaveCount(0)
-    await expect(page.getByTestId('lapsed-5')).toContainText(/^Your call on 5\.00\sFUND expired on .+ without being exercised\./)
+    await expect(page.getByTestId('lapsed-5')).toContainText(/^Your call on 5\.00\sRWA expired on .+ without being exercised\./)
 
     // One ink button on the page: the most pressing action.
     await expect(page.locator('main button[data-variant="primary"]')).toHaveCount(1)
@@ -121,7 +122,7 @@ test.describe('Portfolio', () => {
     await expect(table.getByRole('columnheader', { name: 'State' })).toHaveCount(0)
     await expect(table.getByTestId('row-0')).toContainText('In the money')
     await expect(table.getByTestId('row-0')).toContainText('Exercise value 4.00 at the demo price 10.20')
-    await expect(table.getByTestId('row-0')).toContainText('0.43 per FUND')
+    await expect(table.getByTestId('row-0')).toContainText('0.43 per RWA')
     await expect(table.getByTestId('row-1')).toContainText('Out of the money')
     await expect(table.getByTestId('row-1')).toContainText('Demo price 99.40, above the strike 97.00')
     await expect(table.getByTestId('row-0').getByText('Active', { exact: true })).toHaveCount(0)
@@ -155,11 +156,9 @@ test.describe('Portfolio', () => {
     await page.clock.setFixedTime(deadline + 60_000)
 
     const card = page.getByTestId('todo-request-0')
-    // The mock prices its requests from the time left, so the figure is read from the row, not pinned.
-    await expect(card).toContainText(/^Take back \d+\.\d{2}\sUSDx from your expired request/, { timeout: 20_000 })
-    const taken = /^Take back (\d+\.\d{2})/.exec((await card.textContent()) ?? '')?.[1]
-    expect(taken, 'the amount on the card').toBeTruthy()
-    await expect(request).toContainText(taken!)
+    // The seeded request escrows 0.59 USDx per unit for 2.00 BOND (end-to-end builds price at fixed leads).
+    await expect(card).toContainText(/^Take back 1\.18\sUSDx from your expired request/, { timeout: 20_000 })
+    await expect(request).toContainText('1.18')
     await expect(card).toContainText('No maker filled your request for a put on 2.00 BOND.')
     await expect(card).not.toContainText('stays in the contract')
     // The open request past its deadline can be cancelled from its row too.
@@ -191,45 +190,45 @@ test.describe('Portfolio', () => {
   })
 
   test('a holder who cannot cover the exercise is told before the dialog, with where the asset is', async ({ page }) => {
-    // The wallet holds 1.00 FUND of the 10.00 FUND that exercising option 0 delivers.
+    // The wallet holds 1.00 RWA of the 10.00 RWA that exercising option 0 delivers.
     await openApp(page, '/learn', { connect: true })
     await page.evaluate(async (address) => {
       type Hook = { mock(): Promise<{ setBalance(who: string, token: { contractId: string }, units: bigint): void }>; queryClient: { invalidateQueries(): Promise<void> } }
       const hook = (window as unknown as { __stellsec: Hook }).__stellsec
-      ;(await hook.mock()).setBalance(address, { contractId: 'C_MOCK_FUND' }, 10_000_000n)
+      ;(await hook.mock()).setBalance(address, { contractId: 'C_MOCK_RWA' }, 10_000_000n)
       // Balances read earlier (the wallet menu) are read again.
       await hook.queryClient.invalidateQueries()
     }, ADDR_A)
     await goTo(page, 'Portfolio')
-    await expect(page.getByTestId('todo-exercise-0')).toContainText('You hold 1.00 of the 10.00 FUND this exercise delivers.')
+    await expect(page.getByTestId('todo-exercise-0')).toContainText('You hold 1.00 of the 10.00 RWA this exercise delivers.')
 
-    await page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-0').getByRole('link', { name: /^Put on 10\.00\sFUND/ }).click()
+    await page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-0').getByRole('link', { name: /^Put on 10\.00\sRWA/ }).click()
     const main = page.locator('main')
-    await expect(main).toContainText('You hold 1.00 of the 10.00 FUND this exercise delivers.')
+    await expect(main).toContainText('You hold 1.00 of the 10.00 RWA this exercise delivers.')
     await main.getByRole('button', { name: 'Exercise', exact: true }).click()
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
-    await expect(dialog.getByRole('link', { name: 'FUND in Markets' })).toBeVisible()
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
+    await expect(dialog.getByRole('link', { name: 'RWA in Markets' })).toBeVisible()
   })
 
   test('exercise from the to-do strip, with the confirmation and the receipt', async ({ page }) => {
     await openApp(page, '/portfolio', { connect: true })
     await page.getByTestId('todo-exercise-0').getByRole('button', { name: 'Exercise' }).click()
 
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
-    await expect(dialog).toContainText('You deliver 10.00 FUND and receive 106.00 USDx.')
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
+    await expect(dialog).toContainText('You deliver 10.00 RWA and receive 106.00 USDx.')
     await expect(dialog).toContainText('In the money')
     await expect(dialog).toContainText('Demo price 10.20 USDx')
     // Feasibility with exact figures: the option is still active and the wallet holds what it must deliver.
     const checks = dialog.getByRole('region', { name: 'Checked before you sign' })
     // Mock data is not read from a contract, and the line says so.
     await expect(checks).toContainText(/^Mock data: the option is active/)
-    await expect(checks).toContainText('you hold 120.00 FUND')
+    await expect(checks).toContainText('you hold 120.00 RWA')
 
     const receipt = await confirmAndReadReceipt(dialog, 'Exercise')
-    await expect(page.getByRole('dialog', { name: 'Exercised: put on 10.00 FUND' })).toBeVisible()
-    await expect(receipt).toContainText('Long put, FUND')
+    await expect(page.getByRole('dialog', { name: 'Exercised: put on 10.00 RWA' })).toBeVisible()
+    await expect(receipt).toContainText('Long put, RWA')
     await expect(receipt).toContainText('You delivered')
-    await expect(receipt).toContainText('10.00 FUND')
+    await expect(receipt).toContainText('10.00 RWA')
     await expect(receipt).toContainText('You received')
     await expect(receipt).toContainText('106.00 USDx')
     await expect(receipt.getByRole('link', { name: 'View position' })).toBeVisible()
@@ -245,8 +244,8 @@ test.describe('Portfolio', () => {
   test('a declined signature sends nothing and the review can be opened again', async ({ page }) => {
     await openApp(page, '/portfolio', { connect: true })
     await page.getByTestId('todo-exercise-0').getByRole('button', { name: 'Exercise' }).click()
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
-    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('you hold 120.00 FUND')
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
+    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('you hold 120.00 RWA')
 
     await failNext(page, 'declined')
     await dialog.getByRole('button', { name: 'Exercise', exact: true }).click()
@@ -256,7 +255,7 @@ test.describe('Portfolio', () => {
     await expect(dialog.getByTestId('receipt')).toHaveCount(0)
 
     await dialog.getByRole('button', { name: 'Review again' }).click()
-    await expect(dialog).toContainText('You deliver 10.00 FUND and receive 106.00 USDx.')
+    await expect(dialog).toContainText('You deliver 10.00 RWA and receive 106.00 USDx.')
     await dialog.getByRole('button', { name: 'Not now' }).click()
     await expect(dialog).toBeHidden()
     // Nothing changed on the chain.
@@ -292,7 +291,7 @@ test.describe('Portfolio', () => {
     await page.clock.setFixedTime(deadline - 10 * 60_000)
     await expect(card).toContainText('Less than 15 minutes left. The ledger decides the time, so a signature may not land before the deadline.', { timeout: 20_000 })
     await card.getByRole('button', { name: 'Exercise' }).click()
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
     await expect(dialog).toContainText('Less than 15 minutes to the deadline. The ledger decides the time, so a signature may not land before it.')
     await dialog.getByRole('button', { name: 'Not now' }).click()
     await expect(dialog).toBeHidden()
@@ -301,7 +300,7 @@ test.describe('Portfolio', () => {
     await page.clock.setFixedTime(deadline + 30_000)
     await expect(page.getByTestId('todo-exercise-0')).toHaveCount(0, { timeout: 20_000 })
     const expired = page.getByTestId('lapsed-0')
-    await expect(expired).toContainText(/Your put on 10\.00\sFUND expired on .+ without being exercised\./, { timeout: 20_000 })
+    await expect(expired).toContainText(/Your put on 10\.00\sRWA expired on .+ without being exercised\./, { timeout: 20_000 })
     await expect(expired.getByRole('button')).toHaveCount(0)
     await expect(page.getByRole('table', { name: /^Options you hold/ }).getByTestId('row-0')).toHaveCount(0)
   })
@@ -357,7 +356,7 @@ test.describe('Portfolio', () => {
     await expect(cancelOffer).toContainText('The offer leaves Markets and your 49.00 USDx goes back to your wallet.')
     await expect(cancelOffer.getByRole('region', { name: 'Checked before you sign' })).toContainText('the offer is open with no buyer')
     const offerReceipt = await confirmAndReadReceipt(cancelOffer, 'Cancel offer')
-    await expect(page.getByRole('dialog', { name: 'Offer cancelled: put on 5.00 FUND' })).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Offer cancelled: put on 5.00 RWA' })).toBeVisible()
     await expect(offerReceipt).toContainText('49.00 USDx')
     await done(cancelOffer)
     await expect(page.getByText('No offers of yours are waiting for a buyer.')).toBeVisible()
@@ -508,7 +507,7 @@ test.describe('Portfolio', () => {
     await openApp(page, '/portfolio/0?do=exercise')
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.locator('main').getByRole('button', { name: 'Connect wallet' }).click()
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
     expect(await currentPath(page)).toBe('/portfolio/0')
@@ -529,10 +528,10 @@ test.describe('Portfolio', () => {
     expect(await currentPath(page)).toBe('/portfolio/0')
     const lifecycle = page.getByRole('list', { name: 'Lifecycle of this option' })
     await expect(lifecycle).toContainText('Exercised')
-    await expect(lifecycle).toContainText('You delivered 10.00 FUND and received 106.00 USDx.')
+    await expect(lifecycle).toContainText('You delivered 10.00 RWA and received 106.00 USDx.')
     await expect(lifecycle.getByText('Transaction')).toBeVisible()
     await expect(page.locator('main').getByRole('button', { name: 'Exercise', exact: true })).toHaveCount(0)
-    await expect(page.locator('main')).toContainText('You exercised: you delivered 10.00 FUND and received 106.00 USDx.')
+    await expect(page.locator('main')).toContainText('You exercised: you delivered 10.00 RWA and received 106.00 USDx.')
     // An ended option has no payoff figure: the header and the lifecycle say what happened.
     await expect(page.getByTestId('payoff-chart')).toHaveCount(0)
   })
@@ -548,15 +547,15 @@ test.describe('Portfolio', () => {
 
   test('the position page: contract note, payoff figure, lifecycle and calendar file', async ({ page }) => {
     await openApp(page, '/portfolio/0', { connect: true })
-    await expect(page.getByRole('heading', { level: 1, name: 'Put on 10.00 FUND at 10.60' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Put on 10.00 RWA at 10.60' })).toBeVisible()
     const main = page.locator('main')
-    await expect(main).toContainText('Exercise to sell 10.00 FUND for 106.00 USDx, at any time before the deadline.')
+    await expect(main).toContainText('Exercise to sell 10.00 RWA for 106.00 USDx, at any time before the deadline.')
     // The deadline is in the header, with the time left, and the series is one link away.
     await expect(main.locator('header time').first()).toContainText('UTC')
-    await expect(main.getByRole('link', { name: 'This series in Markets' })).toHaveAttribute('href', /\/markets\/fund\?.*kind=put/)
-    await expect(main).not.toContainText('FUND-2026')
+    await expect(main.getByRole('link', { name: 'This series in Markets' })).toHaveAttribute('href', /\/markets\/rwa\?.*kind=put/)
+    await expect(main).not.toContainText('RWA-2026')
 
-    const note = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Long put, FUND' }) })
+    const note = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Long put, RWA' }) })
     // The serial line prints the option number as the contract does, unpadded.
     await expect(note).toContainText(/No\.\s0(?!\d)/)
     await expect(note.getByText('Active', { exact: true })).toBeVisible()
@@ -582,7 +581,7 @@ test.describe('Portfolio', () => {
     await expect(figure.locator('figcaption')).toContainText(PAYOFF_CAPTION)
     await expect(figure.locator('figcaption')).toContainText('Original premium included.')
     await expect(figure).toContainText('Most you can lose at the original premium')
-    await expect(page.getByTestId('payoff-readout')).toContainText('If FUND is at 10.20 at the deadline, exercising pays')
+    await expect(page.getByTestId('payoff-readout')).toContainText('If RWA is at 10.20 at the deadline, exercising pays')
     await expect(page.getByTestId('payoff-readout')).not.toContainText('+4.00')
     await expect(page.getByTestId('payoff-readout')).toContainText('After the 4.30 USDx original premium:')
     const slider = figure.getByRole('slider')
@@ -644,8 +643,8 @@ test.describe('Portfolio', () => {
     await expect(page.locator('main')).not.toContainText('Options to exercise before their deadline')
 
     await openApp(page, '/portfolio/0')
-    await expect(page.getByRole('heading', { level: 1, name: 'Put on 10.00 FUND at 10.60' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Put, FUND' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Put on 10.00 RWA at 10.60' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Put, RWA' })).toBeVisible()
     await expect(page.locator('main')).toContainText('Connect the wallet that holds or wrote this option to act on it.')
     await expect(page.getByTestId('payoff-chart')).toBeVisible()
     await expect(page.locator('main').getByRole('button', { name: 'Exercise' })).toHaveCount(0)
@@ -654,7 +653,7 @@ test.describe('Portfolio', () => {
 
     // Connecting in place turns the same page into the holder's view.
     await page.locator('main').getByRole('button', { name: 'Connect wallet' }).click()
-    await expect(page.getByRole('heading', { name: 'Long put, FUND' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Long put, RWA' })).toBeVisible()
     await expect(page.locator('main').getByRole('button', { name: 'Exercise', exact: true })).toBeVisible()
   })
 
@@ -704,11 +703,11 @@ test.describe('Portfolio', () => {
     const button = page.getByTestId('todo-exercise-0').getByRole('button', { name: 'Exercise' })
     await button.focus()
     await page.keyboard.press('Enter')
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
     await expect(dialog).toBeVisible()
     // Focus starts on the dialog's title; the primary action is reached by Tab and never by a pointer.
     const confirm = dialog.getByRole('button', { name: 'Exercise', exact: true })
-    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('you hold 120.00 FUND')
+    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('you hold 120.00 RWA')
     for (let i = 0; i < 12 && !(await confirm.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press('Tab')
     await expect(confirm).toBeFocused()
     await page.keyboard.press('Enter')
@@ -741,7 +740,7 @@ test.describe('Portfolio', () => {
     const list = page.getByRole('list', { name: 'Options you hold' })
     await expect(list).toBeVisible()
     await expect(page.getByRole('table', { name: /^Options you hold/ })).toBeHidden()
-    const row = list.getByRole('link', { name: /Put on 10\.00\sFUND at\s10\.60/ })
+    const row = list.getByRole('link', { name: /Put on 10\.00\sRWA at\s10\.60/ })
     await expect(row).toContainText('In the money')
     await expect(row).toContainText('Exercise value 4.00 at the demo price 10.20')
     await expect(row).toContainText('left')
@@ -775,7 +774,7 @@ test.describe('Portfolio', () => {
     await expectNoHorizontalOverflow(page)
     await page.setViewportSize({ width: 390, height: 844 })
     await row.click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Put on 10.00 FUND at 10.60' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Put on 10.00 RWA at 10.60' })).toBeVisible()
     await expect(page.getByTestId('payoff-chart')).toBeVisible()
     await expectNoHorizontalOverflow(page)
 
@@ -788,8 +787,8 @@ test.describe('Portfolio', () => {
     const bar = page.locator('main').getByRole('button', { name: 'Exercise', exact: true })
     await expect(bar).toBeInViewport()
     await bar.click()
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
-    await expect(dialog).toContainText('You deliver 10.00 FUND and receive 106.00 USDx.')
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
+    await expect(dialog).toContainText('You deliver 10.00 RWA and receive 106.00 USDx.')
     const confirm = dialog.getByRole('button', { name: 'Exercise', exact: true })
     expect((await confirm.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44)
     await expectNoHorizontalOverflow(page)
@@ -816,8 +815,8 @@ test.describe('Portfolio', () => {
 
     // An exercise dialog, in review and on its receipt.
     await page.getByTestId('todo-exercise-0').getByRole('button', { name: 'Exercise' }).click()
-    const dialog = await openedDialog(page, 'Exercise put on 10.00 FUND')
-    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('you hold 120.00 FUND')
+    const dialog = await openedDialog(page, 'Exercise put on 10.00 RWA')
+    await expect(dialog.getByRole('region', { name: 'Checked before you sign' })).toContainText('you hold 120.00 RWA')
     await expectNoAxeViolations(page)
     await confirmAndReadReceipt(dialog, 'Exercise')
     await expectNoAxeViolations(page)

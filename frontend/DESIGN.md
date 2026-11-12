@@ -91,7 +91,7 @@ Import from `src/ui` only. `@base-ui/react` and `@phosphor-icons/react` are impo
 | An action on a row (Portfolio, chain orders, Requests) | `secondary size="sm"`, right-aligned in the action column; one action looks the same on every row and page; Cancel is plain `secondary` | a quiet link on one page and a button on another |
 | A disabled action | `disabled` + `disabledReason` (read out, still focusable; shown under the button on hover, focus and on a tap on touch screens). A disabled primary is transparent with a hairline border and disabled text | a dead button with no reason; the field fill (`--sunken`) on a button |
 | Navigation that looks like a button | `ButtonLink`, `Link` (`external` says "opens in a new tab"; `standalone` for a link on its own line, 44 px on touch) | `Button` with `onClick` to navigate |
-| An amount to type | `AmountField`: decimal strings, `inputmode=decimal`, unit suffix, Max, 16 px; a comma groups thousands ("1,000"), an exponent is refused. Its label names the quantity: "Quantity" ("Quantity to lock" on the earn intents), "Asset" on the landing widget | `type="number"`, a float, a library number field; "I hold", "I want", "I would buy" |
+| An amount to type | `AmountField`: decimal strings, `inputmode=decimal`, unit suffix, Max, 16 px; a comma groups thousands ("1,000"), an exponent is refused. Its label names the quantity: "Quantity" ("Quantity to lock" on the two selling intents), "Asset" on the landing widget | `type="number"`, a float, a library number field; "I hold", "I want", "I would buy" |
 | A short known list / a long list | `Select` / `Combobox` | rows of chips (one exception: strike and deadline in the guided note, `ChoiceChips`, where each choice shows whether it is funded) |
 | A few options with a sentence each | `RadioGroup` | |
 | Modes of one view (Guided or Chain, Put or Call, a deadline) | `Segmented`: a real radio group, one tab stop, arrow keys. A selected option of `Segmented` or `ChoiceChips` uses the selection tokens (`--accent-tint`, a 1 px border in text or accent colour, text colour); the weight does not change | tabs; the primary button's fill on a selected option |
@@ -144,8 +144,8 @@ on the best offer, the request figure opens Fill on the best request, each with 
 tone; a request shows its size like an offer (`0.13 ×5.00`). An empty half shows no text at rest; on hover and
 focus it shows "Post a request" (accent, underlined), the action a press performs, and its accessible name says so
 ("No offer at 102.00, call, 13 Nov. Post a request."). Under the chain, a deadline with no orders reads "No orders
-on this deadline yet. Press a strike to post a request or write the first offer."; otherwise "Select a premium to
-see its offers and requests." until a series is selected. Guided mode has one side switch, the intent picker: the
+on this deadline yet. Press a call or put cell to post a request, or write the first offer."; otherwise "Select a
+premium to see its offers and requests." until a series is selected. Guided mode has one side switch, the intent picker: the
 ticket opened from it shows no Buy, Write or Request tabs and is seeded from the terms the guided card resolved
 (kind, strike, deadline, quantity), so the two halves of the asset page never describe different orders.
 
@@ -172,6 +172,11 @@ navigation and where they replace a word in a tight row. Status icons always sit
   - the issuer's powers, on About, Issuer and Reserves alike: "Approval required", "Can freeze", "Can claw
     back", "Can change these", answered Yes or No (`FLAG_LABELS` in `core/assetfacts`). Stellar's flag names
     appear only in the Reserves footnote that maps them.
+  - the four intents: "Set a floor", "Get paid to sell higher", "Get paid to buy lower", "Lock a buy price". A
+    selling intent's name states the obligation, not income, and its sentence says what is locked and that you
+    sell or buy at your price if the holder asks before the deadline. Code ids (`earn-hold`, `earn-buy`) stay.
+  - one asset, one code: the mock market uses the Testnet codes (RWA, BOND, EQTY), so no screen maps one code to
+    another. The type label ("Fund share", "Bond", "Equity") goes beside the code.
   - **clawback shortfall** (not "collateral shortfall"); **Covered contract** (not "options contract");
     **declined** for a refusal in the wallet (not "rejected"). Page names keep their capital: "Go to Markets".
   "Covered" and "Margin" name the two regimes and stay visually and structurally separate.

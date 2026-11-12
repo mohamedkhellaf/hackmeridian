@@ -17,7 +17,7 @@ function row(source: BookRow['source'], kind: BookRow['kind'], strike: bigint, e
     key: `${source}-${kind}-${strike}-${expiry}`,
     source,
     kind,
-    underlying: token('FUND'),
+    underlying: token('RWA'),
     quote: token('USDx'),
     underlyingQty: 5n * U,
     totalStrike: 5n * strike,

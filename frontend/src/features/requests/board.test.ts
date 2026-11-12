@@ -22,7 +22,7 @@ import * as copy from './copy'
 
 const UNIT = 10_000_000n
 const USDX: TokenInfo = { contractId: 'C_MOCK_USDX', code: 'USDx', decimals: 7 }
-const FUND: TokenInfo = { contractId: 'C_MOCK_FUND', code: 'FUND', decimals: 7 }
+const RWA: TokenInfo = { contractId: 'C_MOCK_RWA', code: 'RWA', decimals: 7 }
 const BOND: TokenInfo = { contractId: 'C_MOCK_BOND', code: 'BOND', decimals: 7 }
 const ODD: TokenInfo = { contractId: 'CODD', code: 'ODD', decimals: 2 }
 const ME = 'GME'
@@ -34,7 +34,7 @@ const bid = (over: Partial<Bid> = {}): Bid => ({
   id: 0n,
   buyer: 'GOTHER',
   kind: 'put',
-  underlying: FUND,
+  underlying: RWA,
   quote: USDX,
   underlyingQty: 5n * UNIT,
   totalStrike: 50n * UNIT,
@@ -96,7 +96,7 @@ describe('the order of the board', () => {
   })
 
   it('compares assets with different decimals on the same per-unit scale', () => {
-    // 3.00 USDx for 2.00 ODD (2 decimals) is 1.50 per unit; 2.00 USDx for 5.00 FUND is 0.40 per unit.
+    // 3.00 USDx for 2.00 ODD (2 decimals) is 1.50 per unit; 2.00 USDx for 5.00 RWA is 0.40 per unit.
     const odd = bid({ id: 1n, underlying: ODD, underlyingQty: 200n, totalStrike: 20n * UNIT, totalPremium: 3n * UNIT })
     const fund = bid({ id: 2n })
     expect(sortRequests([fund, odd], 'premium').map((b) => b.id)).toEqual([1n, 2n])
@@ -111,7 +111,7 @@ describe('the order of the board', () => {
   it('boardRequests composes open, filter and order', () => {
     const bids = [lateDear, soonCheap, bid({ id: 7n, state: 'filled' }), bid({ id: 8n, underlying: BOND, expiry: NOW + 50 })]
     expect(boardRequests(bids, { assetId: null, kind: null, sort: 'deadline' }, NOW).map((b) => b.id)).toEqual([8n, 1n, 2n])
-    expect(boardRequests(bids, { assetId: FUND.contractId, kind: 'put', sort: 'premium' }, NOW).map((b) => b.id)).toEqual([2n, 1n])
+    expect(boardRequests(bids, { assetId: RWA.contractId, kind: 'put', sort: 'premium' }, NOW).map((b) => b.id)).toEqual([2n, 1n])
   })
 })
 
@@ -168,22 +168,22 @@ describe('a row', () => {
     expect(row.serial).toBe('12')
     expect(row.kindWord).toBe('Put')
     expect(row.glyph).toBe('long-put')
-    expect(row.quantity).toEqual({ text: '5.00', exact: '5.00', code: 'FUND' })
+    expect(row.quantity).toEqual({ text: '5.00', exact: '5.00', code: 'RWA' })
     expect(row.strike).toEqual({ text: '10.00', exact: '10.00', code: 'USDx' })
     // 1.9999999 is never shown as 2.00, and its per-unit figure is floored.
     expect(row.premium).toEqual({ text: '1.99', exact: '1.9999999', code: 'USDx' })
     expect(row.premiumPerUnit.text).toBe('0.39')
     expect(plain(row.deadlineText)).toBe('16 Jan 2027, 08:00 UTC')
     expect(row.mine).toBe(false)
-    expect(plain(row.terms)).toBe('put on 5.00 FUND at 10.00 USDx, until 16 Jan 2027, 08:00 UTC, premium 1.99 USDx')
+    expect(plain(row.terms)).toBe('put on 5.00 RWA at 10.00 USDx, until 16 Jan 2027, 08:00 UTC, premium 1.99 USDx')
   })
 
   it('a put locks the total strike in the quote token, a call the underlying', () => {
     expect(toRow(bid(), null).lock).toEqual({ text: '50.00', exact: '50.00', code: 'USDx' })
     const call = toRow(bid({ kind: 'call' }), null)
-    expect(call.lock).toEqual({ text: '5.00', exact: '5.00', code: 'FUND' })
+    expect(call.lock).toEqual({ text: '5.00', exact: '5.00', code: 'RWA' })
     expect(call.glyph).toBe('long-call')
-    expect(call.lockToken).toBe(FUND)
+    expect(call.lockToken).toBe(RWA)
   })
 
   it('marks the wallet own request and carries the option of a filled one', () => {
@@ -314,7 +314,7 @@ describe('copy', () => {
     expect(copy.cancelLabel(row).startsWith(copy.CANCEL_REQUEST)).toBe(true)
     expect(copy.positionLabel(row).startsWith(copy.VIEW_POSITION)).toBe(true)
     expect(copy.sortMenuLabel('Soonest deadline').startsWith(copy.SORT_SHORT)).toBe(true)
-    expect(plain(copy.fillLabel(row))).toBe('Fill request: put on 5.00 FUND at 10.00 USDx, until 16 Jan 2027, 08:00 UTC, premium 2.00 USDx, you lock 50.00 USDx')
+    expect(plain(copy.fillLabel(row))).toBe('Fill request: put on 5.00 RWA at 10.00 USDx, until 16 Jan 2027, 08:00 UTC, premium 2.00 USDx, you lock 50.00 USDx')
   })
 
   it('names cancelling one way before and after the deadline (ruling F9)', () => {

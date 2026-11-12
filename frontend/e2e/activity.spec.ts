@@ -85,8 +85,8 @@ const STAGED: readonly Staged[] = [
     effect: 'fee-charged',
     error: 'This action is not valid for the option in its current state.',
   },
-  { action: 'write-offer', label: 'Write call on 2.00 FUND', done: 'Offer written', subject: null, phase: 'unknown', effect: 'outcome-unknown' },
-  { action: 'exercise', label: 'Exercise put on 5.00 FUND', done: 'Exercised', subject: 'option:0', phase: 'pending', effect: 'outcome-unknown' },
+  { action: 'write-offer', label: 'Write call on 2.00 RWA', done: 'Offer written', subject: null, phase: 'unknown', effect: 'outcome-unknown' },
+  { action: 'exercise', label: 'Exercise put on 5.00 RWA', done: 'Exercised', subject: 'option:0', phase: 'pending', effect: 'outcome-unknown' },
 ]
 
 /** Puts entries into the Activity store the app itself uses (the E2E hook), oldest first, as mock transactions of `address`. */
@@ -208,16 +208,16 @@ test.describe('Activity', () => {
     await stageEntries(page, ADDR_A, STAGED)
     await expect(rows(page)).toHaveCount(STAGED.length)
     // Open ones first (the unknown outcome before the one in flight), then the finished ones, newest first.
-    await expect(rows(page)).toContainText([/Write call on 2\.00 FUND/, /Exercise put on 5\.00 FUND/, /Buy put on 5\.00 BOND/, /Claim 98\.00 USDx/, /Reclaim 48\.00 USDx/])
+    await expect(rows(page)).toContainText([/Write call on 2\.00 RWA/, /Exercise put on 5\.00 RWA/, /Buy put on 5\.00 BOND/, /Claim 98\.00 USDx/, /Reclaim 48\.00 USDx/])
     await expect(page.getByRole('table').getByRole('rowheader', { name: 'Waiting for an outcome' })).toBeVisible()
     await expect(page.getByTestId('activity-count')).toHaveText('5 transactions. 1 in progress. 1 with an unknown outcome.')
 
-    const pending = rowOf(page, 'Exercise put on 5.00 FUND')
+    const pending = rowOf(page, 'Exercise put on 5.00 RWA')
     await expect(state(pending)).toHaveText('Pending')
     await expect(pending).toContainText('Waiting for a ledger to include it.')
     await expect(pending.getByRole('link', { name: 'Position 0' })).toHaveAttribute('href', /^\/portfolio\/0(\?|$)/)
 
-    const unknown = rowOf(page, 'Write call on 2.00 FUND')
+    const unknown = rowOf(page, 'Write call on 2.00 RWA')
     await expect(state(unknown)).toHaveText('Outcome unknown')
     // The ticket's words, with the time it can still go through until.
     await expect(unknown).toContainText(/It can still go through until \d{2}:\d{2}:\d{2}\sUTC\. Do not send another one before that: check again first\./)
@@ -254,7 +254,7 @@ test.describe('Activity', () => {
     await main(page).getByRole('button', { name: 'Clear finished' }).click()
     await expectAnnounced(page, '3 finished transactions removed from the list.')
     await expect(rows(page)).toHaveCount(2)
-    await expect(rows(page)).toContainText([/Write call on 2\.00 FUND/, /Exercise put on 5\.00 FUND/])
+    await expect(rows(page)).toContainText([/Write call on 2\.00 RWA/, /Exercise put on 5\.00 RWA/])
     await expect(main(page).getByRole('button', { name: 'Clear finished' })).toHaveCount(0)
     await expect(page.getByTestId('activity-count')).toHaveText('2 transactions. 1 in progress. 1 with an unknown outcome.')
     // What happened stays said, with a way back; focus is on that line, not on the page body.
@@ -338,7 +338,7 @@ test.describe('Activity on a phone', () => {
     await expect(failed.locator('time')).toHaveText(/^\d{2}:\d{2}\sUTC$/)
     expect((await failed.getByRole('link', { name: 'Position 31' }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
 
-    const check = rowOf(page, 'Write call on 2.00 FUND').getByRole('button', { name: 'Check again' })
+    const check = rowOf(page, 'Write call on 2.00 RWA').getByRole('button', { name: 'Check again' })
     expect((await check.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     expect((await main(page).getByRole('button', { name: 'Clear finished' }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
     await expect(main(page)).toContainText(LOCAL_ONLY)

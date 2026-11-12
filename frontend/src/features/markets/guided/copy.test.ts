@@ -156,7 +156,7 @@ describe('guided copy', () => {
   it("says a seller's deal before a premium is typed, and that a second order is another one", () => {
     expect(copy.LOCK_SUMMARY(sample)).toBe('You lock 198.00\u00a0USDx. You are paid the premium you ask only if a buyer takes the offer before 20 Nov 2026, 08:00 UTC.')
     expect(copy.another(copy.ANOTHER.offer, 'You pay 1.40 USDx now.')).toBe('Another offer on these terms: you pay 1.40 USDx now.')
-    expect(copy.OWN_SHORT.holding('58')).toBe('You hold option No. 58.')
+    expect(copy.OWN_SHORT.holding('58')).toBe('You hold No. 58.')
   })
 
   it('counts in words in a sentence', () => {

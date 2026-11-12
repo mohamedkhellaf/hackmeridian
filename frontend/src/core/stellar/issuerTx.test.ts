@@ -16,9 +16,9 @@ import {
 
 const issuer = Keypair.random().publicKey()
 const holder = Keypair.random().publicKey()
-const asset = new Asset('FUND', issuer)
+const asset = new Asset('RWA', issuer)
 const NET = Networks.TESTNET
-const sac = sacContractId('FUND', issuer, NET)
+const sac = sacContractId('RWA', issuer, NET)
 const src = () => new Account(issuer, '100')
 
 describe('issuerTx', () => {
@@ -29,7 +29,7 @@ describe('issuerTx', () => {
   })
 
   it('validates asset codes', () => {
-    expect(isValidAssetCode('FUND')).toBe(true)
+    expect(isValidAssetCode('RWA')).toBe(true)
     expect(isValidAssetCode('')).toBe(false)
     expect(isValidAssetCode('TOOLONGASSET1')).toBe(false)
     expect(isValidAssetCode('A-B')).toBe(false)
@@ -66,11 +66,11 @@ describe('issuerTx', () => {
   })
 
   it('reads trustline status from Horizon balances', () => {
-    const line = { asset_type: 'credit_alphanum4', asset_code: 'FUND', asset_issuer: issuer, balance: '5.0000000' }
-    expect(trustStatus([], 'FUND', issuer).status).toBe('none')
-    expect(trustStatus([{ ...line, is_authorized: true }], 'FUND', issuer).status).toBe('authorized')
-    expect(trustStatus([{ ...line, is_authorized: false }], 'FUND', issuer).status).toBe('not-authorized')
-    expect(trustStatus([{ ...line, is_authorized: false, is_authorized_to_maintain_liabilities: true }], 'FUND', issuer).status).toBe(
+    const line = { asset_type: 'credit_alphanum4', asset_code: 'RWA', asset_issuer: issuer, balance: '5.0000000' }
+    expect(trustStatus([], 'RWA', issuer).status).toBe('none')
+    expect(trustStatus([{ ...line, is_authorized: true }], 'RWA', issuer).status).toBe('authorized')
+    expect(trustStatus([{ ...line, is_authorized: false }], 'RWA', issuer).status).toBe('not-authorized')
+    expect(trustStatus([{ ...line, is_authorized: false, is_authorized_to_maintain_liabilities: true }], 'RWA', issuer).status).toBe(
       'maintain-liabilities',
     )
     expect(trustStatus([{ ...line, is_authorized: true }], 'OTHR', issuer).status).toBe('none')

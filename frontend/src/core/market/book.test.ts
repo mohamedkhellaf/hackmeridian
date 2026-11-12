@@ -3,7 +3,7 @@ import { bookRows, sortBook } from './book'
 import type { Ask, OptionOffer, TokenInfo } from '../options/types'
 import type { Bid } from '../requests/types'
 
-const U = { code: 'FUND', contractId: 'CU', decimals: 7 } as TokenInfo
+const U = { code: 'RWA', contractId: 'CU', decimals: 7 } as TokenInfo
 const Q = { code: 'USDx', contractId: 'CQ', decimals: 7 } as TokenInfo
 const E = 2_000_000_000
 const opt = (id: bigint, qty: bigint, prem: bigint, state = 'offered', holder: string | null = null) =>

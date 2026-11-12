@@ -46,7 +46,7 @@ Option No. 8 of the v1.3.1 deployment of the covered contract: a put on 5.00 EQT
 1.00 USDx, written, bought, exercised and claimed on Testnet on 26 Oct 2026. Its terms are the arguments of the
 `create_offer` call; ledger, close time, fee charged and token movements of each transaction were re-read from
 Horizon on 11 Nov 2026 (`recorded.ts` lists the hashes). The same option is the "Set a floor" example, the
-"Earn while waiting to buy" example (seen from the maker's side) and the five steps of the lifecycle; option
+"Get paid to buy lower" example (seen from the maker's side) and the five steps of the lifecycle; option
 No. 4 of the same run is the covered call, option No. 1 the reclaim after expiry. The page says that these ran
 on an earlier deployment than the one the app uses (under the "How it works" table).
 
@@ -82,7 +82,7 @@ Figures printed as proof (each once, in the Proof table), and what each counts:
   to a screen reader); "How it works" has no "Who acts" column, as each step title names who acts; Limits is one
   ruled list of sentences that each stand on their own, with no table head; the closing has no heading.
 - **The hero note.** "Asset" picks the asset and shows its code; the lot is in the line under the terms ("This
-  offer covers 10.00 FUND for 1.90 USDx ..."), because offers are whole lots, and each floor and deadline in the
+  offer covers 10.00 RWA for 1.90 USDx ..."), because offers are whole lots, and each floor and deadline in the
   lists says which lot it would show. A lot changed by the visitor's own pick fades in under the marker flash.
   The floor is the note's one marked figure. When a change of deadline leaves the chosen floor without an offer,
   the note says which floor it moved to.

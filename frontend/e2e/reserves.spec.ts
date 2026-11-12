@@ -71,10 +71,10 @@ test.describe('Reserves', () => {
   test('the statement has the four headers and a row where held equals locked, difference 0', async ({ page }) => {
     await openReserves(page)
     await expect(statement(page).getByRole('columnheader')).toHaveText(HEADERS)
-    await expect(statement(page).getByRole('rowheader')).toHaveText([/^USDx/, /^FUND/, /^BOND/, /^EQTY/])
+    await expect(statement(page).getByRole('rowheader')).toHaveText([/^USDx/, /^RWA/, /^BOND/, /^EQTY/])
     await expect(tokenRow(page, 'USDx').getByRole('rowheader')).toContainText('Quote token')
 
-    for (const code of ['USDx', 'FUND', 'BOND', 'EQTY']) {
+    for (const code of ['USDx', 'RWA', 'BOND', 'EQTY']) {
       expect(await locked(page, code), code).toBeGreaterThan(0n)
       expect(await held(page, code), code).toBe(await locked(page, code))
       expect(await difference(page, code), code).toBe(0n)
@@ -98,10 +98,10 @@ test.describe('Reserves', () => {
 
   test('a click anywhere on a row opens it; the button stays the one tab stop', async ({ page }) => {
     await openReserves(page)
-    const button = toggle(page, 'FUND')
-    await tokenRow(page, 'FUND').getByTestId('held').click()
+    const button = toggle(page, 'RWA')
+    await tokenRow(page, 'RWA').getByTestId('held').click()
     await expect(button).toHaveAttribute('aria-expanded', 'true')
-    await tokenRow(page, 'FUND').getByTestId('difference').click()
+    await tokenRow(page, 'RWA').getByTestId('difference').click()
     await expect(button).toHaveAttribute('aria-expanded', 'false')
   })
 
@@ -132,7 +132,7 @@ test.describe('Reserves', () => {
 
   test('the keyboard opens and closes a row, with focus in sight', async ({ page }) => {
     await openReserves(page)
-    const button = toggle(page, 'FUND')
+    const button = toggle(page, 'RWA')
     await button.focus()
     await page.keyboard.press('Enter')
     await expect(button).toHaveAttribute('aria-expanded', 'true')
@@ -265,7 +265,7 @@ test.describe('Reserves', () => {
   test('axe finds nothing in either theme: closed, opened, and with a shortfall', async ({ page }) => {
     await openReserves(page)
     await expectNoAxeViolations(page)
-    for (const code of ['USDx', 'FUND']) await toggle(page, code).click()
+    for (const code of ['USDx', 'RWA']) await toggle(page, code).click()
     await expectNoAxeViolations(page)
     await stageShortfall(page, 'C_MOCK_BOND', 65_000_000n)
     await refresh(page)
@@ -288,8 +288,9 @@ test.describe('Contracts and roles', () => {
     await expect(covered.getByRole('link', { name: /^View transaction/ })).toHaveAttribute('href', explorerTx(COVERED_CONTRACT.deployTx))
     for (const term of ['Admin', 'Upgrades', 'Oracle', 'Asset listing', 'Audit']) await expect(covered.getByRole('term').filter({ hasText: new RegExp(`^${term}$`) })).toBeVisible()
     await expect(covered).toContainText('No outside party has reviewed the code.')
-    // A mock build says which deployment this is, and which token it shows under another code.
-    await expect(roles(page)).toContainText('The Testnet deployment is listed here as recorded on 26 Oct 2026. Its fund token is RWA, shown above as FUND.')
+    // A mock build says which deployment this is; the tokens carry the same codes there, so nothing is renamed.
+    await expect(roles(page)).toContainText('The Testnet deployment is listed here as recorded on 26 Oct 2026.')
+    await expect(roles(page)).not.toContainText('shown above as')
     // Copy belongs to an id printed in full and to the wasm hash; a shortened id carries its explorer link only.
     await expect(covered.getByRole('button', { name: /^Copy/ })).toHaveCount(2)
   })
@@ -337,7 +338,7 @@ test.describe('Reserves on a phone', () => {
     for (const header of await statement(page).getByRole('columnheader').all()) await expect(header).toBeInViewport({ ratio: 0 })
     // The statement fits: its wrapper has nothing to scroll.
     expect(await statement(page).evaluate((table) => table.parentElement!.scrollWidth <= table.parentElement!.clientWidth + 1)).toBe(true)
-    for (const code of ['USDx', 'FUND', 'BOND', 'EQTY']) expect((await toggle(page, code).boundingBox())!.height, code).toBeGreaterThanOrEqual(44)
+    for (const code of ['USDx', 'RWA', 'BOND', 'EQTY']) expect((await toggle(page, code).boundingBox())!.height, code).toBeGreaterThanOrEqual(44)
     expect((await page.getByRole('button', { name: 'Refresh' }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
   })
 

@@ -29,7 +29,7 @@ describe('createOptionsClient', () => {
   it('opens on the demo market: three assets and offers to trade', async () => {
     const c = await createOptionsClient(wallet)
     const assets = await c.supportedAssets()
-    expect(assets.underlyings.map((t) => t.code)).toEqual(['FUND', 'BOND', 'EQTY'])
+    expect(assets.underlyings.map((t) => t.code)).toEqual(['RWA', 'BOND', 'EQTY'])
     const options = await c.listOptions()
     expect(options.filter((o) => o.state === 'offered').length).toBeGreaterThan(50)
     expect((await c.listBids())?.length).toBeGreaterThanOrEqual(3)

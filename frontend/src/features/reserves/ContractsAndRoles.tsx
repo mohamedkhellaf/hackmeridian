@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { AssetFlags } from '../../core/assetfacts/assetFacts'
 import { FLAG_LABELS, POWER_STATE } from '../../core/assetfacts/assetFacts'
-import { REFERENCE_ASSETS, isReferenceAsset } from '../../core/assets'
+import { isReferenceAsset } from '../../core/assets'
 import { PRO_ENABLED, config } from '../../core/config'
 import { explorerTx } from '../../core/explorer'
 import { NO_VALUE, formatList } from '../../core/format'
@@ -35,7 +35,6 @@ import {
   flagsUnread,
   notImmutableNote,
   otherListedNote,
-  renamedTokenNote,
 } from './copy'
 import type { RoleCopy } from './copy'
 import { COVERED_CONTRACT, MARGIN_CONTRACT, TOKEN_RECORDS, coveredRecordFor, marginRecordFor, findTokenRecord } from '../../core/deployments'
@@ -252,17 +251,6 @@ function LiveTokens({ tokens }: { tokens: readonly { token: { contractId: string
   return <>{collect(0, [])}</>
 }
 
-/**
- * The mock market names some tokens differently from the recorded deployment (FUND there, RWA here): one
- * sentence per renamed token, matched by asset type.
- */
-function renamedTokens(): string[] {
-  return REFERENCE_ASSETS.testnet.flatMap((recorded) => {
-    const shown = REFERENCE_ASSETS.mock.find((m) => m.type === recorded.type)
-    return shown && shown.code !== recorded.code ? [renamedTokenNote(recorded.type, recorded.code, shown.code)] : []
-  })
-}
-
 // ---------------------------------------------------------------------------------------------- roles
 
 function Role({ copy, address }: { copy: RoleCopy; address: string | null }) {
@@ -334,7 +322,7 @@ export function ContractsAndRoles() {
     <section className={css.root} aria-labelledby="roles-heading">
       <header className={css.head}>
         <h2 id="roles-heading">{ROLES_HEADING}</h2>
-        {isMock ? <p className={css.note}>{[ROLES_MOCK_NOTE, ...renamedTokens()].join(' ')}</p> : null}
+        {isMock ? <p className={css.note}>{ROLES_MOCK_NOTE}</p> : null}
       </header>
 
       <section className={css.block} aria-labelledby="roles-covered">

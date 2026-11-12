@@ -4,7 +4,7 @@ import { requiredCollateral } from './types'
 import type { OptionOffer, TokenInfo } from './types'
 
 const Q: TokenInfo = { contractId: 'CQ', code: 'USDx', decimals: 7 }
-const U: TokenInfo = { contractId: 'CU', code: 'FUND', decimals: 7 }
+const U: TokenInfo = { contractId: 'CU', code: 'RWA', decimals: 7 }
 const UNIT = 10_000_000n
 
 describe('parseAmount', () => {

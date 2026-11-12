@@ -25,14 +25,14 @@ const openOffers = (src: { options: OptionOffer[] }, id: string) => src.options.
 
 describe('buildMarket: the standard grid over the demo market', () => {
   it('lists the standard expiries and a 1-2-5 ladder around the reference', () => {
-    const m = buildMarket(w.source(null), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const m = buildMarket(w.source(null), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     expect(m.expiries).toEqual(standardExpiries(FIXED_SEC))
     expect(m.expiries).toHaveLength(5)
     expect(m.expiries.every(isStandardExpiry)).toBe(true)
     expect(m.columns.map((c) => c.day)).toEqual(['2026-11-13', '2026-11-20', '2026-11-27', '2026-12-25', '2027-01-29'])
     expect(m.columns.map((c) => c.cycle)).toEqual(['weekly', 'weekly', 'monthly', 'monthly', 'monthly'])
     expect(m.columns[0].secondsLeft).toBe(44 * 3600)
-    // FUND demo price 10.20: step 0.20, nine strikes centred on 10.20.
+    // RWA demo price 10.20: step 0.20, nine strikes centred on 10.20.
     expect(m.ladder).toHaveLength(LADDER_ROWS)
     expect(m.ladder).toEqual([9.4, 9.6, 9.8, 10.0, 10.2, 10.4, 10.6, 10.8, 11.0].map(units))
     for (const c of m.columns) expect(c.rows.map((r) => r.strikePerUnit)).toEqual(m.ladder)
@@ -42,7 +42,7 @@ describe('buildMarket: the standard grid over the demo market', () => {
 
   it('prices each cell from the cheapest standard offer of exactly that series and counts its makers', () => {
     const src = w.source(null)
-    const m = buildMarket(src, w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const m = buildMarket(src, w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     let priced = 0
     for (const column of m.columns)
       for (const row of column.rows)
@@ -50,7 +50,7 @@ describe('buildMarket: the standard grid over the demo market', () => {
           const cell = row[kind]
           const same = (o: { kind: string; expiry: number; totalStrike: bigint; underlyingQty: bigint }) =>
             o.kind === kind && o.expiry === column.expiry && (o.totalStrike * 10n ** 7n) / o.underlyingQty === row.strikePerUnit
-          const offers = openOffers(src, w.assets.FUND.contractId).filter(same)
+          const offers = openOffers(src, w.assets.RWA.contractId).filter(same)
           const listing = (src.asks ?? []).map((a) => ({ ask: a, option: src.options.find((o) => o.id === a.id)! })).filter((x) => same(x.option))
           const prices = [...offers.map(perUnit), ...listing.map((x) => perUnit({ totalPremium: x.ask.askTotal, underlyingQty: x.option.underlyingQty }))]
           expect(cell.offers).toBe(prices.length)
@@ -75,7 +75,7 @@ describe('buildMarket: the standard grid over the demo market', () => {
   it('has every strike the demo makers quote on the ladder of each asset, and only the two seeded orders off it', () => {
     const src = w.source(null)
     const others: Record<string, number> = {}
-    for (const asset of [w.assets.FUND, w.assets.BOND, w.assets.EQTY]) {
+    for (const asset of [w.assets.RWA, w.assets.BOND, w.assets.EQTY]) {
       const m = buildMarket(src, asset, w.quote, w.reference(asset))
       expect(m.ladder).toHaveLength(LADDER_ROWS)
       // The five strikes the demo quotes are the five central rows; two empty rows frame them on each side.
@@ -87,11 +87,11 @@ describe('buildMarket: the standard grid over the demo market', () => {
       // The outer rows are empty in the demo: they offer "Request".
       for (const c of m.columns) for (const r of [c.rows[0], c.rows[1], c.rows[7], c.rows[8]]) expect(r.call.empty && r.put.empty).toBe(true)
     }
-    expect(others).toEqual({ FUND: 1, BOND: 0, EQTY: 1 })
+    expect(others).toEqual({ RWA: 1, BOND: 0, EQTY: 1 })
   })
 
   it('keeps off-grid orders out of the grid and lists them with the reason', () => {
-    const fund = buildMarket(w.source(null), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const fund = buildMarket(w.source(null), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     expect(fund.other).toHaveLength(1)
     expect(fund.other[0].reason).toBe('non-standard expiry')
     expect(fund.other[0].row.counterparty).toBe(DEMO_MAKERS.d)
@@ -109,25 +109,25 @@ describe('buildMarket: the standard grid over the demo market', () => {
 
   it('does not let a dust lot or an odd premium price a cell', () => {
     const src = w.source(null)
-    const base = openOffers(src, w.assets.FUND.contractId)[0]
+    const base = openOffers(src, w.assets.RWA.contractId)[0]
     const ref = seriesRefOf(base)!
-    const before = buildMarket(src, w.assets.FUND, w.quote, w.reference(w.assets.FUND)).cells.get(cellKey(ref))!
+    const before = buildMarket(src, w.assets.RWA, w.quote, w.reference(w.assets.RWA)).cells.get(cellKey(ref))!
     // Same series, one thousandth of a unit, at a give-away price per unit.
     const dust: OptionOffer = { ...base, id: 9_001n, writer: 'GSPAMMER', underlyingQty: base.underlyingQty / 1000n / (base.underlyingQty / 10n ** 7n), totalStrike: ref.strikePerUnit / 1000n, totalPremium: 1n }
     // Same series, a whole lot, premium off the 0.01 tick.
     const odd: OptionOffer = { ...base, id: 9_002n, writer: 'GSPAMMER', totalPremium: 12_345n }
-    const after = buildMarket({ ...src, options: [...src.options, dust, odd] }, w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const after = buildMarket({ ...src, options: [...src.options, dust, odd] }, w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     const cell = after.cells.get(cellKey(ref))!
     expect(cell.bestPerUnit).toBe(before.bestPerUnit)
     expect(cell.makers).toBe(before.makers)
     expect(cell.offers).toBe(before.offers)
     expect(after.other.filter((o) => o.row.counterparty === 'GSPAMMER').map((o) => o.reason).sort()).toEqual(['lot below 1 unit', 'premium off the 0.01 tick'])
     // The index's "lowest premium" ignores them too.
-    expect(after.summary.lowestPutPerUnit).toBe(buildMarket(src, w.assets.FUND, w.quote, w.reference(w.assets.FUND)).summary.lowestPutPerUnit)
+    expect(after.summary.lowestPutPerUnit).toBe(buildMarket(src, w.assets.RWA, w.quote, w.reference(w.assets.RWA)).summary.lowestPutPerUnit)
   })
 
   it('marks the cells where the wallet has an order or a position', () => {
-    const m = buildMarket(w.source(A), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const m = buildMarket(w.source(A), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     const cell = (expiry: number, kind: 'put' | 'call', strike: number) => m.cells.get(cellKey({ expiry, kind, strikePerUnit: units(strike) }))!
     // Option 6: its open put offer at 9.80 on the third expiry.
     expect(cell(m.expiries[2], 'put', 9.8).mine).toBe(true)
@@ -135,29 +135,29 @@ describe('buildMarket: the standard grid over the demo market', () => {
     expect(cell(m.expiries[0], 'put', 10.6).holding).toBe(true)
     expect(cell(m.expiries[0], 'put', 10.6).wrote).toBe(false)
     // A guest sees none of it.
-    const guest = buildMarket(w.source(null), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const guest = buildMarket(w.source(null), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     expect([...guest.cells.values()].some((c) => c.mine || c.holding || c.wrote)).toBe(false)
   })
 
   it('gives each cell its moneyness at the reference, and says unknown without one', () => {
-    const m = buildMarket(w.source(null), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const m = buildMarket(w.source(null), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     const row = (strike: number) => m.columns[0].rows.find((r) => r.strikePerUnit === units(strike))!
     expect(row(9.8).put.moneyness).toBe('out')
     expect(row(9.8).call.moneyness).toBe('in')
     expect(row(10.2).put.moneyness).toBe('at')
     expect(row(10.6).put.moneyness).toBe('in')
     expect(row(10.6).call.moneyness).toBe('out')
-    const blind = buildMarket(w.source(null), w.assets.FUND, w.quote, noReference())
+    const blind = buildMarket(w.source(null), w.assets.RWA, w.quote, noReference())
     expect(blind.referenceRule).toBeNull()
     expect([...blind.cells.values()].every((c) => c.moneyness === 'unknown')).toBe(true)
     // Without a reference the ladder comes from the strikes that exist.
     expect(blind.ladder.length).toBeGreaterThan(0)
-    const existing = new Set([...openOffers(w.source(null), w.assets.FUND.contractId), ...(w.source(null).bids ?? [])].map((o) => seriesRefOf(o)?.strikePerUnit))
+    const existing = new Set([...openOffers(w.source(null), w.assets.RWA.contractId), ...(w.source(null).bids ?? [])].map((o) => seriesRefOf(o)?.strikePerUnit))
     expect(blind.ladder.every((k) => existing.has(k))).toBe(true)
   })
 
   it('shows a bid on a series nobody quotes, and lists the asset bids best first', () => {
-    const m = buildMarket(w.source(null), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const m = buildMarket(w.source(null), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     // Request 2: a put at 10.40 on the second expiry, by a hedger, with no offer beside it.
     const cell = m.cells.get(cellKey({ expiry: m.expiries[1], kind: 'put', strikePerUnit: units(10.4) }))!
     expect(cell.bids).toBe(1)
@@ -172,13 +172,13 @@ describe('buildMarket: the standard grid over the demo market', () => {
     const src = w.source(null)
     const later = { ...src, nowSec: standardExpiries(FIXED_SEC)[0] + 1 }
     expect(marketInputs(later).offers.some((o) => o.expiry <= later.nowSec)).toBe(false)
-    const m = buildMarket(later, w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+    const m = buildMarket(later, w.assets.RWA, w.quote, w.reference(w.assets.RWA))
     expect(m.expiries).not.toContain(standardExpiries(FIXED_SEC)[0])
   })
 })
 
 describe('buildBook: one exact series', () => {
-  const market = () => buildMarket(w.source(A), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+  const market = () => buildMarket(w.source(A), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
 
   it('sorts both sides, labels the rows and picks what the wallet can take', () => {
     const m = market()
@@ -191,12 +191,12 @@ describe('buildBook: one exact series', () => {
     expect(book.offers.every((e) => e.reason === null && e.action.kind === 'buy' && !e.mine)).toBe(true)
     expect(book.empty).toBe(false)
     expect(book.prefill.buy.kind).toBe(busiest.ref.kind)
-    expect(book.prefill.buy.underlyingId).toBe(w.assets.FUND.contractId)
+    expect(book.prefill.buy.underlyingId).toBe(w.assets.RWA.contractId)
   })
 
   it('never offers the wallet its own row as the best, and lets it cancel that row', () => {
     const m = market()
-    const ref: SeriesRef = { underlyingId: w.assets.FUND.contractId, expiry: m.expiries[2], kind: 'put', strikePerUnit: units(9.8) }
+    const ref: SeriesRef = { underlyingId: w.assets.RWA.contractId, expiry: m.expiries[2], kind: 'put', strikePerUnit: units(9.8) }
     const book = buildBook(w.source(A), ref, w.quote, m.ladder, m.expiries)
     const own = book.offers.filter((e) => e.mine)
     expect(own).toHaveLength(1)
@@ -210,7 +210,7 @@ describe('buildBook: one exact series', () => {
   it('joins a resale listing as an offer with its own source', () => {
     const m = market()
     // Option 9: a call at 10.40 on the second expiry, listed by its holder.
-    const ref: SeriesRef = { underlyingId: w.assets.FUND.contractId, expiry: m.expiries[1], kind: 'call', strikePerUnit: units(10.4) }
+    const ref: SeriesRef = { underlyingId: w.assets.RWA.contractId, expiry: m.expiries[1], kind: 'call', strikePerUnit: units(10.4) }
     const book = buildBook(w.source(A), ref, w.quote, m.ladder, m.expiries)
     const resale = book.offers.filter((e) => e.row.source === 'resale')
     expect(resale).toHaveLength(1)
@@ -220,12 +220,12 @@ describe('buildBook: one exact series', () => {
 
   it('gives an empty series a prefill of its terms only', () => {
     const m = market()
-    const ref: SeriesRef = { underlyingId: w.assets.FUND.contractId, expiry: m.expiries[4], kind: 'call', strikePerUnit: units(10.8) }
+    const ref: SeriesRef = { underlyingId: w.assets.RWA.contractId, expiry: m.expiries[4], kind: 'call', strikePerUnit: units(10.8) }
     const book = buildBook(w.source(A), ref, w.quote, m.ladder, m.expiries)
     expect(book.empty).toBe(true)
     expect(book.bestOffer).toBeNull()
     expect(book.bestBid).toBeNull()
-    expect(book.prefill.buy).toEqual({ kind: 'call', underlyingId: w.assets.FUND.contractId, strike: '10.8', expiryMs: m.expiries[4] * 1000 })
+    expect(book.prefill.buy).toEqual({ kind: 'call', underlyingId: w.assets.RWA.contractId, strike: '10.8', expiryMs: m.expiries[4] * 1000 })
     expect(book.prefill.sell).toEqual(book.prefill.buy)
   })
 
@@ -244,8 +244,8 @@ describe('buildBook: one exact series', () => {
 describe('buildMarketIndex', () => {
   it('has one row per listed asset, reference assets first, with exact lowest premiums', () => {
     const src = w.source(null)
-    const rows = buildMarketIndex(src, [w.assets.EQTY, w.assets.FUND, w.assets.BOND], w.quote, 'mock', w.reference)
-    expect(rows.map((r) => r.asset.code)).toEqual(['FUND', 'BOND', 'EQTY'])
+    const rows = buildMarketIndex(src, [w.assets.EQTY, w.assets.RWA, w.assets.BOND], w.quote, 'mock', w.reference)
+    expect(rows.map((r) => r.asset.code)).toEqual(['RWA', 'BOND', 'EQTY'])
     for (const r of rows) {
       expect(r.tier).toBe('Reference')
       expect(r.isReference).toBe(true)
@@ -263,8 +263,8 @@ describe('buildMarketIndex', () => {
 
   it('puts an asset outside the reference list after it, with its tier in words', () => {
     const stranger = { contractId: 'C_MOCK_B0ND', code: 'B0ND', decimals: 7 }
-    const rows = buildMarketIndex(w.source(null), [stranger, w.assets.FUND], w.quote, 'mock', w.reference)
-    expect(rows.map((r) => r.asset.code)).toEqual(['FUND', 'B0ND'])
+    const rows = buildMarketIndex(w.source(null), [stranger, w.assets.RWA], w.quote, 'mock', w.reference)
+    expect(rows.map((r) => r.asset.code)).toEqual(['RWA', 'B0ND'])
     expect(rows[1].isReference).toBe(false)
     expect(rows[1].tier).toBe('No domain link')
     expect(rows[1].typeLabel).toBeNull()

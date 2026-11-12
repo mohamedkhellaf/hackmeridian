@@ -19,9 +19,10 @@ import { useBalances, useGuidedMatch, useMarket, useMe, useNowSec, usePositions 
 import type { GuidedMatch, MarketView } from '../../../data'
 import { searchFromTicketIntent } from '../../ticket'
 import type { TicketIntent } from '../../ticket'
-import { ACTION, ANOTHER, INTENT_COPY, LOCK_SUMMARY, OWN_SUMMARY, another } from './copy'
+import { ACTION, ANOTHER, INTENT_COPY, LOCK_SUMMARY, NEED_PREMIUM_ACTION, NEED_QTY_ACTION, OWN_SUMMARY, PREMIUM_INEXACT_ACTION, another } from './copy'
 import type { IntentCopy, Words } from './copy'
 import {
+  canonicalDecimal,
   coverWith,
   defaultSeries,
   inSeries,
@@ -35,6 +36,8 @@ import {
   parsePositive,
   pinnedSeries,
   premiumAt,
+  premiumPerUnitOf,
+  premiumTotal,
   takeIntent,
   totalStrike,
 } from './terms'
@@ -70,7 +73,14 @@ export interface GuidedModel {
   /** A price or date the link named that is not on the list (said once above the chips). */
   dropped: { strike: bigint | null; expiry: number | null }
   qtyDraft: DraftParam
+  /** The premium field: a total on the buyer side, per unit on the seller side (E18, H4). */
   premiumDraft: DraftParam
+  /** True on the seller side, where the premium is typed per unit and its exact total is shown as a row. */
+  premiumPerUnit: boolean
+  /** The premium per unit typed on the seller side does not multiply out to an exact total for this quantity. */
+  premiumInexact: boolean
+  /** The premium as the URL keeps it (a total), from what is typed; undefined while there is none. */
+  premiumUrl: string | undefined
   /** What the quantity field holds, when it is a positive amount. */
   typedQty: bigint | null
   strikeTotal: bigint | null
@@ -85,7 +95,7 @@ export interface GuidedModel {
   lowestOffer: BookRow | null
   /** Smaller offers of the same series that together stay within the quantity: what they would cover. */
   cover: { rows: BookRow[]; total: bigint }
-  /** The premium the user typed, when there is no exact match. */
+  /** The total premium the user typed (or that their price per unit comes to), when there is no exact match. */
   ownPremium: bigint | null
   /** The premium of the order or the user's own: what gets signed. */
   premium: bigint | null
@@ -101,6 +111,8 @@ export interface GuidedModel {
   deadline: string
   primary: { ticket: TicketIntent; step: 'terms' | 'review' } | null
   primaryLabel: string
+  /** Why the action waits, when `primary` is null: a quantity first, then (seller side) a premium. */
+  primaryReason: string
   ownTerms: TicketIntent | null
   summary: string | null
   /** What the action needs in quote units, and what the wallet has, when it has less. */
@@ -169,7 +181,19 @@ export function useGuidedModel(assetId: string): GuidedState {
   const decimals = view?.asset.decimals ?? 7
   const scope = `${assetId}:${intent}`
   const qtyDraft = useDraftParam(`${scope}:qty`, search.qty, lotRow !== null ? inputAmount(lotRow.underlyingQty, decimals) : '1.00')
-  const premiumDraft = useDraftParam(`${scope}:premium`, search.premium, '')
+  // A seller types the premium per unit (E18); the URL keeps the total, as the ticket does. The field is compared
+  // with the URL's total over the URL's quantity, both written one way, so a typed `0.40` stays on screen.
+  const perUnitPremium = side === 'write'
+  const urlQty = parsePositive(search.qty ?? qtyDraft.text, decimals)
+  const urlTotal = search.premium !== undefined ? parsePositive(search.premium, quoteDecimals) : null
+  const urlPerUnit = urlTotal !== null && urlQty !== null ? premiumPerUnitOf(urlTotal, urlQty, decimals) : null
+  const canonPerUnit = useCallback((text: string) => canonicalDecimal(text, quoteDecimals), [quoteDecimals])
+  const premiumDraft = useDraftParam(
+    `${scope}:${perUnitPremium ? 'premiumPerUnit' : 'premium'}`,
+    perUnitPremium ? (urlPerUnit !== null ? plainDecimal(urlPerUnit, quoteDecimals) : undefined) : search.premium,
+    '',
+    perUnitPremium ? canonPerUnit : undefined,
+  )
 
   const typedQty = parsePositive(qtyDraft.text, decimals)
   const strikeTotal = typedQty !== null && strike !== null ? totalStrike(strike, typedQty, decimals) : null
@@ -205,7 +229,10 @@ export function useGuidedModel(assetId: string): GuidedState {
 
   const mine = ownItem(positions.data, ref, side)
 
-  const ownPremium = exact ? null : parsePositive(premiumDraft.text, quote.decimals)
+  const typedPremium = exact ? null : parsePositive(premiumDraft.text, quote.decimals)
+  const ownTotal = perUnitPremium && typedPremium !== null && qty !== null ? premiumTotal(typedPremium, qty, asset.decimals) : null
+  const ownPremium = perUnitPremium ? ownTotal : typedPremium
+  const premiumInexact = perUnitPremium && typedPremium !== null && qty !== null && ownTotal === null
   const premium = exact ? exact.totalPremium : ownPremium
   const lowestPerUnit = lowestOffer ? premiumUnits(lowestOffer) : null
   const assumedTotal = !exact && ownPremium === null && lowestPerUnit !== null && qty !== null ? premiumAt(lowestPerUnit, qty, asset.decimals, quote.decimals) : null
@@ -252,15 +279,35 @@ export function useGuidedModel(assetId: string): GuidedState {
       opts,
     )
   }
-  const typeQty = (text: string) => pin({ qty: qtyDraft.type(text) }, { replace: true })
-  const typePremium = (text: string) => pin({ premium: premiumDraft.type(text) }, { replace: true })
+  // The total a premium typed per unit comes to for a quantity typed as text: what the URL keeps.
+  const totalFor = (perUnitText: string, qtyText: string): string | undefined => {
+    const unit = parsePositive(perUnitText, quote.decimals)
+    const q = parsePositive(qtyText, asset.decimals)
+    const total = unit !== null && q !== null ? premiumTotal(unit, q, asset.decimals) : null
+    return total !== null ? plainDecimal(total, quote.decimals) : undefined
+  }
+  // A seller's price per unit stays when the quantity changes, as in the ticket, while it still multiplies out.
+  const typeQty = (text: string) => {
+    const nextQty = qtyDraft.type(text)
+    const kept = perUnitPremium && premiumDraft.text.trim() !== '' ? totalFor(premiumDraft.text, text) : undefined
+    pin(kept !== undefined ? { qty: nextQty, premium: kept } : { qty: nextQty }, { replace: true })
+  }
+  const typePremium = (text: string) => {
+    const typed = premiumDraft.type(text)
+    if (!perUnitPremium) return pin({ premium: typed }, { replace: true })
+    // Per unit: the URL gets the exact total. A price that does not multiply out leaves the URL as it was; the
+    // field keeps what was typed and says why it cannot be used.
+    const total = totalFor(text, qtyDraft.text)
+    if (total !== undefined || text.trim() === '') pin({ premium: total }, { replace: true })
+  }
   const useTerms = (t: { qty: bigint; strike: bigint; expiry: number }) => pin({ qty: qtyDraft.type(inputAmount(t.qty, asset.decimals)), strike: t.strike, expiry: t.expiry })
 
   // ---- the ticket
   // The link carries the quantity and the premium as they are typed, so the inputs do not change under the user.
   const strikeParam = plainDecimal(strike, quote.decimals)
   const qtyParam = qty !== null ? normalizeDecimal(qtyDraft.text) : undefined
-  const premiumParam = ownPremium !== null ? normalizeDecimal(premiumDraft.text) : undefined
+  const premiumParam = ownPremium !== null ? (perUnitPremium ? plainDecimal(ownPremium, quote.decimals) : normalizeDecimal(premiumDraft.text)) : undefined
+  const premiumUrl = perUnitPremium ? premiumParam : normalizeDecimal(premiumDraft.text)
   const own = (withPremium: boolean): TicketIntent | null =>
     qtyParam === undefined ? null : ownIntent(side, { assetId, kind, strike: strikeParam, qty: qtyParam, premium: withPremium ? premiumParam : undefined, expiry })
   const open = (ticket: TicketIntent, step: 'terms' | 'review') =>
@@ -268,8 +315,10 @@ export function useGuidedModel(assetId: string): GuidedState {
   // A funded order is taken as it stands, at the review step. Terms of one's own go to review once they have a
   // premium, and to the terms step of the ticket while they do not.
   const taking = exact ? takeIntent(exact, me) : null
-  const posting = exact ? null : own(true)
+  // A seller's own offer waits for a premium (H4): its action stays disabled, with the reason, until one is typed.
+  const posting = exact || (perUnitPremium && ownPremium === null) ? null : own(true)
   const primary = taking ? { ticket: taking, step: 'review' as const } : posting ? { ticket: posting, step: ownPremium !== null ? ('review' as const) : ('terms' as const) } : null
+  const primaryReason = qty === null ? NEED_QTY_ACTION : premiumInexact ? PREMIUM_INEXACT_ACTION : NEED_PREMIUM_ACTION
   const primaryLabel = exact
     ? exact.source === 'bid'
       ? ACTION.request
@@ -326,6 +375,9 @@ export function useGuidedModel(assetId: string): GuidedState {
       dropped,
       qtyDraft,
       premiumDraft,
+      premiumPerUnit: perUnitPremium,
+      premiumInexact,
+      premiumUrl,
       typedQty,
       strikeTotal,
       qty,
@@ -348,6 +400,7 @@ export function useGuidedModel(assetId: string): GuidedState {
       deadline,
       primary,
       primaryLabel,
+      primaryReason,
       ownTerms,
       summary,
       shortfall,

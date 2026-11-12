@@ -35,7 +35,7 @@ test.describe('Learn', () => {
     expect(sections).toEqual(SECTIONS.map((s) => s.title))
     // The four intents are the h3s of their section, named as everywhere else in the app, each the row that opens
     // its example. Only the first is open when the page loads.
-    const names = ['Set a floor', 'Earn on what you hold', 'Earn while waiting to buy', 'Lock a buy price']
+    const names = ['Set a floor', 'Get paid to sell higher', 'Get paid to buy lower', 'Lock a buy price']
     for (const name of names) {
       await expect(page.locator('#intents').getByRole('heading', { level: 3, name, exact: true })).toBeVisible()
     }
@@ -166,7 +166,7 @@ test.describe('Learn', () => {
 
     // A written put: what the user locks, and the loss said as plainly as the gain. Its example opens on a click.
     const earnBuy = page.locator('[data-intent="earn-buy"]')
-    await earnBuy.getByRole('heading', { level: 3, name: 'Earn while waiting to buy' }).click()
+    await earnBuy.getByRole('heading', { level: 3, name: 'Get paid to buy lower' }).click()
     await expect(earnBuy).toHaveAttribute('open', '')
     await expect(earnBuy.getByRole('article')).toContainText('You lock')
     await expect(earnBuy.getByRole('article')).toContainText(/47\.50\sUSDx/)
@@ -187,7 +187,7 @@ test.describe('Learn', () => {
     await openApp(page, '/learn')
     const example = page.locator('[data-intent="earn-hold"]')
     await example.locator('summary').click()
-    const action = example.getByRole('link', { name: 'Earn on what you hold in Markets' })
+    const action = example.getByRole('link', { name: 'Get paid to sell higher in Markets' })
     // After the outcomes, not before them.
     const after = await example.evaluate((root) => {
       const list = root.querySelector('ul')

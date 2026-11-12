@@ -1,7 +1,8 @@
 // The demo market of mock mode: three fictional assets, four fictional makers, offers of both kinds on the
 // standard grid (core/series), a few buyer requests, one resale listing and positions for the two test wallets.
 // Everything is computed from the current time, so the demo never goes stale: expiries are the listed Fridays,
-// and the positions that must be near or past their deadline are placed relative to now.
+// and the positions that must be near or past their deadline are placed relative to now. End-to-end builds price
+// at a fixed lead before each deadline instead (`fixedPricing`), so their premiums do not drift with the clock.
 //
 // Premiums are illustrative. They come from a textbook normal-model formula so that the chain is internally
 // consistent (out of the money is cheaper than in the money, longer dated is dearer, makers differ by a spread).
@@ -50,7 +51,7 @@ export function bareSeed(): MockSeed {
 // ------------------------------------------------------------------------------------------- demo premiums
 
 /** Illustrative yearly move of each demo asset, as a fraction of its price. Not calibrated on anything. */
-const DEMO_SWING: Record<string, number> = { FUND: 0.3, BOND: 0.14, EQTY: 0.45 }
+const DEMO_SWING: Record<string, number> = { RWA: 0.3, BOND: 0.14, EQTY: 0.45 }
 const YEAR_SECONDS = 365 * 86_400
 
 const pdf = (x: number) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI)
@@ -118,17 +119,17 @@ const itm = (s: number, kind: OptionKind) => (kind === 'put' ? s >= 2 : s <= 2)
 
 const QUOTING: Quoting[] = [
   // The broad maker: out-of-the-money and at-the-money series of every asset.
-  { maker: DEMO_MAKERS.a, factor: 1, lots: { FUND: 10, BOND: 2, EQTY: 5 }, quotes: (code, e, s, kind) => otm(s, kind) && (e < 2 || code === 'FUND') },
-  // Tighter prices on the three central strikes of FUND and BOND, nearest and furthest expiry.
-  { maker: DEMO_MAKERS.b, factor: TIGHTEST_FACTOR, lots: { FUND: 5, BOND: 1 }, quotes: (code, e, s) => code !== 'EQTY' && e !== 1 && s >= 1 && s <= 3 },
+  { maker: DEMO_MAKERS.a, factor: 1, lots: { RWA: 10, BOND: 2, EQTY: 5 }, quotes: (code, e, s, kind) => otm(s, kind) && (e < 2 || code === 'RWA') },
+  // Tighter prices on the three central strikes of RWA and BOND, nearest and furthest expiry.
+  { maker: DEMO_MAKERS.b, factor: TIGHTEST_FACTOR, lots: { RWA: 5, BOND: 1 }, quotes: (code, e, s) => code !== 'EQTY' && e !== 1 && s >= 1 && s <= 3 },
   // In-the-money series of EQTY, and of BOND for the middle expiry.
   { maker: DEMO_MAKERS.c, factor: 1.05, lots: { EQTY: 4, BOND: 2 }, quotes: (code, e, s, kind) => itm(s, kind) && (code === 'EQTY' || (code === 'BOND' && e === 1)) },
   // Sparse and dearer, larger lots.
   {
     maker: DEMO_MAKERS.d,
     factor: 1.1,
-    lots: { FUND: 25, BOND: 5, EQTY: 10 },
-    quotes: (code, e, s, kind) => (code === 'FUND' ? e === 0 && kind === 'put' && (s === 2 || s === 3) : e === 2 && (kind === 'put' ? s === 0 || s === 2 : s === 2 || s === 4)),
+    lots: { RWA: 25, BOND: 5, EQTY: 10 },
+    quotes: (code, e, s, kind) => (code === 'RWA' ? e === 0 && kind === 'put' && (s === 2 || s === 3) : e === 2 && (kind === 'put' ? s === 0 || s === 2 : s === 2 || s === 4)),
   },
 ]
 
@@ -156,24 +157,49 @@ function soonDeadline(atSec: number): number {
   return Math.ceil((atSec + 30 * 3600) / 3600) * 3600
 }
 
-export function demoSeed(atSec: number = nowSec()): MockSeed {
+export interface DemoSeedOptions {
+  /**
+   * Price every open order at a fixed time before its deadline instead of at `atSec`, and every position five days
+   * before its deadline: the premiums are then the same on every run and every day, while the deadlines stay
+   * relative to now. End-to-end builds (VITE_E2E=1) use it, so
+   * a spec can pin a premium; a normal build prices from the clock, so the demo never goes stale.
+   */
+  fixedPricing?: boolean
+}
+
+/**
+ * The pricing lead of a deadline under `fixedPricing`: a listed deadline is priced as if it were 1, 2 or 3 weeks
+ * away (its place in the list); any other deadline as the last listed one before it, and one before the first
+ * listed deadline (a position near or past its end) as the first.
+ */
+export function fixedLead(expiry: number, expiries: readonly number[]): number {
+  let at = 0
+  for (let i = 0; i < expiries.length; i++) if (expiries[i] <= expiry) at = i
+  return (at + 1) * WEEK_SECONDS
+}
+
+export function demoSeed(atSec: number = nowSec(), opts: DemoSeedOptions = {}): MockSeed {
   const q = MOCK_QUOTE
   const asset = (code: string): TokenInfo => {
     const t = MOCK_UNDERLYINGS.find((x) => x.code === code)
     if (!t) throw new Error(`The mock asset list has no ${code}`)
     return t
   }
-  const [FUND, BOND, EQTY] = [asset('FUND'), asset('BOND'), asset('EQTY')]
+  const [RWA, BOND, EQTY] = [asset('RWA'), asset('BOND'), asset('EQTY')]
   const expiries = demoExpiries(atSec)
   const strikes = new Map(MOCK_UNDERLYINGS.map((t) => [t.contractId, demoStrikes(t)]))
   const K = (t: TokenInfo, s: number) => strikes.get(t.contractId)![s]
   const passed = lastPassedExpiry(atSec)
+  /** When a series is priced: now, or under `fixedPricing` a fixed lead before its deadline. */
+  const pricing = (expiry: number): number => (opts.fixedPricing ? expiry - fixedLead(expiry, expiries) : atSec)
 
   const options: OptionOffer[] = []
   const add = (o: { kind: OptionKind; asset: TokenInfo; strike: bigint; lot: number; expiry: number; writer: string; holder?: string | null; state?: OptionState; factor?: number; pricedAt?: number }): OptionOffer => {
     const qty = whole(o.lot, o.asset)
-    // A position was priced when it was bought: use a moment before its deadline, never after.
-    const pricedAt = o.pricedAt ?? Math.min(atSec, o.expiry - 5 * 86_400)
+    // A position was priced when it was bought: use a moment before its deadline, never after (under fixed pricing,
+    // five days before it, the moment a position near or past its deadline always had). An order is priced now.
+    const bought = o.expiry - 5 * 86_400
+    const pricedAt = opts.fixedPricing ? (o.pricedAt === undefined ? bought : pricing(o.expiry)) : (o.pricedAt ?? Math.min(atSec, bought))
     const perUnit = demoPremiumPerUnit(o.kind, o.asset, o.strike, o.expiry, pricedAt, o.factor ?? 1)
     const option: OptionOffer = {
       id: BigInt(options.length),
@@ -198,7 +224,7 @@ export function demoSeed(atSec: number = nowSec()): MockSeed {
 
   // ---- positions of the default test wallet (ids 0 to 6)
   // 0: a put it holds, in the money at the demo price, with the deadline inside 48 hours.
-  add({ kind: 'put', asset: FUND, strike: K(FUND, 4), lot: 10, expiry: soonDeadline(atSec), writer: makerA, holder: A })
+  add({ kind: 'put', asset: RWA, strike: K(RWA, 4), lot: 10, expiry: soonDeadline(atSec), writer: makerA, holder: A })
   // 1: a put it holds, out of the money.
   add({ kind: 'put', asset: BOND, strike: K(BOND, 0), lot: 2, expiry: expiries[1], writer: makerB, holder: A })
   // 2: a covered call it wrote and sold: 4 EQTY stay locked until exercise or the deadline.
@@ -208,17 +234,17 @@ export function demoSeed(atSec: number = nowSec()): MockSeed {
   // 4: a put it wrote that expired unexercised: the collateral waits for reclaim (the state reads as expired).
   add({ kind: 'put', asset: EQTY, strike: K(EQTY, 1), lot: 2, expiry: passed, writer: A, holder: DEMO_HEDGERS.b })
   // 5: a call it held that expired out of the money. Nothing to do.
-  add({ kind: 'call', asset: FUND, strike: K(FUND, 4), lot: 5, expiry: passed, writer: makerA, holder: A })
+  add({ kind: 'call', asset: RWA, strike: K(RWA, 4), lot: 5, expiry: passed, writer: makerA, holder: A })
   // 6: an open offer it wrote, still for sale.
-  add({ kind: 'put', asset: FUND, strike: K(FUND, 0), lot: 5, expiry: expiries[2], writer: A, factor: 1.02, pricedAt: atSec })
+  add({ kind: 'put', asset: RWA, strike: K(RWA, 0), lot: 5, expiry: expiries[2], writer: A, factor: 1.02, pricedAt: atSec })
 
   // ---- positions of the second test wallet (ids 7 and 8)
   add({ kind: 'call', asset: EQTY, strike: K(EQTY, 2), lot: 4, expiry: expiries[1], writer: makerC, holder: B })
-  add({ kind: 'put', asset: FUND, strike: K(FUND, 1), lot: 5, expiry: expiries[1], writer: B, holder: DEMO_HEDGERS.a })
+  add({ kind: 'put', asset: RWA, strike: K(RWA, 1), lot: 5, expiry: expiries[1], writer: B, holder: DEMO_HEDGERS.a })
 
   // ---- one option a third party holds and has listed for resale (id 9)
-  const listed = add({ kind: 'call', asset: FUND, strike: K(FUND, 3), lot: 5, expiry: expiries[1], writer: makerB, holder: DEMO_HEDGERS.a })
-  const resalePerUnit = demoPremiumPerUnit('call', FUND, K(FUND, 3), expiries[1], atSec, 0.9)
+  const listed = add({ kind: 'call', asset: RWA, strike: K(RWA, 3), lot: 5, expiry: expiries[1], writer: makerB, holder: DEMO_HEDGERS.a })
+  const resalePerUnit = demoPremiumPerUnit('call', RWA, K(RWA, 3), expiries[1], pricing(expiries[1]), 0.9)
   const asks: Ask[] = [{ id: listed.id, holder: DEMO_HEDGERS.a, askTotal: resalePerUnit * 5n }]
 
   // ---- the makers' open offers, on the standard grid
@@ -235,15 +261,15 @@ export function demoSeed(atSec: number = nowSec()): MockSeed {
   // A strike between two ladder strikes.
   add({ kind: 'call', asset: EQTY, strike: (K(EQTY, 2) + K(EQTY, 3)) / 2n, lot: 3, expiry: expiries[0], writer: DEMO_MAKERS.d, factor: 1.1, pricedAt: atSec })
   // A deadline two days after a listed Friday.
-  add({ kind: 'put', asset: FUND, strike: K(FUND, 2), lot: 8, expiry: expiries[0] + 2 * 86_400, writer: DEMO_MAKERS.d, factor: 1.1, pricedAt: atSec })
+  add({ kind: 'put', asset: RWA, strike: K(RWA, 2), lot: 8, expiry: expiries[0] + 2 * 86_400, writer: DEMO_MAKERS.d, factor: 1.1, pricedAt: atSec })
 
   // ---- buyer requests: a premium already escrowed, below what the makers ask
   const bids: Bid[] = []
   const tick = 10n ** BigInt(q.decimals - 2)
   const bid = (o: { kind: OptionKind; asset: TokenInfo; strike: bigint; lot: number; expiry: number; buyer: string }) => {
     // Below the makers: a lower time value, rounded down, and never at or above the tightest ask.
-    const wanted = demoPremiumPerUnit(o.kind, o.asset, o.strike, o.expiry, atSec, BID_FACTOR, 'down')
-    const ceiling = demoPremiumPerUnit(o.kind, o.asset, o.strike, o.expiry, atSec, TIGHTEST_FACTOR) - tick
+    const wanted = demoPremiumPerUnit(o.kind, o.asset, o.strike, o.expiry, pricing(o.expiry), BID_FACTOR, 'down')
+    const ceiling = demoPremiumPerUnit(o.kind, o.asset, o.strike, o.expiry, pricing(o.expiry), TIGHTEST_FACTOR) - tick
     const perUnit = ceiling < tick ? tick : wanted < ceiling ? wanted : ceiling
     bids.push({
       id: BigInt(bids.length),
@@ -262,17 +288,17 @@ export function demoSeed(atSec: number = nowSec()): MockSeed {
   // 0: the default wallet's own request.
   bid({ kind: 'put', asset: BOND, strike: K(BOND, 1), lot: 2, expiry: expiries[2], buyer: A })
   // 1: the second wallet bids under the makers on a busy series.
-  bid({ kind: 'put', asset: FUND, strike: K(FUND, 1), lot: 5, expiry: expiries[2], buyer: B })
+  bid({ kind: 'put', asset: RWA, strike: K(RWA, 1), lot: 5, expiry: expiries[2], buyer: B })
   // 2: a series nobody quotes: the cell shows a bid and no offer.
-  bid({ kind: 'put', asset: FUND, strike: K(FUND, 3), lot: 10, expiry: expiries[1], buyer: DEMO_HEDGERS.a })
+  bid({ kind: 'put', asset: RWA, strike: K(RWA, 3), lot: 10, expiry: expiries[1], buyer: DEMO_HEDGERS.a })
   // 3: a call request on EQTY.
   bid({ kind: 'call', asset: EQTY, strike: K(EQTY, 3), lot: 4, expiry: expiries[1], buyer: DEMO_HEDGERS.b })
 
   const balances: Record<string, Record<string, bigint>> = {
-    [A]: { [q.contractId]: whole(2_500, q), [FUND.contractId]: whole(120, FUND), [BOND.contractId]: whole(12, BOND), [EQTY.contractId]: whole(40, EQTY) },
-    [B]: { [q.contractId]: whole(1_200, q), [FUND.contractId]: whole(60, FUND), [BOND.contractId]: whole(6, BOND), [EQTY.contractId]: whole(25, EQTY) },
+    [A]: { [q.contractId]: whole(2_500, q), [RWA.contractId]: whole(120, RWA), [BOND.contractId]: whole(12, BOND), [EQTY.contractId]: whole(40, EQTY) },
+    [B]: { [q.contractId]: whole(1_200, q), [RWA.contractId]: whole(60, RWA), [BOND.contractId]: whole(6, BOND), [EQTY.contractId]: whole(25, EQTY) },
     // An empty wallet, for the first-run states ("Get test funds"): every other account gets the default balances.
-    [DEMO_WALLETS.c]: { [q.contractId]: 0n, [FUND.contractId]: 0n, [BOND.contractId]: 0n, [EQTY.contractId]: 0n },
+    [DEMO_WALLETS.c]: { [q.contractId]: 0n, [RWA.contractId]: 0n, [BOND.contractId]: 0n, [EQTY.contractId]: 0n },
   }
 
   return { quote: q, underlyings: [...MOCK_UNDERLYINGS], options, asks, bids, balances, defaultBalances: defaultBalances() }

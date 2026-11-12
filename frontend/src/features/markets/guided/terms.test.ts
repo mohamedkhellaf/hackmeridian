@@ -5,6 +5,7 @@ import type { OptionOffer, TokenInfo } from '../../../core/options/types'
 import type { Bid } from '../../../core/requests/types'
 import {
   MIN_DEFAULT_LEAD_SECONDS,
+  canonicalDecimal,
   defaultSeries,
   distanceWords,
   coverWith,
@@ -21,6 +22,8 @@ import {
   parsePositive,
   pinnedSeries,
   premiumAt,
+  premiumPerUnitOf,
+  premiumTotal,
   scenarioPrices,
   strikePreference,
   takeIntent,
@@ -238,6 +241,24 @@ describe('totalStrike', () => {
   it('multiplies out exactly or not at all', () => {
     expect(totalStrike(q(99), 20_000_000n, D)).toBe(q(198))
     expect(totalStrike(q(99.01), 1n, D)).toBeNull()
+  })
+})
+
+describe('a premium typed per unit', () => {
+  it('multiplies out to an exact total, or not at all', () => {
+    expect(premiumTotal(q(0.43), 50_000_000n, D)).toBe(q(2.15))
+    expect(premiumTotal(4_333_333n, 15_000_000n, D)).toBeNull()
+  })
+
+  it('reads a total back per unit, truncated, so a typed price and its total compare equal', () => {
+    expect(premiumPerUnitOf(q(2.15), 50_000_000n, D)).toBe(q(0.43))
+    expect(premiumPerUnitOf(q(1), 30_000_000n, D)).toBe(3_333_333n)
+    expect(premiumPerUnitOf(q(1), 0n, D)).toBeNull()
+    expect(canonicalDecimal('0.40', D)).toBe('0.4')
+    expect(canonicalDecimal('5.', D)).toBe('5')
+    expect(canonicalDecimal('.5', D)).toBe('0.5')
+    expect(canonicalDecimal('', D)).toBeUndefined()
+    expect(canonicalDecimal('0.123456789', D)).toBeUndefined()
   })
 })
 

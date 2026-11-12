@@ -8,7 +8,7 @@ import type { SeriesRef } from '../../../core/market/selection'
 import type { OptionKind } from '../../../core/options/types'
 import { intentFor } from '../../../core/payoff/strategies'
 import type { GuidedIntent } from '../../../core/payoff/strategies'
-import { expiryFromDayKey } from '../../../core/series'
+import { expiryFromDayKey, plainDecimal } from '../../../core/series'
 import type { TicketIntent } from '../../ticket'
 
 /** A default deadline leaves at least this long to act (brief D17: the first reminder is 48 hours out). */
@@ -155,8 +155,29 @@ export function totalStrike(strikePerUnit: bigint, qty: bigint, underlyingDecima
 }
 
 /**
+ * A premium typed per unit, for the whole quantity: an exact quote amount, or null when the product is not one
+ * (E18: the selling intents type the premium per unit, the contract takes the total, the link carries the total).
+ */
+export const premiumTotal = (perUnit: bigint, qty: bigint, underlyingDecimals: number): bigint | null => totalStrike(perUnit, qty, underlyingDecimals)
+
+/** The premium per unit a total stands for over a quantity, truncated; null for no quantity. */
+export function premiumPerUnitOf(total: bigint, qty: bigint, underlyingDecimals: number): bigint | null {
+  return qty > 0n ? (total * 10n ** BigInt(underlyingDecimals)) / qty : null
+}
+
+/**
+ * A typed decimal written the one way a link writes it (`0.4`, `12`), so a typed `0.40` and the per-unit value of
+ * a total compare equal; undefined when the text is empty or not an amount in `decimals`.
+ */
+export function canonicalDecimal(text: string, decimals: number): string | undefined {
+  const normal = normalizeDecimal(text)
+  const units = normal === undefined ? null : parseAmount(normal, decimals)
+  return units === null ? undefined : plainDecimal(units, decimals)
+}
+
+/**
  * The largest quantity a balance allows, for the Max action. An intent that starts from the asset is capped by
- * the asset held; "Earn while waiting to buy" by what the quote balance pays for at the strike, cut to two
+ * the asset held; "Get paid to buy lower" by what the quote balance pays for at the strike, cut to two
  * decimals. "Lock a buy price" has no cap of this kind (only the premium is paid now): null.
  */
 export function maxQuantity(

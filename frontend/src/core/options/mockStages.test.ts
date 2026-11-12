@@ -197,7 +197,7 @@ describe('MockOptionsClient demo ledger', () => {
     expect(await bal(B, quote)).toBe(b0 - UNIT)
     expect(await bal(W, quote)).toBe(w0 - 20n * UNIT + UNIT)
 
-    await run(c.exercise(id, B)) // holder delivers 2 FUND, receives 20 USDx
+    await run(c.exercise(id, B)) // holder delivers 2 RWA, receives 20 USDx
     expect(await bal(B, fund)).toBe(bf0 - 2n * UNIT)
     expect(await bal(B, quote)).toBe(b0 - UNIT + 20n * UNIT)
     expect(await bal(MOCK_CONTRACT, fund)).toBe(2n * UNIT)
@@ -214,10 +214,10 @@ describe('MockOptionsClient demo ledger', () => {
     const { c, quote, fund, offer, bal } = await setup()
     const w0 = await bal(W, quote)
     const wf0 = await bal(W, fund)
-    const { id } = await run(c.createOffer(offer({ kind: 'call' }), W)) // locks 2 FUND
+    const { id } = await run(c.createOffer(offer({ kind: 'call' }), W)) // locks 2 RWA
     expect(await bal(W, fund)).toBe(wf0 - 2n * UNIT)
     await run(c.buy(id, B))
-    await run(c.exercise(id, B)) // holder pays 20 USDx, receives 2 FUND
+    await run(c.exercise(id, B)) // holder pays 20 USDx, receives 2 RWA
     expect((await c.getOption(id)).state).toBe('exercised')
     expect(await bal(W, quote)).toBe(w0 + UNIT) // premium only: the strike waits in the contract
     expect((await c.openCollateral()).find((l) => l.token.contractId === quote.contractId)?.unclaimed).toBe(20n * UNIT)

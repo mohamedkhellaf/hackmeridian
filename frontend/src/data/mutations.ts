@@ -45,7 +45,7 @@ function strike(o: Series, quote: TokenInfo): string {
   return perUnit === null ? `total strike ${amt(o.totalStrike, quote)}` : `strike ${withUnit(formatUnits(perUnit, quote.decimals), quote.code)} per ${o.underlying.code}`
 }
 const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
-/** `Strike 10.20 USDx per FUND, deadline 13 Nov 2026, 08:00 UTC`: for a label that already names kind and quantity. */
+/** `Strike 10.20 USDx per RWA, deadline 13 Nov 2026, 08:00 UTC`: for a label that already names kind and quantity. */
 const terms = (o: Series, quote: TokenInfo): string => capital(`${strike(o, quote)}, deadline ${formatUtc(o.expiry)}`)
 /** `Call on 1.00 BOND, strike 98.00 USDx per BOND, deadline ...`: for a label that names only an amount. */
 const fullTerms = (o: Series, quote: TokenInfo): string => capital(`${on(o)}, ${strike(o, quote)}, deadline ${formatUtc(o.expiry)}`)

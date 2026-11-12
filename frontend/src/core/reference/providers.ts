@@ -14,7 +14,7 @@ export type ReferenceSubject = string | { code: string; contractId: string }
  * these figures (parse with the quote token's decimals, or use `demoPerUnit`).
  */
 export const DEMO_PRICES: Readonly<Record<string, string>> = {
-  FUND: '10.20',
+  RWA: '10.20',
   BOND: '99.40',
   EQTY: '24.60',
 }
@@ -41,7 +41,7 @@ export function demoPerUnit(assetCode: string, quoteDecimals: number = 7): bigin
 }
 
 /**
- * Mock mode: the demo price of FUND, BOND or EQTY; `none` for any other code. Keyed by code because the mock
+ * Mock mode: the demo price of RWA, BOND or EQTY; `none` for any other code. Keyed by code because the mock
  * data has no second issuer; a token whose contract id belongs to another network gets `none`.
  */
 export function demoReference(asset: ReferenceSubject, quoteDecimals: number = 7): ReferencePrice {

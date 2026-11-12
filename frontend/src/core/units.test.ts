@@ -3,22 +3,22 @@ import { parseAmount } from './options/format'
 import { amt, amtExact, byId, byPremiumPerUnit, byStrikePerUnit, compareRatio, perUnit, perUnitText, plainAmount, premiumUnits, shortBy, strikeUnits } from './units'
 
 const U = 10_000_000n
-const FUND = { code: 'FUND', decimals: 7 }
+const RWA = { code: 'RWA', decimals: 7 }
 
 describe('units', () => {
   it('formats an amount with its code, two decimals, truncated: the one rule of core/format', () => {
-    expect(amt(5n * U, FUND)).toBe('5.00\u00A0FUND')
+    expect(amt(5n * U, RWA)).toBe('5.00\u00A0RWA')
     expect(amt(10_800n * U, { code: 'USDx', decimals: 7 })).toBe('10,800.00\u00A0USDx')
-    expect(amt(12_345_678n, FUND)).toBe('1.23\u00A0FUND') // 1.2345678 truncated, never rounded up
-    expect(amt(24_999_945_000n, FUND)).toBe('2,499.99\u00A0FUND') // the same as the asset header
-    expect(amt(1n, FUND)).toBe('<0.01\u00A0FUND') // never a zero for a non-zero amount
-    expect(amt(-5n * U, FUND)).toBe('\u22125.00\u00A0FUND')
+    expect(amt(12_345_678n, RWA)).toBe('1.23\u00A0RWA') // 1.2345678 truncated, never rounded up
+    expect(amt(24_999_945_000n, RWA)).toBe('2,499.99\u00A0RWA') // the same as the asset header
+    expect(amt(1n, RWA)).toBe('<0.01\u00A0RWA') // never a zero for a non-zero amount
+    expect(amt(-5n * U, RWA)).toBe('\u22125.00\u00A0RWA')
   })
 
   it('writes a shortfall to the last unit, which truncation would understate', () => {
     expect(amtExact(4_700_055_000n, { code: 'USDx', decimals: 7 })).toBe('470.0055\u00A0USDx')
-    expect(amtExact(5n * U, FUND)).toBe('5.00\u00A0FUND')
-    expect(amtExact(1n, FUND)).toBe('0.0000001\u00A0FUND')
+    expect(amtExact(5n * U, RWA)).toBe('5.00\u00A0RWA')
+    expect(amtExact(1n, RWA)).toBe('0.0000001\u00A0RWA')
   })
 
   it('writes plain decimals that parse back to the same units', () => {

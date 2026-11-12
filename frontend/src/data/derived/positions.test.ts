@@ -54,10 +54,10 @@ describe('buildPositions', () => {
     expect(itm.secondsLeft).toBe(44 * 3600)
     expect(itm.urgency).toBe('within48h')
     expect(itm.moneyness).toBe('in')
-    // 10 FUND put at 10.60 against the demo price 10.20: exercising is worth 4.00 USDx more than not exercising.
+    // 10 RWA put at 10.60 against the demo price 10.20: exercising is worth 4.00 USDx more than not exercising.
     expect(itm.exerciseValue).toBe(usdx(4))
     expect(itm.reference?.label).toBe('Demo price')
-    expect(itm.series).toBe('FUND-20261113-10.6-P')
+    expect(itm.series).toBe('RWA-20261113-10.6-P')
     expect(otm.moneyness).toBe('out')
     expect(otm.urgency).toBe('far')
     expect(otm.exerciseValue! < 0n).toBe(true)
@@ -149,7 +149,7 @@ describe('buildTodo', () => {
 
   it('asks both writers to claim: a put writer the underlying delivered, a call writer the strike paid', () => {
     const options = w.source(A).options
-    // Option 8: a put on 5 FUND at 9.80 that the second wallet wrote. Its holder exercises it.
+    // Option 8: a put on 5 RWA at 9.80 that the second wallet wrote. Its holder exercises it.
     const put = options.find((o) => o.id === 8n)!
     expect(put.kind).toBe('put')
     const exercised = options.map((o) => (o.id === 8n ? { ...o, state: 'exercised' as const } : o))
@@ -157,7 +157,7 @@ describe('buildTodo', () => {
     const claim = forB.find((t) => t.kind === 'claim')!
     expect(claim.option.id).toBe(8n)
     expect(claim.tone).toBe('action')
-    expect(claim.amount).toEqual({ token: w.assets.FUND, amount: put.underlyingQty })
+    expect(claim.amount).toEqual({ token: w.assets.RWA, amount: put.underlyingQty })
     // Option 3 (the default wallet): a call writer claims the strike in the quote token.
     const call = buildTodo(options, A, FIXED_SEC, referenceOf).find((t) => t.kind === 'claim')!
     expect(call.option.kind).toBe('call')

@@ -28,9 +28,8 @@ import { EXPLORER, SAMPLE_ADDRESS } from './sample'
 
 const ASSETS = [
   { value: 'BOND', label: 'BOND', detail: 'GCNW…FDGM' },
-  { value: 'FUND', label: 'FUND', detail: 'GCNW…FDGM' },
-  { value: 'EQTY', label: 'EQTY', detail: 'GCNW…FDGM' },
   { value: 'RWA', label: 'RWA', detail: 'GCNW…FDGM' },
+  { value: 'EQTY', label: 'EQTY', detail: 'GCNW…FDGM' },
 ]
 
 export function ControlsSection() {
@@ -249,8 +248,8 @@ export function ControlsSection() {
           onValueChange={setIntent}
           options={[
             { value: 'floor', label: 'Set a floor', description: 'You pay a premium for the right to sell at your price.' },
-            { value: 'earn-hold', label: 'Earn on what you hold', description: 'You are paid a premium and may have to sell at your price.' },
-            { value: 'earn-buy', label: 'Earn while waiting to buy', description: 'You are paid a premium and may have to buy at your price.' },
+            { value: 'earn-hold', label: 'Get paid to sell higher', description: 'You are paid a premium and may have to sell at your price.' },
+            { value: 'earn-buy', label: 'Get paid to buy lower', description: 'You are paid a premium and may have to buy at your price.' },
             { value: 'lock-buy', label: 'Lock a buy price', description: 'You pay a premium for the right to buy at your price.', disabled: true },
           ]}
         />

@@ -89,6 +89,6 @@ describe('MockOptionsClient ABI alignment', () => {
     const health = await c.collateralHealth()
     expect(health.length).toBeGreaterThan(0)
     for (const h of health) expect(h.held).toBe(h.reserved)
-    expect(await c.isEligible('C_MOCK_FUND', W)).toBe(true)
+    expect(await c.isEligible('C_MOCK_RWA', W)).toBe(true)
   })
 })

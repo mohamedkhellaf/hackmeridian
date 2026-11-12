@@ -218,7 +218,7 @@ test.describe('wallet menu', () => {
 
     // The balances of the default test wallet, exact, and the same figures in the name of their group.
     await expect(menu).toContainText('USDx2,500.00')
-    await expect(menu.getByRole('group', { name: /^Balances\s*USDx 2,500\.00, FUND 120\.00, BOND 12\.00, EQTY 40\.00$/ })).toBeVisible()
+    await expect(menu.getByRole('group', { name: /^Balances\s*USDx 2,500\.00, RWA 120\.00, BOND 12\.00, EQTY 40\.00$/ })).toBeVisible()
 
     // Every row is in view, Disconnect included.
     await expect(menu.getByRole('menuitem', { name: 'Disconnect' })).toBeInViewport({ ratio: 1 })

@@ -21,7 +21,7 @@ describe('explorer', () => {
     expect(explorerAddress(C)).toBe(explorerContract(C))
   })
   it('knows the mock placeholders, which have no page', () => {
-    expect(isMockId('C_MOCK_FUND')).toBe(true)
+    expect(isMockId('C_MOCK_RWA')).toBe(true)
     expect(isMockId('GMAKERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).toBe(true)
     expect(isMockId('GMOCKISSUERAAAA')).toBe(true)
     expect(isMockId('GHEDGERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).toBe(true)

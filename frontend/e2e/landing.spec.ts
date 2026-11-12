@@ -112,7 +112,7 @@ test.describe('Landing', () => {
     await expect(widget(page)).toContainText(/Offer No\.\s\d+/)
     // A figure and its unit are joined by a no-break space: the patterns below say \s there.
     await expect(page.getByTestId('hero-source')).toHaveText(/^Maker\s*\S+ locked [\d,.]+\sUSDx\.$/)
-    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+\sFUND for [\d,.]+\sUSDx \([\d,.]+ per unit\), paid once to the maker\.$/)
+    await expect(page.getByTestId('hero-meta')).toHaveText(/^This offer covers [\d,.]+\sRWA for [\d,.]+\sUSDx \([\d,.]+ per unit\), paid once to the maker\.$/)
     await expectAnnounced(page, WIDGET.announceOpen)
     // Only now was the (mock) chain client loaded.
     expect(requests.some((url) => /mockClient/.test(url))).toBe(true)
@@ -190,13 +190,13 @@ test.describe('Landing', () => {
     const asset = terms.getByLabel(WIDGET.hold, { exact: true })
     const floor = terms.getByLabel(WIDGET.floor, { exact: true })
     const until = terms.getByLabel(WIDGET.until, { exact: true })
-    await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, FUND')
+    await expect(widget(page).getByRole('heading', { level: 2 })).toHaveText('Long put, RWA')
     // "Asset" picks the asset, and shows its code; the lot is said in the line under the terms.
-    await expect(asset.locator('..')).toContainText('FUND')
-    await expect(page.getByTestId('hero-meta')).toContainText(/covers [\d,.]+\sFUND/)
+    await expect(asset.locator('..')).toContainText('RWA')
+    await expect(page.getByTestId('hero-meta')).toContainText(/covers [\d,.]+\sRWA/)
     // Each floor and each deadline says which lot it would show.
-    await expect(floor.locator('option').first()).toHaveText(/, for [\d,.]+\sFUND$/)
-    await expect(until.locator('option').first()).toHaveText(/, for [\d,.]+\sFUND$/)
+    await expect(floor.locator('option').first()).toHaveText(/, for [\d,.]+\sRWA$/)
+    await expect(until.locator('option').first()).toHaveText(/, for [\d,.]+\sRWA$/)
     const serial = () => widget(page).locator('p', { hasText: /Offer No\./ }).first().innerText()
     const first = await serial()
 
@@ -228,7 +228,7 @@ test.describe('Landing', () => {
     await openLanding(page)
     const id = Number(((await widget(page).innerText()).match(/Offer No\.\s(\d+)/) ?? [])[1])
     await widget(page).getByRole('link', { name: WIDGET.open }).click()
-    await expect(page).toHaveURL((url) => url.pathname === '/markets/fund')
+    await expect(page).toHaveURL((url) => url.pathname === '/markets/rwa')
     const url = new URL(page.url())
     expect(url.searchParams.get('side')).toBe('buy')
     expect(url.searchParams.get('offer')).toBe(String(id))
@@ -238,7 +238,7 @@ test.describe('Landing', () => {
     await openLanding(page)
     await heroPrimary(page).click()
     // With an open offer in the note, the guided flow opens on the same asset and terms.
-    await expect(page).toHaveURL((url) => url.pathname === '/markets/fund')
+    await expect(page).toHaveURL((url) => url.pathname === '/markets/rwa')
     const guided = new URL(page.url()).searchParams
     expect(guided.get('mode')).toBe('guided')
     expect(guided.get('intent')).toBe('floor')
@@ -286,14 +286,14 @@ test.describe('Landing', () => {
     expect(heroText).toBe('h1 first')
     // The closing has no heading of its own: the last section heading is Limits.
     const sections = await page.locator('main h2').evaluateAll((els) => els.map((el) => (el.textContent ?? '').trim()))
-    expect(sections).toEqual(['Long put, FUND', 'What you can do', 'What is different', 'How it works', 'Proof', 'Margin', 'Limits'])
+    expect(sections).toEqual(['Long put, RWA', 'What you can do', 'What is different', 'How it works', 'Proof', 'Margin', 'Limits'])
 
     // The three intents, named as everywhere else in the app. Each name is the link into Markets on that intent.
     const intents = page.locator('#what-you-can-do')
     for (const [name, intent] of [
       ['Set a floor', 'floor'],
-      ['Earn on what you hold', 'earn-hold'],
-      ['Earn while waiting to buy', 'earn-buy'],
+      ['Get paid to sell higher', 'earn-hold'],
+      ['Get paid to buy lower', 'earn-buy'],
     ] as const) {
       await expect(intents.getByRole('heading', { level: 3, name: new RegExp(`^${name}`) })).toBeVisible()
       await expect(intents.getByRole('heading', { level: 3, name: new RegExp(`^${name}`) })).toHaveText(name)

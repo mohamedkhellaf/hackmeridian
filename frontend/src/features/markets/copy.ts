@@ -36,15 +36,15 @@ export const INTENT_COPY: Record<Intent, IntentCopy> = {
     glyph: 'short-call',
     consequence: () => 'Lock what you hold and agree to sell it at a higher price if a buyer asks before the deadline.',
     payer: 'You are paid',
-    question: 'Earn on which asset?',
-    choose: (code) => `Earn on ${code}`,
+    question: 'Which asset would you sell at a higher price?',
+    choose: (code) => `Get paid to sell ${code} higher`,
   },
   'earn-buy': {
     glyph: 'short-put',
     consequence: (quote) => `Lock ${quote} and agree to buy at a lower price if a holder asks before the deadline.`,
     payer: 'You are paid',
     question: 'Which asset would you buy at a lower price?',
-    choose: (code) => `Earn while waiting to buy ${code}`,
+    choose: (code) => `Get paid to buy ${code} lower`,
   },
   'lock-buy': {
     glyph: 'long-call',
@@ -129,8 +129,6 @@ export const FUNDS_LEAD = {
   asked: 'Three steps, all in your wallet.',
 } as const
 export const FUNDS_MOCK_NOTE = 'This build runs on mock data, so these steps will not change the balances shown here. They are the steps on Testnet.'
-/** On mock data, a Testnet asset whose code differs from the one shown here: "FUND (RWA on Testnet)". */
-export const shownAs = (shown: string, testnet: string): string => `${shown} (${testnet} on Testnet)`
 export const FUNDS_STEPS = {
   fund: {
     title: 'Fund the account',

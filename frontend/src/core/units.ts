@@ -10,7 +10,7 @@ export interface UnitToken {
 }
 
 /**
- * `5.00 FUND`, figure and code joined by a no-break space (ruling F7): two decimals, grouped, truncated, `<0.01` for a non-zero dust amount (core/format `formatUnits`, the
+ * `5.00 RWA`, figure and code joined by a no-break space (ruling F7): two decimals, grouped, truncated, `<0.01` for a non-zero dust amount (core/format `formatUnits`, the
  * one rule for amounts on screen). Exact digits belong in the Amount popover: use `amtExact` only for a figure the
  * user must act on to the last unit, such as a shortfall.
  */

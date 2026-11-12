@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { backingFor, formatFixed, formatTenths, lineTotal, ratioTenths, shortfall, shortfallFor } from './reserves'
 import type { CollateralHealth, CollateralLine, TokenInfo } from '../options/types'
 
-const token: TokenInfo = { contractId: 'C1', code: 'FUND', decimals: 7 }
+const token: TokenInfo = { contractId: 'C1', code: 'RWA', decimals: 7 }
 const line = (o: bigint, a: bigint, p: bigint, u: bigint): CollateralLine => ({ token, offered: o, active: a, pendingReclaim: p, unclaimed: u, escrowed: 0n })
 const health = (reserved: bigint, held: bigint): CollateralHealth => ({ token, reserved, held })
 
@@ -44,11 +44,11 @@ describe('shortfallFor', () => {
   const tok = (code: string): TokenInfo => ({ contractId: `C${code}`, code, decimals: 7 })
   const hl: CollateralHealth[] = [
     { token: tok('USDx'), reserved: 100n, held: 100n },
-    { token: tok('FUND'), reserved: 100n, held: 40n },
+    { token: tok('RWA'), reserved: 100n, held: 40n },
   ]
   it('flags options touching a short token only', () => {
-    expect(shortfallFor({ underlying: tok('FUND'), quote: tok('USDx') }, hl).map((t) => t.code)).toEqual(['FUND'])
+    expect(shortfallFor({ underlying: tok('RWA'), quote: tok('USDx') }, hl).map((t) => t.code)).toEqual(['RWA'])
     expect(shortfallFor({ underlying: tok('BOND'), quote: tok('USDx') }, hl)).toEqual([])
-    expect(shortfallFor({ underlying: tok('FUND'), quote: tok('USDx') }, [])).toEqual([])
+    expect(shortfallFor({ underlying: tok('RWA'), quote: tok('USDx') }, [])).toEqual([])
   })
 })

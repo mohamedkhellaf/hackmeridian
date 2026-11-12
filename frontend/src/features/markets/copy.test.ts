@@ -28,10 +28,6 @@ describe('markets copy', () => {
     expect(Object.values(copy.INTENT_COPY).map((c) => c.payer)).toEqual(['You pay', 'You are paid', 'You are paid', 'You pay'])
   })
 
-  it('names a mock token by the code the page shows, with its Testnet code', () => {
-    expect(copy.shownAs('FUND', 'RWA')).toBe('FUND (RWA on Testnet)')
-  })
-
   it('describes a demo token without claiming a network on mock data', () => {
     // The unit tests run without a contract id: a mock build.
     expect(copy.TEST_TOKEN_NOTE).toBe(copy.TEST_TOKEN_NOTE_MOCK)

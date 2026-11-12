@@ -183,7 +183,7 @@ function Flow({ model }: { model: GuidedModel }) {
     // Terms of the user's own typed in an open ticket ("Custom terms") stay with the ticket: closing it under the
     // user would lose them. Once it is closed, the URL names the terms shown, so the dropped ones are said once.
     if (ticketIsOpen) return
-    pin({ premium: normalizeDecimal(model.premiumDraft.text) }, { replace: true })
+    pin({ premium: model.premiumUrl }, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dropped.strike, dropped.expiry, ticketIsOpen])
 

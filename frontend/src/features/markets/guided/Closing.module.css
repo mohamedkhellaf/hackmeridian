@@ -6,13 +6,21 @@
     min-width: 0;
   }
 
-  /* In the page the block closes the note and the outcome cards with a rule; in the rail it opens the column. */
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-12);
+    min-width: 0;
+  }
+
+  /* In the page the section closes the note and the outcome cards with a rule; in the rail the block opens the
+     column with the ink rule, and the line about what the wallet already holds here sits above that rule. */
   .root[data-placement='page'] {
     padding-top: var(--s-20);
     border-top: 1px solid var(--rule);
   }
 
-  .root[data-placement='rail'] {
+  .root[data-placement='rail'] .block {
     padding-top: var(--s-16);
     border-top: 2px solid var(--text);
   }

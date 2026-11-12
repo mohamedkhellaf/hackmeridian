@@ -71,7 +71,7 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
   },
   'earn-hold': {
     glyph: 'short-call',
-    heading: (a) => `Earn on the ${a} you hold`,
+    heading: (a) => `Get paid to sell ${a} higher`,
     line: 'Lock what you hold and agree to sell it at a higher price if a buyer asks before the deadline.',
     money: { label: 'You are paid', value: 'a premium now' },
     contract: 'A call, written',
@@ -90,7 +90,7 @@ export const INTENT_COPY: Record<GuidedIntent, IntentCopy> = {
   },
   'earn-buy': {
     glyph: 'short-put',
-    heading: (a) => `Earn while waiting to buy ${a}`,
+    heading: (a) => `Get paid to buy ${a} lower`,
     line: 'Lock USDx and agree to buy at a lower price if the other side sells to you before the deadline.',
     money: { label: 'You are paid', value: 'a premium now' },
     contract: 'A put, written',
@@ -261,13 +261,15 @@ export const FALLBACK: Record<'buy' | 'write', { heading: string; body: (collate
   write: {
     heading: WRITE_HEADING,
     body: (collateral) => `You name the premium you ask and lock ${collateral}. You are paid when a buyer takes the offer, and you can cancel while nobody has.`,
-    field: 'Premium you ask, in total',
+    field: 'Premium you ask, per unit',
     first: 'Nobody offers this price and date yet. Yours would be the first offer.',
   },
 }
 export const LOWEST_OFFER = (perUnit: string, q: string, qty: string, a: string) => `Lowest open offer at this price and date: ${perUnit}\u00a0${q} per unit, for ${qty}\u00a0${a}.`
 export const matchPrice = (perUnit: string) => `Use ${perUnit} per unit`
 export const perUnitHint = (perUnit: string, q: string) => `${perUnit}\u00a0${q} per unit.`
+/** A premium per unit that does not multiply out to an exact total for the quantity (the contract takes totals). */
+export const PREMIUM_NOT_EXACT = 'Premium per unit × quantity is not an exact amount; adjust one of them.'
 
 /** Field labels of the found order. */
 export const FIELD = {
@@ -280,6 +282,8 @@ export const FIELD = {
   seller: 'Seller',
   buyer: 'Buyer',
   collateral: 'Collateral',
+  /** The exact total of a premium typed per unit, as the ticket's write form names it. */
+  receiveWhenBought: 'You receive when bought',
 } as const
 export const PAID_AT_SIGN = 'When you sign, in the same transaction.'
 export const LOCKED_IN_CONTRACT = 'Locked in the contract.'
@@ -519,7 +523,7 @@ export const LOCK_SUMMARY = (w: Words & { collateral: string; deadline: string }
   `You lock ${w.collateral}. You are paid the premium you ask only if a buyer takes the offer before ${w.deadline}.`
 /** The wallet already has something at these terms: one line above the closing block, with the way to it. */
 export const OWN_SHORT: Record<'holding' | 'written' | 'offer' | 'request', (serial: string) => string> = {
-  holding: (n) => `You hold option No. ${n}.`,
+  holding: (n) => `You hold No. ${n}.`,
   written: (n) => `A buyer holds option No. ${n}, which you wrote.`,
   offer: (n) => `Your offer No. ${n} is open.`,
   request: (n) => `Your request No. ${n} is open.`,
@@ -537,6 +541,10 @@ export const another = (lead: string, sentence: string) => `${lead}: ${sentence.
 /** What the figure in the action bar is. */
 export const BAR_FIGURE = { pay: 'You pay', paid: 'You are paid', escrow: 'You escrow', ask: 'You ask' } as const
 export const NEED_QTY_ACTION = 'Enter a quantity first.'
+/** The seller's own offer waits for the premium they ask (H4). */
+export const NEED_PREMIUM_ACTION = 'Enter a premium first.'
+/** The seller's price per unit does not multiply out to an exact total for the quantity. */
+export const PREMIUM_INEXACT_ACTION = 'Adjust the premium or the quantity first.'
 /** The wallet cannot pay what the action needs (E25). */
 export const CANNOT_PAY = (have: string, need: string, q: string) => `You have ${have}\u00a0${q}; this needs ${need}\u00a0${q}.`
 export const GET_FUNDS = 'Get test funds'

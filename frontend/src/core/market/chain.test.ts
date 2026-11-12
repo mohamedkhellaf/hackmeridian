@@ -13,7 +13,7 @@ let n = 0n
 const offer = (o: Partial<OptionOffer> & { strike?: bigint; premium?: bigint }): OptionOffer => ({
   id: ++n,
   kind: 'put',
-  underlying: tok('FUND'),
+  underlying: tok('RWA'),
   quote: tok('USDx'),
   underlyingQty: 5n * U,
   totalStrike: (o.strike ?? 10n) * 5n * U,
@@ -32,16 +32,16 @@ describe('chain', () => {
     offer({ kind: 'call', strike: 12n, premium: 3n }),
     offer({ underlying: tok('BOND'), expiry: T0 + 14 * DAY }),
   ]
-  const fundCol = () => inColumn(offers, 'FUND', expiryDays(offers, 'FUND')[0])
+  const fundCol = () => inColumn(offers, 'RWA', expiryDays(offers, 'RWA')[0])
 
   it('opens on the asset with the most offers', () => {
-    expect(defaultAsset(offers)).toBe('FUND')
+    expect(defaultAsset(offers)).toBe('RWA')
     expect(defaultAsset([])).toBe('')
   })
 
   it('lists assets and expiry days from the offers', () => {
-    expect(assetCodes(offers)).toEqual(['BOND', 'FUND'])
-    expect(expiryDays(offers, 'FUND')).toHaveLength(1)
+    expect(assetCodes(offers)).toEqual(['BOND', 'RWA'])
+    expect(expiryDays(offers, 'RWA')).toHaveLength(1)
     expect(expiryDays(offers, 'BOND')).toHaveLength(1)
   })
 
@@ -87,14 +87,14 @@ describe('expiry day: one UTC key for the chain and for "lowest offer in this se
     expect(expiryDay(lateUtc)).toBe('2026-10-29')
     expect(expiryDay(earlyUtc)).toBe('2026-10-30')
     const offers = [offer({ expiry: lateUtc }), offer({ expiry: earlyUtc })]
-    expect(expiryDays(offers, 'FUND')).toEqual(['2026-10-29', '2026-10-30'])
-    expect(inColumn(offers, 'FUND', '2026-10-29')).toHaveLength(1)
+    expect(expiryDays(offers, 'RWA')).toEqual(['2026-10-29', '2026-10-30'])
+    expect(inColumn(offers, 'RWA', '2026-10-29')).toHaveLength(1)
   })
 
   it('the chain column and the lowest-offer lookup always agree on the series', () => {
     const offers = [offer({ expiry: lateUtc, premium: 1n }), offer({ expiry: earlyUtc, premium: 2n })]
     for (const o of offers) {
-      const column = inColumn(offers, 'FUND', expiryDay(o.expiry))
+      const column = inColumn(offers, 'RWA', expiryDay(o.expiry))
       const draft = { kind: o.kind, underlying: o.underlying, underlyingQty: o.underlyingQty, totalStrike: o.totalStrike, totalPremium: 9n * U, expiry: o.expiry + 60 }
       const lowest = lowestOpenInSeries(offers, draft, o.quote)
       expect(lowest?.id).toBe(o.id)
@@ -108,7 +108,7 @@ describe('strike order is exact', () => {
     // Whole-unit tokens: 2^53 and 2^53 + 1 are different strikes and the same double.
     const whole = (code: string) => ({ contractId: code, code, decimals: 0 })
     const big = 2n ** 53n
-    const terms = { underlying: whole('FUND'), quote: whole('USDx'), underlyingQty: 1n }
+    const terms = { underlying: whole('RWA'), quote: whole('USDx'), underlyingQty: 1n }
     const low = offer({ ...terms, totalStrike: big })
     const high = offer({ ...terms, totalStrike: big + 1n })
     expect(Number(low.totalStrike) / Number(low.underlyingQty)).toBe(Number(high.totalStrike) / Number(high.underlyingQty))

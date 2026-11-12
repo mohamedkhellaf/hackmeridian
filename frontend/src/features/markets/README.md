@@ -59,8 +59,7 @@ replaced by the canonical segment, and anything else gets the not-found view, wh
   a token the contract is short of after a clawback says so in its row, linked to Reserves.
 - **First run.** "Get test funds" shows for a connected wallet with no quote token, and at `?funds=1`. The steps
   happen in the wallet; progress is read from the balance statuses, never assumed. The asset header links to it
-  when the wallet cannot pay, with `from` set to the order, so the strip ends with "Back to your order". On mock
-  data a token whose Testnet code differs is named the way the page names it: "FUND (RWA on Testnet)".
+  when the wallet cannot pay, with `from` set to the order, so the strip ends with "Back to your order".
 - **Requests tab.** Open, unexpired bids of the asset, highest premium per unit first, then the wallet's own
   lapsed bids ("Expired" under the deadline; cancelling refunds them, in the chain's cancel dialog).
 - **About tab.** "Your access" first for a connected wallet (what the wallet lacks before what the issuer

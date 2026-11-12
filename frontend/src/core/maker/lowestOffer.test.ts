@@ -4,13 +4,13 @@ import { lowestOpenInSeries, premiumPerUnitText } from './lowestOffer'
 
 const U = 10_000_000n
 const USDX: TokenInfo = { contractId: 'Q', code: 'USDx', decimals: 7 }
-const FUND: TokenInfo = { contractId: 'F', code: 'FUND', decimals: 7 }
+const RWA: TokenInfo = { contractId: 'F', code: 'RWA', decimals: 7 }
 const T = 2_000_000_000
 const offer = (over: Partial<OptionOffer> = {}): OptionOffer => ({
-  id: 1n, kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: 2n * U,
+  id: 1n, kind: 'put', underlying: RWA, quote: USDX, underlyingQty: 5n * U, totalStrike: 50n * U, totalPremium: 2n * U,
   expiry: T, writer: 'GA', holder: null, state: 'offered', ...over,
 })
-const draft: NewOffer = { kind: 'put', underlying: FUND, underlyingQty: 10n * U, totalStrike: 100n * U, totalPremium: 3n * U, expiry: T + 3600 }
+const draft: NewOffer = { kind: 'put', underlying: RWA, underlyingQty: 10n * U, totalStrike: 100n * U, totalPremium: 3n * U, expiry: T + 3600 }
 
 describe('lowestOpenInSeries', () => {
   it('picks the cheapest per unit among open offers of the same series', () => {
@@ -24,7 +24,7 @@ describe('lowestOpenInSeries', () => {
       offer({ totalStrike: 60n * U }), // other strike
       offer({ expiry: T + 3 * 86400 }), // other day
       offer({ state: 'active', holder: 'GB' }),
-      offer({ underlying: { ...FUND, contractId: 'F2' } }),
+      offer({ underlying: { ...RWA, contractId: 'F2' } }),
     ]
     expect(lowestOpenInSeries(others, draft, USDX)).toBeNull()
   })
@@ -32,8 +32,8 @@ describe('lowestOpenInSeries', () => {
 
 describe('premiumPerUnitText', () => {
   it('shows two decimals', () => {
-    expect(premiumPerUnitText({ totalPremium: 2n * U, underlyingQty: 5n * U, underlying: FUND }, 7)).toBe('0.40')
-    expect(premiumPerUnitText({ totalPremium: (18n * U) / 10n, underlyingQty: 5n * U, underlying: FUND }, 7)).toBe('0.36')
+    expect(premiumPerUnitText({ totalPremium: 2n * U, underlyingQty: 5n * U, underlying: RWA }, 7)).toBe('0.40')
+    expect(premiumPerUnitText({ totalPremium: (18n * U) / 10n, underlyingQty: 5n * U, underlying: RWA }, 7)).toBe('0.36')
   })
 })
 
@@ -58,7 +58,7 @@ describe('lowestOpenInSeriesOf', () => {
     const a = offer({ id: 1n, totalPremium: 2n * U })
     const b = offer({ id: 2n, totalPremium: (18n * U) / 10n })
     const call = offer({ id: 3n, kind: 'call', totalPremium: U / 10n })
-    const series = { underlying: FUND, kind: 'put' as const, strikePerUnit: 10n * U, expiry: T + 3600 }
+    const series = { underlying: RWA, kind: 'put' as const, strikePerUnit: 10n * U, expiry: T + 3600 }
     expect(lowestOpenInSeriesOf([a, b, call], series, USDX)?.id).toBe(2n)
     expect(lowestOpenInSeriesOf([a, b, call], { ...series, strikePerUnit: 11n * U }, USDX)).toBeNull()
     expect(lowestOpenInSeriesOf([a, b, call], { ...series, kind: 'call' }, USDX)?.id).toBe(3n)

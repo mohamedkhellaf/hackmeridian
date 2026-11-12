@@ -66,7 +66,7 @@ describe('landing copy', () => {
   })
 
   it('names the intents as the rest of the app does, without the word that was removed on purpose', () => {
-    expect(copy.INTENTS.items.map((i) => i.name)).toEqual(['Set a floor', 'Earn on what you hold', 'Earn while waiting to buy'])
+    expect(copy.INTENTS.items.map((i) => i.name)).toEqual(['Set a floor', 'Get paid to sell higher', 'Get paid to buy lower'])
   })
 
   it('tells each figure and each limit once: no stat row, no questions, no limit beside a property', () => {
@@ -79,8 +79,8 @@ describe('landing copy', () => {
 
   it('says "maker" for whoever wrote the option and "seller" only for a holder reselling', () => {
     expect(copy.HERO.lede).not.toContain('seller')
-    expect(copy.WIDGET.lotOpen('10.00 FUND', '1.90 USDx', '0.19')).toBe('This offer covers 10.00 FUND for 1.90 USDx (0.19 per unit), paid once to the maker.')
-    expect(copy.WIDGET.lotResale('10.00 FUND', '1.90 USDx', '0.19')).toContain('to the seller')
+    expect(copy.WIDGET.lotOpen('10.00 RWA', '1.90 USDx', '0.19')).toBe('This offer covers 10.00 RWA for 1.90 USDx (0.19 per unit), paid once to the maker.')
+    expect(copy.WIDGET.lotResale('10.00 RWA', '1.90 USDx', '0.19')).toContain('to the seller')
   })
 
   it('names the network only as the state of a chain build', () => {

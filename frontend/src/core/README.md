@@ -59,7 +59,7 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | `config.ts` | `config` (`rpcUrl`, `horizonUrl`, `networkPassphrase`, `optionsContractId`, `proContractId`), `TESTNET_PASSPHRASE`, `IS_MOCK`, `PRO_ENABLED`. No SDK import (the passphrase is a literal, checked against the SDK in `stellar/passphrase.test.ts`). |
 | `explorer.ts` | The one stellar.expert URL builder: `explorerUrl(kind, id)`, `explorerTx`, `explorerAccount`, `explorerContract`, `explorerAsset(code, issuer)`, `explorerLedger`, `explorerAddress` (G or C), `isMockId` (mock ids have no page: show text, not a link). |
 | `time.ts` | `nowSec`, `nowMs`, `MONTHS`, `SECONDS_PER_DAY`, `expiryDay(unix)` (UTC `YYYY-MM-DD`), `dayLabel(day)`, `compactCountdown(expiry, atMs?)` (`3d 0h`), `formatDuration(seconds)`, `formatExpiryShort` (local), `formatUtcShort`, `toLocalInput`, `fromLocalInput`. Compact forms for the Margin tables; new screens format time with `format/` (`formatUtc`, `formatCountdown(secondsLeft)`, `deadlineUrgency`). |
-| `units.ts` | `amt(units, token)` (`5.00 FUND`), `plainAmount` (input prefill), `perUnit(total, sized)` (bigint, floored), `strikeUnits`, `premiumUnits`, `perUnitText`, `compareRatio`, `byPremiumPerUnit`, `byStrikePerUnit`, `byId`, `shortBy`, types `UnitToken`, `Sized`. |
+| `units.ts` | `amt(units, token)` (`5.00 RWA`), `plainAmount` (input prefill), `perUnit(total, sized)` (bigint, floored), `strikeUnits`, `premiumUnits`, `perUnitText`, `compareRatio`, `byPremiumPerUnit`, `byStrikePerUnit`, `byId`, `shortBy`, types `UnitToken`, `Sized`. |
 | `disclosures.ts` **(core-new)** | Every required sentence, the Margin banners and warning bullets, the footer's `legalNotice(isMock)`, banned-word lists. |
 | `guide.ts` | The welcome guide below the features: `GUIDE_ANCHORS` and `guideAnchor(name, { ring? })` (the `data-tour` attribute a component spreads on the control a note explains), `GuideId`, `GuideSeen`, `GUIDE_VERSION`, `TOUR_NOTES_ON_MARKETS`, `GUIDE_COPY` (the words shared by the welcome and the replay entry), and the two rules `canOfferTour`, `canOpenModeNote`. |
 
@@ -92,7 +92,7 @@ if (state.phase === 'unknown') dispatch({ type: 'resolve', check: await client.c
 | `options/client.ts` | `OptionsClient`: reads (`supportedAssets`, `listOptions`, `getOption`, `openCollateral`, `collateralHealth`, `isEligible`, `writerOpenCount`, `listAsks`, `getAsk`, `listBids`, `getBid`, `buyerOpenCount`, `balances(who, tokens?)`, `checkTx(hash, maxTime)`) and writes, each with an optional last `{ onStage }` (`createOffer`, `buy`, `exercise`, `reclaim`, `cancelOffer`, `claimDelivery`, `listForSale`, `cancelSale`, `buyResale`, `createBid`, `cancelBid`, `fillBid`). |
 | `options/createClient.ts` | `createOptionsClient(wallet): Promise<OptionsClient>` (mock when there is no contract id: one instance per session), `isMockMode()`, `resetMockClient()`. |
 | `options/mockClient.ts` | `MockOptionsClient(seed?)`: the contract's rules in memory, a demo ledger of balances that moves with every trade, the four stages over 600 ms, `failNextWith(kind)` to stage a declined, refused, failed, expired or unknown outcome. `MOCK_CONTRACT`, `MOCK_READ_MS`, `MOCK_TX_MS`. |
-| `options/mockSeed.ts` | `demoSeed(atSec?)` (the demo market, below), `bareSeed()` (empty contract, for tests), `MockSeed`, `MOCK_QUOTE`, `MOCK_UNDERLYINGS`, `demoStrikes(asset)`, `demoExpiries(atSec)`, `demoPremiumPerUnit(...)`. |
+| `options/mockSeed.ts` | `demoSeed(atSec?, { fixedPricing? })` (the demo market, below), `fixedLead(expiry, expiries)`, `bareSeed()` (empty contract, for tests), `MockSeed`, `MOCK_QUOTE`, `MOCK_UNDERLYINGS`, `demoStrikes(asset)`, `demoExpiries(atSec)`, `demoPremiumPerUnit(...)`. |
 | `options/demoAccounts.ts` | `DEMO_WALLETS` (`a`, `b`: the two test wallet identities), `DEMO_MAKERS` (`a` to `d`), `DEMO_HEDGERS` (`a`, `b`). |
 | `options/sorobanClient.ts` (SDK) | `SorobanOptionsClient` (feature-detects contract v1.2 to v1.5; also `transferHolder`, `listAsset`, `isListed`, `pruneExpired`, `pruneBids`, `extendTtl`, `openIds`, which are not on the interface and have no screen yet: no hook or page calls them (capability phase, brief section 8)), `unwrap`. Import only through `createOptionsClient`. |
 | `options/preTrade.ts` | `preTrade(action, facts): PreTradeResult` (pure), `readPreTradeFacts(client, action, me)`, `tokensFor(action)`, types `PreTradeAction` (`buy`, `buy-resale`, `fill-bid`, `write-offer`, `post-bid`, `exercise`, `list-for-sale`), `PreTradeFacts`, `Fact<T>`, `PreTradeIssue` (`level`, `code`, typed figures, `message`), `PreTradeLine`, `PreTradeResult` (`issues`, `blocked`, `pending`, `state`, `account`, `funds`, `pays`, `locks`, `receives`, `lowestInSeries`), `LAST_MINUTES_SECONDS`. |
@@ -165,9 +165,14 @@ without that the live chunks are emitted and simply never loaded.
 
 ## The mock demo market (`demoSeed`)
 
-Used when the build has no `VITE_OPTIONS_CONTRACT_ID`. All of it is computed from the current time.
+Used when the build has no `VITE_OPTIONS_CONTRACT_ID`. All of it is computed from the current time. An
+end-to-end build (`VITE_E2E=1`, through `options/createClient`) passes `fixedPricing`: each open order is then
+priced at a fixed lead before its deadline (1, 2 or 3 weeks by its place in the list) and each position five days
+before it, so the premiums are the same on every run and every day while the deadlines stay relative to now, and a
+spec can pin them.
 
-- **Assets:** FUND, BOND, EQTY against USDx (ids `C_MOCK_*`, from `assets/referenceList`).
+- **Assets:** RWA, BOND, EQTY against USDx, the codes of the Testnet assets (ids `C_MOCK_*`, from
+  `assets/referenceList`).
 - **Grid:** per asset, the five central strikes of `strikeLadder(demo price)` and the first three `standardExpiries`.
 - **Offers:** about 100 open offers from four makers (`DEMO_MAKERS`), both kinds, 0 to 3 makers per series, some
   series empty on purpose. Premiums are illustrative (a normal-model formula on the demo price): out of the money
@@ -201,7 +206,7 @@ Used when the build has no `VITE_OPTIONS_CONTRACT_ID`. All of it is computed fro
 | `maker/lowestOffer.ts` | `lowestOpenInSeriesOf(offers, series, quote)`: the cheapest offer of a series named by its terms. |
 | `series` | `LADDER_ROWS`: the strike rows of the app's grid, one number for every view. |
 | `format` | `noBreak(text)`: keeps a deadline or a figure with its unit on one line. |
-| `assetfacts` | `mockAssetFacts(code)`: the mock issuer's flags, the same for FUND, BOND and EQTY and equal to the recorded Testnet issuer's (`TEAM_ISSUER_FLAGS`: approval not required, can freeze, can claw back); `mock: true`, no counts. |
+| `assetfacts` | `mockAssetFacts(code)`: the mock issuer's flags, the same for RWA, BOND and EQTY and equal to the recorded Testnet issuer's (`TEAM_ISSUER_FLAGS`: approval not required, can freeze, can claw back); `mock: true`, no counts. |
 | `options/mockClient.ts` | `failNextRead(method?, times)`, `clawBack(tokenId, units)`; `DEMO_WALLETS.c` is an empty wallet. `createOptionsClient` no longer keeps a failed load of the mock chunk. |
 | `disclosures.ts` | `MARGIN_PAYOUT_RISK`, `MARGIN_PUBLISHER_LINE` (the on-chain banner is the two together). |
 

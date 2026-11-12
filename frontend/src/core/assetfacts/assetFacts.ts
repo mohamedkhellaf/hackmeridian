@@ -189,7 +189,7 @@ export interface AssetFacts {
  * issuer's flags are given: no trustline count and no holder count is invented (`record` stays null).
  */
 const MOCK_ISSUER_FLAGS: AssetFlags = { ...TEAM_ISSUER_FLAGS, authImmutable: false }
-const MOCK_CODES: ReadonlySet<string> = new Set(['FUND', 'BOND', 'EQTY'])
+const MOCK_CODES: ReadonlySet<string> = new Set(['RWA', 'BOND', 'EQTY'])
 
 /** The facts of a mock asset: the mock issuer's flags (every power off for a code it does not know). */
 export function mockAssetFacts(code: string, issuer: string | null = null): AssetFacts {

@@ -94,7 +94,7 @@ describe('MockOptionsClient bids (v1.5 rules)', () => {
 })
 
 describe('request helpers', () => {
-  const fund = { contractId: 'CF', code: 'FUND', decimals: 7 }
+  const fund = { contractId: 'CF', code: 'RWA', decimals: 7 }
   const usdx = { contractId: 'CU', code: 'USDx', decimals: 7 }
   const mk = (id: bigint, over = {}) => ({
     id, buyer: A, kind: 'put' as const, underlying: fund, quote: usdx, underlyingQty: 5n * UNIT, totalStrike: 50n * UNIT,

@@ -50,7 +50,7 @@ export function balanceRows(tokens: readonly TokenInfo[], balances: readonly Tok
   })
 }
 
-/** The balances as one sentence, for the accessible name of the group: `USDx 2,500.00, FUND 120.00`. */
+/** The balances as one sentence, for the accessible name of the group: `USDx 2,500.00, RWA 120.00`. */
 export function balancesSentence(rows: readonly BalanceRow[]): string {
   return rows.map((row) => `${row.token.code} ${[row.amount, row.reason].filter((part) => part !== null).join(', ')}`).join(', ')
 }

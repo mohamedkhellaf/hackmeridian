@@ -92,6 +92,8 @@ test.describe('option chain', () => {
     const put99 = half(page, 'offer', 'put', '99.00')
     const name = (await put99.getAttribute('aria-label'))!
     const [, best, size, makers] = /^Offer (\d+\.\d\d) at .*, for ([\d.]+) BOND, \d+ offers?, (\d+) makers?/.exec(name)!
+    // End-to-end builds price the demo market at fixed leads, so the figures are pinned (mockSeed fixedPricing).
+    expect([best, size, makers]).toEqual(['0.56', '1.00', '2'])
     // The button's text is its figure, a word of its name; its size is drawn beside it.
     await expect(put99).toHaveText(best)
     await expect(put99).toHaveAttribute('data-size', `×${size}`)
@@ -242,15 +244,10 @@ test.describe('option chain', () => {
     await expect(book(page).getByRole('row', { name: /^Requests/ })).toHaveCount(0)
 
     // Cheapest premium per unit first, each row with its number and labelled with its source; the first is marked Best.
-    const perUnit = await column(offers, COL.perUnit)
-    expect(perUnit).toEqual([...perUnit].sort((a, b) => a - b))
-    // Best marks every row at the lowest premium per unit. The mock prices from the time left, so two makers can
-    // meet on one tick: the pin follows the figures read above, not a fixed row.
-    const lowest = Math.min(...perUnit)
-    for (const [i, p] of perUnit.entries()) {
-      if (p === lowest) await expect(offers.nth(i)).toContainText('Best')
-      else await expect(offers.nth(i)).not.toContainText('Best')
-    }
+    expect(await column(offers, COL.perUnit)).toEqual([0.56, 0.59])
+    expect(await column(offers, COL.qty)).toEqual([1, 2])
+    await expect(offers.nth(0)).toContainText('Best')
+    await expect(offers.nth(1)).not.toContainText('Best')
     for (const row of await offers.all()) {
       await expect(row.getByRole('cell').nth(COL.from)).toContainText(/^Maker/)
       // The contract's own number, unpadded (ruling F1).
@@ -285,10 +282,11 @@ test.describe('option chain', () => {
   })
 
   test('requests are the other side of the book and open the fill ticket', async ({ page }) => {
-    // Seeded: a request on a series nobody quotes (FUND put 10.40, second date).
-    await openApp(page, `/markets/fund?mode=chain&expiry=${DAYS[1]}`)
-    const requestOnly = cell(page, new RegExp(`^Request \\d+\\.\\d\\d at 10\\.40, put, ${date(LABELS[1])}, for [\\d.]+ FUND, 1 request, in the money at the demo price\\. Fill request\\.$`))
-    const [, figure, size] = /^Request (\d+\.\d\d) at .*, for ([\d.]+) FUND/.exec((await requestOnly.getAttribute('aria-label'))!)!
+    // Seeded: a request on a series nobody quotes (RWA put 10.40, second date).
+    await openApp(page, `/markets/rwa?mode=chain&expiry=${DAYS[1]}`)
+    const requestOnly = cell(page, new RegExp(`^Request \\d+\\.\\d\\d at 10\\.40, put, ${date(LABELS[1])}, for [\\d.]+ RWA, 1 request, in the money at the demo price\\. Fill request\\.$`))
+    const [, figure, size] = /^Request (\d+\.\d\d) at .*, for ([\d.]+) RWA/.exec((await requestOnly.getAttribute('aria-label'))!)!
+    expect([figure, size]).toEqual(['0.32', '10.00'])
     // The figure and its size, in the request half: no word in front of it.
     await expect(requestOnly).toHaveText(figure)
     await expect(requestOnly).toHaveAttribute('data-size', `×${size}`)
@@ -297,7 +295,7 @@ test.describe('option chain', () => {
     await requestOnly.click()
     // From 1200 px the request opens the fill ticket on itself, and its series is selected.
     expect(search(page).get('side')).toBeNull()
-    await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(`FUND 10.40 put, ${LABELS[1]}`)
+    await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(`RWA 10.40 put, ${LABELS[1]}`)
     await expect(book(page)).toContainText('No offers on this series.')
     const row = sideRows(page, 'requests')
     await expect(row).toHaveCount(1)
@@ -305,21 +303,21 @@ test.describe('option chain', () => {
     const key = (await row.getAttribute('data-order'))!
     await expect(page).toHaveURL(new RegExp(`[?&]bid=${key.slice(1)}(&|$)`))
     await expect(row).toHaveAttribute('data-selected', 'true')
-    await row.getByRole('button', { name: /^Fill request: put on 10\.00 FUND from GHED…AAAA, \d+\.\d\d USDx escrowed$/ }).click()
+    await row.getByRole('button', { name: /^Fill request: put on 10\.00 RWA from GHED…AAAA, \d+\.\d\d USDx escrowed$/ }).click()
     await expect(page).toHaveURL(new RegExp(`[?&]bid=${key.slice(1)}(&|$)`))
   })
 
   test('the book states the gap between the best offer and the best request', async ({ page }) => {
-    // Seeded: FUND put 10.00, third date, has offers and a funded request.
-    await openApp(page, `/markets/fund?mode=chain&expiry=${DAYS[2]}&kind=put&strike=10.00`)
+    // Seeded: RWA put 10.00, third date, has offers and a funded request.
+    await openApp(page, `/markets/rwa?mode=chain&expiry=${DAYS[2]}&kind=put&strike=10.00`)
     await expect(sideRows(page, 'offers').first()).toBeVisible()
     await expect(sideRows(page, 'requests').first()).toBeVisible()
-    const offer = (await column(sideRows(page, 'offers'), COL.perUnit))[0]
-    const request = (await column(sideRows(page, 'requests'), COL.perUnit))[0]
-    await expect(book(page)).toContainText(`${(offer - request).toFixed(2)} between the best offer and the best request.`)
+    expect(await column(sideRows(page, 'offers'), COL.perUnit)).toEqual([0.2, 0.21])
+    expect(await column(sideRows(page, 'requests'), COL.perUnit)).toEqual([0.16])
+    await expect(book(page)).toContainText('0.04 between the best offer and the best request.')
     // The chain cell shows both sides of the same series, each on its own half.
-    await expect(half(page, 'offer', 'put', '10.00')).toHaveAttribute('aria-label', new RegExp(`^Offer ${offer.toFixed(2)} at 10\\.00, put, .*, for [\\d.]+ FUND,`))
-    await expect(half(page, 'request', 'put', '10.00')).toHaveAttribute('aria-label', new RegExp(`^Request ${request.toFixed(2)} at 10\\.00, put, .*, for [\\d.]+ FUND, 1 request`))
+    await expect(half(page, 'offer', 'put', '10.00')).toHaveAttribute('aria-label', /^Offer 0\.20 at 10\.00, put, .*, for 5\.00 RWA,/)
+    await expect(half(page, 'request', 'put', '10.00')).toHaveAttribute('aria-label', /^Request 0\.16 at 10\.00, put, .*, for 5\.00 RWA, 1 request/)
   })
 
   test('an empty half shows nothing until pointed at, posts a request, and the series actions open empty forms', async ({ page }) => {
@@ -369,7 +367,7 @@ test.describe('option chain', () => {
     await openApp(page, `/markets/eqty?mode=chain&expiry=${DAYS[DAYS.length - 1]}`)
     const mode = page.getByTestId('chain-mode')
     await expect(chain(page, 'EQTY')).toBeVisible()
-    await expect(mode).toContainText('No orders on this deadline yet. Press a strike to post a request or write the first offer.')
+    await expect(mode).toContainText('No orders on this deadline yet. Press a call or put cell to post a request, or write the first offer.')
     await expect(mode).not.toContainText('Select a premium')
     // Every half is empty and blank at rest.
     await expect(chain(page, 'EQTY').getByRole('button', { name: /^(Offer|Request|Your) / })).toHaveCount(0)
@@ -401,8 +399,8 @@ test.describe('option chain', () => {
     }
     await expect(page.getByTestId('chain-mode')).not.toContainText('The highlighter marks')
 
-    // Seeded: the default wallet's open offer, a put on 5 FUND at 9.80 on the third date, tied with a maker's.
-    await page.goto(`/markets/fund?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`)
+    // Seeded: the default wallet's open offer, a put on 5 RWA at 9.80 on the third date, tied with a maker's.
+    await page.goto(`/markets/rwa?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`)
     await connect(page)
     const own = cell(page, /^(Your offer|Offer) \d+\.\d\d at 9\.80, put, .*, 2 offers, 2 makers/)
     await expect(own).toBeVisible()
@@ -418,13 +416,13 @@ test.describe('option chain', () => {
     if (prices[0] === prices[1]) for (const row of await offers.all()) await expect(row).toContainText('Best')
 
     // Cancel is a small secondary button, as every row action (ruling F14).
-    const cancel = mine.getByRole('button', { name: 'Cancel your offer of put on 5.00 FUND' })
+    const cancel = mine.getByRole('button', { name: 'Cancel your offer of put on 5.00 RWA' })
     await expect(cancel).toHaveAttribute('data-variant', 'secondary')
     await expect(cancel).toHaveAttribute('data-size', 'sm')
     await cancel.click()
     const dialog = page.getByRole('dialog', { name: 'Cancel offer' })
     await expect(dialog).toContainText('The offer leaves the book and its collateral returns to your wallet.')
-    await expect(dialog).toContainText('FUND 9.80 put')
+    await expect(dialog).toContainText('RWA 9.80 put')
     await expect(dialog).toContainText('49.00 USDx') // 5 x 9.80, the collateral of a put
     await dialog.getByRole('button', { name: 'Cancel offer' }).click()
     await expect(dialog.getByRole('list', { name: 'Transaction progress' })).toContainText('Confirmed')
@@ -434,33 +432,33 @@ test.describe('option chain', () => {
     // No optimistic update: the row leaves once the chain was read again, and the cell is no longer the wallet's.
     await expect(offers).toHaveCount(1)
     await expect(book(page)).not.toContainText('Yours')
-    await expect(cell(page, /^Offer \d+\.\d\d at 9\.80, put, .*, for [\d.]+ FUND, 1 offer, 1 maker\. Buy\.$/)).toBeVisible()
+    await expect(cell(page, /^Offer \d+\.\d\d at 9\.80, put, .*, for [\d.]+ RWA, 1 offer, 1 maker\. Buy\.$/)).toBeVisible()
   })
 
   test("the wallet's own orders on the asset are listed under the chain, once, and a held option is said in its series", async ({ page }) => {
     // A guest has none: no section.
-    await openApp(page, '/markets/fund?mode=chain')
-    await expect(chain(page, 'FUND')).toBeVisible()
+    await openApp(page, '/markets/rwa?mode=chain')
+    await expect(chain(page, 'RWA')).toBeVisible()
     await expect(page.getByTestId('your-orders')).toHaveCount(0)
 
-    // Seeded: the default wallet's offer on FUND put 9.80, third date, is listed from any date tab.
+    // Seeded: the default wallet's offer on RWA put 9.80, third date, is listed from any date tab.
     await connect(page)
     const mine = page.getByTestId('your-orders')
-    await expect(mine.getByRole('heading', { level: 2 })).toHaveText('Your orders on FUND')
+    await expect(mine.getByRole('heading', { level: 2 })).toHaveText('Your orders on RWA')
     const row = mine.locator('tbody tr[data-order]').filter({ hasText: 'Put 9.80' })
     await expect(row).toHaveCount(1)
     // The role alone: the title already says the rows are the wallet's. The number is the contract's, unpadded.
     await expect(row.getByRole('cell').nth(2)).toHaveText('Maker')
     await expect(row.getByRole('cell').nth(1)).toHaveText(/^(0|[1-9]\d*)$/)
-    await expect(row.getByRole('button', { name: 'Cancel your offer of put on 5.00 FUND' })).toHaveAttribute('data-variant', 'secondary')
+    await expect(row.getByRole('button', { name: 'Cancel your offer of put on 5.00 RWA' })).toHaveAttribute('data-variant', 'secondary')
     await row.getByRole('button', { name: 'Show put 9.80 in the chain' }).click()
-    await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(`FUND 9.80 put, ${LABELS[2]}`)
+    await expect(panel(page).getByRole('heading', { level: 2 })).toHaveText(`RWA 9.80 put, ${LABELS[2]}`)
     expect(search(page).get('expiry')).toBe(DAYS[2])
     expect(search(page).get('strike')).toBe('9.80')
     // The series' book now lists that order with its Cancel; "Your orders" does not list it a second time.
     await expect(sideRows(page, 'offers').filter({ hasText: 'Yours' })).toHaveCount(1)
     await expect(page.getByTestId('your-orders').locator('tbody tr[data-order]').filter({ hasText: 'Put 9.80' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Cancel your offer of put on 5.00 FUND' })).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Cancel your offer of put on 5.00 RWA' })).toHaveCount(1)
 
     // Seeded: the default wallet holds a BOND put 97 on the second date.
     await page.goto(`/markets/bond?mode=chain&expiry=${DAYS[1]}&kind=put&strike=97.00`)
@@ -470,7 +468,7 @@ test.describe('option chain', () => {
   })
 
   test('keeping the offer sends nothing', async ({ page }) => {
-    await openApp(page, `/markets/fund?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`, { connect: true })
+    await openApp(page, `/markets/rwa?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`, { connect: true })
     await book(page).getByRole('button', { name: /^Cancel your offer/ }).click()
     const dialog = page.getByRole('dialog', { name: 'Cancel offer' })
     await dialog.getByRole('button', { name: 'Keep offer' }).click()
@@ -499,14 +497,14 @@ test.describe('option chain', () => {
     await expect(page).toHaveURL(new RegExp(`[?&]offer=${key.slice(1)}(&|$)`))
     await expect(ticket(page)).toContainText(numbered(key.slice(1)))
 
-    // Seeded: one FUND put two days after a listed Friday. The expiry bar links to it.
-    await page.goto('/markets/fund?mode=chain')
+    // Seeded: one RWA put two days after a listed Friday. The expiry bar links to it.
+    await page.goto('/markets/rwa?mode=chain')
     const link = page.getByRole('link', { name: 'Other dates, 1 order' })
     await expect(link).toBeVisible()
     await link.click()
     await expect(page).toHaveURL(/#other-offers$/)
     await expect(other(page)).toBeInViewport()
-    const fundRow = other(page).getByRole('table', { name: 'Other offers on FUND' }).locator('tbody tr')
+    const fundRow = other(page).getByRole('table', { name: 'Other offers on RWA' }).locator('tbody tr')
     await expect(fundRow).toContainText('Put 10.20')
     await expect(fundRow).toContainText('Non-standard deadline')
     await expect(fundRow).toContainText(/08:00\sUTC/)
@@ -545,12 +543,12 @@ test.describe('option chain', () => {
   })
 
   test('has no accessibility violations in either theme', async ({ page }) => {
-    await openApp(page, `/markets/fund?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`, { connect: true })
+    await openApp(page, `/markets/rwa?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`, { connect: true })
     await expect(book(page)).toBeVisible()
     await expect(other(page)).toBeVisible()
     await expectNoAxeViolations(page)
     // With an empty half pointed at, its words shown.
-    const empty = chain(page, 'FUND').getByRole('button', { name: /^No request at / }).last()
+    const empty = chain(page, 'RWA').getByRole('button', { name: /^No request at / }).last()
     await empty.hover()
     await expect(hintOf(empty)).toHaveCSS('opacity', '1')
     await expectNoAxeViolations(page, { themes: ['light'] })
@@ -652,8 +650,8 @@ test.describe('option chain on a phone @phone', () => {
   })
 
   test('other offers fit the screen and the page has no accessibility violations', async ({ page }) => {
-    await openApp(page, `/markets/fund?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`, { connect: true })
-    const list = other(page).getByRole('list', { name: 'Other offers on FUND' })
+    await openApp(page, `/markets/rwa?mode=chain&expiry=${DAYS[2]}&kind=put&strike=9.80`, { connect: true })
+    const list = other(page).getByRole('list', { name: 'Other offers on RWA' })
     await expect(list.getByRole('listitem')).toHaveCount(1)
     await expect(list).toContainText('Put 10.20')
     await expect(list).toContainText('Non-standard deadline')

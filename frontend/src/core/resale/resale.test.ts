@@ -4,21 +4,21 @@ import { askPerUnit, canList, formatAskPerUnit, resaleCheck, resaleRows, selfTra
 
 const UNIT = 10_000_000n
 const USDX: TokenInfo = { contractId: 'CUSDX', code: 'USDx', decimals: 7 }
-const FUND: TokenInfo = { contractId: 'CFUND', code: 'FUND', decimals: 7 }
+const RWA: TokenInfo = { contractId: 'CRWA', code: 'RWA', decimals: 7 }
 const T = 1_000_000
 
 const opt = (over: Partial<OptionOffer> = {}): OptionOffer => ({
-  id: 1n, kind: 'put', underlying: FUND, quote: USDX, underlyingQty: 5n * UNIT, totalStrike: 50n * UNIT,
+  id: 1n, kind: 'put', underlying: RWA, quote: USDX, underlyingQty: 5n * UNIT, totalStrike: 50n * UNIT,
   totalPremium: 2n * UNIT, expiry: T + 3600, writer: 'GW', holder: 'GH', state: 'active', ...over,
 })
 
 describe('askPerUnit', () => {
   it('divides the total ask by the quantity in exact units', () => {
-    expect(askPerUnit(opt(), 3n * UNIT)).toBe(6_000_000n) // 3 USDx / 5 FUND = 0.6
+    expect(askPerUnit(opt(), 3n * UNIT)).toBe(6_000_000n) // 3 USDx / 5 RWA = 0.6
     expect(formatAskPerUnit(opt(), 3n * UNIT)).toBe('0.60')
   })
   it('floors and handles mixed decimals', () => {
-    const o = opt({ underlying: { ...FUND, decimals: 2 }, underlyingQty: 300n }) // 3.00 units
+    const o = opt({ underlying: { ...RWA, decimals: 2 }, underlyingQty: 300n }) // 3.00 units
     expect(askPerUnit(o, 10n * UNIT)).toBe(33_333_333n) // 3.3333333 USDx
   })
   it('returns null for zero quantity', () => {

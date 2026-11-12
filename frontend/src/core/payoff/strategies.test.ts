@@ -25,8 +25,8 @@ describe('intents', () => {
   it('lists the four intents of the brief, the three main ones first', () => {
     expect(GUIDED_INTENTS.map((i) => [i.id, i.name, i.optionKind, i.side, i.starts, i.main])).toEqual([
       ['floor', 'Set a floor', 'put', 'buy', 'asset', true],
-      ['earn-hold', 'Earn on what you hold', 'call', 'write', 'asset', true],
-      ['earn-buy', 'Earn while waiting to buy', 'put', 'write', 'cash', true],
+      ['earn-hold', 'Get paid to sell higher', 'call', 'write', 'asset', true],
+      ['earn-buy', 'Get paid to buy lower', 'put', 'write', 'cash', true],
       ['lock-buy', 'Lock a buy price', 'call', 'buy', 'cash', false],
     ])
   })
@@ -90,7 +90,7 @@ describe('set a floor (hold the asset, buy a put)', () => {
   })
 })
 
-describe('earn on what you hold (hold the asset, write a call)', () => {
+describe('get paid to sell higher (hold the asset, write a call)', () => {
   it('adds the premium below the strike and caps the value above it', () => {
     const low = earnOnHolding(T, 9)
     expect(low.withoutValue).toBeCloseTo(45, 9)
@@ -123,7 +123,7 @@ describe('earn on what you hold (hold the asset, write a call)', () => {
   })
 })
 
-describe('earn while waiting to buy (set cash aside, write a put)', () => {
+describe('get paid to buy lower (set cash aside, write a put)', () => {
   it('keeps the cash and the premium above the strike, and buys at the strike below it', () => {
     const high = earnWhileWaiting(T, 12)
     expect(high.withoutValue).toBeCloseTo(50, 9) // the cash set aside
@@ -284,11 +284,11 @@ describe('every intent', () => {
 
 describe('guidedTermsOf', () => {
   const USDX = { decimals: 7 }
-  const FUND = { decimals: 7 }
+  const RWA = { decimals: 7 }
   const u = (n: number) => BigInt(Math.round(n * 1e7))
 
   it('converts exact terms to display numbers', () => {
-    const exact = { underlying: FUND, quote: USDX, underlyingQty: u(5), totalStrike: u(50), totalPremium: u(1.8) }
+    const exact = { underlying: RWA, quote: USDX, underlyingQty: u(5), totalStrike: u(50), totalPremium: u(1.8) }
     expect(guidedTermsOf(exact)).toEqual({ qty: 5, strike: 10, premiumTotal: 1.8 })
     expect(guidedTermsOf(exact, u(10.2))).toEqual({ qty: 5, strike: 10, premiumTotal: 1.8, entryPrice: 10.2 })
     expect(guidedTermsOf(exact, null)).toEqual({ qty: 5, strike: 10, premiumTotal: 1.8 })
@@ -301,7 +301,7 @@ describe('guidedTermsOf', () => {
   })
 
   it('feeds the outcome functions', () => {
-    const exact = { underlying: FUND, quote: USDX, underlyingQty: u(5), totalStrike: u(50), totalPremium: u(1.8) }
+    const exact = { underlying: RWA, quote: USDX, underlyingQty: u(5), totalStrike: u(50), totalPremium: u(1.8) }
     const o = setFloor(guidedTermsOf(exact, u(10.5)), 7)
     expect(o.withValue).toBeCloseTo(48.2, 9)
     expect(o.maxLoss).toBeCloseTo(4.3, 9)

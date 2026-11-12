@@ -16,12 +16,17 @@ one decision (E11):
 3. **What is available** (`Available`): first what the wallet already has at these terms (its position, offer or
    request, with a link); then the best funded order for exactly these terms and this quantity, its number on the
    heading line; or, for a buyer, what smaller lots of the same terms would cover and the nearest funded terms as
-   one-tap suggestions, and the way to post a request; for a seller, posting an offer first.
+   one-tap suggestions, and the way to post a request; for a seller, posting an offer first. A buyer types the
+   request's premium in total; a seller types the offer's premium per unit and reads its exact total in the row
+   "You receive when bought" under it, as in the ticket's write form (E18). A price per unit that does not
+   multiply out to an exact total is refused at the field.
 4. **What you would hold at the deadline** (`OutcomeCardsBlock`): a lower and a higher price as two cards.
 5. **The closing block** (`ClosingBlock`, in `Closing.tsx`): the deal in one sentence (a seller's also before a
    premium is typed: what is locked, and that the price is theirs to ask), the action, the way to post at one's
-   own price. When the wallet already has something at these terms, one quiet line names it with its link first,
-   the sentence says the next order is another one, and the action is secondary. In the rail from 1200 px; here
+   own price. When the wallet already has something at these terms, one quiet line above the block names it with
+   its link ("You hold No. 58. View position"); the block's sentence then says the next order is another one, and
+   its action stays the one primary (flow-9). A seller's own offer waits for a premium: the action is disabled,
+   with the reason, until one is typed. In the rail from 1200 px; here
    below that, with a sticky action bar (`ActionBar`) while it is out of view. Never while a ticket is open.
 6. **At any price at the deadline** (`OutcomeDetail`): the with-and-without figure across the column with the
    price handle (the read-out gives the two figures and their difference; the sentence is read out with the
@@ -49,10 +54,11 @@ that it shows the closing block, so the page does not show it twice.
 | `strike` | price per unit, decimal; counts only when it is on the standard ladder and of the intent's kind | default series |
 | `expiry` | UTC day `YYYY-MM-DD`; counts only when it is a listed date | default series |
 | `qty` | underlying units, decimal, as typed | the lot of the order the user can take at the series (a seller with no buyer: the lowest offer's lot), else `1.00` |
-| `premium` | total premium of the user's own request or offer (no funded match) | empty |
+| `premium` | total premium of the user's own request or offer (no funded match); a seller types it per unit, the URL keeps the total, as the ticket's does | empty |
 
 - A chip, an intent or a suggestion adds a history entry (Back undoes it). Typing replaces the entry.
-- Any change of terms closes an open ticket and clears a premium typed for the old terms. A quantity the user
+- Any change of terms closes an open ticket and clears a premium typed for the old terms, except a seller's price
+  per unit, which a new quantity keeps (its total is recomputed) while it multiplies out. A quantity the user
   never set is not written, so it follows the lot of the series chosen.
 - Choosing another intent drops `strike`, `expiry`, `qty`, `premium` and `kind`.
 - **Default series** (`terms.ts` `defaultSeries`): the soonest deadline at least 48 hours away that has something
@@ -69,7 +75,7 @@ that it shows the closing block, so the page does not show it twice.
 | a resale listing matches | `{ mode: 'buy-resale', optionId }` | `review` |
 | a funded request matches (earn-hold, earn-buy) | `{ mode: 'fill', bidId }` | `review` |
 | no match, buyer | `{ mode: 'bid', … }` with the chosen terms | `review` with a premium, else `terms` |
-| no match, seller | `{ mode: 'write', … }` with the chosen terms | `review` with a premium, else `terms` |
+| no match, seller | `{ mode: 'write', … }` with the chosen terms and the premium's total | `review`; disabled until a premium is typed |
 | "at your own price" beside a match | `bid` or `write` without a premium | `terms` |
 
 A guest sees everything and gets "Connect wallet" as the action.

@@ -53,9 +53,9 @@ contracts, the tokens, the Margin block) at the page's one width (60rem), so the
 | Issuer flags | Live build: `useAssetFacts(token)` per token, the record as fallback (and the page says so). Mock build: the record. |
 | What a role does and what neither can do | `copy.ts`, from AGENTS.md "StellSec Pro" and the header of `contracts/pro/src/lib.rs` |
 
-A mock build calls no contract, so "Contracts and roles" lists the recorded Testnet deployment and says so, with
-the token the mock market names differently (RWA there, FUND here). A live build shows the contract id it points
-at; if that is not the recorded id it shows no hash and says the app holds no record for it.
+A mock build calls no contract, so "Contracts and roles" lists the recorded Testnet deployment and says so. A
+live build shows the contract id it points at; if that is not the recorded id it shows no hash and says the app
+holds no record for it.
 
 ## Which tokens are shown
 

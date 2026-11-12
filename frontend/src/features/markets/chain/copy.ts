@@ -75,8 +75,8 @@ export const COPY = {
   selectHint: 'Select a premium to see its offers and requests.',
   selectHintNoBids: 'Select a premium to see its offers.',
   /** In place of the instruction when the deadline shown has no order at all (ruling F2). */
-  noOrders: 'No orders on this deadline yet. Press a strike to post a request or write the first offer.',
-  noOrdersNoBids: 'No orders on this deadline yet. Press a strike to write the first offer.',
+  noOrders: 'No orders on this deadline yet. Press a call or put cell to post a request, or write the first offer.',
+  noOrdersNoBids: 'No orders on this deadline yet. Press a call or put cell to write the first offer.',
   /** The line under the deadlines. On a phone it also carries the number of orders on the deadline shown (ruling F3). */
   units: (quote: string, asset: string, deadline: string, orders: number | null = null) =>
     `Premiums per 1${NBSP}${asset} in ${quote}, sizes in ${asset}. Deadline ${deadline}${orders ? `, ${countOf(orders, ORDERS)}` : ''}.`,

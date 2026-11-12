@@ -41,9 +41,9 @@ let bondA: MarketView
 beforeAll(async () => {
   vi.useFakeTimers({ now: FIXED_MS, toFake: ['Date'] })
   w = await demoWorld()
-  fund = buildMarket(w.source(null), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+  fund = buildMarket(w.source(null), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
   bond = buildMarket(w.source(null), w.assets.BOND, w.quote, w.reference(w.assets.BOND))
-  fundA = buildMarket(w.source(DEMO_WALLETS.a), w.assets.FUND, w.quote, w.reference(w.assets.FUND))
+  fundA = buildMarket(w.source(DEMO_WALLETS.a), w.assets.RWA, w.quote, w.reference(w.assets.RWA))
   bondA = buildMarket(w.source(DEMO_WALLETS.a), w.assets.BOND, w.quote, w.reference(w.assets.BOND))
 })
 afterAll(() => vi.useRealTimers())
@@ -80,7 +80,7 @@ describe('figures', () => {
 
   it('names a series with the strike as the chain prints it', () => {
     expect(sp(seriesTitle('BOND', { kind: 'put', strikePerUnit: units(100), expiry: bond.expiries[0] }, 7))).toBe('BOND 100.00 put, 13 Nov')
-    expect(sp(seriesTitle('FUND', { kind: 'call', strikePerUnit: units(9.8), expiry: fund.expiries[2] }, 7))).toBe('FUND 9.80 call, 27 Nov')
+    expect(sp(seriesTitle('RWA', { kind: 'call', strikePerUnit: units(9.8), expiry: fund.expiries[2] }, 7))).toBe('RWA 9.80 call, 27 Nov')
   })
 
   it('reads the reference with its label, and has none without a price', () => {
@@ -120,7 +120,7 @@ describe('selection from the URL', () => {
     for (const strike of ['10', '10.0', '10.00', '10.0000000']) {
       const s = resolveSelection(fund, { expiry: '2026-11-20', kind: 'put', strike })
       expect(s.column?.day).toBe('2026-11-20')
-      expect(s.ref).toEqual({ underlyingId: w.assets.FUND.contractId, expiry: fund.expiries[1], kind: 'put', strikePerUnit: units(10) })
+      expect(s.ref).toEqual({ underlyingId: w.assets.RWA.contractId, expiry: fund.expiries[1], kind: 'put', strikePerUnit: units(10) })
       expect(s.cell?.key).toBe(cellKey(s.ref!))
     }
   })
@@ -218,7 +218,7 @@ describe('cells', () => {
   })
 
   it('gives a request its size like an offer, on its own half', () => {
-    // Seeded: a request on a series nobody quotes (FUND put, second date).
+    // Seeded: a request on a series nobody quotes (RWA put, second date).
     const requestOnly = cells(fund).find((c) => c.empty && c.bids > 0)!
     const { offer, request } = describeCell(requestOnly, 7, ctx({ phrase: null }))
     expect(offer.figure).toBeNull()
@@ -227,7 +227,7 @@ describe('cells', () => {
     expect(request!.size).toBe(formatUnits(requestOnly.bestBid!.underlyingQty, 7))
     expect(request!.hint).toBeNull()
     expect(request!.name).toBe(
-      `Request ${request!.figure} at ${strikeText(requestOnly.ref.strikePerUnit, 7)}, put, ${formatUtcDay(requestOnly.ref.expiry)}, for ${request!.size} FUND, 1 request.`,
+      `Request ${request!.figure} at ${strikeText(requestOnly.ref.strikePerUnit, 7)}, put, ${formatUtcDay(requestOnly.ref.expiry)}, for ${request!.size} RWA, 1 request.`,
     )
     expect(describeCell(requestOnly, 7, ctx()).request!.name).toBe(`${request!.name.slice(0, -1)}, in the money at the demo price.`)
   })
@@ -235,7 +235,7 @@ describe('cells', () => {
   it('names a resale listing when it is the best offer', () => {
     const resale = cells(fund).find((c) => !c.empty && c.best?.source === 'resale')!
     expect(resale).toBeDefined()
-    expect(describeCell(resale, 7, ctx({ phrase: null })).offer.name).toMatch(/, for [\d.,]+ FUND, a resale listing, \d+ offers?/)
+    expect(describeCell(resale, 7, ctx({ phrase: null })).offer.name).toMatch(/, for [\d.,]+ RWA, a resale listing, \d+ offers?/)
   })
 
   it("marks only a figure that is the wallet's own order; a holding is said in words", () => {

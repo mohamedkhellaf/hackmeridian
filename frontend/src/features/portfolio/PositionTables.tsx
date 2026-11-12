@@ -248,7 +248,7 @@ function phoneCorner(p: PositionView, unsettled: UnsettledTx | null | undefined)
   return ''
 }
 
-/** `Put on 10.00 FUND at 10.60`, the strike kept on the line of its "at". */
+/** `Put on 10.00 RWA at 10.60`, the strike kept on the line of its "at". */
 const phoneTitle = (o: Pick<OptionOffer, 'kind' | 'underlying' | 'quote' | 'underlyingQty' | 'totalStrike'>): string =>
   `${KIND_WORD[o.kind]} on ${money(qtyOf(o))} at${NBSP}${strikeText(o)}`
 
